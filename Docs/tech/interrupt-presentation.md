@@ -883,7 +883,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - 에셋의 프로필 5개 모두 `scale`·`hitStopScale` = 1, `hitStopDuration`·`enterDuration`·`holdDuration`·`exitDuration`·`failExitDuration` = 0, 줌 3칸(`interruptZoomFactor`·`interruptWeakZoomFactor`·`slowMotionZoomFactor`) = 1. 코드 기본값(새 SO·참조 빔)은 위 표 그대로다.
 - 동작: 서버는 시도·성공 슬로우를 그대로 발동하고 `Started` 이벤트도 전 피어에 그대로 난다(창 장부 닫힘·오너 성공 단계·빛 모임·성공 섬광은 그대로 돈다). 다만 타임라인은 길이 0 단계를 건너뛰어 **시작 즉시 유휴**라 `Time.timeScale`·줌은 안 바뀐다.
 - 알려진 차이: 빗나감 `ServerFail` 이 올 때 슬로우가 이미 유휴라 **`Failed` 이벤트가 나지 않는다**. 오너 암전은 오너 판정 cue(191 `JudgeFailed`)·스킬 끝(`LocalOwnerEnded`)이 걷어 영향 없지만, **팀원 화면 로컬 선착순 장부(`InterruptLocalWindowClaims.AttemptEnded`)가 그 강 시도로 닫은 창을 다시 열지 않는다** — 새 창이 열릴 때까지 팀원의 같은 창 입력 예측이 약(암전·섬광 없음)으로 내려간다. 서버 판정은 영향 없다(연출만).
-- 🔴 **xlsx `SlowMotion` 시트(SVN r580)는 옛 값**이다 — 테이블 모드 Play·빌드는 옛 슬로우로 돈다. 이 브랜치는 xlsx 를 건드리지 않았다. **development 병합 때 최신 dev 워크트리에서 병합 Export 로 xlsx 에 중립값을 옮겨야 한다**(옮기지 않으면 빌드는 옛 슬로우).
+- ✅ **xlsx `SlowMotion` 시트 = 중립값(SVN r583, 2026-11-04 196·197 병합 Export)** — 병합 Export 는 기존 xlsx 값을 유지하므로, Export 직전에 `InterruptSlowMotionSettings` 열 38칸을 SO 값으로 덮어써 옮겼다(34칸 변경·4칸 이미 같음, 다른 칸 변경 0·버려진 값 0). 이후 이 값을 바꿀 땐 xlsx 를 직접 고친다(병합 Export 로는 기존 칸이 안 바뀐다).
 
 ## 10. 카메라 대상 중심 (할 일 196)
 
@@ -903,7 +903,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - **오프셋 방식**: 오너 줌과 같은 경로 — `FollowOffset`(World Space) = 기본 오프셋 × 줌 배율 + 이동량. 이동량은 수평(XZ)만, 복귀가 끝나면 정확히 0 → 원래 오프셋.
 - **기준점(196 후속)**: 이동량 = (대상 − **카메라가 실제로 따라간 지점**) × 비율. 따라간 지점 = 플레이어 vcam `State.RawPosition` − 직전에 넣은 오프셋(기본 × 줌 배율 + 이동량) — `InterruptCameraCenterRules.FollowedPoint`. 플레이어 실제 위치를 쓰면 팔로우 감쇠(PositionDamping 1, 슬로우 때 감쇠도 느려짐)로 뒤처진 만큼 이동·대쉬 간파 때 대상에서 빗나가고 슬로우가 풀릴 때 중심이 쓸려 갔다.
 - **다른 카메라 연출과 충돌**: `cameraBusy` = 연출 vcam(`IsInCinematic`) ∨ 낙하 뷰 ∨ 관전 ∨ 임시 추적(`HasTemporaryFollow`)이면 진행 중인 이동을 **즉시 버리고 0**(그 연출이 끝나도 되살리지 않는다). 추적 대상이 없을 때도 같다.
-- **데이터 테이블**: SO ④ 칸 3개는 `SlowMotion` 시트(대상 열 `InterruptSlowMotionSettings`)의 **새 행 후보** — 행이 없으면 SO 값으로 돈다. development 병합 때 병합 Export 한 번(버려진 값 0 확인).
+- **데이터 테이블**: SO ④ 칸 3개는 `SlowMotion` 시트(대상 열 `InterruptSlowMotionSettings`) 행 — ✅ SVN r583 병합 Export 로 생김(0.08·0.75·0.25, 버려진 값 0).
 - 랩: 튜닝 패널 효과 줄 밑 **"카메라 대상 중심 (196)"** 토글 — 이 피어 런타임 값만, 다음 간파부터. '전부 켬'·'암전만' 은 건드리지 않는다.
 - 테스트: `InterruptCameraCenterTests`(복귀 시점표·비율·기준점·스위치·오너·SO 기본값) · `InterruptCameraCenterTrackerTests`(이동·유지·복귀·대체·소실) · 랩 토글 `DebugInterruptLabTests`.
 
