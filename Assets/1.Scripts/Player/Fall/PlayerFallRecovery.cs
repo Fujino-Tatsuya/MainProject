@@ -110,6 +110,10 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
         if (dashController != null)
             dashController.ServerResetChargeToOne();
 
+        if (!IsOwner)
+            Debug.Log($"[PlayerFallRecovery] 원격 클라 낙사 생존 복귀 owner={OwnerClientId} fall={fallPoint} → return={returnPoint} " +
+                      $"(authority={(Player.UsesServerAuthoritativeMovement ? "server — forceSnap" : "owner — TeleportOwnerRpc")})", this);
+
         CancelServerReturnRoutine();
         serverReturnRoutine = StartCoroutine(ServerReturnRoutine(returnPoint, fallPoint));
         BeginRecoveryRpc(returnPoint, fallPoint);
@@ -138,7 +142,9 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
             movement?.RotateImmediately(look);
 
         // 회전까지 Motor 상태에 반영한 뒤 보내야 forceSnap이 오너의 동일한 응시 방향을 보존한다.
-        if (!IsOwner)
+        // 🔴 서버 권위에서만(할 일 205). 오너 권위면 위치는 TeleportOwnerRpc 로 오너가 옮겼고, 서버 사본 Motor 는 시뮬레이션이 안 돌아
+        // 스폰 때 값 그대로다 — 그걸 forceSnap 으로 보내면 오너가 맵 시작 근처로 끌려간다(재합류 뒤 낙사 생존 → start 로 감).
+        if (!IsOwner && Player.UsesServerAuthoritativeMovement)
             player.ForceOwnerReconciliation();
 
         serverReturnRoutine = null;

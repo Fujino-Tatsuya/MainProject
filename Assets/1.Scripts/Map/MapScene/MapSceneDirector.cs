@@ -168,6 +168,7 @@ public sealed partial class MapSceneDirector : NetworkBehaviour
     private MapSceneAreaTracker _areas;
     private List<MapSceneBarrierSpec> _barrierSpecs;
     private readonly Dictionary<ulong, int> _backBarrierMasks = new Dictionary<ulong, int>();
+    private readonly Dictionary<ulong, MapSceneArea> _rejoinFronts = new Dictionary<ulong, MapSceneArea>();   // 205 — 재합류 스폰 구간(PlayerRejoined 까지)
     private MapSceneMonsterZones _monsterZones;
     private float _areaPollTimer;
     private bool _pendingActivate;
@@ -796,22 +797,34 @@ public sealed partial class MapSceneDirector : NetworkBehaviour
         Commit();
     }
 
+    /// <summary>
+    /// [서버] 재합류 스폰 구간 기록(할 일 205 — <see cref="MapSceneSafePoints.TryResolveRejoinSpawn"/> 가 파티 진행 구간 안전 지점에 세울 때).
+    /// 곧 이어지는 PlayerRejoined(<see cref="HandlePlayerRejoinedServer"/>)가 그 사람의 지난 배리어 기록을 이 구간 최전방으로 다시 쓴다.
+    /// </summary>
+    public void NoteRejoinFrontServer(ulong clientId, MapSceneArea area) => _rejoinFronts[clientId] = area;
+
     // 판 도중 재합류(할 일 48 C14 R4c · 설계 메모 R-b) — 새 clientId 가 옛 기록의 개인 체크·완전 사망을 이어 받는다.
-    // 안 하면 새 기록(CheckMask 0)이 개인 게이트를 교착 방지 60초까지 막는다. 재합류자는 첫 스폰 지점에서 다시 출발하므로
-    // 개인 뒤 배리어 마스크는 0 — 앞으로 걸어가며 지나는 배리어가 다시 닫힌다.
+    // 안 하면 새 기록(CheckMask 0)이 개인 게이트를 교착 방지 60초까지 막는다.
+    // 개인 뒤 배리어 마스크(205): 파티 진행 구간 안전 지점에 섰으면(NoteRejoinFrontServer) 그 구간을 최전방으로(전멸 리스폰·스킵 이동과 같은 예외 —
+    // 지나온 배리어는 뒤에서 닫히고 앞 배리어엔 안 갇힌다). 맵 시작에 섰으면 0 — 앞으로 걸어가며 지나는 배리어가 다시 닫힌다.
     private void HandlePlayerRejoinedServer(string playerId, ulong oldClientId, ulong newClientId)
     {
         if (_model == null || !IsSpawned) return;
+        bool zoneSpawn = _rejoinFronts.Remove(newClientId, out MapSceneArea front);
         if (!_model.RebindPlayer(oldClientId, newClientId))
         {
             Edit.LogWarning($"[Tutorial] 재합류 {playerId} client {oldClientId}→{newClientId} — 옛 기록이 없어 이어 받지 못했다(새 기록으로 진행).", this);
+            if (zoneSpawn) _backBarrierMasks[newClientId] = MapSceneBackBarrierRules.MaskWithFrontmost(front);
+            Commit();
             return;
         }
 
-        _backBarrierMasks.Remove(newClientId);
+        if (zoneSpawn) _backBarrierMasks[newClientId] = MapSceneBackBarrierRules.MaskWithFrontmost(front);
+        else _backBarrierMasks.Remove(newClientId);
         _model.TryGetPlayer(newClientId, out MapScenePlayerProgress p);
         Edit.Log($"[Tutorial] 재합류 {playerId} client {oldClientId}→{newClientId} — 체크 0x{p.CheckMask:X}·완전 사망 {p.PermanentDead} 이어 받음, " +
-                 $"뒤 배리어 0 (참가자 {_model.ParticipantCount}명).", this);
+                 $"뒤 배리어 {(zoneSpawn ? $"{MapSceneBackBarrierRules.Describe(GetBackBarrierMaskServer(newClientId))}(최전방 {front})" : "0(맵 시작)")} " +
+                 $"(참가자 {_model.ParticipantCount}명).", this);
         Commit();
     }
 
