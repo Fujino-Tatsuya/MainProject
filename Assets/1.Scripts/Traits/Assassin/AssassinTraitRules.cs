@@ -153,10 +153,21 @@ public sealed class AssassinShadowReturnOrigin
 
     public bool HasValue { get; private set; }
 
+    /// <summary>저장할 때마다 1 씩 는다 — 연출이 "새로 저장된 출발점인가"를 가른다(만료 뒤 남은 옛 값을 다시 쓰지 않게).</summary>
+    public int Version { get; private set; }
+
     public void Save(Vector3 position)
     {
         point = position;
         HasValue = true;
+        Version++;
+    }
+
+    /// <summary>가져가지 않고 본다(연출 — 출발점 표식, <see cref="AssassinShadowReturnView"/>).</summary>
+    public bool TryPeek(out Vector3 position)
+    {
+        position = point;
+        return HasValue;
     }
 
     public bool TryTake(out Vector3 position)

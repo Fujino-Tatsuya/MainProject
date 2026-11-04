@@ -85,6 +85,8 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 
 - **수치만 바꾸는 특성**(피해·쿨·회복·스탯·스킬 수치 — 진격 강화·수호 재정비·불굴의 회복·고속 집속·출력 강화·집중 포화·광란/강타 강화·완전 해방·돌파 가속 등): 기존 스킬 연출 그대로라 사건 없음.
 - **모드 변경**(한계 돌파·축열 포격·정온 운용·집속 연사·관통 탄도·그림자 회귀·절제된 분노): 바뀐 동작이 원래 스킬 연출 경로(발수·과열 표시 등)를 그대로 탄다. 집속 연사는 발마다 Q 발사 연출이 이미 나고, 광폭 레이저와 함께면 발마다 위 Activated 가 난다.
+  - 그림자 회귀는 복귀 칸이 열린 동안 출발점에 그림자 단검 표식을 낸다 — 칸 열림(복제)과 각 피어가 저장한 출발점을 본다(`AssassinShadowReturnView`, [handoff-shadow-return-vfx.md](handoff-shadow-return-vfx.md)).
+  - 절제된 분노는 이 이벤트 대신 상태(`AssassinState.IsRestrained`, 전 피어 같은 값)를 보는 전용 연출이 있다 — 켜지는 순간 봉인 + 양손 단검 띠(`AssassinRestraintView`, [handoff-restraint-vfx.md](handoff-restraint-vfx.md)).
 - **사건형 보조**(수호의 순환·불굴의 순환·사냥의 박자 쿨 환급, 수호의 잔광·불굴의 가호 보호막, 돌파의 여세): 보호막은 받는 쪽 `PlayerShieldVfx` 가 복제 목록으로 띄운다 — 수호의 잔광·불굴의 가호는 금색(`PlayerShieldVfxSet.holyTraitIds`, 2026-11-02 [handoff-shield-vfx.md](handoff-shield-vfx.md)), 그 외 흰색. 나머지는 눈에 보이는 공격이 아니다.
 - **밀치기·뇌진탕만 붙는 특성**(제압의 진격·충격 레이저·급소 파괴): 원래 공격 적중 연출 + 대상 넉백·기절 표시로 보인다 — 이번 범위에서 따로 사건을 두지 않았다. 필요하면 수호의 파동 Hit 처럼 공용 RPC 로 더한다.
 
@@ -102,6 +104,8 @@ public sealed class TraitSkillFxListener : MonoBehaviour
 - **공용 RPC 사건은 서버 판정 시각 + 전송 지연**에 클라에 도착한다. 전 피어 경로 사건은 그 경로의 기존 시각(스킬 시작·발사 RPC)과 같다.
 - 전 피어 경로 사건의 위치는 **그 피어의 시전자 위치**다(원격 화면은 NetworkTransform 보간만큼 다를 수 있다 — 기존 스킬 연출과 같은 수준).
 - 칼날의 영역(일반 E 강타)의 Pose 는 시작 순간 발밑이다 — 판정은 전진한 뒤 클립 Hit 순간 위치에서 한다.
+- 추격의 궤적 `Activated` 는 `AssassinSkillView.HandleTraitFx` 가 받아 선분에 `FX_PursuitTrail`(바닥 자국 + 팡 터지는 베기 줄 + 파편)을 낸다(2026-11-04, [handoff-pursuit-trail-vfx.md](handoff-pursuit-trail-vfx.md)). `Hit` 연출 없음.
+- 칼날의 영역은 위 이벤트와 별개로 **기존 베기 VFX 를 판정 배율만큼 키운다**(2026-11-04) — 일반 E 강타 소켓 배율 × 사거리 배율(균일), 변신 E 원 베기 × 반경 배율(`AssassinSkillView`). 추가 레이어 없음.
 - 광폭 레이저·이중 출력의 Hit 은 대상 오브젝트가 없다(기존 RPC 가 지점만 들고, 이중 출력 판정 함수가 맞은 유닛을 내지 않는다).
 - 잔류 포격 `Exploded` 는 이 피어에서 구체를 한 번이라도 띄운(대상을 찾은) 폭탄만 난다 — 위치를 모르면 내지 않는다.
 

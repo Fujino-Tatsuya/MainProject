@@ -95,6 +95,11 @@ public class EffectCatalog : ScriptableObject
     // AssassinSkillView 가 AssassinState.TransformChanged 로 PlayLooping / Release 한다(2026-10-14 민경).
     [field: SerializeField] public EffectEntry Assassin_R_BladeVortex { get; private set; }
 
+    [Header("플레이어 — 어쌔신 특성 절제된 분노(ASN_2_RESTRAINT)")]
+    // 봉인 순간 원샷(FX_Restraint_Seal — 사슬 3줄이 조여들고 0.58초에 오라가 터짐). AssassinRestraintView 가 IsRestrained 켜짐을 보고
+    // 발밑에 내고 R 소용돌이를 같이 켰다가 0.42초에 해제한다. 단검 띠는 엔트리 없이 프리팹을 소켓 자식으로 만든다(2026-11-04 민경).
+    [field: SerializeField] public EffectEntry Assassin_Restraint_Seal { get; private set; }
+
     [Header("플레이어 — 어쌔신 변신 E(원형 5타)")]
     // 공격 동안 원 중심 루프(FX_Assassin_MultiSlashes). 배율 = 원 반경 — 프리팹 생성 원이 반경 1m 로 저작돼 있다.
     // Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 제 곡선대로 사라지게 둔다(2026-10-15 민경).
@@ -105,6 +110,11 @@ public class EffectCatalog : ScriptableObject
     // 끝점 버스트(배율 1). AssassinSkillView.EndPierce 가 재생한다(2026-10-16 민경).
     [field: SerializeField] public EffectEntry Assassin_Q_PierceLine { get; private set; }
     [field: SerializeField] public EffectEntry Assassin_Q_PierceBurst { get; private set; }
+
+    [Header("플레이어 — 어쌔신 특성 추격의 궤적(ASN_4_Q_TRAIL)")]
+    // 추가 피해 판정 순간(TraitSkillFx Activated) 지나온 선분에 한 번 — 바닥 그림자 자국 + 팡 터지는 베기 줄 + 파편(FX_PursuitTrail).
+    // +Z 1m 저작, Z 배율 = 선분 길이. AssassinSkillView.HandleTraitFx 가 재생한다(2026-11-04 민경).
+    [field: SerializeField] public EffectEntry Assassin_Q_PursuitTrail { get; private set; }
 
     [Header("플레이어 — 어쌔신 변신 Q(관통 돌진)")]
     // 돌진 동안 플레이어 루트를 따라가는 루프(FX_Assassin_StormSlash). 입자는 World + Rate over Distance 라
