@@ -1,4 +1,4 @@
-# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198)
+# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198 · 230)
 
 로비 포드 발사(`LobbyPodLaunch`)와 맵 포드 착륙(`MapPodArrival`)에서 **어느 구간을 클립 애니 이벤트가 정하고, 어느 구간을 SO 초가 정하는지** 한 곳에 모은다.
 수치 원본은 `GameData.xlsx` Lobby 시트(`PodDropSettings`), 이벤트 원본은 SVN FBX 임포트 설정이다.
@@ -53,3 +53,20 @@
 
 - 로비: t=0(출격 확정) ~ 해치 클립 시작 — 레터박스·시작 암전·순간이동·카메라 줌.
 - 맵: 페이드 인·디졸브·레터박스 아웃·카메라 줌·흔들림 길이, (건너뛰기 끔일 때) 대기·빠른 낙하·급감속.
+
+## 5. 레터박스·검은 화면 프리팹 (할 일 230)
+
+로비 출격(`LobbyPodLaunch`)·맵 착륙(`MapPodArrival`)이 같은 화면 오버레이(`PodDropScreenOverlay`)를 쓰고, 그 캔버스를 **프리팹에서 고친다**.
+
+- 프리팹: `Assets/2.Prefabs/UI/PodDrop/PodDropOverlay.prefab` — 루트 `Canvas`(Screen Space Overlay)·`CanvasScaler`, 직계 자식 `LetterboxTop`·`LetterboxBottom`(검은 `Image`)·`Fade`(전체 검은 화면, 알파 0·꺼짐). `Fade` 는 마지막 형제(띠 위에 그린다).
+- 연결: `PodDropSettings.overlayPrefab`(`Assets/9.ScriptableObject/Lobby/PodDropSettings.asset`, 화면 칸). 비우면 코드가 같은 구성(검은 띠)을 만든다 = 예전 동작.
+- 처음 만들기: `Tools/Lobby/포드 레터박스 프리팹 만들기 (없을 때만)` — 띠를 `letterboxHeight` 높이로 저장하고 `overlayPrefab` 칸이 비었으면 채운다. 있으면 덮어쓰지 않는다.
+- **코드가 바꾸는 것(매 프레임)**: 위 띠 `anchorMin.y`·아래 띠 `anchorMax.y`(= 시간표 알파 × `letterboxHeight`), `Fade` 색의 알파·`enabled`, 루트 `sortingOrder` = **500 고정**(로딩 화면 1000·ESC 메뉴 900 아래, HUD 위).
+  그 밖의 값 — 띠 색·스프라이트·재질, anchor x·offset, 자식 장식(띠 아래에 붙인 선·글자 등), `Fade` 의 RGB — 은 프리팹 값 그대로다.
+- 이름 계약: 자식 이름 `LetterboxTop`·`LetterboxBottom`·`Fade` 를 바꾸거나 지우면 경고 한 줄 후 코드 기본 구성으로 대체한다. 장식은 이 세 오브젝트의 **자식**이나 새 형제로 붙인다.
+- 띠 높이는 프리팹이 아니라 `PodDropSettings.letterboxHeight`(xlsx `Lobby` 시트 행)가 원본이다 — 프리팹에 저장된 높이는 편집 화면 미리보기용이고 연출 중엔 덮인다.
+- 보면서 고치기:
+  - Play 없이: 프리팹을 열면(Prefab Mode) 띠가 기본 높이로 보인다(Game 뷰 비율로 미리 보려면 Prefab Mode 의 Canvas 환경). 높이를 바꿔 보려면 `LetterboxTop`·`LetterboxBottom` anchor y 를 직접 움직여 보고, 확정 값은 `letterboxHeight` 에 넣는다.
+  - Play 중: `letterboxHeight` 는 매 프레임 읽어서 인스펙터에서 바꾸면 바로 반영된다(테이블 모드면 Play 가 끝날 때 xlsx 값으로 되돌아간다 — 확정은 xlsx). 프리팹 에셋 수정은 **이미 만든 복제본에는 안 들어간다** — 다음 연출(다음 Play·다음 씬의 첫 연출)부터. Play 중 모양은 Hierarchy 의 `LobbyPodLaunch`/`MapPodArrival` 오브젝트 아래 `PodDropOverlay` 복제본을 고쳐 보고(Play 끝나면 사라짐) 프리팹에 옮긴다.
+  - 출격·착륙 연출만 다시 트는 디버그 단축키·메뉴는 없다 — 로비 출격 집결 → 맵 착륙 정상 흐름으로 본다.
+- 테스트: `PodDropScreenOverlayTests`(프리팹 값 보존·대체·커밋된 프리팹 계약).

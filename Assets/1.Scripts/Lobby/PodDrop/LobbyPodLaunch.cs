@@ -524,6 +524,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
 
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         _overlay.HudRescanInterval = settings.Lobby.hudRescanSeconds;
+        _overlay.Prefab = settings.OverlayPrefab;   // 첫 Apply 때만 쓰인다(할 일 230)
         // 시작 암전과 끝 페이드 아웃(포드 하강 시작 + 대기 뒤 — 클립 이벤트 위치 + 복제 시각, 할 일 198)이 같은 검은 화면을 쓴다. 다 검어진 채 유지되다 서버가 건 로딩 화면(정렬 1000, 숨김 예외)이
         // 이 화면(500) 위에 뜨고, 검은 화면·레터박스는 로비 씬과 함께 사라진다 — 로딩 화면이 걷힌 뒤는 맵 도착 페이드인(PodDropMapTimings.fadeInSeconds)이 잇는다.
         double board = _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start));

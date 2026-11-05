@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: PodDropSettings
   m_EditorClassIdentifier: Assembly-CSharp::PodDropSettings
   letterboxHeight: 0.061
+  overlayPrefab: {fileID: 8709938424343515090, guid: e170c51c2dee5f14a88ea8f020ee189e, type: 3}
   lobby:
     letterboxInSeconds: 0.5
     letterboxInEase: 0

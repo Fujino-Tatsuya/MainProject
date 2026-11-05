@@ -444,6 +444,7 @@ public sealed class MapPodArrival : NetworkBehaviour
         if (_overlay == null) _overlay = gameObject.AddComponent<PodDropScreenOverlay>();
         // 기본 0 = 매 프레임 — 로딩이 걷히는 프레임에 HUD 가 한 프레임도 보이지 않게(연출 몇 초 동안만).
         _overlay.HudRescanInterval = settings.Map.hudRescanSeconds;
+        _overlay.Prefab = settings.OverlayPrefab;   // 첫 Apply 때만 쓰인다(할 일 230)
         // 검은 화면 = 도착 페이드 인(할 일 198 — 접기·펴기 끝부터, 앞 구간 건너뛰기면 로딩이 걷힌 순간부터). 그 전엔 검고(로딩 화면(정렬 1000) 아래 포함), 길이 0 이면 없다.
         // 레터박스는 시작 전부터 덮여 있다 — 로딩 화면이 걷히는 순간 이미 덮인 화면이 보인다.
         _overlay.Apply(timeline.LetterboxAlphaAt(elapsed, opened) * settings.LetterboxHeight, timeline.FadeAlphaAt(elapsed, deployed), true);
