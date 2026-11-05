@@ -16,6 +16,7 @@ public sealed class InterruptProductionStageTests
         public SlowMotionProfile Attempt = new SlowMotionProfile { scale = 0.15f };
         public SlowMotionProfile Weak = new SlowMotionProfile { scale = 0.5f };
         public SlowMotionProfile Success = new SlowMotionProfile { scale = 0.25f, hitStopDuration = 0.05f };
+        public SlowMotionProfile SuppressSuccess = new SlowMotionProfile { scale = 0.3f, hitStopDuration = 0.08f }; // 할 일 219
         public SlowMotionProfile DashAttempt = new SlowMotionProfile { scale = 0.16f };
         public SlowMotionProfile DashWeak = new SlowMotionProfile { scale = 0.51f };
         public readonly HashSet<InterruptProductionCue> On = new HashSet<InterruptProductionCue>();
@@ -25,6 +26,7 @@ public sealed class InterruptProductionStageTests
         public SlowMotionProfile InterruptDashProfile => DashAttempt;
         public SlowMotionProfile InterruptDashWeakProfile => DashWeak;
         public SlowMotionProfile InterruptSuccessProfile => Success;
+        public SlowMotionProfile InterruptSuppressSuccessProfile => SuppressSuccess;
         public bool Get(InterruptProductionCue cue) => On.Contains(cue);
     }
 

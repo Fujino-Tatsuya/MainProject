@@ -13,13 +13,13 @@ public enum InterruptCameraCenterState : byte
 }
 
 /// <summary>
-/// 카메라 대상 중심(할 일 196 단계 2) — 오너 화면 카메라 이동량(월드, 수평)을 정하는 상태 기계. 순수 로직(EditMode 테스트 대상) —
+/// 카메라 대상 중심(할 일 196 단계 2 → 11-05 제압 간파 전용) — 이 화면 카메라 이동량(월드, 수평)을 정하는 상태 기계. 순수 로직(EditMode 테스트 대상) —
 /// 시각·위치·슬로우 상태는 호출측(디렉터)이 넘긴다. 판단은 <see cref="InterruptCameraCenterRules"/> 를 쓴다.
 /// <list type="bullet">
-/// <item>시도 cue(<see cref="Begin"/>) — 강·약 + 대상 있음이면 이동 시간 동안 지금 이동량에서 대상 쪽 이동량으로 보간, 그 뒤 대상을 따라간다.
-///       대상 없음·스위치 꺼짐·오너 아님이면 옮기지 않는다(옮겨 둔 상태가 있으면 복귀 — 새 간파가 이전 상태를 대체).</item>
-/// <item>판정 실패·서버 거부·끊김 = <see cref="Return"/>(그 순간 복귀). 대상이 사라지면 마지막 위치를 두고 복귀.</item>
-/// <item>판정 성공 = <see cref="Succeeded"/> — 내 성공 슬로우가 보이면 그 복귀 구간 시작에, 끝내 안 보이면(첫 승인자 아님 등) 성공 프로필 시간표로 복귀.</item>
+/// <item>제압 성공 순간(<see cref="BeginSuccess"/>, 오너 판정 또는 서버 성공 사건) — 대상 있음이면 이동 시간 동안 지금 이동량에서 대상 쪽 이동량으로 보간, 그 뒤 대상을 따라간다.
+///       대상 없음이면 옮기지 않는다(옮겨 둔 상태가 있으면 복귀 — 새 제압 간파가 이전 상태를 대체). 클릭 순간 이동은 없다(11-05).</item>
+/// <item>서버 거부·강제 리셋 = <see cref="Return"/>(그 순간 복귀). 대상이 사라지면 마지막 위치를 두고 복귀.</item>
+/// <item>시작하자마자 성공 복귀를 기다린다 — 발동자의 성공 슬로우가 보이면 그 복귀 구간 시작에, 끝내 안 보이면 성공 프로필 시간표로 복귀.</item>
 /// <item>보간 시작점은 늘 지금 이동량 — 대체·복귀가 이어져도 튀지 않는다. 시간은 호출측이 실제 시간(unscaled)으로 넘긴다.</item>
 /// </list>
 /// </summary>
@@ -50,15 +50,16 @@ public sealed class InterruptCameraCenterTracker
     public Vector3 LastShift => _lastShift;
 
     /// <summary>
-    /// [오너] 시도 cue(근접 = 누른 순간, 대쉬 = 대시에 실린 순간 — 191 예측). 대상 쪽으로 옮기기 시작했으면 true.
-    /// 옮기지 않는 시도면(대상 없음 등) 옮겨 둔 상태를 복귀시킨다.
+    /// 제압 성공 순간(11-05) — 대상 쪽으로 옮기기 시작하고 곧바로 성공 복귀를 기다린다(<see cref="Succeeded"/>). 옮기기 시작했으면 true.
+    /// 대상 없음이면 옮겨 둔 상태를 복귀시킨다. 적용 여부(스위치·제압 단계)는 호출측이 <see cref="InterruptCameraCenterRules.AppliesOnSuccess"/> 로 거른다.
+    /// <paramref name="fallbackReturnDelay"/>·<paramref name="staleSlowTriggerId"/> = <see cref="Succeeded"/> 와 같다.
     /// </summary>
-    public bool Begin(InterruptAttemptForecast forecast, bool hasTarget, bool switchOn, bool isOwner, float ratio,
-        float moveDuration, float returnDuration, float now)
+    public bool BeginSuccess(bool hasTarget, float ratio, float moveDuration, float returnDuration, float fallbackReturnDelay,
+        uint staleSlowTriggerId, float now)
     {
         _returnDuration = Mathf.Max(0f, returnDuration);
         _awaitsSuccessReturn = false;
-        if (!hasTarget || !InterruptCameraCenterRules.Applies(forecast, switchOn, isOwner))
+        if (!hasTarget)
         {
             Return(now);
             return false;
@@ -68,13 +69,14 @@ public sealed class InterruptCameraCenterTracker
         _ratio = ratio;
         _hasTargetOffset = false;
         StartBlend(now, moveDuration);
+        Succeeded(now, fallbackReturnDelay, staleSlowTriggerId);
         return true;
     }
 
     /// <summary>
-    /// [오너] 판정 성공 — 대상 중심을 유지하고 성공 슬로우 복귀 구간에 맞춰 복귀한다.
+    /// 성공 복귀 대기 — 대상 중심을 유지하고 성공 슬로우 복귀 구간에 맞춰 복귀한다.
     /// <paramref name="fallbackReturnDelay"/> = 내 성공 슬로우가 끝내 안 보일 때 지금부터 복귀까지(실제 시간 초, <see cref="InterruptCameraCenterRules.SuccessReturnDelay"/>).
-    /// <paramref name="staleSlowTriggerId"/> = 지금 돌고 있는 내 앞 성공 슬로우 번호(이번 성공 것이 아니다 — 연속 간파), 없으면 0.
+    /// <paramref name="staleSlowTriggerId"/> = 지금 돌고 있는 발동자의 앞 성공 슬로우 번호(이번 성공 것이 아니다 — 연속 간파), 없으면 0.
     /// </summary>
     public void Succeeded(float now, float fallbackReturnDelay, uint staleSlowTriggerId)
     {
@@ -88,7 +90,7 @@ public sealed class InterruptCameraCenterTracker
     }
 
     /// <summary>
-    /// [오너] 매 프레임 — 지금 이 화면의 내 성공 슬로우(<paramref name="mySuccessSlowTriggerId"/>, 없으면 0)와 그 단계.
+    /// 매 프레임 — 지금 이 화면의 발동자 성공 슬로우(<paramref name="mySuccessSlowTriggerId"/>, 없으면 0)와 그 단계.
     /// 보이면 그 복귀 구간 시작에 복귀, 보였다가 사라지면(덮임·리셋) 복귀.
     /// </summary>
     public void ObserveSuccessSlow(uint mySuccessSlowTriggerId, InterruptCameraCenterPhase slowPhase, float now)
@@ -109,7 +111,7 @@ public sealed class InterruptCameraCenterTracker
             Return(now);
     }
 
-    /// <summary>[오너] 지금 복귀를 시작한다(판정 실패·서버 거부·끊김·대상 소실). 옮기지 않았으면 아무것도 안 한다.</summary>
+    /// <summary>지금 복귀를 시작한다(서버 거부·서버 단계 보정·강제 리셋·대상 소실). 옮기지 않았으면 아무것도 안 한다.</summary>
     public void Return(float now)
     {
         _awaitsSuccessReturn = false;
@@ -118,13 +120,6 @@ public sealed class InterruptCameraCenterTracker
 
         _state = InterruptCameraCenterState.Returning;
         StartBlend(now, _returnDuration);
-    }
-
-    /// <summary>[오너] 성공 복귀를 기다리는 중이 아니면 복귀(시전 거부 등 cue 없는 종료 — 성공 유지는 그대로).</summary>
-    public void ReturnUnlessSucceeded(float now)
-    {
-        if (!AwaitsSuccessReturn)
-            Return(now);
     }
 
     /// <summary>즉시 원래대로(다른 카메라 연출이 카메라를 잡음·꺼짐) — 이동량 0, 보간 없음.</summary>
@@ -187,7 +182,7 @@ public sealed class InterruptCameraCenterTracker
         _blendDuration = float.IsNaN(duration) ? 0f : Mathf.Max(0f, duration);
     }
 
-    // 대상 쪽 목표 중심 — 판단은 순수 규칙 하나(스위치·오너는 Begin 에서 이미 걸렀다).
+    // 대상 쪽 목표 중심 — 판단은 순수 규칙 하나(스위치·단계는 호출측이 이미 걸렀다).
     InterruptCameraCenterDecision Decide(InterruptCameraCenterPhase phase, Vector3 baseCenter = default, Vector3 targetPosition = default) =>
         InterruptCameraCenterRules.Decide(InterruptAttemptForecast.Strong, phase, true, _ratio, true, baseCenter, targetPosition);
 }

@@ -13,6 +13,9 @@ public interface IInterruptProductionSettings
     SlowMotionProfile InterruptDashProfile { get; }
     /// <summary>대쉬 간파 시도 슬로우 — 실패 예측(약, 194 후속 2).</summary>
     SlowMotionProfile InterruptDashWeakProfile { get; }
+    /// <summary>성공 슬로우 — 일반·대쉬 간파.</summary>
     SlowMotionProfile InterruptSuccessProfile { get; }
+    /// <summary>제압 간파 성공 슬로우(할 일 219 — 제압 칸 마지막 1칸). 서버가 성공 사건의 제압 표식으로 고른다.</summary>
+    SlowMotionProfile InterruptSuppressSuccessProfile { get; }
     bool Get(InterruptProductionCue cue);
 }

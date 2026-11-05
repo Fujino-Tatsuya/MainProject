@@ -13,28 +13,28 @@ MonoBehaviour:
   m_Name: InterruptSlowMotionSettings
   m_EditorClassIdentifier: Assembly-CSharp::InterruptSlowMotionSettings
   interruptDashProfile:
-    scale: 1
-    hitStopDuration: 0
-    hitStopScale: 1
-    enterDuration: 0
-    holdDuration: 0
-    exitDuration: 0
+    scale: 0.7
+    hitStopDuration: 0.5
+    hitStopScale: 0.7
+    enterDuration: 0.7
+    holdDuration: 0.5
+    exitDuration: 0.5
     failExitDuration: 0
   interruptDashWeakProfile:
-    scale: 1
-    hitStopDuration: 0
-    hitStopScale: 1
-    enterDuration: 0
-    holdDuration: 0
-    exitDuration: 0
+    scale: 0.9
+    hitStopDuration: 0.5
+    hitStopScale: 0.9
+    enterDuration: 0.5
+    holdDuration: 0.5
+    exitDuration: 0.5
     failExitDuration: 0
   interruptProfile:
-    scale: 1
-    hitStopDuration: 0
-    hitStopScale: 1
-    enterDuration: 0
-    holdDuration: 0
-    exitDuration: 0
+    scale: 0.7
+    hitStopDuration: 0.5
+    hitStopScale: 0.7
+    enterDuration: 0.7
+    holdDuration: 0.5
+    exitDuration: 0.5
     failExitDuration: 0
   interruptWeakProfile:
     scale: 1
@@ -47,14 +47,22 @@ MonoBehaviour:
   interruptZoomFactor: 1
   interruptWeakZoomFactor: 1
   interruptSuccessProfile:
-    scale: 1
-    hitStopDuration: 0
-    hitStopScale: 1
+    scale: 0.1
+    hitStopDuration: 1.25
+    hitStopScale: 0.01
     enterDuration: 0
     holdDuration: 0
     exitDuration: 0
     failExitDuration: 0
-  slowMotionZoomFactor: 1
+  slowMotionZoomFactor: 0.9
+  interruptSuppressSuccessProfile:
+    scale: 0.3
+    hitStopDuration: 0.08
+    hitStopScale: 0.02
+    enterDuration: 0.2
+    holdDuration: 0.35
+    exitDuration: 0.25
+    failExitDuration: 0.1
   cameraCenterMoveDuration: 0.08
   cameraCenterRatio: 0.75
   cameraCenterReturnDuration: 0.25

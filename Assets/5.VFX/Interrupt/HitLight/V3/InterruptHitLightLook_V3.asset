@@ -194,11 +194,11 @@ MonoBehaviour:
     m_RotationOrder: 4
   whiteoutFrames: 0
   gapRaySpread: 20
-  gapRayCount: 5
+  gapRayCount: 1
   gapSparkSpread: 30
   gapStreakAxis: 0
   raySpace: 1
-  rayScreenSize: 0.05
+  rayScreenSize: 0.06
   rayScreenLength: 1
   rayScreenBrightness: 1
   rayScreenMaterial: {fileID: 2100000, guid: d04c16b45e7636a4fbad39483f445774, type: 2}

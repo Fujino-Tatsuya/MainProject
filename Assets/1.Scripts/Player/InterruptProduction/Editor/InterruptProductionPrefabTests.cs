@@ -83,6 +83,7 @@ public sealed class InterruptProductionPrefabTests
         AssertProfileInRange(settings.InterruptProfile, "interruptProfile");
         AssertProfileInRange(settings.InterruptWeakProfile, "interruptWeakProfile");
         AssertProfileInRange(settings.InterruptSuccessProfile, "interruptSuccessProfile");
+        AssertProfileInRange(settings.InterruptSuppressSuccessProfile, "interruptSuppressSuccessProfile"); // 할 일 219
         Assert.AreEqual(SlowMotionCameraZoom.ClampZoomFactor(settings.InterruptZoomFactor), settings.InterruptZoomFactor, 1e-6f);
         Assert.AreEqual(SlowMotionCameraZoom.ClampZoomFactor(settings.InterruptWeakZoomFactor), settings.InterruptWeakZoomFactor, 1e-6f);
         Assert.AreEqual(SlowMotionCameraZoom.ClampZoomFactor(settings.SlowMotionZoomFactor), settings.SlowMotionZoomFactor, 1e-6f);
@@ -132,6 +133,7 @@ public sealed class InterruptProductionPrefabTests
         Assert.AreSame(settings.InterruptWeakProfile,
             InterruptProductionRules.SelectAttemptProfile(SlowMotionPurpose.AttemptWeak, InterruptVariant.Normal, director), "근접 약");
         Assert.AreSame(settings.InterruptSuccessProfile, director.InterruptSuccessProfile, "성공");
+        Assert.AreSame(settings.InterruptSuppressSuccessProfile, director.InterruptSuppressSuccessProfile, "제압 성공(할 일 219)");
     }
 
     [Test]

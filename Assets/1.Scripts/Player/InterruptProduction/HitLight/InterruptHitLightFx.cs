@@ -3,10 +3,12 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// 적중 라이트 연출 월드 이펙트 루트(V1·V2·V3, 할 일 194) — <c>Assets/5.VFX/Interrupt/HitLight/FX_InterruptHitLight.prefab</c>(V3 는 <c>V3/FX_InterruptHitLight_V3.prefab</c>).
-/// 적중 지점 포인트 라이트(따뜻한 흰주황, 실시간 곡선) + 자식 파티클(불꽃·메시 파편·빛줄기, V3 는 + 중심 점·가로 빛줄). 모든 피어가 성공 순간 각자 튼다.
+/// 적중 지점 포인트 라이트(따뜻한 흰주황, 실시간 곡선) + 자식 파티클(불꽃·메시 파편·빛줄기, V3 는 파편 없이(11-05 삭제) + 중심 점·가로 빛줄). 모든 피어가 성공 순간 각자 튼다.
 /// <list type="bullet">
 /// <item>디렉터가 첫 재생 때 한 번 만들어 재사용한다(재생마다 생성 없음). 라이트도 첫 재생 때 자식으로 한 번 만든다.</item>
-/// <item>전부 실시간(Q8) — 재생할 때마다 모든 파티클의 useUnscaledTime 을 켠다(히트스톱 중에도 움직인다).</item>
+/// <item>시간 기준 = 칸 <see cref="gameTime"/>. 꺼짐(V1·V2, 기본) = 실시간(Q8) — 재생마다 모든 파티클 useUnscaledTime 켬(히트스톱 중에도 움직인다).
+///       켬(V3 일반·대쉬·제압, 11-05) = 게임 시간 — 파티클·포인트 라이트 곡선이 Time.timeScale(GlobalTimeScale 슬로우·히트스톱)을 따라 히트스톱 동안 거의 멈추고 슬로우 동안 느려진다.
+///       라이트는 실시간 안전장치(<see cref="GameTimeSafetyRealSeconds"/>)로 끝을 보장한다. 화면 효과(블룸·색 보정·암순응·화이트아웃)는 진행기 몫이라 늘 실시간.</item>
 /// <item>수치는 <see cref="InterruptHitLightLook"/> — 재생마다 넣는다.</item>
 /// <item>틈 수직(194 후속, 방향 있는 <see cref="InterruptHitLightPlacement"/>)이면 재생 때 자식 몇 개만 방향을 넣는다(이름으로 찾는다):
 /// <c>Rays</c> = 수직선 따라 양쪽 부채(<see cref="gapRaysMesh"/> 날개 2개 메시를 ±퍼짐 각으로 여러 줄, 정렬 Local + 카메라 쪽 기울임) ·
@@ -31,6 +33,12 @@ public sealed class InterruptHitLightFx : MonoBehaviour
     [Tooltip("틈 수직 빛줄기 메시 — 양쪽으로 뻗는 날개 2개(Mesh_InterruptHitLight_Streak). 비면 원래 빛줄기 메시를 기울여 쓴다")]
     [SerializeField] private Mesh gapRaysMesh;
 
+    [Tooltip("켜면 이펙트(파티클·포인트 라이트 곡선)가 게임 시간(Time.timeScale — 슬로우·히트스톱)을 따른다. 끄면 실시간(V1·V2). V3 일반·대쉬·제압 프리팹 = 켬(11-05)")]
+    [SerializeField] private bool gameTime;
+
+    /// <summary>게임 시간 라이트가 timeScale 0 근처(일시정지 등)에 갇혀도 꺼지게 — 라이트 곡선 길이 + 이 실시간 초가 지나면 끈다.</summary>
+    public const float GameTimeSafetyRealSeconds = 5f;
+
     private static readonly int IntensityId = Shader.PropertyToID("_Intensity");
 
     private ParticleSystem[] _systems;
@@ -38,6 +46,7 @@ public sealed class InterruptHitLightFx : MonoBehaviour
     private Light _light;
     private InterruptHitLightLook _look;
     private float _lightElapsed = -1f;
+    private float _lightRealElapsed;
     private MaterialPropertyBlock _rayBlock;
 
     // 화면(렌즈) 빛줄기 — 월드 원점·선은 성공 순간 고정, 화면 투영은 카메라 렌더마다 다시 한다.
@@ -66,6 +75,12 @@ public sealed class InterruptHitLightFx : MonoBehaviour
     public Light HitLight => _light;
     /// <summary>라이트가 아직 꺼지는 중이다.</summary>
     public bool LightActive => _lightElapsed >= 0f;
+    /// <summary>이펙트가 게임 시간(슬로우·히트스톱)을 따르는가(V3, 11-05) — 아니면 실시간.</summary>
+    public bool UsesGameTime
+    {
+        get => gameTime;
+        set => gameTime = value;
+    }
     /// <summary>화면(렌즈) 빛줄기를 카메라에 맞춰 따라가는 중이다 — 확인용.</summary>
     public bool ScreenRaysActive => _screenRays != null;
 
@@ -93,6 +108,7 @@ public sealed class InterruptHitLightFx : MonoBehaviour
         // 라이트 반경은 부모 스케일을 따르지 않는다 — 루트 스케일을 직접 곱한다.
         InterruptEffectLight.Apply(_light, look.LightColor, look.LightRange * rootScale, look.LightShadows);
         _lightElapsed = 0f;
+        _lightRealElapsed = 0f;
         InterruptEffectLight.SetIntensity(_light, LightIntensityAt(look, 0f));
     }
 
@@ -151,16 +167,23 @@ public sealed class InterruptHitLightFx : MonoBehaviour
         t.localScale = Vector3.one * (worldPerUnit / parentScale);
     }
 
-    private void Update() => Tick(Time.unscaledDeltaTime);
+    private void Update() => Tick(gameTime ? Time.deltaTime : Time.unscaledDeltaTime, Time.unscaledDeltaTime);
 
-    /// <summary>한 프레임(실시간) — 라이트 세기 곡선. 테스트는 직접 부른다.</summary>
-    public void Tick(float unscaledDelta)
+    /// <summary>한 프레임 — 라이트 세기 곡선(곡선 시간 = 실시간과 같다). 테스트는 직접 부른다.</summary>
+    public void Tick(float unscaledDelta) => Tick(unscaledDelta, unscaledDelta);
+
+    /// <summary>
+    /// 한 프레임 — <paramref name="curveDelta"/> 만큼 라이트 곡선을 진행(게임 시간이면 Time.deltaTime, 아니면 실시간),
+    /// <paramref name="realDelta"/> = 실시간 — 곡선 길이 + <see cref="GameTimeSafetyRealSeconds"/> 를 넘으면 끈다(timeScale 0 근처 안전장치).
+    /// </summary>
+    public void Tick(float curveDelta, float realDelta)
     {
         if (_lightElapsed < 0f)
             return;
 
-        _lightElapsed += Mathf.Max(0f, unscaledDelta);
-        float intensity = LightIntensityAt(_look, _lightElapsed);
+        _lightElapsed += Mathf.Max(0f, curveDelta);
+        _lightRealElapsed += Mathf.Max(0f, realDelta);
+        float intensity = InterruptHitLightRules.LightTimedOut(_look, _lightRealElapsed) ? 0f : LightIntensityAt(_look, _lightElapsed);
         InterruptEffectLight.SetIntensity(_light, intensity);
         if (intensity <= 0f)
             _lightElapsed = -1f;
@@ -179,7 +202,7 @@ public sealed class InterruptHitLightFx : MonoBehaviour
             ParticleSystem system = _systems[i];
             RestoreDefaults(system, _defaults[i]);
             ParticleSystem.MainModule main = system.main;
-            main.useUnscaledTime = true;
+            main.useUnscaledTime = !gameTime; // V3 = 게임 시간(슬로우·히트스톱 따라감), V1·V2 = 실시간
             system.Clear(false);
 
             bool rays = system.gameObject.name == RaysName;

@@ -96,6 +96,12 @@ public static class InterruptProductionRules
     }
 
     /// <summary>
+    /// 성공 슬로우 프로필(할 일 219) — 제압 간파(성공 사건의 제압 표식)면 제압 전용 프로필, 그 밖(일반·대쉬)은 기존 성공 프로필.
+    /// </summary>
+    public static SlowMotionProfile SelectSuccessProfile(bool suppressInterrupt, IInterruptProductionSettings settings) =>
+        suppressInterrupt ? settings.InterruptSuppressSuccessProfile : settings.InterruptSuccessProfile;
+
+    /// <summary>
     /// 지금 재생 중인 슬로우 목적별 오너 줌 배율(할 일 132) — 강 시도 / 약 시도 / 성공(카메라 <c>slowMotionZoomFactor</c>).
     /// A3 칸 on/off 는 따로(<see cref="OwnerZoomFactor"/>) 본다.
     /// </summary>

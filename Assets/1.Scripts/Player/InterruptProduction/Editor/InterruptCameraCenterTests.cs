@@ -202,12 +202,8 @@ public sealed class InterruptCameraCenterTests
         {
             var director = go.AddComponent<InterruptProductionDirector>();
             director.CameraCenterEnabled = true;
-            var cue = new InterruptOwnerCue
-            {
-                Result = new InterruptJudgeResult { Outcome = InterruptJudgeOutcome.Success },
-                Target = target,
-            };
-            ((IInterruptOwnerCueSink)director).OwnerAttempt(cue);
+            // 11-05 — 클릭 이동 없음, 제압 간파 성공 사건으로만 옮긴다.
+            director.CameraCenterServerSucceeded(InterruptPresentationTier.Suppress, false, 7, target.transform.position, Time.unscaledTime);
             Assert.AreEqual(InterruptCameraCenterState.Centering, director.CameraCenterState);
             Assert.AreEqual(Vector3.zero, director.StepCameraCenter(null, false, Time.unscaledTime));
             Assert.AreEqual(InterruptCameraCenterState.Idle, director.CameraCenterState);
