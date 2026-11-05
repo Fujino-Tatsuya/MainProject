@@ -40,20 +40,20 @@ public sealed class ResultPlayerRowView : MonoBehaviour
     public RectTransform VisibleCrown => crownImage != null && crownImage.enabled ? crownImage.rectTransform : null;
 
     /// <summary>
-    /// 숫자 칸(피해·처치·간파·사망·회복·입은 피해)을 최종값 × <paramref name="progress"/>(0~1)로 쓴다 — 1 = 최종값.
+    /// 숫자 칸(피해·처치·간파·사망·회복·입은 피해)을 카운트업 프레임 <paramref name="frame"/> 으로 쓴다 — 값마다 크기에 맞는 감속(할 일 220), 모두 같은 순간 최종값.
     /// 로비 결과창 카운트업(할 일 215, <see cref="LobbyResultPanelAnimator"/>)이 매 프레임 부른다. Bind 전이면 아무것도 안 한다.
     /// </summary>
-    public void SetCountUpProgress(float progress)
+    public void SetCountUpProgress(LobbyResultCountUpFrame frame)
     {
         if (!_bound)
             return;
 
-        SetText(damageText, LobbyResultPanelAnimMath.CountUpValue(_stats.Damage, progress));
-        SetText(killsText, LobbyResultPanelAnimMath.CountUpValue(_stats.Kills, progress));
-        SetText(countersText, LobbyResultPanelAnimMath.CountUpValue(_stats.Counters, progress));
-        SetText(deathsText, LobbyResultPanelAnimMath.CountUpValue(_stats.Deaths, progress));
-        SetText(healingText, LobbyResultPanelAnimMath.CountUpValue(_stats.Healing, progress));
-        SetText(damageTakenText, LobbyResultPanelAnimMath.CountUpValue(_stats.DamageTaken, progress));
+        SetText(damageText, frame.Value(_stats.Damage));
+        SetText(killsText, frame.Value(_stats.Kills));
+        SetText(countersText, frame.Value(_stats.Counters));
+        SetText(deathsText, frame.Value(_stats.Deaths));
+        SetText(healingText, frame.Value(_stats.Healing));
+        SetText(damageTakenText, frame.Value(_stats.DamageTaken));
     }
 
     public void Bind(int slotNumber, PlayerSessionStats stats, CharacterRoster.Entry character, bool isLocal)
@@ -64,7 +64,7 @@ public sealed class ResultPlayerRowView : MonoBehaviour
         SetText(characterText, character != null ? character.DisplayName : unknownCharacterLabel);
         _stats = stats;
         _bound = true;
-        SetCountUpProgress(1f); // 숫자는 최종값 — 카운트업은 로비 결과창 애니(할 일 215)만 덮어쓴다
+        SetCountUpProgress(LobbyResultCountUpFrame.Final); // 숫자는 최종값 — 카운트업은 로비 결과창 애니(할 일 215)만 덮어쓴다
         SetRank(0, false); // 순위를 매기는 쪽(로비 패널)만 SetRank 로 다시 채운다
 
         if (portraitImage != null)

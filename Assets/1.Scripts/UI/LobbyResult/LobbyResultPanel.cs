@@ -26,6 +26,18 @@ public sealed class LobbyResultPanel : MonoBehaviour
     [SerializeField] private TMP_Text outcomeText;
     [SerializeField] private Button closeButton;
 
+    [Header("Grade Stamp (할 일 223)")]
+    [Tooltip("등급 도장(소요시간 칸 오른쪽 빗금 칸). 클리어 판에만 보인다(전멸·중단 = 숨김). 찍히는 연출은 LobbyResultPanelAnimator 가 한다. 비우면 등급 없음.")]
+    [SerializeField] private RectTransform gradeStamp;
+    [Tooltip("도장 위 등급 글자(S/A/B/C).")]
+    [SerializeField] private TMP_Text gradeText;
+    [Tooltip("이 분 이하 = S(소요 시간, 화면 표기와 같은 정수 초 기준).")]
+    [SerializeField] private float gradeSMaxMinutes = LobbyResultGrade.DefaultSMaxMinutes;
+    [Tooltip("이 분 이하 = A.")]
+    [SerializeField] private float gradeAMaxMinutes = LobbyResultGrade.DefaultAMaxMinutes;
+    [Tooltip("이 분 이하 = B, 그보다 길면 C.")]
+    [SerializeField] private float gradeBMaxMinutes = LobbyResultGrade.DefaultBMaxMinutes;
+
     [Header("Behaviour")]
     [Tooltip("열린 뒤 자동으로 닫히는 시간(초, unscaled). 0 이하면 자동으로 닫지 않는다.")]
     [SerializeField] private float autoCloseSeconds = LobbyResultPanelRules.DefaultAutoCloseSeconds;
@@ -168,19 +180,31 @@ public sealed class LobbyResultPanel : MonoBehaviour
 
         if (outcomeText != null && SessionResult.HasValue)
             outcomeText.color = OutcomeColor(SessionResult.Outcome);
+
+        if (gradeStamp != null)
+            gradeStamp.gameObject.SetActive(SessionResult.HasValue && LobbyResultGrade.ShowsStamp(SessionResult.Outcome)); // 클리어 판에만(전멸·중단·결과 없음 = 숨김)
+        if (gradeText != null && SessionResult.HasValue)
+            gradeText.text = LobbyResultGrade.Letter(EvaluateGrade(SessionResult.SurvivalSeconds));
     }
 
     /// <summary>
-    /// 소요 시간 값을 최종값 × <paramref name="progress"/>(0~1)로 쓴다(표기는 <see cref="Refresh"/> 와 같은 mm:ss) — 1 = 최종값.
+    /// 소요 시간 값을 카운트업 프레임 <paramref name="frame"/> 으로 쓴다(값 크기에 맞는 감속 — 할 일 220, 표기는 <see cref="Refresh"/> 와 같은 mm:ss) — 1 = 최종값.
     /// 로비 결과창 카운트업(할 일 215, <see cref="LobbyResultPanelAnimator"/>)만 부른다. 결과가 없으면 아무것도 안 한다.
     /// </summary>
-    public void SetPlayTimeCountUp(float progress)
+    public void SetPlayTimeCountUp(LobbyResultCountUpFrame frame)
     {
         if (playTimeText == null || !SessionResult.HasValue)
             return;
         playTimeText.text = SessionResult.FormatTime(
-            LobbyResultPanelAnimMath.CountUpSeconds(SessionResult.SurvivalSeconds, progress));
+            frame.Seconds(SessionResult.SurvivalSeconds));
     }
+
+    /// <summary>등급 도장(할 일 223) — 없으면 null. 찍히는 연출(<see cref="LobbyResultPanelAnimator"/>)이 읽는다.</summary>
+    public RectTransform GradeStamp => gradeStamp;
+
+    /// <summary>소요 시간(초) → 등급(인스펙터 경계).</summary>
+    public LobbyResultGradeRank EvaluateGrade(float seconds) =>
+        LobbyResultGrade.Evaluate(seconds, gradeSMaxMinutes, gradeAMaxMinutes, gradeBMaxMinutes);
 
     /// <summary>인스펙터 순위 계수.</summary>
     public LobbyResultScoreWeights ScoreWeights => new LobbyResultScoreWeights

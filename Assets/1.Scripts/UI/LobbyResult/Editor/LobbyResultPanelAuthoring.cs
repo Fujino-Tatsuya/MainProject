@@ -89,7 +89,12 @@ public static class LobbyResultPanelAuthoring
     }
 
     static readonly Color TextLight = new Color(0.86f, 0.86f, 0.84f, 1f);
-    static readonly Color LocalMarkerColor = new Color(1f, 0.78f, 0.2f, 1f);
+    // "나" 강조(할 일 222) — 흰 기본 UI 스프라이트(Unity 내장 UISprite, 9-slice)에 밝은 금색. 예전 RowBacking(회색 88)에 금색을 곱하면 어두운 갈색이 돼 안 보였다.
+    static readonly Color LocalMarkerColor = new Color(1f, 0.84f, 0.3f, 1f);
+    const string LocalMarkerSpritePath = "UI/Skin/UISprite.psd"; // AssetDatabase.GetBuiltinExtraResource
+    const float LocalMarkerOutset = 14f;           // 행 배경(Backing) 밖으로 나오는 테 두께(px) — 예전 9
+    const float LocalMarkerCornerScale = 0.18f;    // pixelsPerUnitMultiplier — 내장 스프라이트 모서리를 키워 행 배경 둥근 모서리에 맞춤
+    static readonly Vector3 LocalMarkerScale = new Vector3(0.99f, 0.9f, 1f); // 사용자 조정(222 후속)
     static readonly Color DimColor = new Color(0f, 0f, 0f, 0.6f);
 
     // ── 메뉴 ────────────────────────────────────────────────
@@ -187,10 +192,13 @@ public static class LobbyResultPanelAuthoring
             element.minWidth = element.preferredWidth = RowWidth;
             element.minHeight = element.preferredHeight = RowH;
 
-            // "나" 강조 — 행 배경을 금색으로 조금 크게 깐다(배경 뒤). Bind 가 로컬 행만 켠다.
+            // "나" 강조 — 밝은 금색 테를 행 배경 뒤에 크게 깐다(테만 보임) + 은은한 맥동(할 일 222). Bind 가 로컬 행만 켠다.
             RectTransform marker = NewRect("Marker_Local", root.transform);
-            StretchWithOffset(marker, Padding + 9f);
-            AddImage(marker.gameObject, sprites.RowBacking, true, LocalMarkerColor);
+            StretchWithOffset(marker, Padding + LocalMarkerOutset);
+            Image markerImage = AddImage(marker.gameObject, AssetDatabase.GetBuiltinExtraResource<Sprite>(LocalMarkerSpritePath), true, LocalMarkerColor);
+            markerImage.pixelsPerUnitMultiplier = LocalMarkerCornerScale;
+            marker.gameObject.AddComponent<LobbyResultLocalMarkerPulse>(); // 맥동 값은 컴포넌트 기본값
+            marker.localScale = LocalMarkerScale; // 맥동은 여백·알파만 바꿔 크기를 덮어쓰지 않는다
             marker.gameObject.SetActive(false);
 
             RectTransform backing = NewRect("Backing", root.transform);
@@ -374,6 +382,10 @@ public static class LobbyResultPanelAuthoring
             closeImage.raycastTarget = true;
             Button closeButton = close.gameObject.AddComponent<Button>();
             closeButton.targetGraphic = closeImage;
+            // hover·선택 시 흰 테두리(할 일 224) — 버튼 Transition 은 그대로, 테두리는 버튼 뒤 형제 Image 를 런타임에 만든다.
+            var closeOutline = new SerializedObject(close.gameObject.AddComponent<UiHoverBorder>());
+            closeOutline.FindProperty("outlineSprite").objectReferenceValue = AssetDatabase.GetBuiltinExtraResource<Sprite>(LocalMarkerSpritePath);
+            closeOutline.ApplyModifiedPropertiesWithoutUndo();
             RectTransform closeLabel = NewRect("Label", close);
             StretchWithOffset(closeLabel, -Padding);
             AddText(closeLabel, font, LobbyResultUiStrings.Close, 54f, TextAlignmentOptions.Center, TextLight);
@@ -400,6 +412,8 @@ public static class LobbyResultPanelAuthoring
             viewSo.FindProperty("closeButton").objectReferenceValue = closeButton;
             viewSo.ApplyModifiedPropertiesWithoutUndo();
 
+            AddGradeStamp(panel, LoadGradeFont(), LoadGradeStampSprite(), view); // 등급 도장(할 일 223) — 맨 위에 그린다
+
             LobbyResultPanelAnimAuthoring.Wire(content.gameObject); // 열고 닫기·카운트업 연출(할 일 215)
 
             content.gameObject.SetActive(false); // 기본 닫힘 — Show 가 켠다
@@ -411,6 +425,125 @@ public static class LobbyResultPanelAuthoring
         {
             Object.DestroyImmediate(root);
         }
+    }
+
+    // ── 등급 도장(할 일 223) ──────────────────────────────────
+
+    // 소요시간 캡슐(x 137~962) 과 닫기 버튼(x 1313~) 사이 빗금 칸 가운데. 빨간 원 하나 + 가운데 등급 글자(TMP).
+    // 원 = git 의 작은 흰 원 PNG(512px, 가장자리 안티에일리어싱)에 Image 색으로 빨강 — 기본 Knob 은 확대하면 흐려서 안 쓴다.
+    const string GradeStampSpritePath = "Assets/2.Prefabs/UI/Textures/ResultGradeCircle.png";
+    static readonly Color GradeStampColor = new Color(205f / 255f, 32f / 255f, 36f / 255f, 1f); // 예전 도장 PNG 의 빨강
+    const float GradeStampCenterX = 1150f;
+    const float GradeStampCenterY = 903f;
+    const float GradeStampSize = 120f;      // 사용자 조정(223 — 175 → 120)
+    const float GradeLetterSize = 112f;     // 사용자: 원만 줄이고 글자는 그대로
+    const float GradeStampAngle = -8f; // 최종 기울기 — 연출(LobbyResultPanelAnimator.stampEndAngle)과 같은 값
+    static readonly Color GradeLetterColor = new Color(1f, 0.95f, 0.84f, 1f); // 크림색
+    // 글자 폰트 = 결과창 다른 글자(프리팹)가 실제로 쓰는 서울알림 Medium. 위 FontPath(NotoSansKR)는 처음 저작 때 값이라 도장에는 쓰지 않는다.
+    const string GradeFontPath = "Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset";
+
+    static TMP_FontAsset LoadGradeFont() => AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GradeFontPath);
+
+    /// <summary>기존 패널 프리팹에 도장을 붙인다. 이미 있으면 원 스프라이트·색만 다시 맞춘다(위치·글자는 그대로 — 손으로 맞춘 값 보호).</summary>
+    [MenuItem("Tools/UI/Authoring/Lobby Result Panel 등급 도장 추가·갱신 (223)")]
+    public static void AddGradeStampToPrefab()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogError($"{Tag} Play 중에는 실행하지 않는다 — 먼저 정지할 것.");
+            return;
+        }
+
+        Sprite stamp = LoadGradeStampSprite();
+        var font = LoadGradeFont();
+        if (stamp == null || font == null)
+        {
+            Debug.LogError($"{Tag} 도장 스프라이트 또는 폰트가 없다: {GradeStampSpritePath} · {GradeFontPath}");
+            return;
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+        try
+        {
+            var panel = root.transform.Find("Content/Panel") as RectTransform;
+            if (panel == null)
+            {
+                Debug.LogError($"{Tag} Content/Panel 이 없다: {PanelPath}");
+                return;
+            }
+            Transform existing = panel.Find("GradeStamp");
+            if (existing != null)
+            {
+                Image image = existing.GetComponent<Image>();
+                if (image == null || (image.sprite == stamp && image.color == GradeStampColor))
+                {
+                    Debug.Log($"{Tag} 등급 도장이 이미 최신 — 손대지 않음.");
+                    return;
+                }
+                image.sprite = stamp;
+                image.color = GradeStampColor;
+                PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool updated);
+                Debug.Log($"{Tag} 등급 도장 원·색 갱신 {(updated ? "성공" : "실패")}: {PanelPath}");
+                return;
+            }
+
+            AddGradeStamp(panel, font, stamp, root.GetComponent<LobbyResultPanel>());
+            PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool success);
+            Debug.Log($"{Tag} 등급 도장 추가 {(success ? "성공" : "실패")}: {PanelPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>batchmode 용(-executeMethod) — 새 PNG 임포트 후 도장 추가·갱신.</summary>
+    public static void AddGradeStampBatch()
+    {
+        AssetDatabase.Refresh();
+        AddGradeStampToPrefab();
+    }
+
+    /// <summary>원 PNG 를 Sprite(Single·밉맵 없음)로 맞춰 읽는다.</summary>
+    static Sprite LoadGradeStampSprite()
+    {
+        if (AssetImporter.GetAtPath(GradeStampSpritePath) is TextureImporter importer &&
+            (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single || importer.mipmapEnabled))
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.SaveAndReimport();
+        }
+
+        Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(GradeStampSpritePath);
+        if (sprite == null)
+            Debug.LogError($"{Tag} 도장 Sprite 를 찾지 못했다: {GradeStampSpritePath}");
+        return sprite;
+    }
+
+    static void AddGradeStamp(RectTransform panel, TMP_FontAsset font, Sprite stamp, LobbyResultPanel view)
+    {
+        RectTransform root = NewRect("GradeStamp", panel);
+        root.SetAsLastSibling(); // 내려찍을 때 2.5배로 커져도 다른 칸 위에
+        PlaceDesign(root, GradeStampCenterX - GradeStampSize * 0.5f, GradeStampCenterY - GradeStampSize * 0.5f, GradeStampSize, GradeStampSize);
+        root.localRotation = Quaternion.Euler(0f, 0f, GradeStampAngle);
+        AddImage(root.gameObject, stamp, false, GradeStampColor).preserveAspect = true;
+        CanvasGroup group = root.gameObject.AddComponent<CanvasGroup>(); // 연출이 투명도를 바꾼다
+        group.interactable = false;
+        group.blocksRaycasts = false;
+
+        RectTransform letter = NewRect("Text_Grade", root);
+        StretchWithOffset(letter, 0f);
+        TMP_Text text = AddText(letter, font, "S", GradeLetterSize, TextAlignmentOptions.Center, GradeLetterColor);
+
+        if (view == null)
+            return;
+        var so = new SerializedObject(view);
+        so.FindProperty("gradeStamp").objectReferenceValue = root;
+        so.FindProperty("gradeText").objectReferenceValue = text;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     // ── 미리보기 캡처 ─────────────────────────────────────────

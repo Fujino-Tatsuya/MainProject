@@ -1,8 +1,9 @@
 using EuniTween;
+using UnityEngine;
 using NUnit.Framework;
 
 /// <summary>
-/// 로비 결과창 애니메이션(할 일 215) 계산 — 진행도·카운트업 지연·투명도/크기·카운트업 숫자.
+/// 로비 결과창 애니메이션(할 일 215·220) 계산 — 진행도·카운트업 지연·투명도/크기·카운트업 숫자·감속 곡선·값 크기별 세기·끝 펀치.
 /// </summary>
 public sealed class LobbyResultPanelAnimMathTests
 {
@@ -52,6 +53,13 @@ public sealed class LobbyResultPanelAnimMathTests
         Assert.AreEqual(0, LobbyResultPanelAnimMath.CountUpValue(0, 0.7f));
         Assert.AreEqual(int.MaxValue, LobbyResultPanelAnimMath.CountUpValue(int.MaxValue, 1f));
         Assert.LessOrEqual(LobbyResultPanelAnimMath.CountUpValue(int.MaxValue, 0.999999f), int.MaxValue);
+        // 220: 소수 버림 — 최종값은 진행도 1 에서만(작은 값이 감속 꼬리 동안 미리 최종값에 멈추지 않게)
+        Assert.AreEqual(11, LobbyResultPanelAnimMath.CountUpValue(12, 0.99f));
+        Assert.AreEqual(11, LobbyResultPanelAnimMath.CountUpValue(12, 0.9999f));
+        Assert.AreEqual(12, LobbyResultPanelAnimMath.CountUpValue(12, 1f));
+        Assert.AreEqual(48209, LobbyResultPanelAnimMath.CountUpValue(48210, 0.99999f));
+        for (float p = 0f; p < 1f; p += 0.001f)
+            Assert.Less(LobbyResultPanelAnimMath.CountUpValue(12, p), 12);
     }
 
     [Test]
@@ -75,10 +83,12 @@ public sealed class LobbyResultPanelAnimMathTests
     [Test]
     public void CrownCycle_FirstRightAfterCountUp_ThenEveryInterval()
     {
-        // 숫자 지연 0.15 + 숫자 0.8 + 왕관 지연 0.05 = 1.0 초에 첫 점프, 0.6 초 동안
-        float first = LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 0.8f, 0.05f);
+        // 숫자 지연 0.15 + 숫자 0.8 + 펀치 0(꺼짐) + 왕관 지연 0.05 = 1.0 초에 첫 점프, 0.6 초 동안
+        float first = LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 0.8f, 0f, 0.05f);
         Assert.AreEqual(1f, first, 1e-5f);
-        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownFirstStart(-1f, -1f, -1f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownFirstStart(-1f, -1f, -1f, -1f), 1e-6f);
+        // 220 기본: 0.15 + 1.5 + 펀치 0.28 + 0.05 = 1.98 초 — 펀치가 끝난 직후
+        Assert.AreEqual(1.98f, LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 1.5f, 0.28f, 0.05f), 1e-5f);
 
         Assert.AreEqual(3f, LobbyResultPanelAnimMath.CrownPeriod(0.6f, 3f), 1e-6f);
         Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownPeriod(0.6f, 0f), 1e-6f);
@@ -149,5 +159,183 @@ public sealed class LobbyResultPanelAnimMathTests
         Assert.AreEqual(0f, LobbyResultPanelAnimMath.SparklePulse(-1f, Ease.OutCubic), 1e-6f);
         Assert.AreEqual(1f, LobbyResultPanelAnimMath.SparklePulse(0.5f, Ease.OutCubic), 1e-5f);
         Assert.AreEqual(0f, LobbyResultPanelAnimMath.SparklePulse(1f, Ease.OutCubic), 1e-6f);
+    }
+    [Test]
+    public void DefaultCountUpCurve_StrongEaseOut_NeverOvershoots()
+    {
+        // 220: 30% 시간에 82%, 남은 70% 시간 동안 마지막 18% — 끝으로 갈수록 느려지고 1 을 넘지 않는다.
+        AnimationCurve curve = LobbyResultPanelAnimator.DefaultCountUpCurve();
+        Assert.AreEqual(0f, curve.Evaluate(0f), 1e-5f);
+        Assert.AreEqual(0.82f, curve.Evaluate(0.3f), 1e-4f);
+        Assert.AreEqual(1f, curve.Evaluate(1f), 1e-5f);
+        Assert.Greater(curve.Evaluate(0.65f), 0.93f); // 중반 이후는 거의 다 왔다 — 남은 자리가 천천히
+
+        float previous = 0f;
+        float previousStep = float.MaxValue;
+        for (int i = 1; i <= 100; i++)
+        {
+            float t = i / 100f;
+            float v = curve.Evaluate(t);
+            Assert.LessOrEqual(v, 1f + 1e-5f, $"t={t}");
+            Assert.GreaterOrEqual(v, previous - 1e-6f, $"t={t}"); // 되돌아가지 않음
+            if (t > 0.3f)
+            {
+                float step = v - previous;
+                Assert.LessOrEqual(step, previousStep + 1e-5f, $"t={t}"); // 감속 구간: 한 칸 증가량이 줄기만
+                previousStep = step;
+            }
+            previous = v;
+        }
+    }
+
+    [Test]
+    public void PanelPunch_OneToPeakToOne_AtCountUpEnd()
+    {
+        Assert.AreEqual(1.65f, LobbyResultPanelAnimMath.CountUpEnd(0.15f, 1.5f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpEnd(-1f, -1f), 1e-6f);
+
+        // 끝나기 전·끝난 뒤 = 정확히 1
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(-0.1f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(0f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(0.28f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(5f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        // 가운데 = 최대
+        Assert.AreEqual(1.06f, LobbyResultPanelAnimMath.PanelPunchScale(0.14f, 0.28f, 1.06f, Ease.OutQuad), 1e-4f);
+        float rising = LobbyResultPanelAnimMath.PanelPunchScale(0.07f, 0.28f, 1.06f, Ease.OutQuad);
+        Assert.Greater(rising, 1f);
+        Assert.Less(rising, 1.06f);
+        // 지속 0 = 펀치 없음
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(0.1f, 0f, 1.06f, Ease.OutQuad), 1e-6f);
+    }
+
+    [Test]
+    public void CountUpCurveWeight_SmallLinear_LargeCurve_LogBlend()
+    {
+        // 기본 기준 10 ~ 1000: 10 이하 선형, 1000 이상 곡선 그대로, 100 = 반반(자릿수 보간)
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(1, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(3, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(10, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.CountUpCurveWeight(100, 10f, 1000f), 1e-5f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CountUpCurveWeight(1000, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CountUpCurveWeight(1234567, 10f, 1000f), 1e-6f);
+        // 기준이 뒤집히면 선형 기준 하나로 자른다
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(50, 100f, 10f), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CountUpCurveWeight(500, 100f, 10f), 1e-6f);
+    }
+
+    [Test]
+    public void CountUpFrame_AllValuesArriveTogether_SmallEven_LargeDramatic()
+    {
+        AnimationCurve curve = LobbyResultPanelAnimator.DefaultCountUpCurve();
+        LobbyResultCountUpFrame At(float p) => new LobbyResultCountUpFrame(p, p >= 1f ? 1f : Mathf.Clamp01(curve.Evaluate(p)), 10f, 1000f);
+
+        int[] finals = { 1, 3, 12, 100, 754, 48210, 1234567 };
+        // 같은 끝: 끝 직전엔 모두 최종값 전, 끝(1)에서 모두 최종값. 도중 어느 값도 최종값을 넘지 않는다.
+        foreach (int final in finals)
+        {
+            Assert.Less(At(0.99f).Value(final), final, $"final={final}");
+            Assert.AreEqual(final, At(1f).Value(final), $"final={final}");
+            int previous = 0;
+            for (float p = 0f; p < 1f; p += 0.005f)
+            {
+                int v = At(p).Value(final);
+                Assert.LessOrEqual(v, final, $"final={final} p={p}");
+                Assert.GreaterOrEqual(v, previous, $"final={final} p={p}"); // 되돌아가지 않음
+                previous = v;
+            }
+        }
+        Assert.AreEqual(754.4f, At(1f).Seconds(754.4f), 1e-4f);
+        Assert.Less(At(0.99f).Seconds(754.4f), 754f); // 표기 12:34 는 끝에만
+        Assert.AreEqual(1f, LobbyResultCountUpFrame.Final.ProgressFor(3), 1e-6f);
+
+        // 작은 값(3) = 선형 — 1/3·2/3 지점에서 고르게 한 칸씩
+        Assert.AreEqual(0, At(0.33f).Value(3));
+        Assert.AreEqual(1, At(0.34f).Value(3));
+        Assert.AreEqual(1, At(0.66f).Value(3));
+        Assert.AreEqual(2, At(0.67f).Value(3));
+        // 큰 값 = 곡선 그대로(30% 시간에 82%)
+        Assert.AreEqual(curve.Evaluate(0.3f), At(0.3f).ProgressFor(48210), 1e-5f);
+        Assert.Greater(At(0.3f).Value(48210), 48210 * 0.8f);
+        // 중간 값(100) = 반반 — 선형보다 빠르고 곡선보다 느리다
+        float mid = At(0.3f).ProgressFor(100);
+        Assert.Greater(mid, 0.3f);
+        Assert.Less(mid, curve.Evaluate(0.3f));
+    }
+
+    [Test]
+    public void LocalMarkerPulse_PingPongsEveryPeriod()
+    {
+        // 222: 0 초 = 0(가장 밝음), 반 주기 = 1(가장 어두움), 한 주기 = 다시 0, 반복
+        const float period = 1.6f;
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.PingPongPulse(0f, period, Ease.InOutSine), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PingPongPulse(0.8f, period, Ease.InOutSine), 1e-4f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.PingPongPulse(1.6f, period, Ease.InOutSine), 1e-4f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.PingPongPulse(0.4f, period, Ease.InOutSine), 1e-4f);
+        Assert.AreEqual(LobbyResultPanelAnimMath.PingPongPulse(0.4f, period, Ease.InOutSine),
+            LobbyResultPanelAnimMath.PingPongPulse(1.2f, period, Ease.InOutSine), 1e-4f); // 거울
+        Assert.AreEqual(LobbyResultPanelAnimMath.PingPongPulse(0.3f, period, Ease.InOutSine),
+            LobbyResultPanelAnimMath.PingPongPulse(0.3f + 5f * period, period, Ease.InOutSine), 1e-3f); // 반복
+        for (float t = 0f; t < 5f; t += 0.01f)
+        {
+            float v = LobbyResultPanelAnimMath.PingPongPulse(t, period, Ease.InOutSine);
+            Assert.GreaterOrEqual(v, 0f);
+            Assert.LessOrEqual(v, 1f);
+        }
+        // 주기 0 이하 = 맥동 없음
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.PingPongPulse(0.4f, 0f, Ease.InOutSine), 1e-6f);
+    }
+
+    // ── 등급 도장(할 일 223) ──
+
+    [Test]
+    public void StampDropPose_HiddenBeforeStart_SlamsToFinalWithInQuad()
+    {
+        LobbyResultStampPose before = LobbyResultPanelAnimMath.StampDropPose(-0.01f, 0.12f, 2.5f, -12f, -8f, Ease.InQuad);
+        Assert.AreEqual(0f, before.Alpha, 1e-6f);
+        Assert.AreEqual(2.5f, before.Scale, 1e-6f);
+        Assert.AreEqual(-12f, before.Angle, 1e-6f);
+
+        // 절반 시간 = InQuad 0.25 — 아직 크게 남아 있다가 끝에서 빨라진다
+        LobbyResultStampPose half = LobbyResultPanelAnimMath.StampDropPose(0.06f, 0.12f, 2.5f, -12f, -8f, Ease.InQuad);
+        Assert.AreEqual(2.5f - 1.5f * 0.25f, half.Scale, 1e-4f);
+        Assert.AreEqual(0.25f, half.Alpha, 1e-4f);
+        Assert.AreEqual(-11f, half.Angle, 1e-4f);
+
+        LobbyResultStampPose landed = LobbyResultPanelAnimMath.StampDropPose(0.12f, 0.12f, 2.5f, -12f, -8f, Ease.InQuad);
+        Assert.AreEqual(1f, landed.Scale, 1e-6f);
+        Assert.AreEqual(1f, landed.Alpha, 1e-6f);
+        Assert.AreEqual(-8f, landed.Angle, 1e-6f);
+
+        // 지속 0 = 시작하자마자 최종
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampDropPose(0f, 0f, 2.5f, -12f, -8f, Ease.InQuad).Alpha, 1e-6f);
+    }
+
+    [Test]
+    public void StampBounceAndShake_OnlyAfterLanding_SettleExactly()
+    {
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampBounceScale(0f, 0.16f, 1.08f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1.08f, LobbyResultPanelAnimMath.StampBounceScale(0.08f, 0.16f, 1.08f, Ease.OutQuad), 1e-4f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampBounceScale(0.16f, 0.16f, 1.08f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampBounceScale(0.05f, 0f, 1.08f, Ease.OutQuad), 1e-6f);
+
+        Assert.AreEqual(Vector2.zero, LobbyResultPanelAnimMath.StampShakeOffset(-0.01f, 0.12f, 8f, 3f));
+        Assert.AreEqual(Vector2.zero, LobbyResultPanelAnimMath.StampShakeOffset(0.12f, 0.12f, 8f, 3f));
+        Vector2 mid = LobbyResultPanelAnimMath.StampShakeOffset(0.01f, 0.12f, 8f, 3f);
+        Assert.Greater(mid.magnitude, 0f);
+        Assert.LessOrEqual(Mathf.Abs(mid.x), 8f);
+    }
+
+    [Test]
+    public void StampTiming_AfterPunch_CrownWaitsUntilStampSettles()
+    {
+        // 카운트업 0.15 + 1.5 = 1.65 끝 → 펀치 0.28 → 도장 1.93 시작
+        Assert.AreEqual(1.93f, LobbyResultPanelAnimMath.StampStart(0.15f, 1.5f, 0.28f, 0f), 1e-5f);
+        // 음수 지연은 펀치와 겹치되 카운트업 끝보다 앞으로는 안 간다
+        Assert.AreEqual(1.65f, LobbyResultPanelAnimMath.StampStart(0.15f, 1.5f, 0.28f, -1f), 1e-5f);
+        // 내려찍기 0.12 + max(흔들림 0.12, 반동 0.16) = 0.28
+        Assert.AreEqual(0.28f, LobbyResultPanelAnimMath.StampTotal(0.12f, 0.12f, 0.16f), 1e-6f);
+        // 왕관 첫 점프 = 카운트업 끝 + (펀치 + 도장) + 왕관 지연 — 도장이 자리 잡은 뒤
+        float crown = LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 1.5f, 0.28f + 0.28f, 0.05f);
+        Assert.GreaterOrEqual(crown, 1.93f + 0.28f);
     }
 }
