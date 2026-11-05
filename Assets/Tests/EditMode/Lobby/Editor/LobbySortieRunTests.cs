@@ -264,8 +264,8 @@ public sealed class LobbySortieRunTests
     [Test]
     public void 쓰러짐_사망은_집결_불인정()
     {
-        Assert.That(new PartyGatherMemberState(true, true, false).Gathered, Is.False);
-        Assert.That(new PartyGatherMemberState(true, false, false).Gathered, Is.True);
+        Assert.That(new PartyGatherMemberState(true, true).Gathered, Is.False);
+        Assert.That(new PartyGatherMemberState(true, false).Gathered, Is.True);
     }
 
     // ── 재접속 rebind(Q-T2 A) ──

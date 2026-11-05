@@ -1,18 +1,17 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 
-/// <summary>보스 엘리베이터 파티 집결 — 할 일 89(전원 발판 5초, 사망·이탈·인원 변화 취소, Soul 대기, Forced·발판 잠김·연출·도착 대기 중 비활성, Busy 보류).</summary>
+/// <summary>보스 엘리베이터 파티 집결 — 할 일 89(전원 발판 5초, 사망·이탈·인원 변화 취소, Soul 대기, Forced·발판 잠김·연출·도착 대기 중 비활성, 행동 상태 무관 — 할 일 231).</summary>
 public sealed class BossElevatorGatherTests
 {
     const double Hold = 5d;
 
     static readonly BossElevatorGatherConditions Open = new BossElevatorGatherConditions(true, false, false, false);
 
-    static BossElevatorGatherMember On(ulong id) => new BossElevatorGatherMember(id, true, PlayerLifeState.Alive, 100f, true, false);
-    static BossElevatorGatherMember Off(ulong id) => new BossElevatorGatherMember(id, true, PlayerLifeState.Alive, 100f, false, false);
-    static BossElevatorGatherMember OnBusy(ulong id) => new BossElevatorGatherMember(id, true, PlayerLifeState.Alive, 100f, true, true);
-    static BossElevatorGatherMember OnIn(ulong id, PlayerLifeState state) => new BossElevatorGatherMember(id, true, state, state == PlayerLifeState.Alive ? 100f : 0f, true, false);
-    static BossElevatorGatherMember Gone(ulong id) => new BossElevatorGatherMember(id, false, PlayerLifeState.Alive, 100f, false, false);
+    static BossElevatorGatherMember On(ulong id) => new BossElevatorGatherMember(id, true, PlayerLifeState.Alive, 100f, true);
+    static BossElevatorGatherMember Off(ulong id) => new BossElevatorGatherMember(id, true, PlayerLifeState.Alive, 100f, false);
+    static BossElevatorGatherMember OnIn(ulong id, PlayerLifeState state) => new BossElevatorGatherMember(id, true, state, state == PlayerLifeState.Alive ? 100f : 0f, true);
+    static BossElevatorGatherMember Gone(ulong id) => new BossElevatorGatherMember(id, false, PlayerLifeState.Alive, 100f, false);
 
     static List<BossElevatorGatherMember> Members(params BossElevatorGatherMember[] members) => new List<BossElevatorGatherMember>(members);
 
@@ -79,7 +78,7 @@ public sealed class BossElevatorGatherTests
     public void 체력_0이면_Alive_여도_쓰러짐()
     {
         var gather = new BossElevatorGather(Hold);
-        var zeroHp = new BossElevatorGatherMember(1, true, PlayerLifeState.Alive, 0f, true, false);
+        var zeroHp = new BossElevatorGatherMember(1, true, PlayerLifeState.Alive, 0f, true);
 
         gather.Tick(0d, Open, Members(On(0), zeroHp));
         Assert.That(gather.IsCountdownActive, Is.False);
@@ -178,29 +177,18 @@ public sealed class BossElevatorGatherTests
     }
 
     [Test]
-    public void 진행_중_행동이_있으면_시작만_미룬다()
+    public void 마지막_한_명이_발판에_오른_그_판정에서_바로_카운트가_시작된다()
     {
+        // 할 일 231 — 공격하며 올라와도 무시되던 버그. 입력은 발판·생명뿐이라 행동 상태로 시작을 미루지 않는다.
         var gather = new BossElevatorGather(Hold);
 
-        gather.Tick(0d, Open, Members(On(0), OnBusy(1)));
+        gather.Tick(0d, Open, Members(On(0), Off(1)));
         Assert.That(gather.IsCountdownActive, Is.False);
-        Assert.That(gather.GatheredCount, Is.EqualTo(2), "Busy 여도 집결 인원에는 든다");
 
-        gather.Tick(1d, Open, Members(On(0), On(1)));
-        Assert.That(gather.CountdownEndTime, Is.EqualTo(6d));
-
-        // 시작 뒤 행동은 카운트를 끊지 않는다.
-        Assert.That(gather.Tick(3d, Open, Members(OnBusy(0), On(1))), Is.False);
+        Assert.That(gather.Tick(1d, Open, Members(On(0), On(1))), Is.False);
         Assert.That(gather.IsCountdownActive, Is.True);
-        Assert.That(gather.Tick(6d, Open, Members(OnBusy(0), On(1))), Is.True);
-    }
-
-    [Test]
-    public void Busy_는_Idle_Move_가_아닌_상태()
-    {
-        Assert.That(BossElevatorGather.IsBusy(PlayerActionState.Idle), Is.False);
-        Assert.That(BossElevatorGather.IsBusy(PlayerActionState.Move), Is.False);
-        Assert.That(BossElevatorGather.IsBusy(PlayerActionState.Dash), Is.True);
+        Assert.That(gather.CountdownEndTime, Is.EqualTo(6d));
+        Assert.That(gather.Tick(6d, Open, Members(On(0), On(1))), Is.True);
     }
 
     [Test]

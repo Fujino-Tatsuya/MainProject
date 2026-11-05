@@ -4,11 +4,10 @@ using System.Collections.Generic;
 /// <summary>참여자 한 명의 이번 판정 입력 — <see cref="PartyGatherRules.SetMemberState"/>.</summary>
 public readonly struct PartyGatherMemberState
 {
-    public PartyGatherMemberState(bool inside, bool incapacitated, bool busy)
+    public PartyGatherMemberState(bool inside, bool incapacitated)
     {
         Inside = inside;
         Incapacitated = incapacitated;
-        Busy = busy;
     }
 
     /// <summary>구역 사각형 안.</summary>
@@ -17,9 +16,6 @@ public readonly struct PartyGatherMemberState
     /// <summary>쓰러짐·사망 — 안에 있어도 집결로 인정하지 않는다(자동 부활 없음).</summary>
     public bool Incapacitated { get; }
 
-    /// <summary>진행 중 행동(공격·스킬·대시·넉백 등 Idle/Move 가 아닌 상태) — 카운트다운을 시작하지 않는다.</summary>
-    public bool Busy { get; }
-
     /// <summary>집결 인정 = 안 + 쓰러짐·사망 아님.</summary>
     public bool Gathered => Inside && !Incapacitated;
 }
@@ -27,11 +23,11 @@ public readonly struct PartyGatherMemberState
 /// <summary>
 /// [서버] 파티 집결 규칙 — 할 일 86 PLAN §3.1·§7(유지 시간 = 전부 5초, 데이터 값). MonoBehaviour·NGO 의존 없는 순수 상태(EditMode 테스트 대상).
 /// <list type="bullet">
-/// <item>참여자 전원이 집결 인정(안 + 쓰러짐·사망 아님)이고 진행 중 행동이 없으면 카운트다운 시작. 참여자 0명이면 시작하지 않는다.</item>
+/// <item>참여자 전원이 집결 인정(안 + 쓰러짐·사망 아님)이면 카운트다운 시작. 참여자 0명이면 시작하지 않는다.</item>
 /// <item>카운트다운 중 한 명 이탈·쓰러짐 → 즉시 0 초기화. 참여자 추가·제거(인원 변화) → 즉시 0 초기화(남은 전원이 안이면 다음 판정에서 처음부터 다시).</item>
 /// <item>유지 시간을 채우면 확정 1회(래치) — <see cref="Tick"/> 이 한 번만 true. 래치 뒤엔 판정하지 않는다(<see cref="ResetConfirmation"/> 로만 푼다).</item>
 /// <item>비활성이면 판정·카운트 없음(끄는 순간 카운트다운도 0).</item>
-/// <item>행동이 이미 진행 중이면 카운트다운 시작만 미룬다 — 시작 뒤의 행동은 카운트다운을 끊지 않는다. 카운트다운 중 입력 제한은 없다(사용자 결정 2026-10-22).</item>
+/// <item>행동 상태(공격·스킬·대시 등)는 보지 않는다 — 공격하며 들어와도 바로 집결로 친다(할 일 231, 옛 '진행 중 행동이면 시작 보류' 삭제). 카운트다운 중 입력 제한도 없다(사용자 결정 2026-10-22).</item>
 /// </list>
 /// 시각은 호출자가 넣는다(PartyGatherZone = NetworkManager.ServerTime.Time). 종료 시각 0 이하 = 카운트다운 없음.
 /// </summary>
@@ -182,7 +178,7 @@ public sealed class PartyGatherRules
 
     /// <summary>
     /// 판정 한 번. 확정 순간에만 true(1회). 비활성·확정 뒤에는 아무것도 하지 않는다.
-    /// 전원 집결이 깨지면 카운트다운 0, 전원 집결 + 진행 중 행동 없음이면 now 부터 카운트다운, 종료 시각에 닿으면 확정.
+    /// 전원 집결이 깨지면 카운트다운 0, 전원 집결이면 now 부터 카운트다운, 종료 시각에 닿으면 확정.
     /// </summary>
     public bool Tick(double now)
     {
@@ -196,12 +192,7 @@ public sealed class PartyGatherRules
         }
 
         if (!IsCountdownActive)
-        {
-            if (AnyBusy())
-                return false;
-
             CountdownEndTime = Math.Max(now + _holdSeconds, MinActiveEndTime);
-        }
 
         if (now < CountdownEndTime)
             return false;
@@ -222,17 +213,6 @@ public sealed class PartyGatherRules
     public static double RemainingSeconds(double countdownEndTime, double now)
     {
         return countdownEndTime > NoCountdown ? Math.Max(0d, countdownEndTime - now) : 0d;
-    }
-
-    bool AnyBusy()
-    {
-        foreach (var clientId in _participants)
-        {
-            if (_states.TryGetValue(clientId, out var state) && state.Busy)
-                return true;
-        }
-
-        return false;
     }
 
     void CancelCountdown()

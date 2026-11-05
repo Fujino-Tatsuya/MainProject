@@ -5,10 +5,9 @@ public sealed class PartyGatherRulesTests
 {
     const double Hold = 5d;
 
-    static readonly PartyGatherMemberState In = new PartyGatherMemberState(true, false, false);
-    static readonly PartyGatherMemberState Out = new PartyGatherMemberState(false, false, false);
-    static readonly PartyGatherMemberState InDown = new PartyGatherMemberState(true, true, false);
-    static readonly PartyGatherMemberState InBusy = new PartyGatherMemberState(true, false, true);
+    static readonly PartyGatherMemberState In = new PartyGatherMemberState(true, false);
+    static readonly PartyGatherMemberState Out = new PartyGatherMemberState(false, false);
+    static readonly PartyGatherMemberState InDown = new PartyGatherMemberState(true, true);
 
     static PartyGatherRules CreateActive(params ulong[] clientIds)
     {
@@ -196,34 +195,20 @@ public sealed class PartyGatherRulesTests
     }
 
     [Test]
-    public void 진행_중_행동이_있으면_카운트다운을_시작하지_않는다()
+    public void 마지막_한_명이_들어온_그_판정에서_바로_카운트다운이_시작된다()
     {
+        // 할 일 231 — 공격하며 들어와도 무시되던 버그. 집결 입력은 위치·생명뿐이고 행동 상태로 시작을 미루지 않는다.
         var rules = CreateActive(0, 1);
         rules.SetMemberState(0, In);
-        rules.SetMemberState(1, InBusy);
-
-        Assert.That(rules.Tick(0d), Is.False);
-        Assert.That(rules.IsCountdownActive, Is.False);
-        Assert.That(rules.GatheredCount, Is.EqualTo(2));
-
-        // 행동이 끝나면 그때부터 5초.
-        rules.SetMemberState(1, In);
-        rules.Tick(2d);
-        Assert.That(rules.CountdownEndTime, Is.EqualTo(7d));
-    }
-
-    [Test]
-    public void 카운트다운_중_행동을_시작해도_카운트다운은_이어진다()
-    {
-        // 카운트다운 중 입력 제한은 없다(사용자 결정 10-22) — 시작 뒤의 행동은 카운트다운을 끊지 않는다.
-        var rules = CreateActive(0, 1);
-        SetAll(rules, In);
+        rules.SetMemberState(1, Out);
         rules.Tick(0d);
+        Assert.That(rules.IsCountdownActive, Is.False);
 
-        rules.SetMemberState(1, InBusy);
-        Assert.That(rules.Tick(3d), Is.False);
-        Assert.That(rules.CountdownEndTime, Is.EqualTo(5d));
-        Assert.That(rules.Tick(5d), Is.True);
+        rules.SetMemberState(1, In);
+        Assert.That(rules.Tick(2d), Is.False);
+        Assert.That(rules.IsCountdownActive, Is.True);
+        Assert.That(rules.CountdownEndTime, Is.EqualTo(7d));
+        Assert.That(rules.Tick(7d), Is.True);
     }
 
     [Test]
@@ -296,7 +281,7 @@ public sealed class PartyGatherRulesTests
         Assert.That(rules.GatheredCount, Is.EqualTo(1));
         Assert.That(rules.ParticipantCount, Is.EqualTo(3));
 
-        rules.SetMemberState(1, InBusy);
+        rules.SetMemberState(1, In);
         rules.SetMemberState(2, In);
         Assert.That(rules.GatheredCount, Is.EqualTo(3));
         Assert.That(rules.AreAllGathered, Is.True);

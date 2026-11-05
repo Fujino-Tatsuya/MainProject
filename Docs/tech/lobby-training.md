@@ -58,7 +58,7 @@
 | `LobbyTutorialState.cs` | 158 읽기 파사드(정적) — 계약 문서 §2·§3 |
 | `LobbyTrainingDirector.cs` (+`.Recovery.cs`) | NGO 진행기 — 스냅샷·명단·클리어 플래그 복제, 집결 구역 켜고 끄기, 대사 스케줄러, 텔레포트, 출격, 연결/재접속 |
 | 내용 컴포넌트(같은 오브젝트) | `LobbyTrainingWeaponCheck`(T10)·`LobbyTrainingCombat`(T22)·`LobbyTrainingSparring`(T31~T40·T50 허수아비)·`LobbyBriefing`(L31~L34 잠금·카메라) |
-| `PartyGatherZone` / `PartyGatherRules` | 집결 구역(서버 폴링·쓰러짐 제외·확정 래치·카운트다운 서버 시각 복제) |
+| `PartyGatherZone` / `PartyGatherRules` | 집결 구역(서버 폴링·쓰러짐 제외·행동 상태 무관 — 공격 중이어도 집결(231)·확정 래치·카운트다운 서버 시각 복제) |
 | `LobbyAreaVolume` | 비네트워크 박스 볼륨 — 라커룸 `Area_Locker`(L00 + 캐릭터 선택 영역, 161) |
 
 ### 2.1 진행·보고 규칙
