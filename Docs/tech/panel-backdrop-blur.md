@@ -49,3 +49,14 @@ Screen Space Overlay UI 는 후처리 뒤에 그려져 렌더 피처가 못 건�
 - 쓰는 곳: `TitleFlowDirector` — Press 문구(`_pressAnyKeyRoot`)의 캔버스를 패널로 잡아 그 캔버스(문구·스킵 안내·페이드)는 선명, 월드만 블러 + 흑백(기본 세기 1.42·채도 0·어둡게 0·반경 비례).
   아무 키 → 문구 끔 → `_restoreDuration`(1초, unscaled) 동안 세기 1→0 선형(블러·흑백 같이 원복) → 놓고 기존 카메라 진입(`EnterApproaching`). 원복 중 ESC 스킵 없음.
 - 문구 참조가 비면 블러를 건너뛴다(캔버스 없이 잡으면 모든 Overlay 가 흐려져 문구까지 흐려짐).
+
+### 5.1 TV 글리치 (218 후속, 11-05)
+
+`PanelBackdropBlur.Drive(owner, amount, look, glitch, glitchLook)` — 구동에 아날로그 TV 글리치를 얹는다. **블러 합성 패스(`PanelBlurComp`) 안에서** 절차적으로 그린다 — 새 패스·RT·텍스처 없음.
+화면 세기 = `glitch`(호출자가 매 프레임 계산, 0~1) × 블러 세기 → 원복 동안 블러와 같은 진행도로 0. 글리치 없는 `Drive`·패널 블러(201)는 세기 0 → 셰이더가 분기로 건너뛴다(비용 그대로).
+
+- 모양 `PanelBackdropGlitchLook`(값 = 글리치 세기 1 기준): 주사선 어둡기·주기(px)·RGB 어긋남(UV)·찢김 최대 폭(UV)·찢김 띠 비율(세기³ 비례 — 상시엔 드묾)·잡음.
+- 셰이더: 가로 띠 찢김(띠 수·위치는 초당 15번 바뀜)·줄 단위 미세 떨림 → RGB 어긋남(흑백 처리 **뒤** 채널을 따로 뽑아 흑백 위에 빨강·파랑 테두리)·주사선·흑백 잡음(초당 30번). 시간 = `Time.unscaledTime`.
+- 비용: 글리치 중 합성이 원본·블러 샘플 2 → 6(풀 해상도 1패스), 해시 몇 번. 그 외 동일.
+- 쓰는 곳: `TitleFlowDirector` 「Press 대기 TV 글리치 (218 후속)」 칸 — 상시 세기 0.3 + 불규칙 버스트(세기 0.75~1, 간격 1.5~4초, 길이 0.12~0.3초, 즉시 피크 → (1-k)² 감쇠 = `TitleCrtFx` 버스트와 같은 모양), 모양 기본 (0.45, 3px, 0.008, 0.06, 0.35, 0.18). Press 문구 캔버스는 블러와 같은 규칙으로 글리치에서도 빠진다.
+- 기존 타이틀 CRT 를 안 쓴 이유: `TitleCrtFx` 는 모니터 화면 머티리얼(`Title/CRTScreen`) 전용이고, 전체화면 `RetroCRTController`(Cyanilux)는 타이틀에서 꺼져 있으며(`_effectEnabled 0`) 베젤·곡률까지 바뀌어 룩이 달라진다. 카메라 진입 때의 지직거림(`_approachBurst`·`_burstFx`)은 그대로.

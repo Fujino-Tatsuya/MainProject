@@ -84,6 +84,31 @@ public sealed class PanelBackdropBlurTests
     }
 
     [Test]
+    public void DrivenGlitch_OnlyWhileDriven_ResetByPlainDrive()
+    {
+        var state = new PanelBackdropBlurState();
+        object title = new object();
+        var look = new PanelBackdropBlurLook(1.42f, 0f, 0f, true);
+        var glitchLook = new PanelBackdropGlitchLook(0.45f, 3f, 0.008f, 0.06f, 0.35f, 0.18f);
+
+        state.SetDrivenGlitch(1f, glitchLook);
+        Assert.AreEqual(0f, state.GetDrivenGlitch(out _), "구동 전에는 글리치를 걸 수 없다");
+
+        state.Acquire(title, 0);
+        state.Drive(title, 1f, look);
+        state.SetDrivenGlitch(2f, glitchLook);
+        Assert.AreEqual(1f, state.GetDrivenGlitch(out PanelBackdropGlitchLook got), 1e-4f, "0~1 로 자른다");
+        Assert.AreEqual(0.06f, got.tearOffset, 1e-4f);
+
+        state.Drive(title, 1f, look);
+        Assert.AreEqual(0f, state.GetDrivenGlitch(out _), "글리치 없는 Drive 는 글리치 0");
+
+        state.SetDrivenGlitch(0.3f, glitchLook);
+        state.Release(title);
+        Assert.AreEqual(0f, state.GetDrivenGlitch(out _), "놓으면 글리치도 꺼진다");
+    }
+
+    [Test]
     public void ShouldSwitch_OnlyOverlayRootsBelowTopPanel_NotPanelsThemselves()
     {
         const int top = 900;

@@ -54,8 +54,22 @@ public static class PanelBackdropBlur
             state.Drive(owner, amount, look);
     }
 
+    /// <summary>
+    /// 직접 구동 + TV 글리치(218 후속). <paramref name="glitch"/> = 이번 프레임 글리치 세기 0~1(상시+버스트, 호출자가 계산) —
+    /// 화면에는 블러 세기(<paramref name="amount"/>)를 곱해 나가므로 원복 동안 블러와 같은 진행도로 0 이 된다.
+    /// 글리치는 블러 합성 패스 안에서 그린다(새 패스·텍스처 없음). 패널(선명 캔버스)에는 걸리지 않는다.
+    /// </summary>
+    public static void Drive(object owner, float amount, PanelBackdropBlurLook look, float glitch, PanelBackdropGlitchLook glitchLook)
+    {
+        if (owner != null && state.Drive(owner, amount, look))
+            state.SetDrivenGlitch(glitch, glitchLook);
+    }
+
     /// <summary>구동 중이면 그 연출 값. 렌더 피처가 SO 값 대신 쓴다.</summary>
     public static bool TryGetDrivenLook(out PanelBackdropBlurLook look) => state.TryGetDrivenLook(out look);
+
+    /// <summary>구동 중 글리치 세기(블러 세기 곱하기 전)·모양. 구동 중이 아니거나 글리치 없이 구동하면 세기 0.</summary>
+    public static float GetDrivenGlitch(out PanelBackdropGlitchLook look) => state.GetDrivenGlitch(out look);
 
     /// <summary>패널이 닫혔다. 잡지 않은 owner 는 무시.</summary>
     public static void Release(object owner)
@@ -246,6 +260,8 @@ public sealed class PanelBackdropBlurState
     private object drivenOwner;
     private float drivenAmount;
     private PanelBackdropBlurLook drivenLook;
+    private float drivenGlitch;
+    private PanelBackdropGlitchLook drivenGlitchLook;
 
     /// <summary>블러 세기 0~1.</summary>
     public float Amount { get; private set; }
@@ -296,8 +312,26 @@ public sealed class PanelBackdropBlurState
         drivenOwner = owner;
         drivenAmount = Mathf.Clamp01(amount);
         drivenLook = look;
+        drivenGlitch = 0f; // 글리치는 매 구동마다 다시 건다(SetDrivenGlitch) — 글리치 없는 Drive 는 0
         Amount = drivenAmount;
         return true;
+    }
+
+    /// <summary>방금 <see cref="Drive"/> 한 구동에 글리치를 얹는다(세기 0~1 로 자름). 구동 중이 아니면 무시.</summary>
+    public void SetDrivenGlitch(float glitch, PanelBackdropGlitchLook look)
+    {
+        if (drivenOwner == null)
+            return;
+
+        drivenGlitch = Mathf.Clamp01(glitch);
+        drivenGlitchLook = look;
+    }
+
+    /// <summary>구동 중 글리치 세기(블러 세기 곱하기 전). 구동 중이 아니면 0.</summary>
+    public float GetDrivenGlitch(out PanelBackdropGlitchLook look)
+    {
+        look = drivenGlitchLook;
+        return drivenOwner != null ? drivenGlitch : 0f;
     }
 
     /// <summary>구동 중인가 + 그 연출 값.</summary>
@@ -326,6 +360,7 @@ public sealed class PanelBackdropBlurState
     {
         owners.Clear();
         drivenOwner = null;
+        drivenGlitch = 0f;
         Amount = 0f;
     }
 
@@ -362,5 +397,41 @@ public struct PanelBackdropBlurLook
         this.saturation = saturation;
         this.darken = darken;
         this.scaleRadiusWithAmount = scaleRadiusWithAmount;
+    }
+}
+
+/// <summary>
+/// 직접 구동 TV 글리치 모양(218 후속 — 타이틀 Press 대기). 값은 <b>글리치 세기 1</b>일 때 기준이고, 화면에는 (글리치 세기 × 블러 세기)를 곱해 나간다.
+/// 블러 합성 패스(<c>PanelBlurComp</c>) 안에서 절차적으로 그린다 — 텍스처·패스 추가 없음. 시간은 unscaled.
+/// </summary>
+[System.Serializable]
+public struct PanelBackdropGlitchLook
+{
+    [Tooltip("주사선(가로 줄) 어둡기. 0 = 없음, 1 = 줄 사이가 검정.")]
+    [Range(0f, 1f)] public float scanlineStrength;
+
+    [Tooltip("주사선 한 주기 높이(화면 픽셀). 작을수록 촘촘하다.")]
+    [Range(2f, 12f)] public float scanlinePeriodPx;
+
+    [Tooltip("RGB 어긋남 폭(화면 너비 비율, 0.01 = 1%). 흑백 화면 위 가장자리에 빨강·파랑 테두리로 보인다.")]
+    [Range(0f, 0.05f)] public float rgbSplit;
+
+    [Tooltip("가로 줄 찢김이 옆으로 밀리는 최대 폭(화면 너비 비율).")]
+    [Range(0f, 0.2f)] public float tearOffset;
+
+    [Tooltip("찢기는 가로 띠 비율의 최대값(글리치 세기 1 기준, 세기의 세제곱에 비례 — 상시엔 드묾). 0.3 = 띠의 30% 가 밀림.")]
+    [Range(0f, 1f)] public float tearAmount;
+
+    [Tooltip("잡음(지글거리는 흑백 알갱이) 세기.")]
+    [Range(0f, 1f)] public float noise;
+
+    public PanelBackdropGlitchLook(float scanlineStrength, float scanlinePeriodPx, float rgbSplit, float tearOffset, float tearAmount, float noise)
+    {
+        this.scanlineStrength = scanlineStrength;
+        this.scanlinePeriodPx = scanlinePeriodPx;
+        this.rgbSplit = rgbSplit;
+        this.tearOffset = tearOffset;
+        this.tearAmount = tearAmount;
+        this.noise = noise;
     }
 }
