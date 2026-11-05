@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &360726123
+--- !u!1 &117923788
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +127,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 360726125}
-  - component: {fileID: 360726124}
+  - component: {fileID: 117923790}
+  - component: {fileID: 117923789}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -136,13 +136,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &360726124
+--- !u!108 &117923789
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 360726123}
+  m_GameObject: {fileID: 117923788}
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
@@ -201,13 +201,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!4 &360726125
+--- !u!4 &117923790
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 360726123}
+  m_GameObject: {fileID: 117923788}
   serializedVersion: 2
   m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
   m_LocalPosition: {x: 0, y: 3, z: 0}
@@ -216,7 +216,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
---- !u!1 &1008274698
+--- !u!1 &337039641
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -224,63 +224,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1008274700}
-  - component: {fileID: 1008274699}
-  m_Layer: 0
-  m_Name: DecalFloorBlendLab
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1008274699
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1008274698}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 60efdc5af6a74164bb547865f0b98cc1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DebugDecalFloorBlendLab
-  brightFloor: {fileID: 0}
-  darkFloor: {fileID: 0}
-  patternFloor: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
-  skillRange: {fileID: 2100000, guid: 62f58cdc33eed9d4ba9fa1ab34a29f3e, type: 2}
-  targetCircle: {fileID: 2100000, guid: ad285b3b24144f7686ff051897683f1f, type: 2}
-  skillLine: {fileID: 2100000, guid: 1f84585092d34abeb630cfd87288d82c, type: 2}
-  skillArrow: {fileID: 2100000, guid: 1a01b792a98446bc8459053123a3e607, type: 2}
-  aimQuad: {fileID: 2100000, guid: ace0f553686d359418a9030d5dc35ad4, type: 2}
-  aimTexture: {fileID: 0}
-  floorSpacing: 16
---- !u!4 &1008274700
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1008274698}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1670628712
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1670628715}
-  - component: {fileID: 1670628714}
-  - component: {fileID: 1670628713}
+  - component: {fileID: 337039644}
+  - component: {fileID: 337039643}
+  - component: {fileID: 337039642}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -288,21 +234,21 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!81 &1670628713
+--- !u!81 &337039642
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1670628712}
+  m_GameObject: {fileID: 337039641}
   m_Enabled: 1
---- !u!20 &1670628714
+--- !u!20 &337039643
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1670628712}
+  m_GameObject: {fileID: 337039641}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -347,16 +293,72 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &1670628715
+--- !u!4 &337039644
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1670628712}
+  m_GameObject: {fileID: 337039641}
   serializedVersion: 2
   m_LocalRotation: {x: 0.43837115, y: 0, z: 0, w: 0.89879405}
   m_LocalPosition: {x: 0, y: 30, z: -24}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &392277693
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 392277695}
+  - component: {fileID: 392277694}
+  m_Layer: 0
+  m_Name: DecalFloorBlendLab
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &392277694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 392277693}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60efdc5af6a74164bb547865f0b98cc1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugDecalFloorBlendLab
+  brightFloor: {fileID: 0}
+  darkFloor: {fileID: 0}
+  patternFloor: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
+  skillRange: {fileID: 2100000, guid: 62f58cdc33eed9d4ba9fa1ab34a29f3e, type: 2}
+  targetCircle: {fileID: 2100000, guid: ad285b3b24144f7686ff051897683f1f, type: 2}
+  skillLine: {fileID: 2100000, guid: 1f84585092d34abeb630cfd87288d82c, type: 2}
+  skillArrow: {fileID: 2100000, guid: 1a01b792a98446bc8459053123a3e607, type: 2}
+  aimQuad: {fileID: 2100000, guid: ace0f553686d359418a9030d5dc35ad4, type: 2}
+  aimTexture: {fileID: 0}
+  smashWarning: {fileID: 1989413823170049497, guid: 39572e92739d2d6449ddd4978d8ddae2, type: 3}
+  smashDiameter: 2.6
+  floorSpacing: 16
+--- !u!4 &392277695
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 392277693}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -366,6 +368,6 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1670628715}
-  - {fileID: 360726125}
-  - {fileID: 1008274700}
+  - {fileID: 337039644}
+  - {fileID: 117923790}
+  - {fileID: 392277695}

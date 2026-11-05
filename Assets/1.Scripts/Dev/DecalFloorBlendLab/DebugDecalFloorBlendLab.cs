@@ -8,7 +8,8 @@ using UnityEngine.Rendering.Universal;
 /// 할 일 221 바닥 블렌딩 확인 씬(DebugDecalFloorBlendLab — 빌드 목록에 없다)의 구동기.
 /// ▶ 하면 밝은·어두운·무늬 바닥 3장 위에 같은 세트를 나란히 놓는다:
 ///   플레이어 = 사거리 원·대상 원(투영 데칼) · 거너 Q 직선·대시 화살표(SkillLineIndicator 판) · 조준 표시(URP Lit 판)
-///   예고     = C3 부채꼴·경로 띠(외곽선 + 채움, 투영 데칼) · 원판(23호 차징 오라 모양) · C3 원 판(드론)·사각 판(전기 장판)
+///   예고     = C3 부채꼴·경로 띠(외곽선 + 채움, 투영 데칼) · 원판(23호 차징 오라 모양) · C3 원 판(드론)·사각 판(전기 장판) ·
+///              건틀렛 스매시 원(실제 VFX 프리팹 + EnemyC3SmashPlate — 게임과 같은 붙이기 경로)
 /// 값은 <c>Resources/Rendering/DecalFloorBlendSettings</c> 를 Play 중 고치면 바로 보인다(<see cref="DecalFloorBlendDriver"/>).
 /// 키: B = 누르는 동안 블렌딩 끔(221 이전 화면과 비교). 씬은 <c>Tools/Debug/221 바닥 블렌딩 확인 씬 만들기</c> 로 다시 만든다.
 /// 표시 전용 — 네트워크·게임플레이 없음. 만든 재질 인스턴스는 OnDestroy 에서 지운다.
@@ -29,6 +30,12 @@ public sealed class DebugDecalFloorBlendLab : MonoBehaviour
     [SerializeField] private Material skillArrow;
     [SerializeField] private Material aimQuad;
     [SerializeField] private Texture aimTexture;
+
+    [Header("예고 VFX")]
+    [Tooltip("건틀렛 스매시 예고(FX_Mob_Smah_Warning, SVN). 비우면 스매시는 빠진다.")]
+    [SerializeField] private GameObject smashWarning;
+    [Tooltip("스매시 원 지름(m) — 확인 씬 배치용으로 프리팹 크기를 맞춘다.")]
+    [SerializeField] private float smashDiameter = 2.6f;
 
     [Header("배치")]
     [SerializeField] private float floorSpacing = 16f;
@@ -119,7 +126,29 @@ public sealed class DebugDecalFloorBlendLab : MonoBehaviour
         // C3 바닥 판 — 드론 원(12)·전기 장판 사각(15)
         Plate(row, "DronePlate", "12", false, new Vector3(-4f, 0.07f, -10f), 3f);
         Plate(row, "FloorTile", "15", true, new Vector3(4f, 0.07f, -10f), 2.5f);
+
+        // 건틀렛 스매시 원(09) — 실제 VFX 프리팹에 게임과 같은 ApplySmash, 알파는 FadeInHoldEffect 가 판으로 넘긴다.
+        Smash(row, new Vector3(1f, 0.07f, -3.5f));
     }
+
+    void Smash(Transform parent, Vector3 localPos)
+    {
+        if (smashWarning == null) return;
+        GameObject go = Instantiate(smashWarning, parent, false);
+        go.name = "GauntletSmash";
+        go.transform.localPosition = localPos;
+        EnemyC3Visuals.ApplySmash(go);
+        var plate = go.GetComponentInChildren<EnemyC3SmashPlate>(true);
+        if (plate == null || plate.Plate == null) return;
+        float size = plate.Plate.bounds.size.x;
+        if (size > 1e-4f) go.transform.localScale *= smashDiameter / size;
+        var fade = go.GetComponent<FadeInHoldEffect>();
+        if (fade != null && Application.isPlaying) fade.BeginFade(0.6f);   // 0 → 목표 알파(프리팹 0.7)로 차오른 뒤 유지
+        else plate.SetFadeAlpha(SmashCaptureAlpha);                          // Play 밖(캡처) — Update 가 안 돌아 목표 알파로 바로
+    }
+
+    /// <summary>캡처(Play 밖)에서 쓰는 스매시 알파 = 프리팹 FadeInHoldEffect 목표 알파.</summary>
+    public const float SmashCaptureAlpha = 0.7f;
 
     Material C3Instance(Material shape, Color color)
     {

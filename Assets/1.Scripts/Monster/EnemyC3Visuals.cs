@@ -23,7 +23,7 @@ public static class EnemyC3Visuals
     {
         // Reload the selected JSON on each Play, including when domain reload is disabled.
         WellsDroneVisualPool.ResetForPlay();
-        plateBlocks.Clear();entries=null;smashSprite=null;prewarmed=false;
+        plateBlocks.Clear();entries=null;prewarmed=false;
     }
     static bool prewarmed;
     /// <summary>
@@ -66,7 +66,7 @@ public static class EnemyC3Visuals
     /// <summary>Writes the entry's distance fade into a C3 decal material instance (_DecalFade) — outlines and fills of the same telegraph share it.</summary>
     public static void SetDistanceFade(Material m,string id){if(m!=null)m.SetVector(DecalDistanceFade.MaterialPropertyId,DecalDistanceFade.ToVector(DistanceFade(id)));}
     // The CPU 384² Bake (Circle/Square/Decal) is editor-only: Monster/Editor/EnemyC3BakeReference.cs (pixel comparison
-    // baseline and smash 09 sprite bake). The runtime below never creates textures.
+    // baseline). The runtime below never creates textures.
     // Floor plates (12·14·15·16, jump 06·07) are drawn by the EnemyC3Plate shader — no runtime texture.
     static readonly Dictionary<(string,bool,bool),MaterialPropertyBlock> plateBlocks=new();
     static Material plateMaterial;
@@ -206,21 +206,20 @@ public static class EnemyC3Visuals
         m.SetVector(ExtentId,new Vector4(extent.x,extent.y,extent.x,extent.y));
         m.SetVector(PathId,new Vector4(pathRadius*2,pathLength,coneCenter,coneRadius));
     }
-    // Smash 09 is a SpriteRenderer (FX_Mob_Smah_Warning/L_circle, FadeInHoldEffect drives sr.color alpha), so it needs a sprite:
-    // EnemyC3BakeReference.Circle("09") pre-baked in the editor (Tools/Enemy C3/Bake smash 09 sprite) — no runtime Sprite.Create.
-    // Its import PPU makes it cover the original sprite × OuterScale("09"), so no transform scaling is needed.
-    public const string SmashSpritePath="Telegraph/EnemyC3_Smash09";
-    static Sprite smashSprite;
-    public static Sprite SmashSprite=>smashSprite!=null?smashSprite:smashSprite=Resources.Load<Sprite>(SmashSpritePath);
+    // Smash 09 (FX_Mob_Smah_Warning/L_circle) — 221: drawn by the EnemyC3Plate shader (circle "09" boundary = fill under +
+    // band + pins + lines, the same picture the old pre-baked sprite held) on a quad laid in the sprite's plane, so the
+    // 221 floor blending applies. The VFX sprite is hidden; FadeInHoldEffect forwards its alpha to the plate.
+    // See EnemyC3SmashPlate. Idempotent — pooled instances reuse their plate.
+    public const string SmashId="09";
     public static void ApplySmash(GameObject go)
     {
-        var sprite=SmashSprite;
-        if(sprite==null){Debug.LogError("[Enemy C3] Missing smash sprite Resources/"+SmashSpritePath);return;}
+        if(go==null)return;
+        var fade=go.GetComponentInChildren<FadeInHoldEffect>(true);
+        if(fade==null)fade=go.GetComponentInParent<FadeInHoldEffect>();
         foreach(var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
         {
             if(sr.sprite==null)continue;
-            if(sr.sprite!=sprite)sr.sprite=sprite;
-            sr.color=new Color(1,1,1,sr.color.a);
+            EnemyC3SmashPlate.Attach(sr,fade);
         }
     }
     public static GameObject CreateJump(Vector3 point,float radius,float duration)

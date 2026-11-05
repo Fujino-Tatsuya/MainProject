@@ -19,6 +19,8 @@ public static class DecalFloorBlendLabSceneBuilder
     const string SkillLinePath = "Assets/3.Materials/Player/SkillLineIndicator/SkillLineRange.mat";
     const string SkillArrowPath = "Assets/3.Materials/Player/SkillLineIndicator/SkillLineArrow.mat";
     const string AimQuadPath = "Assets/3.Materials/Player/AimIndicator/AimIndicator3D.mat";
+    // 건틀렛 스매시 예고 VFX(SVN, 읽기만) — 221 후속부터 C3 판(EnemyC3SmashPlate)으로 그린다.
+    public const string SmashWarningPath = "Assets/50.Art/VFX/Common/Monsters/FX_Mob_Smah_Warning.prefab";
 
     [MenuItem("Tools/Debug/221 바닥 블렌딩 확인 씬 만들기")]
     public static void BuildFromMenu()
@@ -60,6 +62,9 @@ public static class DecalFloorBlendLabSceneBuilder
         Assign(so, "skillLine", SkillLinePath);
         Assign(so, "skillArrow", SkillArrowPath);
         Assign(so, "aimQuad", AimQuadPath);
+        var smash = AssetDatabase.LoadAssetAtPath<GameObject>(SmashWarningPath);
+        if (smash == null) Debug.LogWarning($"{Tag} 스매시 예고 프리팹 없음(칸 비움): {SmashWarningPath}");
+        so.FindProperty("smashWarning").objectReferenceValue = smash;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(ScenePath));

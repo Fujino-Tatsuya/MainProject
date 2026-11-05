@@ -153,19 +153,20 @@ Add Renderer Feature → Decal
 | 사거리 원·대상 원·지면 마커 | `SkillRangeIndicator.shadergraph`(Custom Function `SkillRangeDecalFade`, `SkillRangeDecalAlpha.hlsl`) | 텍스처 알파 0.45 이하(안쪽 그라데이션) | 알파 0.7 이상(선·흰 테두리), 소프트 = 흰 바깥 테두리(반경 0.979~0.996) |
 | 예고 C3 데칼 외곽선(부채꼴·띠·열쇠구멍) | `SG_EnemyC3Decal`(`EnemyC3Decal.hlsl`) | 띠 그라데이션·쐐기 | 외곽선·안쪽 선, 소프트 = 바깥 외곽선 |
 | 예고 C3 데칼 채움(부채꼴·띠·열쇠구멍·방향 표식 호) | 〃 | 전부 | — |
-| 원판(`AoeTelegraph` 코드 원판 = 23호 차징 오라) | 〃(원판 모드 6) | 안쪽 채움 | 테두리(rim) 띠, 소프트 = rim |
+| 원판(`AoeTelegraph` 코드 원판 — `shapeTexture` 없는 것만) | 〃(원판 모드 6) | 안쪽 채움 | 테두리(rim) 띠, 소프트 = rim |
+| 건틀렛 스매시 원(09) | `Monster/EnemyC3Plate` 판 — `EnemyC3SmashPlate`(221 후속, 구운 sprite 대체) | 채움 아래 깔기·띠·핀 | 외곽선·안쪽 선, 소프트 = 바깥 외곽선 |
 | C3 바닥 판(드론·박격포·전기 장판·점프 착지) | `Monster/EnemyC3Plate` | 채움·띠·쐐기(× 판 추가) | 외곽선·안쪽 선, 소프트 = 바깥 외곽선 |
 | `TelegraphQuad` 판(코드 사각·원판·텍스처) | `Monster/TelegraphQuad` | 알파 0.6 이하(채움 0.55, × 판 추가) | 알파 0.95 이상(테두리 1), 소프트 = 코드 사각·원판만 |
 | 거너 Q 직선·대시 화살표 | `SkillLineIndicator.shader` | 안쪽 면·쐐기(× 판 추가) | 외곽선·안쪽 선·끝선, 소프트 = 바깥 외곽선 + 양옆 흰 라인 |
 | 조준 표시 | URP Lit 투명(`AimIndicator3D.mat`) — 셰이더 못 고침 | `PlayerAimIndicator` 가 `_BaseColor` 알파에 판 채움(채움 × 판 추가)만 곱함 | 그림 한 장이라 구분·소프트 없음 |
 
 ### 한계(1차)
-- **건틀렛 스매시 원** = 미리 구운 sprite(`EnemyC3_Smash09.png`, SpriteRenderer 기본 셰이더)라 **적용 안 됨**. 하려면 굽기 다시(채움 알파 낮춘 sprite) 또는 전용 셰이더 — 별도 할 일.
-- **23호 차징 오라** — 프리팹에 `shapeTexture` 가 없으면 C3 원판 경로라 **적용됨**. `shapeTexture` 를 넣은 `AoeTelegraph` 는 `SG_TelegraphDecal` 경로라 미적용(현재 대체 경로).
+- **건틀렛 스매시 원 = 적용(221 후속)** — 예전 미리 구운 sprite(`EnemyC3_Smash09.png`·굽기 메뉴 `Tools/Enemy C3/Bake smash 09 sprite`)는 **삭제**. 이제 `EnemyC3Visuals.ApplySmash` 가 VFX 스프라이트(`FX_Mob_Smah_Warning/L_circle`, SVN 무수정) 자식에 C3 판(원 09 경계 = 구운 sprite 와 같은 CPU 식, `EnemyC3PlateShaderTests` Plate_09 픽셀 비교)을 스프라이트 평면에 붙이고 스프라이트는 끈다. 크기 = 원본 sprite 폭 × `OuterScale("09")`(예전과 같음). 알파는 `FadeInHoldEffect` 가 `IFadeInHoldAlphaTarget` 로 판 MaterialPropertyBlock `_Color.a` 에 넘긴다. 풀 재사용 시 판 재사용.
+- **23호 차징 오라 = 미적용(사용자 결정 11-05, 그대로 둠)** — `No23*.asset` 의 `chargeAuraTelegraphPrefab` = `AoeDecalTelegraph.prefab` 에 `shapeTexture` 가 물려 있어 `SG_TelegraphDecal` 경로다(C3 원판 아님). (1차 문서의 "적용됨" 은 틀렸다 — 정정.)
 - `SG_TelegraphDecal`·`SG_DecalFloorOnly`·`SG_ColoredDecal`(옛·대체 예고 데칼)·`AimIndicator.shadergraph`(보관용 프리팹 전용)은 손대지 않았다.
 - **`Mobile_Renderer` 에는 Decal 피처가 없다** — 투영 데칼은 원래 안 보이고, 판(투명 쿼드) 경로에만 적용된다(지금과 같은 상태).
 - 물들임은 **근사**다 — 기준 바닥(감마 0.3)에서 맞고, 아주 밝은·아주 어두운 바닥에서는 목표 섞기와 어긋난다(데칼이 바닥 색을 못 읽음). 판도 블렌드 상태를 안 바꾸고 같은 근사를 쓴다.
-- 물들임은 외곽선·안쪽 선(가장자리)만 — 원판(23호 차징 오라) **안쪽 채움**과 예고 채움에는 걸지 않는다(채움 배율만). `TelegraphQuad` 는 알파로 가장자리를 구분해 섞는다.
+- 물들임은 외곽선·안쪽 선(가장자리)만 — 원판 **안쪽 채움**과 예고 채움에는 걸지 않는다(채움 배율만). `TelegraphQuad` 는 알파로 가장자리를 구분해 섞는다.
 - 조준 표시(URP Lit)는 물들임 없음(채움 배율만).
 
 ### 확인

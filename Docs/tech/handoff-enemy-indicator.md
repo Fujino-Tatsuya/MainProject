@@ -138,7 +138,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 
 | 파일 | 바뀐 지점 | 그대로 둔 것 |
 |---|---|---|
-| `GauntletBot.cs` | `LateUpdate` 의 스매시 예고 색칠 루프 — `TelegraphStyleSO.interrupt.fill` 파랑으로 SpriteRenderer 색을 바꾸던 것 → `EnemyC3Visuals.ApplySmash(go)` (sprite 를 C3 그림으로 교체 — 할 일 57 S3 이후 에디터에서 미리 구운 PNG `Resources/Telegraph/EnemyC3_Smash09`) | 카운터 창 판정·`_smashTintVersion` 재칠 조건·슬로우 모션 인터페이스(`_interruptSuccessCount`) |
+| `GauntletBot.cs` | `LateUpdate` 의 스매시 예고 색칠 루프 — `TelegraphStyleSO.interrupt.fill` 파랑으로 SpriteRenderer 색을 바꾸던 것 → `EnemyC3Visuals.ApplySmash(go)` (할 일 221 후속부터 C3 판 `EnemyC3SmashPlate` 를 붙이고 스프라이트는 끔 — 예전 미리 구운 PNG 는 삭제) | 카운터 창 판정·`_smashTintVersion` 재칠 조건·슬로우 모션 인터페이스(`_interruptSuccessCount`) |
 | `TwentyThreeBoss.cs` | 필드 `_c3JumpTelegraph` 추가 · `ShowJumpTelegraphClientRpc` 본문 = 카탈로그 루프(`Drop_Charge_Boundary/Indicator`) 대신 `EnemyC3Visuals.CreateJump(point, radius, growTime)` · `ReleaseJumpTelegraphs()` 첫 줄에서 C3 점프 뷰 파괴 | RPC 시그니처·호출 시점(서버 `BeginJumpHover` 표시 / `ApplyJumpLandingDamage`·`AbortAttackChain` 해제), 콤보·훅·돌진 로직 전부. `_boundaryHandle`/`_indicatorHandle`·`WarnNo…EntryOnce` 는 남겨 두었다(이제 쓰이지 않음 — 되돌리기 쉽게) |
 
 **알아 둘 점 (경석 변경과의 상호작용, 코드는 안 고침):**
@@ -193,7 +193,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 | 바닥 판 셰이더 | `1.Scripts/Rendering/Telegraph/EnemyC3Plate.shader`(`Monster/EnemyC3Plate`) + `Resources/Telegraph/MA_EnemyC3Plate.mat` | 원·사각 판 12·14·15·16, 점프 06·07. 재질 한 장 공유 + `(id, 사각, 채움)` 별 `MaterialPropertyBlock` 캐시(`EnemyC3Visuals.PaintPlate/PaintLayer/PaintActive`). renderQueue 3100·블렌드는 `TelegraphQuad` 와 같다 |
 | 데칼 셰이더 | `1.Scripts/Rendering/Telegraph/SG_EnemyC3Decal.shadergraph` + `EnemyC3Decal.hlsl` + `Resources/Telegraph/MA_EnemyC3Decal.mat` | `SG_TelegraphDecal` 복제 그래프에서 Sample Texture 대신 Custom Function(`EnemyC3DecalShade`). 색·마스크 합성은 기존 `TelegraphMask.hlsl`(`TelegraphShade`) 그대로. `SG_TelegraphDecal`·`TelegraphMask.hlsl` 은 **무수정** |
 | 판·조준 코드 모양 | `1.Scripts/Rendering/Telegraph/TelegraphQuad.shader` 의 `_CodeShape` | `BossPatternVisuals` 가 예전에 런타임으로 굽던 64²/128² 흰 텍스처(사각·원판·조준)를 셰이더에서 재현. `_CodeShape.x` 0 = 기존 `_MainTex`(기본값 — 재질 에셋 무수정), 1 사각 · 2 원판 · 3 조준, `y` = 테두리 비율(0.005 단위) |
-| 스매시 09 | `Resources/Telegraph/EnemyC3_Smash09.png`(+meta) | SpriteRenderer 라 sprite 가 필요 → 에디터에서 **미리 구운 PNG**. 메뉴 `Tools/Enemy C3/Bake smash 09 sprite`(`Monster/Editor/EnemyC3SmashSpriteBaker.cs`), PPU 18.3605 = 384/(원본 sprite 폭 × `OuterScale("09")`), 중심 피벗·FullRect·무압축 sRGB. `ApplySmash` 는 할당만 |
+| 스매시 09 | `1.Scripts/Monster/EnemyC3SmashPlate.cs` | **할 일 221 후속(11-05)부터 판** — VFX 스프라이트 자식에 `EnemyC3Plate` 판(원 09 경계)을 스프라이트 평면에 붙이고 스프라이트는 끔, 크기 = 원본 sprite 폭 × `OuterScale("09")`, 알파 = `FadeInHoldEffect` → `IFadeInHoldAlphaTarget`. 옛 미리 구운 PNG·굽기 메뉴·`EnemyC3SmashSpriteTests` 는 삭제 |
 | 에디터 비교 기준 | `1.Scripts/Monster/Editor/EnemyC3BakeReference.cs` | 예전 C3 CPU `Circle/Square/Decal`(+캐시) — 픽셀 비교 기준·스매시 PNG 굽기·`EnemyC3Validation` 전용. **런타임에서 부를 수 없다** |
 | 에디터 비교 기준 | `1.Scripts/Monster/Editor/LegacyDecalTextureReference.cs` | 57 이전 비-C3 굽기 원본(`BuildArcTexture`·`BuildDiscTexture`·`BuildSquare`·`BuildDisc`·`BuildCrosshair`) — 픽셀 비교 기준 전용 |
 | 비교용 셰이더 | `1.Scripts/Monster/Editor/EnemyC3DecalCompare.shader`(`Hidden/EnemyC3DecalCompare`) | pass 0 = 예전 텍스처, pass 1 = 그래프가 부르는 바로 그 `EnemyC3DecalShade` |
@@ -321,7 +321,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 |---|---|---|---|
 | `EnemyC3PlateShaderTests` | S1 | 6 id × 테두리/채움 × 크기 3 = 36 | 원 테두리 99.257%(최대 5/255) · 원 채움 99.984% · 사각 100% |
 | `EnemyC3DecalShaderTests` | S2 | id 8종 × 크기 3 = 24 + 그래프 함수 연결 1 | 전부 ≥ 99.998% |
-| `EnemyC3SmashSpriteTests` | S3 | PNG vs CPU `Circle("09")` + 화면 크기·피벗 | 100%(최대 0) |
+| ~~`EnemyC3SmashSpriteTests`~~ → `EnemyC3SmashPlateTests` + `EnemyC3PlateShaderTests` Plate_09 | 221 후속 | 판 셰이더 vs CPU `Circle("09")` · 크기·평면·알파 전달·풀 재사용 | — |
 | `EnemyC3FillShaderTests` | S4a | 부채꼴 3 · 잡기 고리 10 · 띠 1 · 합집합 18 = 32 + 런타임 동작 3 | 100%(최대 1/255) |
 | `EnemyC3MarkerDiscShaderTests` | S4c1 | 방향 표식 12 + 원판 3 + 재질 전제 1 + 런타임 2 | ≥ 99.67%(표식 최대 4/255, 원판 최대 8/255) |
 | `BossPatternPlateShaderTests` | S4c2 | 원판 5 · 사각 4 · 조준 2 · 마스크 2 = 13 + 기본 경로 3 | 100%(최대 1/255) |
@@ -344,7 +344,7 @@ ID 13 은 없다(패키지 원본 번호 그대로).
 ### 9.8 프리셋을 바꿀 때
 
 - `Resources/Telegraph/EnemyC3Selected.json` 이 정본이다. 바꾸면 **다음 Play 부터** 반영된다(`EnemyC3Visuals.ResetForPlay`) — 셰이더 경로는 다시 굽을 것이 없다.
-- 🔴 **스매시 09 값(색·기하·`smashShowMarkers`)을 바꾸면 PNG 를 다시 굽는다**: 메뉴 `Tools/Enemy C3/Bake smash 09 sprite` → `Assets/Resources/Telegraph/EnemyC3_Smash09.png` 커밋(meta guid 는 그대로여야 한다). 안 구우면 `EnemyC3SmashSpriteTests` 가 실패해 알려 준다.
+- 스매시 09 값(색·기하·`smashShowMarkers`)은 이제 판 셰이더가 JSON 에서 바로 읽는다 — 다시 구울 것 없음(할 일 221 후속, 굽기 메뉴 삭제).
 - 검사: `Tools/Enemy C3/Validate selected preset` → `Tools/Enemy C3/Run existing telegraph tests`.
 
 ### 9.9 커밋

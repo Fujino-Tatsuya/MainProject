@@ -102,7 +102,7 @@ public sealed class EnemyC3PrewarmTests
         var blocks = (System.Collections.IDictionary)typeof(EnemyC3Visuals).GetField("plateBlocks", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
         Assert.That(blocks.Count, Is.GreaterThanOrEqualTo(10), "plate property blocks (12·14·15·16·06·07 layers)");
         Assert.IsNotNull(typeof(EnemyC3Visuals).GetField("entries", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null), "preset JSON loaded");
-        Assert.IsNotNull(typeof(EnemyC3Visuals).GetField("smashSprite", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null), "smash 09 sprite loaded");
+        Assert.IsTrue(blocks.Contains(("09", false, false)), "smash 09 plate block (221 — plate, no sprite)");
         Assert.IsNotNull(EnemyC3Visuals.PlateMaterial);
         Assert.IsNotNull(EnemyC3Visuals.DecalMaterial);
     }

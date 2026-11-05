@@ -1,4 +1,14 @@
+using System.Collections.Generic;
 using UnityEngine;
+
+/// <summary>
+/// <see cref="FadeInHoldEffect"/> 의 알파를 스프라이트가 아닌 렌더러(셰이더 판 등)로 받는 쪽.
+/// 할 일 221 — 건틀렛 스매시 예고를 C3 판(EnemyC3Plate)으로 그리면서 페이드 알파를 판의 MaterialPropertyBlock 으로 넘긴다.
+/// </summary>
+public interface IFadeInHoldAlphaTarget
+{
+    void SetFadeAlpha(float alpha);
+}
 
 /// <summary>
 /// <b>지정 시간 동안 목표 색으로 변한 뒤, 해제될 때까지 그 색을 유지</b>하는 스프라이트 연출.
@@ -37,6 +47,15 @@ public class FadeInHoldEffect : MonoBehaviour
              "드라이버가 런타임 시간(partDuration)을 넘겨주면 그쪽이 우선한다 — " +
              "재생 시점에 시간이 정해지는 연출용 통로다")]
     [SerializeField, Min(0.01f)] float fadeDuration = 0.6f;
+
+    // 스프라이트 말고 알파를 받는 쪽(런타임에 붙는 셰이더 판 등). 풀 인스턴스와 함께 재사용된다 — 지우지 않는다.
+    readonly List<IFadeInHoldAlphaTarget> _alphaTargets = new List<IFadeInHoldAlphaTarget>();
+
+    /// <summary>알파 받는 쪽을 등록한다(같은 것은 한 번만). 이후 모든 알파 변경이 함께 간다.</summary>
+    public void AddAlphaTarget(IFadeInHoldAlphaTarget target)
+    {
+        if (target != null && !_alphaTargets.Contains(target)) _alphaTargets.Add(target);
+    }
 
     // 히트스톱 배율. EffectManager가 SetPlayRate로 전달한다. 0 = 완전 정지.
     // Time.deltaTime을 그냥 쓰면 이펙트만 히트스톱을 무시하고 혼자 진행한다.
@@ -124,15 +143,22 @@ public class FadeInHoldEffect : MonoBehaviour
     /// </summary>
     void ApplyAlpha(float alpha)
     {
-        if (targets == null) return;
-
-        for (int i = 0; i < targets.Length; i++)
+        if (targets != null)
         {
-            if (targets[i] == null) continue;
+            for (int i = 0; i < targets.Length; i++)
+            {
+                if (targets[i] == null) continue;
 
-            Color c = targets[i].color;
-            c.a = alpha;
-            targets[i].color = c;
+                Color c = targets[i].color;
+                c.a = alpha;
+                targets[i].color = c;
+            }
+        }
+
+        for (int i = 0; i < _alphaTargets.Count; i++)
+        {
+            if (_alphaTargets[i] is Object o && o == null) continue;   // 지워진 컴포넌트
+            _alphaTargets[i].SetFadeAlpha(alpha);
         }
     }
 }

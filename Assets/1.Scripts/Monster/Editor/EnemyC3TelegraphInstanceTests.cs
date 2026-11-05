@@ -185,20 +185,18 @@ public sealed class EnemyC3TelegraphInstanceTests
     }
 
     [Test]
-    public void SmashSprite_RepeatedApply_ReusesThePrebakedSprite()
+    public void SmashPlate_RepeatedApply_ReusesThePlate()
     {
-        var go = new GameObject("EnemyC3InstanceTest_Smash");
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(DecalFloorBlendLabSceneBuilder.SmashWarningPath);
+        Assume.That(prefab, Is.Not.Null, DecalFloorBlendLabSceneBuilder.SmashWarningPath);
+        var go = Object.Instantiate(prefab);
         try
         {
-            var sr = new GameObject("L_circle").AddComponent<SpriteRenderer>();
-            sr.transform.SetParent(go.transform, false);
-            sr.sprite = EnemyC3Visuals.SmashSprite;
-            Assume.That(sr.sprite, Is.Not.Null, "Resources/" + EnemyC3Visuals.SmashSpritePath);
             EnemyC3Visuals.ApplySmash(go);
             var before = Count();
             for (int i = 0; i < 20; i++) EnemyC3Visuals.ApplySmash(go);
             AssertNoGrowth(before, "ApplySmash ×20");
-            Assert.AreSame(EnemyC3Visuals.SmashSprite, sr.sprite);
+            Assert.AreEqual(1, go.GetComponentsInChildren<EnemyC3SmashPlate>(true).Length, "one plate per sprite");
         }
         finally { Object.DestroyImmediate(go); }
     }
