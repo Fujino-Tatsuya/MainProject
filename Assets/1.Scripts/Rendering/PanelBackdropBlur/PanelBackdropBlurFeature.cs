@@ -5,6 +5,7 @@
 //  주입 시점 = BeforeRenderingPostProcessing — 투명 이후라 월드·VFX 와 함께, 블러 동안 Screen Space Camera 로
 //  잠깐 바뀐 HUD 캔버스(PanelBackdropBlur 가 바꾼다)까지 흐려진다. 패널(Overlay)은 그 뒤에 그려져 선명하다.
 //  블러가 0 이면 패스를 넣지 않는다(비용 0). Game 카메라만(씬 뷰·프리뷰 제외).
+//  218 후속: 직접 구동에 글리치 세기가 있으면 합성 패스가 TV 글리치(찢김·RGB 어긋남·주사선·잡음)도 그린다 — 패스 수 그대로.
 //  MaskBlurFeature(203)와 피처·셰이더·설정이 따로다. PC_Renderer 에만 넣는다.
 // ----------------------------------------------------------------------------
 using UnityEngine;
@@ -60,7 +61,17 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
         if (amount <= 0f)
             return;
 
-        _pass.Setup(_settings, amount);
+        // 직접 구동(218 타이틀) 중이면 SO 대신 구동 값. 반경 비례면 블러 세기에 Amount 를 곱한다.
+        PanelBackdropBlurLook look = PanelBackdropBlur.TryGetDrivenLook(out PanelBackdropBlurLook driven)
+            ? driven
+            : new PanelBackdropBlurLook(_settings.blurStrength, _settings.saturation, _settings.darken, false);
+        if (look.scaleRadiusWithAmount)
+            look.blurStrength *= amount;
+
+        // 218 후속 — TV 글리치(구동 중에만). 화면 세기 = 글리치 × 블러 세기 → 원복 진행도와 같이 0 으로.
+        float glitch = PanelBackdropBlur.GetDrivenGlitch(out PanelBackdropGlitchLook glitchLook) * amount;
+
+        _pass.Setup(_settings, amount, look, glitch, glitchLook);
         renderer.EnqueuePass(_pass);
     }
 
@@ -85,10 +96,15 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
         private static readonly int IdStep = Shader.PropertyToID("_PanelBlurStep");
         private static readonly int IdParams = Shader.PropertyToID("_PanelBlurParams");
         private static readonly int IdBlurTex = Shader.PropertyToID("_PanelBlurTex");
+        private static readonly int IdGlitch0 = Shader.PropertyToID("_PanelGlitch0");
+        private static readonly int IdGlitch1 = Shader.PropertyToID("_PanelGlitch1");
 
         private readonly Material _material;
         private PanelBackdropBlurSettings _settings;
         private float _amount;
+        private PanelBackdropBlurLook _look;
+        private float _glitch;
+        private PanelBackdropGlitchLook _glitchLook;
 
         private class PassData
         {
@@ -103,10 +119,14 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
             profilingSampler = new ProfilingSampler("PanelBackdropBlur");
         }
 
-        public void Setup(PanelBackdropBlurSettings settings, float amount)
+        public void Setup(PanelBackdropBlurSettings settings, float amount, PanelBackdropBlurLook look,
+            float glitch, PanelBackdropGlitchLook glitchLook)
         {
             _settings = settings;
             _amount = amount;
+            _look = look;
+            _glitch = glitch;
+            _glitchLook = glitchLook;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -134,9 +154,16 @@ public sealed class PanelBackdropBlurFeature : ScriptableRendererFeature
             blurDesc.height = Mathf.Max(1, fullDesc.height / divisor);
 
             _material.SetVector(IdStep, new Vector4(
-                _settings.blurStrength / Mathf.Max(1, blurDesc.width),
-                _settings.blurStrength / Mathf.Max(1, blurDesc.height), 0f, 0f));
-            _material.SetVector(IdParams, new Vector4(_amount, _settings.saturation, _settings.darken, 0f));
+                _look.blurStrength / Mathf.Max(1, blurDesc.width),
+                _look.blurStrength / Mathf.Max(1, blurDesc.height), 0f, 0f));
+            _material.SetVector(IdParams, new Vector4(_amount, _look.saturation, _look.darken, 0f));
+
+            // 글리치: 0 = (세기, 시간 unscaled, 화면 높이/주사선 주기 = 줄 수, 찢김 띠 비율), 1 = (주사선, RGB 어긋남, 찢김 폭, 잡음).
+            // 세기 0 이면 셰이더가 글리치 분기를 건너뛴다(패널 블러 201 은 항상 0).
+            float period = Mathf.Max(2f, _glitchLook.scanlinePeriodPx);
+            _material.SetVector(IdGlitch0, new Vector4(_glitch, Time.unscaledTime % 1000f, fullDesc.height / period, _glitchLook.tearAmount));
+            _material.SetVector(IdGlitch1, new Vector4(_glitchLook.scanlineStrength, _glitchLook.rgbSplit,
+                _glitchLook.tearOffset, _glitchLook.noise));
 
             TextureHandle blurA = UniversalRenderer.CreateRenderGraphTexture(renderGraph, blurDesc, "_PanelBlurA", false, FilterMode.Bilinear);
             TextureHandle blurB = UniversalRenderer.CreateRenderGraphTexture(renderGraph, blurDesc, "_PanelBlurB", false, FilterMode.Bilinear);

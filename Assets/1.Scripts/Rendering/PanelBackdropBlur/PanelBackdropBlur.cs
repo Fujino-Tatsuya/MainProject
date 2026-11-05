@@ -43,6 +43,34 @@ public static class PanelBackdropBlur
             r.SetPanelCanvas(owner, root);
     }
 
+    /// <summary>
+    /// 직접 구동(할 일 218 타이틀 Press 대기) — 잡은 owner 가 세기를 0~1 로 직접 정한다(<see cref="PanelBackdropBlurSettings.fadeSeconds"/> 보간 대신).
+    /// 구동하는 동안 렌더 피처는 SO 의 세기·채도·어둡게 대신 <paramref name="look"/> 을 쓴다. 먼저 <see cref="Acquire"/> 해야 한다(아니면 무시).
+    /// <see cref="Release"/> 하면 구동이 풀리고, 남은 세기는 평소처럼 fadeSeconds 로 0 이 된다(0 까지 구동한 뒤 놓으면 바로 꺼짐).
+    /// </summary>
+    public static void Drive(object owner, float amount, PanelBackdropBlurLook look)
+    {
+        if (owner != null)
+            state.Drive(owner, amount, look);
+    }
+
+    /// <summary>
+    /// 직접 구동 + TV 글리치(218 후속). <paramref name="glitch"/> = 이번 프레임 글리치 세기 0~1(상시+버스트, 호출자가 계산) —
+    /// 화면에는 블러 세기(<paramref name="amount"/>)를 곱해 나가므로 원복 동안 블러와 같은 진행도로 0 이 된다.
+    /// 글리치는 블러 합성 패스 안에서 그린다(새 패스·텍스처 없음). 패널(선명 캔버스)에는 걸리지 않는다.
+    /// </summary>
+    public static void Drive(object owner, float amount, PanelBackdropBlurLook look, float glitch, PanelBackdropGlitchLook glitchLook)
+    {
+        if (owner != null && state.Drive(owner, amount, look))
+            state.SetDrivenGlitch(glitch, glitchLook);
+    }
+
+    /// <summary>구동 중이면 그 연출 값. 렌더 피처가 SO 값 대신 쓴다.</summary>
+    public static bool TryGetDrivenLook(out PanelBackdropBlurLook look) => state.TryGetDrivenLook(out look);
+
+    /// <summary>구동 중 글리치 세기(블러 세기 곱하기 전)·모양. 구동 중이 아니거나 글리치 없이 구동하면 세기 0.</summary>
+    public static float GetDrivenGlitch(out PanelBackdropGlitchLook look) => state.GetDrivenGlitch(out look);
+
     /// <summary>패널이 닫혔다. 잡지 않은 owner 는 무시.</summary>
     public static void Release(object owner)
     {
@@ -228,6 +256,13 @@ public sealed class PanelBackdropBlurState
 {
     private readonly Dictionary<object, int> owners = new Dictionary<object, int>();
 
+    // 직접 구동(218) — 구동하는 owner 가 있으면 Amount = drivenAmount(보간 없음).
+    private object drivenOwner;
+    private float drivenAmount;
+    private PanelBackdropBlurLook drivenLook;
+    private float drivenGlitch;
+    private PanelBackdropGlitchLook drivenGlitchLook;
+
     /// <summary>블러 세기 0~1.</summary>
     public float Amount { get; private set; }
 
@@ -260,12 +295,61 @@ public sealed class PanelBackdropBlurState
         return added;
     }
 
-    /// <summary>놓는다. 잡고 있었으면 true.</summary>
-    public bool Release(object owner) => owners.Remove(owner);
+    /// <summary>놓는다. 잡고 있었으면 true. 구동하던 owner 면 구동도 풀린다.</summary>
+    public bool Release(object owner)
+    {
+        if (ReferenceEquals(owner, drivenOwner))
+            drivenOwner = null;
+        return owners.Remove(owner);
+    }
 
-    /// <summary>세기를 목표(열림 1 / 닫힘 0)로 <paramref name="fadeSeconds"/> 에 걸쳐 옮긴다. 0 이하면 바로 목표.</summary>
+    /// <summary>잡은 owner 가 세기를 직접 정한다(0~1 로 자름). 잡지 않은 owner 면 false. 세기는 바로 바뀐다.</summary>
+    public bool Drive(object owner, float amount, PanelBackdropBlurLook look)
+    {
+        if (!owners.ContainsKey(owner))
+            return false;
+
+        drivenOwner = owner;
+        drivenAmount = Mathf.Clamp01(amount);
+        drivenLook = look;
+        drivenGlitch = 0f; // 글리치는 매 구동마다 다시 건다(SetDrivenGlitch) — 글리치 없는 Drive 는 0
+        Amount = drivenAmount;
+        return true;
+    }
+
+    /// <summary>방금 <see cref="Drive"/> 한 구동에 글리치를 얹는다(세기 0~1 로 자름). 구동 중이 아니면 무시.</summary>
+    public void SetDrivenGlitch(float glitch, PanelBackdropGlitchLook look)
+    {
+        if (drivenOwner == null)
+            return;
+
+        drivenGlitch = Mathf.Clamp01(glitch);
+        drivenGlitchLook = look;
+    }
+
+    /// <summary>구동 중 글리치 세기(블러 세기 곱하기 전). 구동 중이 아니면 0.</summary>
+    public float GetDrivenGlitch(out PanelBackdropGlitchLook look)
+    {
+        look = drivenGlitchLook;
+        return drivenOwner != null ? drivenGlitch : 0f;
+    }
+
+    /// <summary>구동 중인가 + 그 연출 값.</summary>
+    public bool TryGetDrivenLook(out PanelBackdropBlurLook look)
+    {
+        look = drivenLook;
+        return drivenOwner != null;
+    }
+
+    /// <summary>세기를 목표(열림 1 / 닫힘 0)로 <paramref name="fadeSeconds"/> 에 걸쳐 옮긴다. 0 이하면 바로 목표. 구동 중이면 구동 값 그대로.</summary>
     public void Advance(float unscaledDeltaTime, float fadeSeconds)
     {
+        if (drivenOwner != null)
+        {
+            Amount = drivenAmount;
+            return;
+        }
+
         float target = owners.Count > 0 ? 1f : 0f;
         Amount = fadeSeconds <= 0f
             ? target
@@ -275,6 +359,8 @@ public sealed class PanelBackdropBlurState
     public void Reset()
     {
         owners.Clear();
+        drivenOwner = null;
+        drivenGlitch = 0f;
         Amount = 0f;
     }
 
@@ -284,4 +370,68 @@ public sealed class PanelBackdropBlurState
     /// </summary>
     public static bool ShouldSwitch(bool isOverlay, bool isRoot, bool isPanelCanvas, int canvasSortingOrder, int topPanelOrder) =>
         isOverlay && isRoot && !isPanelCanvas && canvasSortingOrder < topPanelOrder;
+}
+
+/// <summary>
+/// 직접 구동(<see cref="PanelBackdropBlur.Drive"/>, 할 일 218) 때 SO 대신 쓰는 연출 값. 뜻은 <see cref="PanelBackdropBlurSettings"/> 의 같은 이름 칸과 같고,
+/// 셋 다 세기(Amount)와 함께 0 쪽으로 줄어든다 — 세기 1 = 이 값 그대로, 0 = 원본 화면.
+/// </summary>
+[System.Serializable]
+public struct PanelBackdropBlurLook
+{
+    [Tooltip("블러 세기(축소 해상도 텍셀 스텝 배율). PanelBackdropBlurSettings.blurStrength 와 같은 뜻.")]
+    [Range(0f, 4f)] public float blurStrength;
+
+    [Tooltip("채도. 0 = 완전 흑백, 1 = 원색. 세기가 0 으로 가면 원색으로 돌아온다.")]
+    [Range(0f, 1f)] public float saturation;
+
+    [Tooltip("어둡게. 0 = 그대로, 1 = 검정.")]
+    [Range(0f, 1f)] public float darken;
+
+    [Tooltip("켜면 블러 반경도 세기에 비례해 줄어든다(원본·블러 겹침 대신 실제로 덜 흐려지는 모양). 끄면 패널 블러와 같은 교차 섞기만.")]
+    public bool scaleRadiusWithAmount;
+
+    public PanelBackdropBlurLook(float blurStrength, float saturation, float darken, bool scaleRadiusWithAmount)
+    {
+        this.blurStrength = blurStrength;
+        this.saturation = saturation;
+        this.darken = darken;
+        this.scaleRadiusWithAmount = scaleRadiusWithAmount;
+    }
+}
+
+/// <summary>
+/// 직접 구동 TV 글리치 모양(218 후속 — 타이틀 Press 대기). 값은 <b>글리치 세기 1</b>일 때 기준이고, 화면에는 (글리치 세기 × 블러 세기)를 곱해 나간다.
+/// 블러 합성 패스(<c>PanelBlurComp</c>) 안에서 절차적으로 그린다 — 텍스처·패스 추가 없음. 시간은 unscaled.
+/// </summary>
+[System.Serializable]
+public struct PanelBackdropGlitchLook
+{
+    [Tooltip("주사선(가로 줄) 어둡기. 0 = 없음, 1 = 줄 사이가 검정.")]
+    [Range(0f, 1f)] public float scanlineStrength;
+
+    [Tooltip("주사선 한 주기 높이(화면 픽셀). 작을수록 촘촘하다.")]
+    [Range(2f, 12f)] public float scanlinePeriodPx;
+
+    [Tooltip("RGB 어긋남 폭(화면 너비 비율, 0.01 = 1%). 흑백 화면 위 가장자리에 빨강·파랑 테두리로 보인다.")]
+    [Range(0f, 0.05f)] public float rgbSplit;
+
+    [Tooltip("가로 줄 찢김이 옆으로 밀리는 최대 폭(화면 너비 비율).")]
+    [Range(0f, 0.2f)] public float tearOffset;
+
+    [Tooltip("찢기는 가로 띠 비율의 최대값(글리치 세기 1 기준, 세기의 세제곱에 비례 — 상시엔 드묾). 0.3 = 띠의 30% 가 밀림.")]
+    [Range(0f, 1f)] public float tearAmount;
+
+    [Tooltip("잡음(지글거리는 흑백 알갱이) 세기.")]
+    [Range(0f, 1f)] public float noise;
+
+    public PanelBackdropGlitchLook(float scanlineStrength, float scanlinePeriodPx, float rgbSplit, float tearOffset, float tearAmount, float noise)
+    {
+        this.scanlineStrength = scanlineStrength;
+        this.scanlinePeriodPx = scanlinePeriodPx;
+        this.rgbSplit = rgbSplit;
+        this.tearOffset = tearOffset;
+        this.tearAmount = tearAmount;
+        this.noise = noise;
+    }
 }
