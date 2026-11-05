@@ -905,6 +905,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - **새로 생길 행 7개** — `SlowMotion` 시트 구역 `#■ InterruptSlowMotionSettings`, 대상 열 `InterruptSlowMotionSettings`: `interruptSuppressSuccessProfile.scale`(0.3) · `.hitStopDuration`(0.08) · `.hitStopScale`(0.02) · `.enterDuration`(0.02) · `.holdDuration`(0.35) · `.exitDuration`(0.25) · `.failExitDuration`(0.1). 버려질 행 0.
 - **절차**: development 병합 당일 최신 dev 워크트리에서 SVN update(`GameData.xlsx`) → `Tools/Data/Export Template` 병합 → 보고가 "새 7 · 버려진 값 0" 인지 확인 → SVN 커밋. 병합 Export 는 기존 칸을 안 바꾸므로 새 7칸은 SO 값(위)으로 들어간다.
 - **그 사이 테이블 모드**: 행이 없을 뿐 **오류 아님** — `DataTableApplier.Bind` 는 테이블에 있는 칸만 쓰므로 새 칸은 SO 에셋 값으로 돈다([data-table.md](data-table.md) "테이블에 없으면 = SO·프리팹 값"). 빌드도 같다.
+- **🟪 사용자 튜닝(커밋 `4dfe01a0`, 11-05) — 기존 행 값도 바뀜 → 병합 Export 때 덮어쓰기 필요**: 병합 Export 는 기존 xlsx 값을 유지하므로(지금 xlsx = 중립값 r583), Export 직전에 `InterruptSlowMotionSettings` 열을 SO 값으로 덮어쓴다(r583 때와 같은 절차). 바뀐 기존 행 **21개**: `interruptDashProfile.` scale 0.7·hitStopDuration 0.5·hitStopScale 0.7·enterDuration 0.7·holdDuration 0.5·exitDuration 0.5 · `interruptDashWeakProfile.` 0.9·0.5·0.9·0.5·0.5·0.5 · `interruptProfile.` 0.7·0.5·0.7·0.7·0.5·0.5 · `interruptSuccessProfile.scale` 0.1·`.hitStopDuration` 1.25 · `slowMotionZoomFactor` 0.9. 새 7행 중 `interruptSuppressSuccessProfile.enterDuration` = **0.2**(위 0.02 아님). 테이블 모드 Play·빌드는 그전까지 xlsx 중립값으로 돈다(인스펙터 모드에서만 이 튜닝이 보인다).
 
 ### 9.9 단계별 강화 — 1단계 일반 · 2단계 대쉬 · 3단계 제압 (할 일 219, 2026-11-05)
 
