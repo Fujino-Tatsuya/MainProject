@@ -410,6 +410,13 @@ public sealed class InterruptHitLightPlayer : IDisposable
 /// <summary>적중 라이트 연출 순수 규칙(할 일 194) — EditMode 테스트 대상.</summary>
 public static class InterruptHitLightRules
 {
+    /// <summary>
+    /// 게임 시간 월드 이펙트(V3, 11-05) 라이트 안전장치 — 재생 뒤 실시간 <paramref name="realElapsed"/> 가 라이트 곡선 길이 + <see cref="InterruptHitLightFx.GameTimeSafetyRealSeconds"/> 이상이면 끝.
+    /// 데이터 없음 = 끝. 실시간 이펙트(V1·V2)는 곡선 시간 = 실시간이라 곡선이 먼저 끝나 닿지 않는다.
+    /// </summary>
+    public static bool LightTimedOut(InterruptHitLightLook look, float realElapsed) =>
+        look == null || realElapsed >= look.LightDuration + InterruptHitLightFx.GameTimeSafetyRealSeconds;
+
     /// <summary>모든 곡선(라이트·블룸·암순응)이 끝났는가. 데이터가 없으면 끝.</summary>
     public static bool Finished(InterruptHitLightLook look, float elapsed) => Finished(look, look != null ? look.GradeProfile : null, elapsed);
 

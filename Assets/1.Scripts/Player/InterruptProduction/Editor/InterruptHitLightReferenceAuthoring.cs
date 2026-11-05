@@ -138,7 +138,7 @@ internal static class InterruptHitLightReferenceAuthoring
         var root = new GameObject("FX_InterruptHitLight_V3");
         try
         {
-            root.AddComponent<InterruptHitLightFx>();
+            root.AddComponent<InterruptHitLightFx>().UsesGameTime = true; // 11-05 — V3 이펙트는 게임 시간(히트스톱·슬로우 따라감)
             BuildCore(root.transform, coreMesh, coreMaterial);
             BuildStreak(root.transform, streakMesh, streakMaterial);
             BuildRays(root.transform, raysMesh, raysMaterial);

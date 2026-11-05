@@ -348,4 +348,63 @@ public sealed class InterruptTierScalingTests
         foreach (string child in new[] { "Rays", "Sparks", "Streak", "Core" })
             Assert.IsNotNull(prefab.transform.Find(child), path + " " + child + " 는 그대로");
     }
+
+    // ---- 11-05 — V3 이펙트 = 게임 시간(히트스톱·슬로우 따라감), V1·V2 = 실시간 ----
+
+    [TestCase(InterruptHitLightReferenceAuthoring.PrefabPath, true)]
+    [TestCase(InterruptHitLightTierAuthoring.DashPrefabPath, true)]
+    [TestCase(InterruptHitLightTierAuthoring.SuppressPrefabPath, true)]
+    [TestCase(InterruptHitLightAuthoring.PrefabPath, false)]
+    public void V3_프리팹만_게임_시간(string path, bool expected)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        Assert.IsNotNull(prefab, path);
+        Assert.AreEqual(expected, prefab.GetComponent<InterruptHitLightFx>().UsesGameTime, path);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void 재생하면_파티클_시간_기준이_칸을_따른다(bool gameTime)
+    {
+        InterruptHitLightFx fx = CreateFx("GameTimeFx");
+        var child = new GameObject("Sparks");
+        child.transform.SetParent(fx.transform, false);
+        ParticleSystem system = child.AddComponent<ParticleSystem>();
+        ParticleSystem.MainModule main = system.main;
+        main.useUnscaledTime = gameTime; // 반대로 시작
+        fx.UsesGameTime = gameTime;
+
+        fx.Play(Vector3.zero, CreateLook(0));
+
+        Assert.AreEqual(!gameTime, system.main.useUnscaledTime, gameTime ? "게임 시간 = unscaled 끔" : "실시간 = unscaled 켬");
+    }
+
+    [Test]
+    public void 게임_시간_라이트는_히트스톱_중_곡선이_멈추고_실시간_안전장치로_끝난다()
+    {
+        InterruptHitLightFx fx = CreateFx("GameTimeLight");
+        fx.UsesGameTime = true;
+        InterruptHitLightLook look = CreateLook(0);
+        fx.Play(Vector3.zero, look);
+        float start = fx.HitLight.intensity;
+
+        // 히트스톱(게임 시간 거의 0) — 곡선은 거의 안 움직이고 실시간만 흐른다.
+        fx.Tick(0f, look.LightDuration * 2f);
+        Assert.IsTrue(fx.LightActive, "실시간으로는 곡선 길이를 넘었지만 게임 시간은 멈춰 있다");
+        Assert.AreEqual(start, fx.HitLight.intensity, 1e-4f);
+
+        // timeScale 0 근처에 갇혀도 곡선 길이 + 안전장치 초가 지나면 끈다.
+        fx.Tick(0f, InterruptHitLightFx.GameTimeSafetyRealSeconds);
+        Assert.IsFalse(fx.LightActive);
+        Assert.AreEqual(0f, fx.HitLight.intensity);
+    }
+
+    [Test]
+    public void 라이트_안전장치_규칙()
+    {
+        InterruptHitLightLook look = CreateLook(0);
+        Assert.IsFalse(InterruptHitLightRules.LightTimedOut(look, look.LightDuration));
+        Assert.IsTrue(InterruptHitLightRules.LightTimedOut(look, look.LightDuration + InterruptHitLightFx.GameTimeSafetyRealSeconds));
+        Assert.IsTrue(InterruptHitLightRules.LightTimedOut(null, 0f), "데이터 없음 = 끝");
+    }
 }

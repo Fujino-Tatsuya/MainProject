@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 /// <summary>
 /// 적중 라이트 연출(V1·V2, 할 일 194) 수치 — 디렉터 칸 <c>hitLightLook</c> 이 가리키는 SO. V3(194 후속)는 같은 형식의 별도 에셋(<c>hitLightLookReference</c>)이라 V1·V2 값과 섞이지 않는다. 사건마다·프레임마다 읽는다(Play 중 바꾸면 다음 프레임부터).
-/// 시간은 전부 실시간(unscaled, Q8) — 슬로우·히트스톱과 무관. 데이터 테이블에는 내지 않는다(PLAN 194 §3 — 범위 밖).
+/// 시간은 실시간(unscaled, Q8) — 슬로우·히트스톱과 무관. 예외(11-05): V3 월드 이펙트의 라이트 곡선은 프리팹 칸 InterruptHitLightFx.gameTime 이 켜져 있어 게임 시간. 데이터 테이블에는 내지 않는다(PLAN 194 §3 — 범위 밖).
 /// 문서: Docs/tech/interrupt-presentation.md §9.
 /// </summary>
 [CreateAssetMenu(menuName = "BeaverLobby/Interrupt/Hit Light Look", fileName = "InterruptHitLightLook")]

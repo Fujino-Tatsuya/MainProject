@@ -934,6 +934,14 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - **화이트아웃 끄기(쉽게 빼기)**: 디렉터 `suppressWhiteout` 끔(또는 랩 토글) **또는** 제압 SO `whiteoutFrames` 0 — 둘 중 하나만 꺼도 안 나온다. 코드 삭제 불필요.
 - **알려진 한계**: 1단계 `Rays` 최대 입자 4 가 `gapRayCount` 5 보다 작아 1단계 화면 빛줄기는 4줄로 잘린다(194 기존 — 1단계 값 변경 금지라 그대로, 2·3단계는 16). '가로 빛줄 길이' 는 크기(Start Size)로만 늘렸다(수명 0.22초 그대로).
 
+#### V3 이펙트 = 게임 시간 (11-05 사용자 요청 "HitStop 때 이펙트도 Time Scale 영향")
+
+- **게임 시간으로 바뀐 것(V3 일반·대쉬·제압 프리팹만)** — 프리팹 루트 `InterruptHitLightFx.gameTime` = 켬(`FX_InterruptHitLight_V3`·`_Dash`·`_Suppress`, 저작 메뉴도 켬으로 만든다). 재생 때 모든 파티클(`Rays`·`Sparks`·`Streak`·`Core`) `useUnscaledTime` 끔 → `Time.timeScale`(GlobalTimeScale 성공 슬로우·히트스톱)을 따라 **히트스톱 동안 거의 멈추고 슬로우 동안 느려진다**. 적중 **포인트 라이트 세기 곡선**도 `Time.deltaTime` 으로 진행. 빛줄기 셰이더는 시간 값을 안 쓴다(입자 수명으로만 움직임) — 바꿀 것 없음.
+- **안전장치**: 히트스톱 배율 하한 0.01(`SlowMotionProfile.MinScale`)이고 슬로우 타임라인은 실시간으로 끝나 timeScale 은 늘 1 로 돌아온다. 그래도 일시정지 등으로 0 근처에 갇히면 라이트는 **곡선 길이 + 5초(실시간, `InterruptHitLightFx.GameTimeSafetyRealSeconds`)** 에 끈다(`InterruptHitLightRules.LightTimedOut`). 파티클은 다음 재생 때 `Clear` 로 지워지고, 월드 이펙트 인스턴스는 단계별로 하나씩 재사용(풀 반납·정리 타이머 없음 — 진행기 `Finish` 는 이펙트를 끄지 않고 강제 리셋 `Stop` 만 지운다).
+- **실시간(unscaled)으로 남은 것 — 사용자 결정 대기**: 진행기(`InterruptHitLightPlayer.Tick(Time.unscaledTime)`)가 도는 화면 효과 — **블룸 Volume 곡선**·**색 보정(Grade) Volume 곡선**·**암순응 가(화면 패스)·나(태양광·환경광 `SceneLightDim`)**·**화이트아웃(렌더 프레임 수)**, 그리고 진행기 끝 판정(`Finished` — 라이트·블룸·암순응·색 보정 길이, 실시간). V1·V2 랩 버전 월드 이펙트(`FX_InterruptHitLight`, `gameTime` 꺼짐)도 실시간 그대로.
+- 게임 시간 라이트는 슬로우만큼 실시간으로 더 오래 켜져 있어 진행기 끝(실시간)보다 늦게 꺼질 수 있다 — 서로 독립이라 문제 없음.
+- 테스트: `InterruptTierScalingTests` — V3 프리팹만 게임 시간 · 재생 시 파티클 시간 기준 · 히트스톱 중 라이트 곡선 정지 + 안전장치 · 규칙.
+
 ## 10. 카메라 대상 중심 (할 일 196)
 
 > 계획서: `_lane-artifacts/MainProject-WorkTree/196/PLAN.md`(레포 밖). 코드: `InterruptCameraCenterRules`(순수 규칙)·`InterruptCameraCenterTracker`(상태 기계, 실제 시간)·`InterruptProductionDirector.CameraCenter.cs`·`CameraTargetSwitcher`.
