@@ -412,7 +412,7 @@ public static class LobbyResultPanelAuthoring
             viewSo.FindProperty("closeButton").objectReferenceValue = closeButton;
             viewSo.ApplyModifiedPropertiesWithoutUndo();
 
-            AddGradeStamp(panel, font, LoadGradeStampSprite(), view); // 등급 도장(할 일 223) — 맨 위에 그린다
+            AddGradeStamp(panel, LoadGradeFont(), LoadGradeStampSprite(), view); // 등급 도장(할 일 223) — 맨 위에 그린다
 
             LobbyResultPanelAnimAuthoring.Wire(content.gameObject); // 열고 닫기·카운트업 연출(할 일 215)
 
@@ -436,6 +436,10 @@ public static class LobbyResultPanelAuthoring
     const float GradeStampSize = 175f;
     const float GradeStampAngle = -8f; // 최종 기울기 — 연출(LobbyResultPanelAnimator.stampEndAngle)과 같은 값
     static readonly Color GradeLetterColor = new Color(1f, 0.95f, 0.84f, 1f); // 크림색
+    // 글자 폰트 = 결과창 다른 글자(프리팹)가 실제로 쓰는 서울알림 Medium. 위 FontPath(NotoSansKR)는 처음 저작 때 값이라 도장에는 쓰지 않는다.
+    const string GradeFontPath = "Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset";
+
+    static TMP_FontAsset LoadGradeFont() => AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GradeFontPath);
 
     /// <summary>기존 패널 프리팹에 도장만 붙인다(멱등 — 이미 있으면 손대지 않는다). 다시 만들려면 프리팹의 GradeStamp 를 지우고 다시.</summary>
     [MenuItem("Tools/UI/Authoring/Lobby Result Panel 등급 도장 추가 (223)")]
@@ -448,10 +452,10 @@ public static class LobbyResultPanelAuthoring
         }
 
         Sprite stamp = LoadGradeStampSprite();
-        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+        var font = LoadGradeFont();
         if (stamp == null || font == null)
         {
-            Debug.LogError($"{Tag} 도장 스프라이트 또는 폰트가 없다: {GradeStampSpritePath} · {FontPath}");
+            Debug.LogError($"{Tag} 도장 스프라이트 또는 폰트가 없다: {GradeStampSpritePath} · {GradeFontPath}");
             return;
         }
 

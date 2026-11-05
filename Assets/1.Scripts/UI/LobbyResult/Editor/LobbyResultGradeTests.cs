@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-/// <summary>로비 결과창 등급 도장 규칙(할 일 223) — 6분 이하 S, 9분 이하 A, 12분 이하 B, 그 위 C(경계 포함·정수 초).</summary>
+/// <summary>로비 결과창 등급 도장 규칙(할 일 223) — 6분 이하 S, 9분 이하 A, 12분 이하 B, 그 위 C(경계 포함·정수 초), 클리어 판에만 도장.</summary>
 public sealed class LobbyResultGradeTests
 {
     [Test]
@@ -30,5 +30,13 @@ public sealed class LobbyResultGradeTests
         Assert.AreEqual("A", LobbyResultGrade.Letter(LobbyResultGradeRank.A));
         Assert.AreEqual("B", LobbyResultGrade.Letter(LobbyResultGradeRank.B));
         Assert.AreEqual("C", LobbyResultGrade.Letter(LobbyResultGradeRank.C));
+    }
+
+    [Test]
+    public void ShowsStamp_OnlyWhenCleared()
+    {
+        Assert.IsTrue(LobbyResultGrade.ShowsStamp(SessionOutcome.Cleared));
+        Assert.IsFalse(LobbyResultGrade.ShowsStamp(SessionOutcome.Wiped));   // 전멸(패배)
+        Assert.IsFalse(LobbyResultGrade.ShowsStamp(SessionOutcome.Aborted)); // 중단
     }
 }

@@ -5,7 +5,7 @@ public enum LobbyResultGradeRank { S, A, B, C }
 /// 로비 결과창 등급 도장 규칙(할 일 223) — MonoBehaviour 밖 순수 함수(EditMode 테스트 대상).
 /// 소요 시간 ≤ S 경계 = S, ≤ A 경계 = A, ≤ B 경계 = B, 그보다 길면 C. 경계 = 분(인스펙터 <see cref="LobbyResultPanel"/>, 기본 6/9/12).
 /// 판단은 화면 표기(mm:ss, 초 아래 버림)와 같은 정수 초로 한다 — 06:00.4 는 "06:00" 으로 보이므로 S.
-/// 판 결과(클리어/전멸/중단)와 무관하게 시간만 본다.
+/// 도장은 클리어 판에만 보인다(전멸·중단 = 숨김, <see cref="ShowsStamp"/> — 사용자 결정 11-05). 등급 자체는 시간만 본다.
 /// </summary>
 public static class LobbyResultGrade
 {
@@ -22,6 +22,9 @@ public static class LobbyResultGrade
         if (whole <= bMaxMinutes * 60f) return LobbyResultGradeRank.B;
         return LobbyResultGradeRank.C;
     }
+
+    /// <summary>도장을 보여 줄 판인가 — 클리어만. 전멸(패배)·중단은 숨긴다.</summary>
+    public static bool ShowsStamp(SessionOutcome outcome) => outcome == SessionOutcome.Cleared;
 
     /// <summary>기본 경계(6/9/12분).</summary>
     public static LobbyResultGradeRank Evaluate(float seconds) =>

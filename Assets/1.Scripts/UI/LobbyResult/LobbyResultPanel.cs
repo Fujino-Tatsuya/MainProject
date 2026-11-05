@@ -27,7 +27,7 @@ public sealed class LobbyResultPanel : MonoBehaviour
     [SerializeField] private Button closeButton;
 
     [Header("Grade Stamp (할 일 223)")]
-    [Tooltip("등급 도장(소요시간 칸 오른쪽 빗금 칸). 찍히는 연출은 LobbyResultPanelAnimator 가 한다. 비우면 등급 없음.")]
+    [Tooltip("등급 도장(소요시간 칸 오른쪽 빗금 칸). 클리어 판에만 보인다(전멸·중단 = 숨김). 찍히는 연출은 LobbyResultPanelAnimator 가 한다. 비우면 등급 없음.")]
     [SerializeField] private RectTransform gradeStamp;
     [Tooltip("도장 위 등급 글자(S/A/B/C).")]
     [SerializeField] private TMP_Text gradeText;
@@ -182,7 +182,7 @@ public sealed class LobbyResultPanel : MonoBehaviour
             outcomeText.color = OutcomeColor(SessionResult.Outcome);
 
         if (gradeStamp != null)
-            gradeStamp.gameObject.SetActive(SessionResult.HasValue); // 결과가 없으면 도장 없음
+            gradeStamp.gameObject.SetActive(SessionResult.HasValue && LobbyResultGrade.ShowsStamp(SessionResult.Outcome)); // 클리어 판에만(전멸·중단·결과 없음 = 숨김)
         if (gradeText != null && SessionResult.HasValue)
             gradeText.text = LobbyResultGrade.Letter(EvaluateGrade(SessionResult.SurvivalSeconds));
     }
