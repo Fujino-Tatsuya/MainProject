@@ -400,6 +400,8 @@ public static class LobbyResultPanelAuthoring
             viewSo.FindProperty("closeButton").objectReferenceValue = closeButton;
             viewSo.ApplyModifiedPropertiesWithoutUndo();
 
+            LobbyResultPanelAnimAuthoring.Wire(content.gameObject); // 열고 닫기·카운트업 연출(할 일 215)
+
             content.gameObject.SetActive(false); // 기본 닫힘 — Show 가 켠다
 
             PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool success);

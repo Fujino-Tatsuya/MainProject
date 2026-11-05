@@ -73,9 +73,12 @@ public static class SessionResult
     }
 
     /// <summary>mm:ss 표기.</summary>
-    public static string FormatSurvival()
+    public static string FormatSurvival() => FormatTime(SurvivalSeconds);
+
+    /// <summary>초 → mm:ss(초 아래는 버림). 로비 결과창 시간 카운트업(할 일 215)도 같은 표기를 쓴다.</summary>
+    public static string FormatTime(float seconds)
     {
-        int total = Mathf.FloorToInt(SurvivalSeconds);
+        int total = Mathf.FloorToInt(Mathf.Max(0f, seconds));
         return $"{total / 60:00}:{total % 60:00}";
     }
 }

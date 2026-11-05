@@ -78,6 +78,26 @@
 - 폰트 = `NotoSansKR-VariableFont_wght SDF`(원본 SeoulAlrimTTF-Heavy 없음) — 목업보다 얇다.
 - 탭 제목·열 제목·소요시간 라벨·닫기 글자 = `LocalizedText`(`UI.LobbyResult.*`, 목록 [LobbyResultUiStrings.cs](../../Assets/1.Scripts/UI/LobbyResult/LobbyResultUiStrings.cs)). 직렬화 글자 = 키 ko(시트에 행이 없을 때 폴백). 재생성 메뉴도 같은 키를 붙인다. 키 표는 [lobby-demo-flow.md §8](lobby-demo-flow.md#8-화면-문구-키-strings).
 
+## 열고 닫기·숫자 카운트업 연출 (할 일 215)
+- `Content` 의 `LobbyResultPanelAnimator`(표시 전용 — 열고 닫기 판단·`Closed`·ESC·네트워크 표시 계약은 그대로).
+  - 열기: 창(`Content/Panel`) 크기 `hiddenScale`(0.95)→1 · `Content` 투명도 0→1(Dim 포함), `openDuration` 0.22초.
+  - 닫기: 반대로 `closeDuration` 0.14초 뒤 `Content` 를 끈다. **입력 차단은 닫기 시작 때 바로 푼다**(`UiModalBlocker` 끔 + 클릭 막기 해제). `IsOpen`·`Closed` 도 즉시.
+  - 숫자: 플레이어 행 숫자(가한 피해·회복량·간파 성공·입은 피해·사망)가 열기 시작 `countUpDelay` 0.15초 뒤 `countUpDuration` 0.8초에 걸쳐 0→최종값.
+  - 소요 시간(`Text_PlayTime`, mm:ss)도 숫자와 **같은 진행도**로 00:00→최종값(`LobbyResultPanel.SetPlayTimeCountUp`, 표기 = `SessionResult.FormatTime` — 초 아래 버림이라 최종값을 넘지 않음). 패널은 애니가 부모에서 찾는다(프리팹 연결 없음).
+  - 1위 왕관(`Image_Crown`, 켜진 것): 카운트업이 끝나고 `crownDelay` 0.05초 뒤 첫 점프, 그 뒤 **`crownRepeatInterval` 3초 주기**(시작→다음 시작, 0 = 1회만)로 반복. 한 번 = `crownDuration` 0.6초 동안 `crownJumpHeight` 28 만큼 점프하며 `crownSpinDegrees` 360° 회전. 행 밖으로 튀어나가도 자르지 않는다(마스크 없음). **EuniTween** 이징 — 점프 `Easing.Punch(crownJumpEase=OutQuad)`(오를 때 느려지고 떨어질 때 빨라짐), 회전 `Easing.Evaluate(crownSpinEase=InOutCubic)`.
+    회전 축 `crownSpinAxis` 기본 **Y** — 동전 뒤집듯 좌우로 돌아 왕관이 늘 서 있다(Z 는 화면 안 바퀴 회전이라 중간에 거꾸로 섬). UI 셰이더가 양면이라 뒷면도 보인다. 끝나면 원래 위치·회전으로 정확히 돌린다.
+  - 왕관 반짝임: **착지마다** `sparkleOffsets`(왕관 크기 대비 3곳)에 `sparkleStagger` 0.08초 간격으로 크게 한 번씩, 그 뒤 다음 점프 전까지 `sparkleRepeatInterval` 0.7초마다 하나씩 번갈아 은은하게(`sparkleRepeatScale` 0.7 — 3초 주기 안에 2번, 다음 점프와 안 겹침). 간격 0 = 착지 때만. 점프 중엔 반짝임을 끈다(Y 회전에 같이 납작해지지 않게).
+    스프라이트 = 인스펙터 **`sparkleSprite` 한 칸**(교체는 여기만) — 기본은 기존 에셋 `Assets/50.Art/VFX/Textures/Flare06.png`(4갈래 별빛, 원래 Sprite 임포트, `FX_Heal` 이 쓰는 것). 연결 메뉴가 비어 있을 때만 넣는다.
+    구현 = 왕관 자식 Image 3개(파티클 아님 → Overlay 캔버스에 그대로 보임, 런타임 텍스처·메시 생성 없음, 행이 다시 그려지면 같이 사라짐). 색 `sparkleColor`·크기 `sparkleSize`·회전 `sparkleSpinDegrees`·이징 `sparkleEase`.
+  - 곡선 3개(`openCurve`·`closeCurve`·`countUpCurve`)와 시간 = 인스펙터. 시간은 `Time.unscaledDeltaTime`(슬로모션 무관). 지속 0 = 즉시.
+  - CanvasGroup 은 프리팹에 없고 런타임에 붙인다. 컴포넌트가 없으면 패널은 예전처럼 즉시 켜고 끈다.
+- 계산 = `LobbyResultPanelAnimMath`(순수, 테스트 `Editor/LobbyResultPanelAnimMathTests.cs`). 카운트업 진입점 = `ResultStatsView.SetCountUpProgress` → `ResultPlayerRowView.SetCountUpProgress`(5.ResultScene 은 부르지 않음).
+- 테스트 씬 = `Assets/0.Scenes/Debug/DebugLobbyResultPanelLab.unity`(빌드 목록 없음, 씬 열고 그냥 ▶ — 네트워크 없음). 다시 만들기 = `Tools/Debug/215 로비 결과창 테스트 씬 만들기`.
+  가짜 결과(최대 1,234,567)로 바로 열린다. 키: 1/2/3 = 플레이어 수 바꿔 열기 · O 열기 · C 닫기 · ESC 패널 닫기 · R 닫는 도중 다시 열기 · V 값 바꿔 다시 열기 · T 슬로모션 0.1 토글. 배경 도형이 천천히 돌아 201 블러 확인에도 쓴다.
+- 연결 = `Tools/UI/로비 결과창 애니 연결` — 멱등(이미 붙어 있으면 저장 안 함, 튜닝값 보존). 프리팹 병합 충돌로 빠지면 다시 돌린다. 재생성 메뉴도 같이 붙인다.
+  반짝임 스프라이트가 비어 있으면 `Flare06` 을 넣는다(바꾼 스프라이트는 그대로). 시간 카운트업·왕관 점프는 런타임에 찾아 쓰므로 따로 잇지 않는다.
+- 테스트 씬 V(값 바꿔 다시 열기)로 숫자·시간 카운트업·왕관 점프·반짝임이 처음부터 다시 재생된다. 닫힘 연출 끝(Content 꺼짐)·다시 열기·행 다시 그림 때 왕관 반복은 멈추고 원위치(다시 열면 첫 점프부터)
+
 ## 다시 만들기·미리보기
 - `Tools/UI/Authoring/Lobby Result Panel` — 없는 프리팹만 만든다(있으면 손대지 않음, 다시 돌려도 바이트 동일).
 - `Tools/UI/Authoring/Lobby Result Panel (재생성)` — 두 프리팹을 처음부터 덮어쓴다(GUID 유지, 내부 fileID 는 바뀜). 열 폭·위치·색은 스크립트 상단 상수.
