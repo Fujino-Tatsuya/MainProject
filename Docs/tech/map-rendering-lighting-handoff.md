@@ -16,7 +16,7 @@
 - HDR 컬러 그레이딩과 URP 포스트프로세싱 기준값
 - 벽 투명화 범위·디더·AA 설정
 - 화면공간 마스크 블러와 외곽 픽셀레이트
-- F8 렌더링 성능 HUD와 F9 룩 A/B 비교
+- F8 렌더링 성능 HUD (F9 룩 A/B 비교는 할 일 226 에서 삭제)
 - 포그, 층 디밍, 시야 차폐(LoS), 어비스 물안개
 - Stage 환경광·주광·스카이박스·Volume Profile
 - 12개 Zone 프리팹의 로컬 조명 리그
@@ -29,7 +29,7 @@
 - Bootstrap의 `targetSceneName`과 `mainGameSceneName`은 `4.MapScene-trensparent`를 가리킨다.
 - `4.MapScene` 단독 Play에서는 런타임 카메라가 준비되지 않아 정상 비교가 어렵다.
 - F8: `ProfilerHUD` 표시
-- F9: 룩 A/B 전환
+- ~~F9: 룩 A/B 전환~~ — 할 일 226(11-05) 삭제
 
 `4.MapScene.unity`는 기존 렌더링 실험 이력이 남은 보조 장면이다. 최종 검수와 후속 튜닝은 `4.MapScene-trensparent`에서 진행한다.
 

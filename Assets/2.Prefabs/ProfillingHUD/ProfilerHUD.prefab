@@ -10,7 +10,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1245972112267408864}
   - component: {fileID: 3078212583230318523}
-  - component: {fileID: 5418834981001723847}
   - component: {fileID: 1284531838405133848}
   m_Layer: 0
   m_Name: ProfilerHUD
@@ -71,26 +70,6 @@ MonoBehaviour:
   - label: Silh Comp
     markerName: PlayerSilhouette Composite
     budgetMs: 0
---- !u!114 &5418834981001723847
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5842449110104199389}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b8ab627a32dd5804f9a64dbd0eb78dab, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RenderCostAB
-  toggleKey: 100
-  startWithSilhouette: 1
-  startWithWallOcclusion: 0
-  autoMeasure: 0
-  warmupFrames: 180
-  sampleFrames: 120
-  alternations: 4
-  switchSettleFrames: 30
 --- !u!114 &1284531838405133848
 MonoBehaviour:
   m_ObjectHideFlags: 0

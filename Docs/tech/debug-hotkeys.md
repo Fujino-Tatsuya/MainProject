@@ -32,8 +32,7 @@
 | F4 | 살아 있는 보스(23호·웰즈) 체력 최대치의 10% 깎기(호스트) — 정상 피해 경로라 페이즈 전환이 실제처럼 난다 | `Dev/DevBossHpCut.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F5 | 보스방 진입 패드로 파티 워프 | `Dev/DevBossEntranceWarp.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F6 | 보스 전투 중(Phase = Combat) 누른 사람만 보스방 지정 지점으로 이동(호스트·클라, 오너 권한) — 지점 = `bossroom.prefab` 의 빈 오브젝트 `[Dev] BossWarpPoint`(옮기면 위치·y축 회전이 바뀜). 연출·낙하 복구 중엔 안 함 | `Dev/DevBossPointWarp.cs` (자동 생성) | DEV_HOTKEYS | — (신규) | |
-| F7 | RetroCRT(Cyanilux CRT) 토글 | `Rendering/RetroCRT/RetroCRTController.cs` (맵 씬) | DEV_HOTKEYS | ✗ | ⚠️ F7 — RenderCostAB |
-| F7 | 실루엣 ON/OFF 수동 토글(측정기) | `Dev/LookAB/RenderCostAB.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F7 — RetroCRTController |
+| F7 | RetroCRT(Cyanilux CRT) 토글 | `Rendering/RetroCRT/RetroCRTController.cs` (맵 씬) | DEV_HOTKEYS | ✗ | |
 | F8 | 프로파일러 HUD 토글 | `Dev/Profiler/ProfilerHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F8 — ZonePerfRecorder |
 | F8 | 존별 성능 한 줄 오버레이 토글 | `Dev/Profiler/ZonePerfRecorder.cs` (씬 배치형) | DEV_HOTKEYS (본문) | ✗ | ⚠️ F8 — ProfilerHUD |
 | Home | 존별 성능 CSV 저장 + 콘솔 요약 | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
@@ -56,14 +55,15 @@
 
 - 23호 예약(F3)은 `TwentyThreeBoss.cs` 의 `DevReserveJumpCombo`·`ConsumeDevReservation` 블록(같은 게이트)을 쓴다. 단타 예약 5종(F3 훅·Shift+F3·F4·F6·F9·F11)은 2026-10-20 경석 요청으로 걷어 냈다 — F11 은 10-27 23호 막타 준비로 다시 씀(F4 는 10-22 보스 체력 10% 깎기, F6 은 10-26 보스방 지정 위치 이동(할 일 102)으로 씀).
 - **겹침은 표시만 했다** — 코드는 고치지 않았다.
-  F8·F7 은 둘 다 씬에 붙어 있을 때만 겹친다. `[ ]` 는 관전 모드이고 미니맵이 슬롯 밖일 때만 겹친다.
+  F8 은 둘 다 씬에 붙어 있을 때만 겹친다. `[ ]` 는 관전 모드이고 미니맵이 슬롯 밖일 때만 겹친다.
 - 일반 조작 키(ESC·이동·스킬·F 상호작용·Alt+Enter 창 모드 등)는 디버그 단축키가 아니라 제외했다.
-- `LookToggle` 은 게이트 대상이지만 단축키가 없다(F9 룩 토글은 09-29 에 뺐다 — 시작 룩 적용만 한다).
+- 룩 A/B 토글(`LookToggle`)과 실루엣 비용 측정기(`RenderCostAB`, F7)는 할 일 226(11-05)에 `Dev/LookAB/` 폴더째 삭제했다.
+  맵 씬 화면은 그대로다 — `FogManager.prefab` 의 디밍·시야 차폐 값이 원래 룩 B 와 같다. 기록: [history/look-ab-tuning.md](../history/look-ab-tuning.md).
 
 ## 4. 게이트를 바꾼 파일 (할 일 41)
 
-`Dev/DevBossAttackHotkeys.cs` · `Dev/DevBossEntranceWarp.cs` · `Dev/HitVFXDebugHUD.cs` · `Dev/LookAB/LookToggle.cs` ·
-`Dev/LookAB/RenderCostAB.cs` · `Dev/Profiler/ProfilerHUD.cs` · `Dev/Profiler/ZonePerfRecorder.cs` · `Utility/DevMonsterKill.cs` ·
+`Dev/DevBossAttackHotkeys.cs` · `Dev/DevBossEntranceWarp.cs` · `Dev/HitVFXDebugHUD.cs` · ~~`Dev/LookAB/LookToggle.cs`~~ ·
+~~`Dev/LookAB/RenderCostAB.cs`~~(둘 다 226 삭제) · `Dev/Profiler/ProfilerHUD.cs` · `Dev/Profiler/ZonePerfRecorder.cs` · `Utility/DevMonsterKill.cs` ·
 `Map/MapScene/MapSceneSkipController.cs` · `Map/MapScene/MapSceneDebugActions.cs` · `Map/MapScene/MapSceneDirector.Skip.cs` ·
 `Map/MapScene/Flow/MapSceneTraitCorridorFlow.cs` · `Monster/Boss/TwentyThreeBoss.cs` · `Rendering/RetroCRT/RetroCRTController.cs`
 

@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// 적 외곽선(할 일 58)의 이번 프레임 그릴 목록 — <see cref="PlayerEnemyHoverOutline"/>(오너 로컬)이 LateUpdate 에 채우고
 /// <see cref="EnemyOutlineFeature"/> 가 렌더에서 읽는다. 렌더러 피처는 렌더러 애셋의 서브에셋이라 씬 쪽에서 참조를 잡기
-/// 번거롭다 — <see cref="PlayerSilhouetteFeature.DevEnabled"/> 처럼 정적 한 곳으로 넘긴다(프로세스당 오너는 하나, MPPM 은 피어마다 프로세스).
+/// 번거롭다 — <see cref="PlayerSilhouetteFeature.SuppressedByCinematic"/> 처럼 정적 한 곳으로 넘긴다(프로세스당 오너는 하나, MPPM 은 피어마다 프로세스).
 /// 색은 인덱스 두 개뿐이다 — 마스크 G 채널이 0/1 로 구분한다. 두께도 색 묶음마다 하나씩(빨강·회색).
 /// </summary>
 public static class EnemyOutlineDrawList

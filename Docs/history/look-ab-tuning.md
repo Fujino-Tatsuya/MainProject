@@ -1,8 +1,11 @@
 # 룩 A/B 비교 & 조절 가이드 (아트용)
 
+> 🗄️ **폐기 기록 (2026-11-05, 할 일 226)** — `LookToggle`·`RenderCostAB`(`Assets/1.Scripts/Dev/LookAB/`)와 씬·프리팹의 컴포넌트를 모두 삭제했다.
+> 맵 씬은 이제 토글 없이 `FogManager.prefab` 값(디밍·시야 차폐 켬 = 옛 룩 B)으로만 그려진다. 아래는 당시 기록이다.
+
 > 대상: 아트팀 · 렌더링 룩을 눈으로 보고 값을 조절하는 사람.
 > 최종 갱신 2026-08-06 · 브랜치 `feature/maprendering` · 씬 `4.MapScene`
-> 코드/설계 배경은 [PLAN-vision.md](../history/PLANS/PLAN-vision.md) §8. 이 문서는 **쓰는 법만** 다룬다.
+> 코드/설계 배경은 [PLAN-vision.md](PLANS/PLAN-vision.md) §8. 이 문서는 **쓰는 법만** 다룬다.
 
 ---
 
