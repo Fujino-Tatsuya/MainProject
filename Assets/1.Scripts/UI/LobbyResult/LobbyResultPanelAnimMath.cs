@@ -97,41 +97,31 @@ public static class LobbyResultPanelAnimMath
     public static float CountUpEnd(float countUpDelay, float countUpDuration) =>
         Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration);
 
-    /// <summary>
-    /// 카운트업 끝 패널 펀치 크기 배율(할 일 220) — 1 → <paramref name="peakScale"/> → 1. EuniTween <see cref="Easing.Punch"/>:
-    /// 커지는 절반에 <paramref name="ease"/>, 줄어드는 절반은 그 거울. 펀치 전·후(경과 0 이하·지속 이상)와 지속 0 이하는 정확히 1.
-    /// </summary>
-    public static float PanelPunchScale(float sinceCountUpEnd, float duration, float peakScale, Ease ease)
-    {
-        if (duration <= 0f || sinceCountUpEnd <= 0f || sinceCountUpEnd >= duration)
-            return 1f;
-        return 1f + (peakScale - 1f) * Easing.Punch(ease, sinceCountUpEnd / duration);
-    }
+    /// <summary>카운트업 끝 패널 펀치 길이(초) = ① 급확대 + ② 언더슈트까지 + ③ 자리 잡기. 음수 칸은 0 취급.</summary>
+    public static float PanelPunchLength(float riseTime, float fallTime, float settleTime) =>
+        Mathf.Max(0f, riseTime) + Mathf.Max(0f, fallTime) + Mathf.Max(0f, settleTime);
 
     /// <summary>
-    /// 펀치 번쩍임 세기 0~1(할 일 220) — 지속의 <paramref name="riseFraction"/> 동안 0→1 로 빠르게 켜지고,
-    /// 남은 시간 동안 1→0 으로 사라진다(<paramref name="ease"/> = 사라지는 쪽 이징, OutCubic 이면 금방 빠지고 꼬리가 길다).
-    /// 시작 전·끝난 뒤·지속 0 이하 = 0. 켜지는 비율 0 이하 = 첫 순간부터 최대.
+    /// 카운트업 끝 패널 펀치 크기 배율(할 일 220) — 짧고 세게 '탁':
+    /// ① <paramref name="riseTime"/> 동안 1 → <paramref name="peakScale"/>(<paramref name="riseEase"/>),
+    /// ② <paramref name="fallTime"/> 동안 → <paramref name="undershootScale"/>(<paramref name="fallEase"/>),
+    /// ③ <paramref name="settleTime"/> 동안 → 1(<paramref name="settleEase"/>). 이징 = EuniTween <see cref="Easing.Evaluate"/>.
+    /// 구간 경계에서 값이 이어진다. 펀치 전(경과 0 이하)·후(길이 이상)·길이 0 은 정확히 1. 시간 0 인 구간은 건너뛴다.
     /// </summary>
-    public static float FlashAlpha(float sinceStart, float duration, float riseFraction, Ease ease)
+    public static float PanelPunchScale(float sinceCountUpEnd, float riseTime, float fallTime, float settleTime,
+        float peakScale, float undershootScale, Ease riseEase, Ease fallEase, Ease settleEase)
     {
-        if (duration <= 0f || sinceStart < 0f || sinceStart >= duration)
-            return 0f;
-        float t = sinceStart / duration;
-        float rise = Mathf.Clamp(riseFraction, 0f, 0.99f);
+        float rise = Mathf.Max(0f, riseTime), fall = Mathf.Max(0f, fallTime), settle = Mathf.Max(0f, settleTime);
+        float t = sinceCountUpEnd;
+        if (t <= 0f || t >= rise + fall + settle)
+            return 1f;
         if (t < rise)
-            return t / rise;
-        return 1f - Easing.Evaluate(ease, (t - rise) / (1f - rise));
-    }
-
-    /// <summary>번쩍임 퍼짐 0~1(할 일 220) — EuniTween <see cref="Easing.Evaluate"/>. 시작 전 0, 끝·지속 0 이하 = 1.</summary>
-    public static float FlashSpread(float sinceStart, float duration, Ease ease)
-    {
-        if (sinceStart <= 0f)
-            return 0f;
-        if (duration <= 0f || sinceStart >= duration)
-            return 1f;
-        return Easing.Evaluate(ease, sinceStart / duration);
+            return Mathf.LerpUnclamped(1f, peakScale, Easing.Evaluate(riseEase, t / rise));
+        t -= rise;
+        if (t < fall)
+            return Mathf.LerpUnclamped(peakScale, undershootScale, Easing.Evaluate(fallEase, t / fall));
+        t -= fall;
+        return Mathf.LerpUnclamped(undershootScale, 1f, Easing.Evaluate(settleEase, t / settle));
     }
 
     /// <summary>

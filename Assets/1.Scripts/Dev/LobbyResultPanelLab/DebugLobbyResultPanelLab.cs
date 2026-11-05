@@ -137,7 +137,7 @@ public sealed class DebugLobbyResultPanelLab : MonoBehaviour
         GUILayout.BeginArea(new Rect(10f, 10f, 460f, 300f), GUI.skin.box);
         GUILayout.Label("215 로비 결과창 애니 테스트");
         GUILayout.Label("1/2/3 = 플레이어 수 바꿔 열기 · O = 열기 · C = 닫기 · ESC = 패널 닫기");
-        GUILayout.Label("R = 닫는 도중 다시 열기 · V = 값 바꿔 다시 열기(카운트업 끝 감속·패널 펀치·번쩍임·1위 왕관 점프·반짝임 재확인)");
+        GUILayout.Label("R = 닫는 도중 다시 열기 · V = 값 바꿔 다시 열기(카운트업 끝 감속·값 크기별 세기·패널 펀치·1위 왕관 점프·반짝임 재확인)");
         GUILayout.Label("T = 슬로모션 0.1 토글(패널 연출은 unscaled 라 그대로여야 함)");
         if (panel == null)
         {
