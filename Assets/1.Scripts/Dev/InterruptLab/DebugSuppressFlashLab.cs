@@ -32,6 +32,9 @@ public sealed class DebugSuppressInterruptRepro
     /// <summary>매 프레임 — 실제 시간 1초마다 씬의 허수아비를 다시 찾아 새로 생긴 것만 구독한다.</summary>
     public void Tick(float now)
     {
+        // 219 — 켜 둔 동안 오너 판정 순간 제압 예측도 허수아비를 제압으로 본다(23호처럼 판정 순간 3단계, 서버 표식은 보험). 끄면 런타임 기본.
+        InterruptProductionDirector.DebugSuppressForecastOverride = Enabled ? IsDummyForecast : null;
+
         if (now < _nextRefresh)
             return;
 
@@ -55,9 +58,13 @@ public sealed class DebugSuppressInterruptRepro
         }
     }
 
+    // 캐시된 델리게이트(매 프레임 새로 만들지 않게).
+    private static readonly System.Func<GameObject, bool> IsDummyForecast = target => target.GetComponent<TrainingDummyInterrupt>() != null;
+
     /// <summary>구독 전부 해제.</summary>
     public void Dispose()
     {
+        InterruptProductionDirector.DebugSuppressForecastOverride = null;
         foreach (TrainingDummyInterrupt dummy in _subscribed)
             if (dummy != null)
                 dummy.ServerInterruptSucceeded -= HandleSucceeded;

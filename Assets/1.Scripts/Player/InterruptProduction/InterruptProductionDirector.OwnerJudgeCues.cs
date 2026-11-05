@@ -34,21 +34,23 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
         return LocalOwnerAttempt(cue.Skill, cue.Forecast, cue.Owner, cue.Target, cue.AttackDirection, cue.ViaDash);
     }
 
-    // 판정 성공(할 일 192) — 시도 순간 예측한 단계(일반·대쉬 — 제압은 예측하지 않는다, 11-04 할 일 211)의 섬광을 지금 튼다.
-    // 서버 표식은 성공 슬로우로 뒤에 온다 — 서버가 제압이어도 같은 V3 라 다시 틀지 않는다(HandleStarted).
+    // 판정 성공(할 일 192 → 219) — 시도 순간 예측한 단계(일반·대쉬)에, 대상의 복제된 제압 칸이 이번 간파로 0 이 될 것으로 보이면 제압(3단계)으로 지금 튼다.
+    // 서버 표식은 성공 슬로우로 뒤에 오는 보험 — 튼 단계와 다르면 그때 서버 단계로 다시 튼다(HandleStarted, ServerCorrectsOwner).
     void IInterruptOwnerCueSink.OwnerJudgeSucceeded(in InterruptOwnerCue cue)
     {
         ulong viewer = _networkManager != null ? _networkManager.LocalClientId : 0;
-        InterruptSuccessLook look = SuccessLook(_ownerPredictedTier);
+        InterruptPresentationTier tier = InterruptPresentationTierRules.OwnerJudgeTier(_ownerPredictedTier, PredictsSuppress(cue.Target));
+        _ownerPlayedTier = tier;
+        InterruptSuccessLook look = SuccessLook(tier);
         InterruptVariant variant = InterruptPresentationTierRules.VariantOf(cue.ViaDash);
         uint triggerId = OwnerJudgeCues.JudgeSucceeded(viewer, FlashPoint(cue.FlashPosition), cue.FlashPosition,
             Time.unscaledTime, InterruptEffectTime.Now(HitFlash.Clock), Time.frameCount, look, variant);
-        LastOwnerTier = _ownerPredictedTier;
-        CameraCenterSucceeded(Time.unscaledTime);
-        // 제압 칸 = 예측 단계 그대로(랩 '제압 간파' 재현만 제압 — 그 단계 설정의 발생 위치·암순응을 쓰게).
+        LastOwnerTier = tier;
+        CameraCenterSucceeded(Time.unscaledTime, tier == InterruptPresentationTier.Suppress);
+        // 제압 칸 = 판정 순간 단계(오너 제압 예측 또는 랩 '제압 간파' 재현) — 그 단계 설정의 발생 위치·암순응·단계별 V3 에셋을 쓰게.
         if (InterruptPresentationTierRules.UsesHitLight(look))
             BeginHitLight(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition,
-                _ownerPredictedTier == InterruptPresentationTier.Suppress, variant), true, look);
+                tier == InterruptPresentationTier.Suppress, variant), true, look);
     }
 
     void IInterruptOwnerCueSink.OwnerEnded(InterruptOwnerEndReason reason)

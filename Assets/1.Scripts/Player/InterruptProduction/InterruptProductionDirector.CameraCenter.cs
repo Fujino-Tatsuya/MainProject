@@ -49,9 +49,11 @@ public sealed partial class InterruptProductionDirector
     }
 
     // 판정 성공 — 성공 슬로우 복귀 구간까지 유지. 내 앞 성공 슬로우가 아직 돌고 있으면(연속 간파) 그 번호는 이번 것이 아니다.
-    private void CameraCenterSucceeded(float now)
+    // 제압 간파(판정 순간 제압 예측, 할 일 219)면 제압 전용 성공 프로필로 복귀 시점을 잡는다(예측이 빗나가도 복귀는 실제 슬로우 단계 관찰이 바로잡는다).
+    private void CameraCenterSucceeded(float now, bool suppress = false)
     {
-        _cameraCenter.Succeeded(now, InterruptCameraCenterRules.SuccessReturnDelay(InterruptSuccessProfile), MySuccessSlowTriggerId());
+        _cameraCenter.Succeeded(now, InterruptCameraCenterRules.SuccessReturnDelay(InterruptProductionRules.SelectSuccessProfile(suppress, this)),
+            MySuccessSlowTriggerId());
     }
 
     private void CameraCenterReturn(float now) => _cameraCenter.Return(now);

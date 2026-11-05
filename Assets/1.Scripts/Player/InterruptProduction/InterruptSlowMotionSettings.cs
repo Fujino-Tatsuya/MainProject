@@ -55,6 +55,13 @@ public sealed class InterruptSlowMotionSettings : ScriptableObject
              "시도에서 이어진 성공은 둘 중 더 깊은 쪽(강 0.7 → 성공은 0.7 유지). 이 피어 값을 쓴다(A3 칸이 켜져야 쓰인다)")]
     [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float slowMotionZoomFactor = DefaultSlowMotionZoomFactor;
 
+    // ③-2 제압 간파 적중(할 일 219) — 제압 칸 마지막 1칸을 깎은 성공만 이 프로필(서버가 성공 사건의 제압 표식으로 고른다 — 새 RPC·바이트 없음).
+    // 일반·대쉬 성공은 ③ 그대로. 처음 값 = 3단계만 더 긴 히트스톱·슬로우(PLAN 219 §4 시작값). 줌은 ③ slowMotionZoomFactor 공유.
+    [Header("③-2 제압 간파 적중 (할 일 219)")]
+    [Tooltip("제압 간파 성공(제압 칸 마지막 1칸) 때 거는 슬로우 모양 — 일반·대쉬 성공(interruptSuccessProfile)보다 길게. 서버 값만 쓴다. " +
+             "히트스톱 켜기/끄기 = 디렉터 A1 칸. 줌은 slowMotionZoomFactor 공유")]
+    [SerializeField] private SlowMotionProfile interruptSuppressSuccessProfile = SuppressSuccessDefaults();
+
     // ④ 카메라 대상 중심(할 일 196) — 간파 클릭 즉시 오너 화면 카메라 중심을 간파 대상 쪽으로(강·약 예측, 대상 없음 = 그대로). 줌(위 배율)은 그대로, 중심만.
     // 켜기/끄기 = 디렉터 칸(cameraCenter). 이 피어 값을 쓴다(오너 화면만). 시간은 실제 시간(슬로우·히트스톱 무관).
     [Header("④ 카메라 대상 중심 (할 일 196)")]
@@ -73,6 +80,7 @@ public sealed class InterruptSlowMotionSettings : ScriptableObject
     public float InterruptWeakZoomFactor => interruptWeakZoomFactor;
     public SlowMotionProfile InterruptSuccessProfile => interruptSuccessProfile;
     public float SlowMotionZoomFactor => slowMotionZoomFactor;
+    public SlowMotionProfile InterruptSuppressSuccessProfile => interruptSuppressSuccessProfile;
     public float CameraCenterMoveDuration => cameraCenterMoveDuration;
     public float CameraCenterRatio => cameraCenterRatio;
     public float CameraCenterReturnDuration => cameraCenterReturnDuration;
@@ -95,6 +103,18 @@ public sealed class InterruptSlowMotionSettings : ScriptableObject
         hitStopScale = 0.02f,
         enterDuration = 0.05f,
         holdDuration = 0.2f,
+        exitDuration = 0.25f,
+        failExitDuration = 0.1f,
+    };
+
+    /// <summary>제압 간파 성공 처음 값(할 일 219 §4) — 히트스톱 0.08초(0.02) → 슬로우 0.3 · 진입 0.02 · 유지 0.35 · 복귀 0.25.</summary>
+    public static SlowMotionProfile SuppressSuccessDefaults() => new SlowMotionProfile
+    {
+        scale = 0.3f,
+        hitStopDuration = 0.08f,
+        hitStopScale = 0.02f,
+        enterDuration = 0.02f,
+        holdDuration = 0.35f,
         exitDuration = 0.25f,
         failExitDuration = 0.1f,
     };

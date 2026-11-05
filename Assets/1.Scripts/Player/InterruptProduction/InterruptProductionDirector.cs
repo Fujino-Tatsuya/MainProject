@@ -20,7 +20,7 @@ using UnityEngine.Serialization;
 /// </summary>
 [DisallowMultipleComponent]
 public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterruptProductionSettings, IInterruptOwnerPresentationSettings,
-    IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings, IInterruptHitLightScene
+    IInterruptOwnerDimLook, IInterruptHitFlashSettings, IInterruptHitFlashScreenSettings, IInterruptHitLightScene, IInterruptHitLightAssets
 {
     public static InterruptProductionDirector Instance { get; private set; }
 
@@ -35,7 +35,22 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     private static void ResetStaticEvents()
     {
         LocalSucceeded = null;
+        DebugSuppressForecastOverride = null;
     }
+
+    /// <summary>
+    /// [디버그 — DebugInterruptLab 전용, 할 일 219] 대상의 제압 예측을 덮어쓴다(허수아비엔 제압 칸이 없어 '허수아비 간파 = 제압 간파' 때 오너 판정 순간 3단계도 맞춘다).
+    /// true 를 돌려주면 제압으로 예측한다. null = 없음(런타임 기본).
+    /// </summary>
+    public static System.Func<GameObject, bool> DebugSuppressForecastOverride;
+
+    /// <summary>
+    /// [오너] 이 대상을 지금 간파하면 제압에 들어갈 것으로 보이는가(할 일 219 — <see cref="IInterruptSuppressForecast"/>, 23호 = 복제된 남은 제압 칸). 대상 없음 = false.
+    /// 예측일 뿐 — 서버 성공 표식이 보험이다.
+    /// </summary>
+    public static bool PredictsSuppress(GameObject target) =>
+        target != null && ((DebugSuppressForecastOverride != null && DebugSuppressForecastOverride(target)) ||
+                           (target.TryGetComponent(out IInterruptSuppressForecast forecast) && forecast.WouldSuppressOnInterrupt));
 
     // 슬로우 3단계 수치(194 후속 2) — ① 대쉬 간파 시도 · ② 간파 준비 · ③ 간파 적중. 옛 이 자리 칸을 이름 그대로 옮겼다(테이블 대상 열 = SO 에셋).
     // 비면 코드 기본값(InterruptSlowMotionSettings.OrDefault).
@@ -162,6 +177,20 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Tooltip("V3 월드 이펙트 프리팹(FX_InterruptHitLight_V3 — 중심 점·가로 빛줄·가는 불꽃·작은 빛줄기). 비면 V3 대신 V0")]
     [DataTableIgnore, SerializeField] private InterruptHitLightFx hitLightVfxReference;
 
+    // 간파 연출 단계별 강화(할 일 219) — 1단계(일반) = 위 V3 칸 그대로, 2단계(대쉬)·3단계(제압) = V3 를 복제해 세게 한 SO·프리팹.
+    // 단계마다 SO·프리팹 둘 다 있어야 그 단계 것을 쓰고, 하나라도 비면 1단계(위 V3 칸)로 대체 — 동작 변화 0. V3 버전일 때만 쓴다(V0~V2 는 그대로).
+    [Header("성공 — 단계별 V3 강화(할 일 219)")]
+    [Tooltip("2단계 대쉬 간파 V3 수치 SO(InterruptHitLightLook_V3_Dash) — 라이트·블룸·암순응 나 최대·지속·빛줄기 양. 비면(또는 프리팹이 비면) 1단계 V3")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightLook hitLightLookDash;
+    [Tooltip("2단계 대쉬 간파 V3 프리팹(FX_InterruptHitLight_V3_Dash) — 불꽃·파편 개수·파편 거리·크기·가로 빛줄. 비면(또는 SO 가 비면) 1단계 V3")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightFx hitLightVfxDash;
+    [Tooltip("3단계 제압 간파 V3 수치 SO(InterruptHitLightLook_V3_Suppress) — 1단계 대비 약 2.5배 + 화이트아웃 프레임. 비면(또는 프리팹이 비면) 1단계 V3")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightLook hitLightLookSuppress;
+    [Tooltip("3단계 제압 간파 V3 프리팹(FX_InterruptHitLight_V3_Suppress) — 1단계 대비 약 2.5배. 비면(또는 SO 가 비면) 1단계 V3")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightFx hitLightVfxSuppress;
+    [Tooltip("3단계 제압 간파 화이트아웃 스위치(본인 화면만) — 끄면 제압 SO 의 whiteoutFrames 와 무관하게 안 나온다. SO 프레임 0 으로도 끌 수 있다(둘 중 하나만 꺼도 끔)")]
+    [DataTableIgnore, SerializeField] private bool suppressWhiteout = true;
+
     // 간파 연출 4단계(할 일 192) — 실패 / 간파 / 대쉬 간파 / 제압 간파. 단계는 성공 사건(슬로우 Start 이벤트의 제압·대쉬 칸)으로 고르고,
     // 오너 시도 암전은 입력 순간 예측한 단계로 고른다. 이 피어 값을 쓴다(사건마다 읽음). 문서: interrupt-presentation.md §8.
     // 실패 = 단계 설정 없음(약 예측 = 약한 줌만, 강 예측의 판정 실패 = 그 순간 연출 종료 — 191 D4).
@@ -189,6 +218,15 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     public SlowMotionProfile InterruptDashWeakProfile => SlowMotion.InterruptDashWeakProfile;
     /// <summary>성공 슬로우 프로필.</summary>
     public SlowMotionProfile InterruptSuccessProfile => SlowMotion.InterruptSuccessProfile;
+    /// <summary>제압 간파 성공 슬로우 프로필(할 일 219).</summary>
+    public SlowMotionProfile InterruptSuppressSuccessProfile => SlowMotion.InterruptSuppressSuccessProfile;
+
+    /// <summary>3단계 제압 화이트아웃 스위치(할 일 219) — 런타임 값(저장하지 않음, 랩 토글·테스트). 다음 성공부터.</summary>
+    public bool SuppressWhiteout
+    {
+        get => suppressWhiteout;
+        set => suppressWhiteout = value;
+    }
 
     public float OwnerDimInDuration => ownerDimInDuration;
     public float OwnerDimOutDuration => ownerDimOutDuration;
@@ -230,9 +268,35 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     /// <summary>V3 수치 SO(194 후속) — 확인용.</summary>
     public InterruptHitLightLook HitLightLookReference => hitLightLookReference;
 
-    /// <summary>이 섬광 종류가 읽는 수치 SO — V3 는 전용, 그 밖은 V1·V2 공용.</summary>
+    /// <summary>이 섬광 종류가 읽는 수치 SO — V3 는 전용(1단계 일반), 그 밖은 V1·V2 공용.</summary>
     public InterruptHitLightLook HitLightLookFor(InterruptSuccessLook look) =>
         InterruptPresentationTierRules.UsesReferenceLook(look) ? hitLightLookReference : hitLightLook;
+
+    /// <summary>
+    /// 이 섬광 종류·단계가 읽는 수치 SO(할 일 219) — V3 면 단계별(대쉬·제압 묶음이 비면 1단계), 그 밖은 V1·V2 공용.
+    /// </summary>
+    public InterruptHitLightLook HitLightLookFor(InterruptSuccessLook look, InterruptPresentationTier tier)
+    {
+        if (!InterruptPresentationTierRules.UsesReferenceLook(look))
+            return hitLightLook;
+
+        switch (ReferenceAssetTier(tier))
+        {
+            case InterruptPresentationTier.Dash: return hitLightLookDash;
+            case InterruptPresentationTier.Suppress: return hitLightLookSuppress;
+            default: return hitLightLookReference;
+        }
+    }
+
+    /// <summary>V3 단계별 에셋 묶음 선택(할 일 219) — 대쉬·제압은 그 단계 SO·프리팹이 둘 다 있을 때만, 아니면 일반.</summary>
+    public InterruptPresentationTier ReferenceAssetTier(InterruptPresentationTier tier) =>
+        InterruptPresentationTierRules.SelectReferenceAssetTier(tier,
+            hitLightLookDash != null && hitLightVfxDash != null,
+            hitLightLookSuppress != null && hitLightVfxSuppress != null);
+
+    InterruptHitLightLook IInterruptHitLightAssets.LookFor(in InterruptHitLightRequest request) => HitLightLookFor(request.Look, request.Tier);
+
+    InterruptHitLightFx IInterruptHitLightAssets.FxFor(in InterruptHitLightRequest request) => EnsureHitLightFx(request.Look, request.Tier);
 
     /// <summary>단계 설정(할 일 192). 실패는 설정이 없다(null).</summary>
     public InterruptTierProfile TierProfile(InterruptPresentationTier tier)
@@ -257,6 +321,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     // [오너] 입력 순간 예측한 성공 단계 — 판정 성공 때 섬광 종류를 고른다(서버 표식보다 먼저라서).
     private InterruptPresentationTier _ownerPredictedTier = InterruptPresentationTier.Normal;
+    // [오너] 판정 순간 실제로 튼 성공 단계(할 일 219 — 예측 단계 + 대상 제압 예측). 서버 성공 표식이 다르면 그때 바로잡는다.
+    private InterruptPresentationTier _ownerPlayedTier = InterruptPresentationTier.Normal;
 
     // 단계 객체는 값을 들지 않는다(설정 = this, 시간 = 포트) — 만들어 두기만 하고 사건마다 this 의 필드를 읽는다.
     private readonly ITimeScalePort _timePort = new GlobalTimeScalePort();
@@ -318,10 +384,12 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     private InterruptHitLightPlayer _hitLight;
     private InterruptHitLightFx _hitLightFx;
     private InterruptHitLightFx _hitLightFxReference;
+    private InterruptHitLightFx _hitLightFxDash;
+    private InterruptHitLightFx _hitLightFxSuppress;
 
-    /// <summary>적중 라이트 연출 진행기(V1·V2·V3) — 성공 순간 시작, 매 프레임 실시간으로 진행.</summary>
+    /// <summary>적중 라이트 연출 진행기(V1·V2·V3) — 성공 순간 시작, 매 프레임 실시간으로 진행. 에셋 = 요청의 버전 + 단계(할 일 219).</summary>
     public InterruptHitLightPlayer HitLight => _hitLight ??=
-        new InterruptHitLightPlayer(HitLightLookFor, EnsureHitLightFx, () => _darkAdaptation, SceneLightDim.Shared,
+        new InterruptHitLightPlayer(this, () => _darkAdaptation, SceneLightDim.Shared,
             new InterruptHitFlashOverlay(new InterruptHitLightWhiteoutSettings(this)), FindCasterWeaponPoint, this);
 
     // 194 후속 — 시전자 플레이어(이 피어에 스폰된 것)의 Variant 루트 PlayerWeaponAnchor 오른손 무기 위치. 못 찾으면 null(대상으로 대체).
@@ -372,11 +440,19 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         return camera != null;
     }
 
-    // V3 는 전용 프리팹 인스턴스(194 후속), 그 밖은 V1·V2 공용 인스턴스.
-    private InterruptHitLightFx EnsureHitLightFx(InterruptSuccessLook look) =>
-        InterruptPresentationTierRules.UsesReferenceLook(look)
-            ? EnsureFx(ref _hitLightFxReference, hitLightVfxReference)
-            : EnsureFx(ref _hitLightFx, hitLightVfx);
+    // V3 는 단계별 전용 프리팹 인스턴스(194 후속 → 219 대쉬·제압 묶음, 비면 1단계), 그 밖은 V1·V2 공용 인스턴스.
+    private InterruptHitLightFx EnsureHitLightFx(InterruptSuccessLook look, InterruptPresentationTier tier)
+    {
+        if (!InterruptPresentationTierRules.UsesReferenceLook(look))
+            return EnsureFx(ref _hitLightFx, hitLightVfx);
+
+        switch (ReferenceAssetTier(tier))
+        {
+            case InterruptPresentationTier.Dash: return EnsureFx(ref _hitLightFxDash, hitLightVfxDash);
+            case InterruptPresentationTier.Suppress: return EnsureFx(ref _hitLightFxSuppress, hitLightVfxSuppress);
+            default: return EnsureFx(ref _hitLightFxReference, hitLightVfxReference);
+        }
+    }
 
     private InterruptHitLightFx EnsureFx(ref InterruptHitLightFx instance, InterruptHitLightFx prefab)
     {
@@ -756,6 +832,12 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             // 적중 라이트 연출(할 일 194, V1·V2·V3) — 성공 순간 바로(섬광 순간 예약 없음). 본인 화면은 판정 cue 가 이미 틀었으면 건너뛴다.
             if (!ownerCueHandled)
                 BeginHitLight(e, viewerIsCaster, look);
+            // 219 — 서버 표식은 보험: 판정 순간 튼 단계(오너 제압 예측 포함)가 서버 단계와 다르면 서버 단계로 다시 튼다. 같으면 그대로.
+            else if (viewerIsCaster && InterruptPresentationTierRules.ServerCorrectsOwner(true, _ownerPlayedTier, tier, look))
+            {
+                _ownerPlayedTier = tier;
+                BeginHitLight(e, true, look);
+            }
         }
         else
         {
@@ -917,6 +999,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             ViewerIsCaster = viewerIsCaster,
             Look = look,
             DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
+            Tier = e.Tier,                       // 219 — V3 단계별 SO·프리팹(빈 칸 = 1단계)·제압 화이트아웃
+            SuppressWhiteout = suppressWhiteout,
         }, Time.unscaledTime, Time.frameCount);
     }
 

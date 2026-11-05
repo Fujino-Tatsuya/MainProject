@@ -15,6 +15,19 @@ public struct InterruptHitLightRequest
     public bool ViewerIsCaster;
     public InterruptSuccessLook Look;
     public InterruptDarkAdaptMode DarkAdapt;
+    /// <summary>성공 단계(할 일 219) — V3 단계별 SO·프리팹(대쉬·제압)과 제압 화이트아웃을 고른다. 기본값(실패 = 0)은 일반 묶음.</summary>
+    public InterruptPresentationTier Tier;
+    /// <summary>디렉터 스위치 '제압 화이트아웃'(할 일 219) — 꺼지면 V3 제압 단계 화이트아웃 없음(SO 프레임 수와 무관). V2 화이트아웃과는 무관.</summary>
+    public bool SuppressWhiteout;
+}
+
+/// <summary>
+/// 적중 라이트 요청 하나에 쓸 수치 SO·월드 이펙트(할 일 219 — 버전 + 단계). 디렉터가 구현한다(V1·V2 공용 / V3 일반·대쉬·제압 묶음, 빈 칸 = 일반).
+/// </summary>
+public interface IInterruptHitLightAssets
+{
+    InterruptHitLightLook LookFor(in InterruptHitLightRequest request);
+    InterruptHitLightFx FxFor(in InterruptHitLightRequest request);
 }
 
 /// <summary>
@@ -78,8 +91,7 @@ public interface IInterruptHitLightScene
 /// </summary>
 public sealed class InterruptHitLightPlayer : IDisposable
 {
-    private readonly Func<InterruptSuccessLook, InterruptHitLightLook> _look;
-    private readonly Func<InterruptSuccessLook, InterruptHitLightFx> _fx;
+    private readonly IInterruptHitLightAssets _assets;
     private readonly Func<ISuppressDarkAdaptOutput> _darkAdapt;
     private readonly SceneLightDim _sceneDim;
     private readonly IInterruptHitFlashOverlayOutput _whiteout;
@@ -117,9 +129,16 @@ public sealed class InterruptHitLightPlayer : IDisposable
     public InterruptHitLightPlayer(Func<InterruptSuccessLook, InterruptHitLightLook> look, Func<InterruptSuccessLook, InterruptHitLightFx> fx,
         Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null,
         Func<ulong, Vector3?> casterWeapon = null, IInterruptHitLightScene scene = null)
+        : this(new LookFuncAssets(look, fx), darkAdapt, sceneDim, whiteout, casterWeapon, scene)
     {
-        _look = look;
-        _fx = fx;
+    }
+
+    /// <summary>요청(버전 + 단계)별 데이터·월드 이펙트(할 일 219 — V3 단계별 SO·프리팹). 디렉터가 쓴다.</summary>
+    public InterruptHitLightPlayer(IInterruptHitLightAssets assets,
+        Func<ISuppressDarkAdaptOutput> darkAdapt = null, SceneLightDim sceneDim = null, IInterruptHitFlashOverlayOutput whiteout = null,
+        Func<ulong, Vector3?> casterWeapon = null, IInterruptHitLightScene scene = null)
+    {
+        _assets = assets;
         _darkAdapt = darkAdapt;
         _sceneDim = sceneDim;
         _whiteout = whiteout;
@@ -146,18 +165,21 @@ public sealed class InterruptHitLightPlayer : IDisposable
     /// <summary>성공 순간 시작(<paramref name="now"/> = 실시간, <paramref name="frame"/> = 렌더 프레임). 돌던 연출은 새 것으로 바뀐다.</summary>
     public void Begin(in InterruptHitLightRequest request, float now, int frame = 0)
     {
-        InterruptHitLightLook look = _look?.Invoke(request.Look);
+        InterruptHitLightLook look = _assets?.LookFor(request);
         // 앞 연출의 암순응 방식이 다를 수 있다 — 넣어 둔 것을 먼저 걷는다(곧바로 새 값이 들어간다).
         ReleaseDarkAdapt();
         _request = request;
         _startTime = now;
         _whiteoutStartFrame = frame;
-        _whiteoutFrames = look != null ? InterruptPresentationTierRules.WhiteoutFrames(request.Look, request.ViewerIsCaster, look.WhiteoutFrames) : 0;
+        // V2 = 그 SO 프레임 수, V3 = 제압 단계 ∧ 스위치 켬일 때만(할 일 219).
+        _whiteoutFrames = look != null
+            ? InterruptPresentationTierRules.WhiteoutFrames(request.Look, request.Tier, request.ViewerIsCaster, look.WhiteoutFrames, request.SuppressWhiteout)
+            : 0;
         IsPlaying = true;
 
         // 위치·방향은 이 순간 한 번만 계산한다 — 이펙트는 월드에 남고 시전자를 따라가지 않는다.
         Placement = ResolvePlacement(request);
-        InterruptHitLightFx fx = _fx?.Invoke(request.Look);
+        InterruptHitLightFx fx = _assets?.FxFor(request);
         // 버전이 바뀌어 다른 인스턴스를 틀면 앞 것은 지운다(같은 인스턴스는 Play 가 다시 튼다).
         if (_playedFx != null && _playedFx != fx)
             _playedFx.Stop();
@@ -192,7 +214,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
         if (!IsPlaying)
             return;
 
-        InterruptHitLightLook look = _look?.Invoke(_request.Look);
+        InterruptHitLightLook look = _assets?.LookFor(_request);
         float elapsed = now - _startTime;
         float bloom = look != null ? InterruptEffectLight.Pulse(look.BloomCurve, 1f, elapsed, look.BloomDuration) : 0f;
         _bloomVolume = ApplyVolume(_bloomVolume, "Bloom", look != null ? look.BloomProfile : null, bloom);
@@ -357,6 +379,22 @@ public sealed class InterruptHitLightPlayer : IDisposable
 
         volume.weight = Mathf.Clamp01(weight);
         volume.enabled = volume.weight > 0f;
+    }
+
+    // 버전만으로 고르는 옛 생성자(테스트·194)용 — 단계는 보지 않는다.
+    private sealed class LookFuncAssets : IInterruptHitLightAssets
+    {
+        private readonly Func<InterruptSuccessLook, InterruptHitLightLook> _look;
+        private readonly Func<InterruptSuccessLook, InterruptHitLightFx> _fx;
+
+        public LookFuncAssets(Func<InterruptSuccessLook, InterruptHitLightLook> look, Func<InterruptSuccessLook, InterruptHitLightFx> fx)
+        {
+            _look = look;
+            _fx = fx;
+        }
+
+        public InterruptHitLightLook LookFor(in InterruptHitLightRequest request) => _look?.Invoke(request.Look);
+        public InterruptHitLightFx FxFor(in InterruptHitLightRequest request) => _fx?.Invoke(request.Look);
     }
 }
 

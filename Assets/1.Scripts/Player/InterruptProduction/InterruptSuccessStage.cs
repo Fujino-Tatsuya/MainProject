@@ -28,7 +28,8 @@ public sealed class InterruptSuccessStage
     /// </summary>
     public uint Server(in InterruptProductionEvent e, IReadOnlyList<IInterruptSuccessRelay> relays)
     {
-        uint triggerId = _timeScale.ServerStart(_settings.InterruptSuccessProfile, e.CasterClientId, SlowMotionPurpose.Success,
+        // 제압 간파(표식)면 제압 전용 성공 프로필(할 일 219 — 3단계만 더 길게), 일반·대쉬는 기존 성공 프로필.
+        uint triggerId = _timeScale.ServerStart(InterruptProductionRules.SelectSuccessProfile(e.SuppressInterrupt, _settings), e.CasterClientId, SlowMotionPurpose.Success,
             e.EffectPosition, _settings.Get(InterruptProductionCue.HitStop), e.SuppressInterrupt, e.Variant == InterruptVariant.Dash);
 
         if (relays != null)

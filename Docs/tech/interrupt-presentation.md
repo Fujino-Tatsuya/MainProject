@@ -708,6 +708,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 > 확정(grill Q1~Q8): 암전 = 제압만(Q1) · 슬로우 강/약 그대로(Q2) · 실패 규칙(Q3) · **Q4(일반 포인트라이트 섬광)·Q5(대쉬 암순응·블룸)는 보류 — 지금은 기존 ②~⑥** · 제압 = 대쉬 세트 포함(Q6) · 제압 암순응 컷(Q7) · 누가 보나(Q8).
 > 코드: `InterruptPresentationTier.cs`(단계·종류·단계 설정·규칙 순수 함수) · 디렉터 · 테스트 `InterruptPresentationTierTests`.
 > 🔸 **11-04(할 일 211) 제압 간파 = V3, 시퀀스는 Legacy.** 제압 간파도 일반·대쉬와 같은 적중 라이트 V3·**암전 없음**(Q1 '암전 = 제압만' 은 폐기 — 지금은 어느 단계도 기본 암전이 없다). 아래 표·절은 211 기준으로 고쳤다. 제압 단계(`Suppress`)·표식 비트는 남아 단계 칸 `suppressTier` 로 따로 고를 수 있다.
+> 🔸 **11-05(할 일 219) 단계별 강화 — 1단계 일반 < 2단계 대쉬 < 3단계 제압.** 세 단계 모두 V3 이되 대쉬·제압은 **V3 를 복제해 세게 한 SO·프리팹**을 쓴다(§9.9). 3단계만 **제압 전용 성공 슬로우**(더 긴 히트스톱·슬로우, §9.8)·**화이트아웃**(스위치). 오너는 **판정 순간** 대상 제압 칸이 마지막 1칸인지 복제값으로 보고 그 자리에서 3단계를 튼다 — 서버 표식은 보험(§8.2).
 
 ### 8.1 단계표
 
@@ -725,10 +726,14 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 - **사건 종류 `InterruptVariant`(Normal/Dash)**: 서버 성공 사건에 싣는다 — 세션 = 신고(`InterruptClaim.ViaDash`, 191 경로) → `ServerOnClaimVerdict(…, viaDash)`, 오프라인 = 시전 시작의 대쉬 여부(`castViaDash`).
 - **피어 전달**: 슬로우 Start 이벤트의 179 **표식 바이트 하나**에 비트로(비트 0 = 제압, 비트 1 = 대쉬 — `SlowMotionEvent.PackInterruptFlags`, 직렬화 크기 그대로). 디렉터 `HandleStarted` 가 `GlobalTimeScale.CurrentSuppressInterrupt`·`CurrentDashInterrupt` 를 읽어 `InterruptPresentationTierRules.Select`(실패 / 제압 &gt; 대쉬 &gt; 일반).
-- **오너 시도 예측 = 일반·대쉬만**(11-04 할 일 211): 오너는 제압을 예측하지 않는다 — 옛 대상 제압 예측 `IInterruptSuppressForecast`(23호 구현 포함)·랩 `DebugSuppressForecastOverride` 는 삭제. 입력 순간 `Select(true, VariantOf(viaDash), false)` 의 단계 설정이 암전 켬이고 강 예측일 때만 `InterruptOwnerPresentation.Predict(…, dims: true)` — 기본 단계 설정은 모두 암전 끔이라 강 상태(줌 붙잡기·②~⑥ 조건)만 남는다.
+- **오너 시도 예측 = 일반·대쉬만**(11-04 할 일 211): 시도(입력) 순간에는 제압을 예측하지 않는다(암전 판단용 — 기본 암전 없음). 제압 예측은 219 부터 **판정 순간**에만 한다(아래). 입력 순간 `Select(true, VariantOf(viaDash), false)` 의 단계 설정이 암전 켬이고 강 예측일 때만 `InterruptOwnerPresentation.Predict(…, dims: true)` — 기본 단계 설정은 모두 암전 끔이라 강 상태(줌 붙잡기·②~⑥ 조건)만 남는다.
 - **오너 판정 성공(191 cue)**: 예측 단계의 섬광(`SuccessLook`)으로 — V1~V3 면 바로 적중 라이트 연출(§9), V0 면 ②~⑥. 뒤이은 내 서버 성공은 한 번 삼킨다.
   사건에 근접/대쉬 종류(`variant`)를 싣는다 — 194 전에는 cue 경로 사건이 늘 Normal 이라 대쉬가 일반 단계로 계산됐다.
-  서버가 제압이어도(예측은 일반·대쉬) 오너 화면은 판정 순간 튼 연출을 그대로 둔다 — 기본값은 단계 모두 V3 라 같은 연출이다(`suppressTier` 를 다르게 바꾸면 오너만 예측 단계 연출, 팀원은 제압 단계 연출). 서버 거부면 적중 라이트를 즉시 끈다.
+  서버 거부면 적중 라이트를 즉시 끈다.
+- **오너 판정 순간 제압 예측(할 일 219, 11-05 사용자 결정 — "간파 게이지가 한 칸인 건 이미 알고 있는 거 아냐? 서버는 보험용")**: 판정 성공 cue 에서 `OwnerJudgeTier(예측 단계, PredictsSuppress(cue.Target))` —
+  대상이 `IInterruptSuppressForecast` 를 구현하고(23호 `WouldSuppressOnInterrupt` = 기믹 중 아님 ∧ 복제된 남은 칸을 간파 칸 분기 `BossCounterProgress.ResolveSegments` 에 넣으면 제압) 참이면 **그 자리에서 3단계**(제압 V3 에셋·화이트아웃·카메라 중심 복귀 = 제압 성공 프로필)를 튼다.
+  **서버 표식은 보험**: 내 서버 성공 슬로우의 단계(표식 bit0)가 판정 순간 튼 단계와 **다르면** 서버 단계로 다시 튼다, 같으면 그대로(`ServerCorrectsOwner` — 새 RPC·바이트 없음). 클라 오너는 복제 지연·구출 성공·기믹 판정을 서버만 정확히 알아 틀릴 수 있다 — 그때 보정된다.
+  랩: '허수아비 간파 = 제압 간파' 토글이 켜진 동안 `DebugSuppressForecastOverride` 로 허수아비도 제압으로 예측한다.
 
 ### 8.3 디렉터 칸 — "간파 연출 단계(할 일 192)"
 
@@ -737,6 +742,9 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | `normalTier` | 암전 끔 · 섬광 `HitLightReference`(V3) · 암순응 나 | 간파(근접) 성공(194 §9, 11-03 V1 → V3) |
 | `dashTier` | 암전 끔 · 섬광 `HitLightReference`(V3) · 암순응 나 | 대쉬 간파 성공(194 §9, 11-03 V2 → V3) |
 | `suppressTier` | 암전 끔 · 섬광 `HitLightReference`(V3) · 암순응 나 | 제압 간파 성공(11-04 할 일 211 — 일반·대쉬와 같은 버전 선택, §9.7). 옛 `SuppressSequence`·`sequenceHitLight` 는 삭제(enum 값 1 은 비워 둠 — 들어 있으면 V0) |
+| `hitLightLookDash`·`hitLightVfxDash` | `V3/Dash/` SO·프리팹 | 2단계 대쉬 V3 에셋(할 일 219, §9.9) — 둘 중 하나라도 비면 1단계(`hitLightLookReference`·`hitLightVfxReference`) |
+| `hitLightLookSuppress`·`hitLightVfxSuppress` | `V3/Suppress/` SO·프리팹 | 3단계 제압 V3 에셋(할 일 219) — 둘 중 하나라도 비면 1단계 |
+| `suppressWhiteout` | 켬 | 3단계 화이트아웃 스위치(본인 화면) — 끄면 제압 SO `whiteoutFrames` 와 무관하게 안 나온다 |
 
 ### 8.4 제압 암순응 컷 (Q7) — Legacy (11-04 할 일 211)
 
@@ -750,12 +758,14 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 - **지금 단계 표시**: `내 마지막`(오너 — 시도 예측 단계 → 판정·서버 결과로 갱신, 실패면 실패) · `받은 성공`(이 화면이 마지막으로 받은 성공 단계, 남의 것 포함).
 - **재현 버튼 4개**(`실패`·`간파(근접)`·`대쉬 간파`·`제압 간파`): 이 화면에서만, 서버·슬로우·판정 없이 오너 연출을 판정 cue 경로 그대로 돌린다(시도 → 0.4초 → 결론, 대상 = 가장 가까운 간파 대상). **슬로우가 없어 줌은 안 보인다** — 줌·팀원 화면은 실제 간파로 본다.
-- "허수아비 간파 = 제압 간파" 토글(§7.8) 유지 — 호스트에서 허수아비 성공을 제압 간파로 표식(받은 성공 = 제압 · `suppressTier` 연출 확인용). 섬광 A6 토글·A7 버튼과 오너 제압 예측 덮어쓰기는 11-04(할 일 211) 삭제.
+- "허수아비 간파 = 제압 간파" 토글(§7.8) 유지 — 호스트에서 허수아비 성공을 제압 간파로 표식(받은 성공 = 제압 · `suppressTier` 연출 확인용). 섬광 A6 토글·A7 버튼은 11-04(할 일 211) 삭제. 219 부터 이 토글이 켜진 동안 오너 판정 순간 제압 예측도 허수아비를 제압으로 본다(`DebugSuppressForecastOverride` 재도입) — 제압 성공 슬로우(서버)는 호스트 토글일 때만.
+- **"제압 화이트아웃 (219)" 토글** — 디렉터 `suppressWhiteout` 런타임 값(다음 성공부터). 밑 줄에 `V3 에셋 — 대쉬 전용/1단계 대체 · 제압 전용/1단계 대체`(단계 칸이 비어 1단계로 돌아갔는지).
+- **1 < 2 < 3 비교**: 재현 버튼 `간파(근접)`·`대쉬 간파`·`제압 간파`(또는 버전 줄의 `재생`)를 차례로 — 재현은 슬로우가 없으므로 3단계 슬로우는 '허수아비 간파 = 제압 간파' 토글(호스트) + 실제 간파로 본다.
 
 ### 8.6 알려진 한계
 
 - ~~**기믹 중 23호**: 클라 오너가 기믹 중 마지막 칸을 제압으로 잘못 예측해 암전을 켤 수 있다~~ → 11-04(할 일 211) 오너 제압 예측을 지워 없어졌다.
-- 오너 화면의 성공 연출은 예측 단계(일반·대쉬) 설정을 쓴다 — `suppressTier` 를 일반·대쉬와 다르게 바꾸면 제압 간파 성공자 본인 화면만 예측 단계 연출이다(기본값은 셋 다 V3 라 차이 없음).
+- ~~오너 화면의 성공 연출은 예측 단계(일반·대쉬) 설정을 쓴다~~ → 219: 판정 순간 제압 예측 + 서버 보정. 클라 오너 예측이 틀리면(복제 지연·기믹·구출) 서버 성공 슬로우가 올 때 한 번 다시 튼다 — 그 사이(왕복 지연) 본인 화면은 틀린 단계를 잠깐 본다.
 - 레이드 구출 성공(③ 새 가족)의 제압은 179 와 같이 제압 간파 표식을 내지 않는다(제압 칸 경로만).
 - ~~Q4·Q5 섬광(포인트라이트·환경광 끄기 / 암순응·블룸)은 미구현~~ → 194 적중 라이트 연출 V1·V2(§9).
 
@@ -858,6 +868,9 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | ① 대쉬 간파 시도 | `interruptDashProfile.*` 7(강) · `interruptDashWeakProfile.*` 7(약) | ② 강·약 복사(0.15/0/0.02/0.05/0.5/0.25/0.1 · 0.5/0/0.02/0.05/0.2/0.25/0.1) | 서버(Start 이벤트에 실림) |
 | ② 간파 준비(근접 간파 시도) | `interruptProfile.*` 7(강) · `interruptWeakProfile.*` 7(약) · `interruptZoomFactor` 0.7 · `interruptWeakZoomFactor` 0.93 | 이관 전 프리팹 값 그대로 | 프로필 = 서버 / 줌 = 각 피어(A3), **줌은 ① 대쉬 시도도 같이 쓴다** |
 | ③ 간파 적중(성공) | `interruptSuccessProfile.*` 7(히트스톱 `hitStopDuration` 0.05·`hitStopScale` 0.02 포함) · `slowMotionZoomFactor` 0.85 | 이관 전 프리팹 값 그대로 | 프로필 = 서버 / 줌 = 각 피어(A3) |
+| ③-2 제압 간파 적중(할 일 219) | `interruptSuppressSuccessProfile.*` 7 — 제압 표식(bit0) 성공만, 일반·대쉬는 ③ | 히트스톱 0.08(0.02) · 슬로우 0.3 · 진입 0.02 · 유지 0.35 · 복귀 0.25 · 실패 복귀 0.1(코드 기본값 = 에셋 값) | 서버(`InterruptProductionRules.SelectSuccessProfile` — 새 RPC·바이트 없음). 줌은 ③ `slowMotionZoomFactor` 공유(에셋 1 = 줌 없음) |
+
+- **219 제압 성공 슬로우**: 다른 프로필은 에셋 중립값(아래)이라 사실상 꺼져 있고 3단계만 켜져 있다. 히트스톱은 디렉터 A1 `hitStop`(NetworkManager.prefab 켬)이 꺼지면 0. 서버 권한이라 팀원 화면도 같이 느려진다.
 
 - 스위치 A1 `hitStop`·A3 `ownerZoom` 은 디렉터에 남았다(bool, 테이블 밖).
 - **대쉬 시도 고르기**: 서버 시도 사건 `InterruptProductionEvent.Attempt(…, variant)` 에 대시에 실렸는가(`attachedToDash`)를 싣고 `InterruptProductionRules.SelectAttemptProfile(purpose, variant, settings)` 가 고른다. 목적(`Attempt`/`AttemptWeak`)은 근접과 같아 창 장부·오너 강약·빛 모임·줌이 그대로다. 새 RPC·바이트 없음 — 시도 Start 이벤트의 대쉬 비트는 여전히 성공에만 실린다(시도 슬로우는 프로필 7칸이 이미 실려 간다).
@@ -886,6 +899,39 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - 동작: 서버는 시도·성공 슬로우를 그대로 발동하고 `Started` 이벤트도 전 피어에 그대로 난다(창 장부 닫힘·오너 성공 단계·빛 모임·성공 섬광은 그대로 돈다). 다만 타임라인은 길이 0 단계를 건너뛰어 **시작 즉시 유휴**라 `Time.timeScale`·줌은 안 바뀐다.
 - 알려진 차이: 빗나감 `ServerFail` 이 올 때 슬로우가 이미 유휴라 **`Failed` 이벤트가 나지 않는다**. 오너 암전은 오너 판정 cue(191 `JudgeFailed`)·스킬 끝(`LocalOwnerEnded`)이 걷어 영향 없지만, **팀원 화면 로컬 선착순 장부(`InterruptLocalWindowClaims.AttemptEnded`)가 그 강 시도로 닫은 창을 다시 열지 않는다** — 새 창이 열릴 때까지 팀원의 같은 창 입력 예측이 약(암전·섬광 없음)으로 내려간다. 서버 판정은 영향 없다(연출만).
 - ✅ **xlsx `SlowMotion` 시트 = 중립값(SVN r583, 2026-11-04 196·197 병합 Export)** — 병합 Export 는 기존 xlsx 값을 유지하므로, Export 직전에 `InterruptSlowMotionSettings` 열 38칸을 SO 값으로 덮어써 옮겼다(34칸 변경·4칸 이미 같음, 다른 칸 변경 0·버려진 값 0). 이후 이 값을 바꿀 땐 xlsx 를 직접 고친다(병합 Export 로는 기존 칸이 안 바뀐다).
+
+#### 🟪 219 병합 때 — 병합 Export 할 새 행(xlsx 는 브랜치 `feature/InterruptTierScaling` 에서 고치지 않았다)
+
+- **새로 생길 행 7개** — `SlowMotion` 시트 구역 `#■ InterruptSlowMotionSettings`, 대상 열 `InterruptSlowMotionSettings`: `interruptSuppressSuccessProfile.scale`(0.3) · `.hitStopDuration`(0.08) · `.hitStopScale`(0.02) · `.enterDuration`(0.02) · `.holdDuration`(0.35) · `.exitDuration`(0.25) · `.failExitDuration`(0.1). 버려질 행 0.
+- **절차**: development 병합 당일 최신 dev 워크트리에서 SVN update(`GameData.xlsx`) → `Tools/Data/Export Template` 병합 → 보고가 "새 7 · 버려진 값 0" 인지 확인 → SVN 커밋. 병합 Export 는 기존 칸을 안 바꾸므로 새 7칸은 SO 값(위)으로 들어간다.
+- **그 사이 테이블 모드**: 행이 없을 뿐 **오류 아님** — `DataTableApplier.Bind` 는 테이블에 있는 칸만 쓰므로 새 칸은 SO 에셋 값으로 돈다([data-table.md](data-table.md) "테이블에 없으면 = SO·프리팹 값"). 빌드도 같다.
+
+### 9.9 단계별 강화 — 1단계 일반 · 2단계 대쉬 · 3단계 제압 (할 일 219, 2026-11-05)
+
+> 계획: `_lane-artifacts/Work1/219/PLAN.md`(grill 확정 11-05). 코드: `InterruptPresentationTierRules.SelectReferenceAssetTier`·`WhiteoutFrames(look, tier, …)`·`OwnerJudgeTier`·`ServerCorrectsOwner` · 디렉터 `HitLightLookFor(look, tier)`·`ReferenceAssetTier` · 진행기 요청 `Tier`·`SuppressWhiteout`(에셋 창구 `IInterruptHitLightAssets`) · 저작 메뉴 `Tools/Interrupt/간파 단계별 V3 강화 에셋 만들기 (219)`(없을 때만 생성·빈 칸만 연결) · 테스트 `InterruptTierScalingTests`.
+
+- **1단계(일반) = 지금 V3 그대로**(`InterruptHitLightLook_V3`·`FX_InterruptHitLight_V3` — 값 변화 0). 대쉬·제압은 V3 를 **복제**한 SO·블룸 프로필·프리팹(`V3/Dash/`·`V3/Suppress/`)을 단계 칸으로 고른다. 재질·메시·셰이더·색 보정 프로필(`VP_InterruptHitLight_V3_Grade`)은 공유.
+- **빈 칸 = 1단계**: 단계 SO·프리팹 둘 다 있을 때만 그 단계 것, 하나라도 비면 1단계 묶음(섞어 쓰지 않음). V3 일 때만 — V0~V2 는 단계 무관.
+- 모든 피어가 같은 단계 에셋을 튼다(성공 사건의 단계 = 표식 비트). 오너는 판정 순간 단계(§8.2 제압 예측), 서버 단계가 다르면 보정.
+
+| 요소 | 칸 | 1단계(현재 V3) | 2단계 대쉬 | 3단계 제압 |
+|---|---|---|---|---|
+| 불꽃 개수 | 프리팹 `Sparks` 버스트(최대 입자) | 55~70 (96) | ×1.6 = 88~112 (128) | ×2.5 = 138~175 (200) |
+| 포인트 라이트 세기 | SO `lightIntensity` | 10 | ×1.5 = 15 | ×2.5 = 25 |
+| 블룸 세기 | 단계별 프로필 `VP_InterruptHitLight_V3_{Dash,Suppress}_Bloom` intensity | 5 | ×1.4 = 7 | ×2.5 = 12.5 |
+| 암순응 나 깊이 | SO `sunDimDepth`·`ambientDimDepth` | 0.95·0.9 | 1·1(최대) | 1·1 |
+| 암순응 지속 | SO `sceneDimDuration`·`darkAdaptDuration` | 0.9 | ×1.3 = 1.17 | ×2.5 = 2.25 |
+| 가로 빛줄 크기 | 프리팹 `Streak` Start Size | 2.6 | ×1.5 = 3.9 | ×2.5 = 6.5 |
+| 빛줄기 양 | SO `gapRayCount`·`rayScreenBrightness`(+ 프리팹 `Rays` 버스트·최대 입자) | 5 · 1 (버스트 2 · 최대 4) | 8 · 1.5 (3 · 16) | 13 · 2.5 (5 · 16) |
+| 파편 개수 | 프리팹 `Debris` 버스트(최대 입자) | 5~8 (16) | ×1.6 = 8~13 (16) | ×2.5 = 13~20 (24) |
+| 파편 거리(속도)·크기 | 프리팹 `Debris` Start Speed·Size | 3~6.5 · 0.6~1.2 | ×1.4 = 4.2~9.1 · 0.84~1.68 | ×2.5 = 7.5~16.25 · 1.5~3 |
+| 중심 점 크기 | 프리팹 `Core` Start Size | 0.45 | 그대로 | ×2.5 = 1.125 |
+| 화이트아웃 | SO `whiteoutFrames` + 디렉터 `suppressWhiteout` | 0 | 0 | **3프레임**(본인 화면, 기존 V2 화이트아웃 경로 재사용) |
+| 성공 슬로우 | 슬로우 SO | ③(중립) | ③(중립) | **③-2** (§9.8) |
+
+- 값은 **시작값**(사용자 Play 튜닝 전제) — 3단계 ×2.5 는 화면을 날릴 수 있다. 블룸·라이트가 과하면 그 칸만 낮춘다. 인스펙터에서 단계 에셋을 직접 고치면 되고, 저작 메뉴는 있는 에셋을 덮지 않는다.
+- **화이트아웃 끄기(쉽게 빼기)**: 디렉터 `suppressWhiteout` 끔(또는 랩 토글) **또는** 제압 SO `whiteoutFrames` 0 — 둘 중 하나만 꺼도 안 나온다. 코드 삭제 불필요.
+- **알려진 한계**: 1단계 `Rays` 최대 입자 4 가 `gapRayCount` 5 보다 작아 1단계 화면 빛줄기는 4줄로 잘린다(194 기존 — 1단계 값 변경 금지라 그대로, 2·3단계는 16). '가로 빛줄 길이' 는 크기(Start Size)로만 늘렸다(수명 0.22초 그대로).
 
 ## 10. 카메라 대상 중심 (할 일 196)
 

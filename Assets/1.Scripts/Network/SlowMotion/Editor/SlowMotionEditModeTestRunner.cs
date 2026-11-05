@@ -33,6 +33,7 @@ internal static class SlowMotionEditModeTestRunner
         // SuppressFlashTests(제압 간파 섬광 시퀀스, 179)는 11-04(할 일 211) Legacy — 런타임 연결이 없어 이 메뉴에서 뺐다(Test Runner 에서 직접).
         "^InterruptPresentationTierTests$",        // 간파 연출 4단계 선택·버전 선택·제압 표식(할 일 192·194·211)
         "^InterruptHitLightTests$",                // 적중 라이트 연출 V1·V2·V3(레퍼런스 맞춤·채도 Volume)·발생 위치(틈 수직/오른손 무기/대상/대체)·Variant 기준점(할 일 194)
+        "^InterruptTierScalingTests$",            // 간파 연출 단계별 강화 — 단계별 V3 에셋·제압 화이트아웃·오너 제압 예측·제압 성공 슬로우(할 일 219)
         "^SceneLightDimTests$",                    // 암순응 나 × 23호 차징 태양광 배율 공유(할 일 194)
     };
 

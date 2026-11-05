@@ -171,4 +171,57 @@ public static class InterruptPresentationTierRules
     /// <summary>V2 화이트아웃 프레임 수 — V2 이고 이 화면이 발동자 본인일 때만(화면 효과는 오너만, ②~⑥ 와 같다). 그 밖은 0.</summary>
     public static int WhiteoutFrames(InterruptSuccessLook look, bool viewerIsCaster, int frames) =>
         look == InterruptSuccessLook.HitLightWhiteout && viewerIsCaster ? Mathf.Max(0, frames) : 0;
+
+    /// <summary>
+    /// 화이트아웃 프레임 수(할 일 219) — V2 는 위와 같다. V3 는 <b>제압 단계</b>이고 디렉터 스위치 <paramref name="suppressWhiteout"/> 가 켜졌을 때만
+    /// 그 단계 SO 의 프레임 수(<paramref name="frames"/>, 0 = 끔) — 둘 중 하나만 꺼도 안 나온다. 본인 화면만.
+    /// </summary>
+    public static int WhiteoutFrames(InterruptSuccessLook look, InterruptPresentationTier tier, bool viewerIsCaster, int frames,
+        bool suppressWhiteout)
+    {
+        if (look == InterruptSuccessLook.HitLightReference)
+            return tier == InterruptPresentationTier.Suppress && suppressWhiteout && viewerIsCaster ? Mathf.Max(0, frames) : 0;
+        return WhiteoutFrames(look, viewerIsCaster, frames);
+    }
+
+    /// <summary>
+    /// V3 적중 라이트에 쓸 단계별 에셋 묶음(할 일 219) — 대쉬·제압은 그 단계 SO·프리팹이 <b>둘 다</b> 있을 때만 그 단계 것, 아니면 1단계(일반 V3) 묶음.
+    /// 실패·일반은 늘 일반. 빈 칸 = 1단계 그대로(동작 변화 0).
+    /// </summary>
+    public static InterruptPresentationTier SelectReferenceAssetTier(InterruptPresentationTier tier, bool hasDashAssets, bool hasSuppressAssets)
+    {
+        switch (tier)
+        {
+            case InterruptPresentationTier.Dash when hasDashAssets:
+                return InterruptPresentationTier.Dash;
+            case InterruptPresentationTier.Suppress when hasSuppressAssets:
+                return InterruptPresentationTier.Suppress;
+            default:
+                return InterruptPresentationTier.Normal;
+        }
+    }
+
+    /// <summary>
+    /// [오너] 판정 순간 트는 성공 단계(할 일 219) — 시도 때 예측한 단계(일반·대쉬, 랩 재현은 제압도)에, 대상이 이번 간파로 제압에 들어갈 것으로 보이면 제압.
+    /// 제압 예측 = 복제된 대상 제압 칸(<see cref="IInterruptSuppressForecast"/>). 서버 표식은 보험(<see cref="ServerCorrectsOwner"/>).
+    /// </summary>
+    public static InterruptPresentationTier OwnerJudgeTier(InterruptPresentationTier predicted, bool predictsSuppress) =>
+        predictsSuppress ? InterruptPresentationTier.Suppress : predicted;
+
+    /// <summary>
+    /// [오너] 서버 성공(슬로우 표식)이 판정 순간 튼 연출을 바로잡는가(할 일 219) — 본인 화면이 판정 cue 로 이미 틀었고, 서버 단계가 튼 단계와 다르고,
+    /// 서버 단계가 적중 라이트(V1~V3)일 때만 서버 단계로 다시 튼다. 같으면 다시 안 튼다.
+    /// </summary>
+    public static bool ServerCorrectsOwner(bool ownerCueHandled, InterruptPresentationTier played, InterruptPresentationTier server,
+        InterruptSuccessLook serverLook) =>
+        ownerCueHandled && played != server && UsesHitLight(serverLook);
+}
+
+/// <summary>
+/// [오너] 간파 대상이 이번 간파 성공으로 제압에 들어갈지 미리 알려 준다(할 일 192 → 219 판정 순간 3단계 연출).
+/// 23호 = 복제된 남은 제압 칸이 이번 간파 한 번으로 0 이 되는가. 예측일 뿐 — 실제 제압 여부는 서버가 성공 슬로우 표식으로 보낸다(보험).
+/// </summary>
+public interface IInterruptSuppressForecast
+{
+    bool WouldSuppressOnInterrupt { get; }
 }

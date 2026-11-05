@@ -183,7 +183,21 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             GUILayout.Label("  " + _tierPreview.Status);
 
         DrawTierVersions(director);
+
+        // 3단계 제압 화이트아웃 스위치(할 일 219) — 이 피어 디렉터 런타임 값만, 다음 성공부터. 제압 SO whiteoutFrames 0 이면 켜도 안 나온다.
+        bool whiteout = director.SuppressWhiteout;
+        bool nextWhiteout = GUILayout.Toggle(whiteout, SuppressWhiteoutLabel);
+        if (nextWhiteout != whiteout)
+            director.SuppressWhiteout = nextWhiteout;
+        GUILayout.Label($"  V3 에셋 — 대쉬 {AssetTierLabel(director, InterruptPresentationTier.Dash)} · 제압 {AssetTierLabel(director, InterruptPresentationTier.Suppress)}");
     }
+
+    /// <summary>제압 화이트아웃 토글 글자(할 일 219).</summary>
+    public const string SuppressWhiteoutLabel = "제압 화이트아웃 (219)";
+
+    // 그 단계가 실제로 쓰는 V3 에셋 묶음 — 단계 칸이 비면 '1단계 대체'.
+    static string AssetTierLabel(InterruptProductionDirector director, InterruptPresentationTier tier) =>
+        director.ReferenceAssetTier(tier) == tier ? "전용" : "1단계 대체";
 
     // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬·제압(11-04) 단계마다 V0~V3·암순응 가/나·월드 이펙트 위치 무기/대상(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
     // '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
