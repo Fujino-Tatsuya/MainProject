@@ -12,15 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e50501a65a55b880f2f79f448812c1d, type: 3}
   m_Name: DecalFloorBlendSettings
   m_EditorClassIdentifier: Assembly-CSharp::DecalFloorBlendSettings
-  skillFillAlphaScale: 0.6
+  skillFillAlphaScale: 0.35
   skillEdgeSoftness: 0.5
   skillOutlineAlphaScale: 0.9
-  skillOutlineStain: 0.7
-  skillStainMode: 0
+  skillOutlineStain: 0.8
+  skillStainMode: 1
   skillPlateFillAlphaScale: 1
   telegraphFillAlphaScale: 0.6
   telegraphEdgeSoftness: 0.5
-  telegraphOutlineAlphaScale: 0.9
-  telegraphOutlineStain: 0.6
-  telegraphStainMode: 0
+  telegraphOutlineAlphaScale: 0.4
+  telegraphOutlineStain: 0.65
+  telegraphStainMode: 1
   telegraphPlateFillAlphaScale: 1
