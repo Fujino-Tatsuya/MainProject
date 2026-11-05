@@ -1,9 +1,8 @@
-using System;
 using EuniTween;
 using UnityEngine;
 
 /// <summary>
-/// 로비 결과창 애니메이션(할 일 215) 계산 — MonoBehaviour 밖 순수 함수(EditMode 테스트 대상).
+/// 로비 결과창 애니메이션(할 일 215·220) 계산 — MonoBehaviour 밖 순수 함수(EditMode 테스트 대상).
 /// 시간은 호출 측이 넘긴다(<see cref="LobbyResultPanelAnimator"/> = <c>Time.unscaledDeltaTime</c> 누적).
 /// 곡선 평가는 호출 측이 한다 — 여기는 진행도·보간·숫자만.
 /// </summary>
@@ -37,6 +36,8 @@ public static class LobbyResultPanelAnimMath
 
     /// <summary>
     /// 카운트업 중 보일 숫자. 진행도는 0~1 로 자른다(곡선이 넘쳐도 최종값을 넘지 않는다). 1 이면 정확히 최종값.
+    /// 소수는 버린다(0 쪽으로, 할 일 220) — 최종값은 진행도 1(= 카운트업 끝, 패널 펀치 순간)에만 나온다.
+    /// 반올림이면 작은 값(처치 12 등)이 끝나기 한참 전에 최종값에 닿아 감속 꼬리 동안 멈춰 보인다.
     /// 큰 값의 float 오차를 피하려고 double 로 곱한다.
     /// </summary>
     public static int CountUpValue(int finalValue, float progress)
@@ -45,7 +46,7 @@ public static class LobbyResultPanelAnimMath
             return finalValue;
         if (progress <= 0f)
             return 0;
-        return (int)Math.Round(finalValue * (double)progress, MidpointRounding.AwayFromZero);
+        return (int)(finalValue * (double)progress);
     }
 
     /// <summary>
@@ -62,9 +63,27 @@ public static class LobbyResultPanelAnimMath
         return Mathf.Min(final, final * progress);
     }
 
-    /// <summary>왕관 첫 점프 시작 시각(열기부터 초) = 숫자 지연 + 숫자 시간 + 왕관 지연 — 카운트업이 끝난 직후. 음수 칸은 0 취급.</summary>
-    public static float CrownFirstStart(float countUpDelay, float countUpDuration, float crownDelay) =>
-        Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration) + Mathf.Max(0f, crownDelay);
+    /// <summary>카운트업이 끝나는 시각(열기부터 초) = 숫자 지연 + 숫자 시간. 패널 펀치가 이 순간 시작한다(할 일 220). 음수 칸은 0 취급.</summary>
+    public static float CountUpEnd(float countUpDelay, float countUpDuration) =>
+        Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration);
+
+    /// <summary>
+    /// 카운트업 끝 패널 펀치 크기 배율(할 일 220) — 1 → <paramref name="peakScale"/> → 1. EuniTween <see cref="Easing.Punch"/>:
+    /// 커지는 절반에 <paramref name="ease"/>, 줄어드는 절반은 그 거울. 펀치 전·후(경과 0 이하·지속 이상)와 지속 0 이하는 정확히 1.
+    /// </summary>
+    public static float PanelPunchScale(float sinceCountUpEnd, float duration, float peakScale, Ease ease)
+    {
+        if (duration <= 0f || sinceCountUpEnd <= 0f || sinceCountUpEnd >= duration)
+            return 1f;
+        return 1f + (peakScale - 1f) * Easing.Punch(ease, sinceCountUpEnd / duration);
+    }
+
+    /// <summary>
+    /// 왕관 첫 점프 시작 시각(열기부터 초) = 카운트업 끝 + 패널 펀치 시간 + 왕관 지연 — 펀치가 끝난 직후(할 일 220).
+    /// 펀치가 꺼져 있으면 <paramref name="punchDuration"/> = 0 을 넘긴다. 음수 칸은 0 취급.
+    /// </summary>
+    public static float CrownFirstStart(float countUpDelay, float countUpDuration, float punchDuration, float crownDelay) =>
+        CountUpEnd(countUpDelay, countUpDuration) + Mathf.Max(0f, punchDuration) + Mathf.Max(0f, crownDelay);
 
     /// <summary>
     /// 왕관 점프 주기(시작→다음 시작, 초). 반복 간격 0 이하 = 0(1회만). 간격이 점프 시간보다 짧으면 점프 시간(겹치지 않게).

@@ -9,7 +9,9 @@ using UnityEngine.UI;
 /// (a) 창 등장: 열 때 크기(<c>hiddenScale</c>→1)·투명도(0→1), 닫을 때 반대(짧게).
 /// (c) 숫자 카운트업: 열 때 플레이어 행 숫자(<see cref="ResultStatsView.SetCountUpProgress"/>)와 소요 시간
 ///     (<see cref="LobbyResultPanel.SetPlayTimeCountUp"/>)이 같은 진행도로 0 에서 최종값까지 올라간다.
-/// (d) 1위 왕관: 카운트업이 끝난 직후부터 <c>crownRepeatInterval</c>(3초)마다 점프하며 한 바퀴(기본 Y축) 돌고,
+///     기본 곡선은 강한 감속 — 82% 까지 빠르게, 남은 자리는 시간의 70% 동안 천천히(할 일 220).
+/// (c2) 카운트업이 끝나는 순간(최종값 도달) 창 본체가 살짝 커졌다 돌아오는 펀치(EuniTween <c>Easing.Punch</c>, 할 일 220).
+/// (d) 1위 왕관: 카운트업 끝 펀치가 끝난 직후부터 <c>crownRepeatInterval</c>(3초)마다 점프하며 한 바퀴(기본 Y축) 돌고,
 ///     착지마다 반짝임이 크게 터진 뒤 다음 점프 전까지 은은하게 반복한다(EuniTween 이징). 행 밖으로 튀어나가도 자르지 않는다.
 ///
 /// - 시간 = <c>Time.unscaledDeltaTime</c>(슬로모션 영향 없음). 곡선·지속시간 = 이 컴포넌트 인스펙터.
@@ -47,16 +49,24 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     [Tooltip("열기 시작부터 숫자가 올라가기 시작할 때까지(초, unscaled). 그동안 숫자·시간은 0.")]
     [SerializeField] private float countUpDelay = 0.15f;
     [Tooltip("0 → 최종값까지 걸리는 시간(초, unscaled). 0 이하면 카운트업 없이 바로 최종값. 소요 시간(mm:ss)도 같은 진행도.")]
-    [SerializeField] private float countUpDuration = 0.8f;
-    [Tooltip("카운트업 곡선(가로 = 진행 0~1, 세로 = 최종값 대비 0~1). 0~1 밖은 자른다.")]
-    [SerializeField] private AnimationCurve countUpCurve = new AnimationCurve(new Keyframe(0f, 0f, 0f, 2f), new Keyframe(1f, 1f, 0f, 0f));
+    [SerializeField] private float countUpDuration = 1.5f;
+    [Tooltip("카운트업 곡선(가로 = 진행 0~1, 세로 = 최종값 대비 0~1). 0~1 밖은 자른다. 기본 = 강한 감속(30% 시간에 82%, 남은 70% 시간 동안 마지막 자리가 천천히 — 할 일 220). 숫자는 소수 버림이라 최종값은 끝(펀치 순간)에만 나온다.")]
+    [SerializeField] private AnimationCurve countUpCurve = DefaultCountUpCurve();
+
+    [Header("카운트업 끝 패널 펀치 (EuniTween)")]
+    [Tooltip("카운트업이 끝나는 순간(최종값 도달) 창 본체(scaleTarget)가 커졌다 돌아오는 시간(초, unscaled). 0 이하면 펀치 없음. 왕관 첫 점프는 펀치가 끝난 뒤.")]
+    [SerializeField] private float punchDuration = 0.28f;
+    [Tooltip("펀치 최대 크기 배율(1 = 펀치 없음). 열기 크기 위에 곱한다.")]
+    [SerializeField] private float punchScale = 1.06f;
+    [Tooltip("펀치 이징 — 커지는 절반에 적용, 줄어드는 절반은 거울(EuniTween Easing.Punch). OutQuad = 빠르게 커졌다 꼭대기에서 멈칫.")]
+    [SerializeField] private Ease punchEase = Ease.OutQuad;
 
     [Header("1위 왕관 점프·회전 (EuniTween)")]
-    [Tooltip("카운트업이 끝나고 왕관이 뛰기 시작할 때까지(초, unscaled).")]
+    [Tooltip("카운트업 끝 패널 펀치가 끝나고(펀치 없으면 카운트업 끝) 왕관이 뛰기 시작할 때까지(초, unscaled).")]
     [SerializeField] private float crownDelay = 0.05f;
     [Tooltip("점프 + 한 바퀴 시간(초, unscaled). 0 이하면 왕관 연출 없음(반짝임만 착지 시각에).")]
     [SerializeField] private float crownDuration = 0.6f;
-    [Tooltip("점프·회전 반복 주기(초, 시작→다음 시작, unscaled). 첫 점프는 카운트업 직후, 그 뒤 이 간격마다. 0 이하면 1회만. 점프 시간보다 짧으면 점프 시간.")]
+    [Tooltip("점프·회전 반복 주기(초, 시작→다음 시작, unscaled). 첫 점프는 펀치 직후, 그 뒤 이 간격마다. 0 이하면 1회만. 점프 시간보다 짧으면 점프 시간.")]
     [SerializeField] private float crownRepeatInterval = 3f;
     [Tooltip("점프 높이(UI 단위, 캔버스 기준 px).")]
     [SerializeField] private float crownJumpHeight = 28f;
@@ -104,7 +114,9 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     private Action _onHidden;
 
     private bool _countingUp;
-    private float _countUpElapsed;
+    private bool _punching;
+    private float _countUpElapsed; // 열기부터(초, unscaled) — 카운트업·펀치 공용
+    private float _punchMultiplier = 1f;
 
     private RectTransform _crown;  // 이번 열기의 1위 왕관(행이 다시 그려지면 파괴된다 — Unity null 로 확인)
     private Vector2 _crownBasePosition;
@@ -134,7 +146,10 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
 
         _countUpElapsed = 0f;
         _countingUp = countUpDuration > 0f && (statsView != null || _panel != null);
+        _punching = _countingUp && PunchEnabled; // 카운트업이 없으면 "끝나는 순간"도 없다
+        _punchMultiplier = 1f;
         ApplyCountUp();
+        ApplyPunch();
 
         StartCrown();
     }
@@ -152,6 +167,7 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
             _blocker.enabled = false;
         _canvasGroup.interactable = false;
         _canvasGroup.blocksRaycasts = false;
+        StopPunch(); // 닫힘 크기 연출이 바로 이어받는다
 
         if (!isActiveAndEnabled || closeDuration <= 0f)
         {
@@ -168,10 +184,13 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     {
         float dt = Time.unscaledDeltaTime;
 
-        if (_countingUp)
+        if (_countingUp || _punching)
         {
             _countUpElapsed += dt;
-            ApplyCountUp();
+            if (_countingUp)
+                ApplyCountUp();
+            if (_punching)
+                ApplyPunch();
         }
 
         if (_crownPlaying)
@@ -235,6 +254,7 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
         _tweening = false;
         _countingUp = false;
         _onHidden = null;
+        StopPunch();
         StopCrown();
         SetVisibility(0f);
     }
@@ -279,7 +299,7 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
             return;
         }
 
-        float firstStart = LobbyResultPanelAnimMath.CrownFirstStart(countUpDelay, countUpDuration, crownDelay);
+        float firstStart = LobbyResultPanelAnimMath.CrownFirstStart(countUpDelay, countUpDuration, PunchEnabled ? punchDuration : 0f, crownDelay);
         float progress = LobbyResultPanelAnimMath.CrownCycleProgress(_crownElapsed, firstStart, crownDuration, crownRepeatInterval);
         float jump = LobbyResultPanelAnimMath.CrownJumpOffset(progress, crownJumpHeight, crownJumpEase);
         float angle = LobbyResultPanelAnimMath.CrownSpinAngle(progress, crownSpinDegrees, crownSpinEase);
@@ -386,17 +406,52 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
         _sparkles.Clear(); // Image 는 왕관 자식이라 행이 다시 그려질 때 같이 사라진다
     }
 
+    // ── 카운트업 끝 패널 펀치(할 일 220) ─────────────────────────
+
+    private bool PunchEnabled => punchDuration > 0f && !Mathf.Approximately(punchScale, 1f);
+
+    private void ApplyPunch()
+    {
+        float since = _countUpElapsed - LobbyResultPanelAnimMath.CountUpEnd(countUpDelay, countUpDuration);
+        _punchMultiplier = LobbyResultPanelAnimMath.PanelPunchScale(since, punchDuration, punchScale, punchEase);
+        if (since >= punchDuration)
+        {
+            _punching = false;
+            _punchMultiplier = 1f;
+        }
+        ApplyScale();
+    }
+
+    private void StopPunch()
+    {
+        _punching = false;
+        _punchMultiplier = 1f;
+        ApplyScale();
+    }
+
     private void SetVisibility(float visibility)
     {
         _visibility = visibility;
         if (_canvasGroup != null)
             _canvasGroup.alpha = LobbyResultPanelAnimMath.Alpha(visibility);
-        if (scaleTarget != null)
-        {
-            float scale = LobbyResultPanelAnimMath.Scale(visibility, hiddenScale);
-            scaleTarget.localScale = new Vector3(scale, scale, 1f);
-        }
+        ApplyScale();
     }
+
+    // 크기 = 열기·닫기(보임 정도) × 카운트업 끝 펀치. 둘이 시간상 겹쳐도 곱이라 튀지 않는다.
+    private void ApplyScale()
+    {
+        if (scaleTarget == null)
+            return;
+        float scale = LobbyResultPanelAnimMath.Scale(_visibility, hiddenScale) * _punchMultiplier;
+        scaleTarget.localScale = new Vector3(scale, scale, 1f);
+    }
+
+    // 강한 감속: 0~0.3 에 0→0.82(시작 기울기 4.5), 0.3~1 에 0.82→1(기울기 0.5→0 — 넘침 없음, 끝에서 거의 멈춤).
+    /// <summary>카운트업 곡선 기본값(할 일 220) — 인스펙터 기본·테스트 공용. 프리팹에는 같은 키가 저장돼 있다.</summary>
+    public static AnimationCurve DefaultCountUpCurve() => new AnimationCurve(
+        new Keyframe(0f, 0f, 0f, 4.5f),
+        new Keyframe(0.3f, 0.82f, 0.5f, 0.5f),
+        new Keyframe(1f, 1f, 0f, 0f));
 
     private void Resolve()
     {

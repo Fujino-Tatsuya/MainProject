@@ -1,8 +1,9 @@
 using EuniTween;
+using UnityEngine;
 using NUnit.Framework;
 
 /// <summary>
-/// 로비 결과창 애니메이션(할 일 215) 계산 — 진행도·카운트업 지연·투명도/크기·카운트업 숫자.
+/// 로비 결과창 애니메이션(할 일 215·220) 계산 — 진행도·카운트업 지연·투명도/크기·카운트업 숫자·감속 곡선·끝 펀치.
 /// </summary>
 public sealed class LobbyResultPanelAnimMathTests
 {
@@ -52,6 +53,13 @@ public sealed class LobbyResultPanelAnimMathTests
         Assert.AreEqual(0, LobbyResultPanelAnimMath.CountUpValue(0, 0.7f));
         Assert.AreEqual(int.MaxValue, LobbyResultPanelAnimMath.CountUpValue(int.MaxValue, 1f));
         Assert.LessOrEqual(LobbyResultPanelAnimMath.CountUpValue(int.MaxValue, 0.999999f), int.MaxValue);
+        // 220: 소수 버림 — 최종값은 진행도 1 에서만(작은 값이 감속 꼬리 동안 미리 최종값에 멈추지 않게)
+        Assert.AreEqual(11, LobbyResultPanelAnimMath.CountUpValue(12, 0.99f));
+        Assert.AreEqual(11, LobbyResultPanelAnimMath.CountUpValue(12, 0.9999f));
+        Assert.AreEqual(12, LobbyResultPanelAnimMath.CountUpValue(12, 1f));
+        Assert.AreEqual(48209, LobbyResultPanelAnimMath.CountUpValue(48210, 0.99999f));
+        for (float p = 0f; p < 1f; p += 0.001f)
+            Assert.Less(LobbyResultPanelAnimMath.CountUpValue(12, p), 12);
     }
 
     [Test]
@@ -75,10 +83,12 @@ public sealed class LobbyResultPanelAnimMathTests
     [Test]
     public void CrownCycle_FirstRightAfterCountUp_ThenEveryInterval()
     {
-        // 숫자 지연 0.15 + 숫자 0.8 + 왕관 지연 0.05 = 1.0 초에 첫 점프, 0.6 초 동안
-        float first = LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 0.8f, 0.05f);
+        // 숫자 지연 0.15 + 숫자 0.8 + 펀치 0(꺼짐) + 왕관 지연 0.05 = 1.0 초에 첫 점프, 0.6 초 동안
+        float first = LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 0.8f, 0f, 0.05f);
         Assert.AreEqual(1f, first, 1e-5f);
-        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownFirstStart(-1f, -1f, -1f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownFirstStart(-1f, -1f, -1f, -1f), 1e-6f);
+        // 220 기본: 0.15 + 1.5 + 펀치 0.28 + 0.05 = 1.98 초 — 펀치가 끝난 직후
+        Assert.AreEqual(1.98f, LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 1.5f, 0.28f, 0.05f), 1e-5f);
 
         Assert.AreEqual(3f, LobbyResultPanelAnimMath.CrownPeriod(0.6f, 3f), 1e-6f);
         Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownPeriod(0.6f, 0f), 1e-6f);
@@ -149,5 +159,52 @@ public sealed class LobbyResultPanelAnimMathTests
         Assert.AreEqual(0f, LobbyResultPanelAnimMath.SparklePulse(-1f, Ease.OutCubic), 1e-6f);
         Assert.AreEqual(1f, LobbyResultPanelAnimMath.SparklePulse(0.5f, Ease.OutCubic), 1e-5f);
         Assert.AreEqual(0f, LobbyResultPanelAnimMath.SparklePulse(1f, Ease.OutCubic), 1e-6f);
+    }
+    [Test]
+    public void DefaultCountUpCurve_StrongEaseOut_NeverOvershoots()
+    {
+        // 220: 30% 시간에 82%, 남은 70% 시간 동안 마지막 18% — 끝으로 갈수록 느려지고 1 을 넘지 않는다.
+        AnimationCurve curve = LobbyResultPanelAnimator.DefaultCountUpCurve();
+        Assert.AreEqual(0f, curve.Evaluate(0f), 1e-5f);
+        Assert.AreEqual(0.82f, curve.Evaluate(0.3f), 1e-4f);
+        Assert.AreEqual(1f, curve.Evaluate(1f), 1e-5f);
+        Assert.Greater(curve.Evaluate(0.65f), 0.93f); // 중반 이후는 거의 다 왔다 — 남은 자리가 천천히
+
+        float previous = 0f;
+        float previousStep = float.MaxValue;
+        for (int i = 1; i <= 100; i++)
+        {
+            float t = i / 100f;
+            float v = curve.Evaluate(t);
+            Assert.LessOrEqual(v, 1f + 1e-5f, $"t={t}");
+            Assert.GreaterOrEqual(v, previous - 1e-6f, $"t={t}"); // 되돌아가지 않음
+            if (t > 0.3f)
+            {
+                float step = v - previous;
+                Assert.LessOrEqual(step, previousStep + 1e-5f, $"t={t}"); // 감속 구간: 한 칸 증가량이 줄기만
+                previousStep = step;
+            }
+            previous = v;
+        }
+    }
+
+    [Test]
+    public void PanelPunch_OneToPeakToOne_AtCountUpEnd()
+    {
+        Assert.AreEqual(1.65f, LobbyResultPanelAnimMath.CountUpEnd(0.15f, 1.5f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpEnd(-1f, -1f), 1e-6f);
+
+        // 끝나기 전·끝난 뒤 = 정확히 1
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(-0.1f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(0f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(0.28f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(5f, 0.28f, 1.06f, Ease.OutQuad), 1e-6f);
+        // 가운데 = 최대
+        Assert.AreEqual(1.06f, LobbyResultPanelAnimMath.PanelPunchScale(0.14f, 0.28f, 1.06f, Ease.OutQuad), 1e-4f);
+        float rising = LobbyResultPanelAnimMath.PanelPunchScale(0.07f, 0.28f, 1.06f, Ease.OutQuad);
+        Assert.Greater(rising, 1f);
+        Assert.Less(rising, 1.06f);
+        // 지속 0 = 펀치 없음
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(0.1f, 0f, 1.06f, Ease.OutQuad), 1e-6f);
     }
 }

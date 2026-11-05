@@ -1879,7 +1879,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   countUpDelay: 0.15
-  countUpDuration: 0.8
+  countUpDuration: 1.5
   countUpCurve:
     serializedVersion: 2
     m_Curve:
@@ -1887,7 +1887,16 @@ MonoBehaviour:
       time: 0
       value: 0
       inSlope: 0
-      outSlope: 2
+      outSlope: 4.5
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.3
+      value: 0.82
+      inSlope: 0.5
+      outSlope: 0.5
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -1904,6 +1913,9 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  punchDuration: 0.28
+  punchScale: 1.06
+  punchEase: 5
   crownDelay: 0.05
   crownDuration: 0.6
   crownJumpHeight: 28
