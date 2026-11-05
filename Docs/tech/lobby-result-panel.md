@@ -46,10 +46,7 @@
 ## 닫기·모달
 - 닫기 버튼, ESC, **열린 뒤 180초**(`autoCloseSeconds`, `Time.unscaledTime` — 슬로모션 영향 없음, 0 이하면 끔) 중 먼저 오는 것. 피어마다 각자(로컬) 닫는다.
 - 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력을 막고, 반투명 Dim 이 뒤 클릭을 막는다.
-- **닫기 버튼 hover 흰 테두리(할 일 224)** = `Button_Close` 의 `UiHoverBorder`(범용 컴포넌트, `Assets/1.Scripts/UI/UiHoverBorder.cs` — 셰브론용 기존 `UiHoverOutline`(할 일 109)과 별개). 마우스를 올리거나 키보드·패드로 선택하면 버튼 둘레에 흰 테두리가 `fadeTime` 0.1초(unscaled, EuniTween `ease` OutQuad)에 켜지고, 벗어나면 같은 시간에 꺼진다.
-  - 버튼 Image·Button Transition(ColorTint)은 그대로 — 테두리는 버튼 바로 뒤 형제 Image(처음 켜질 때 하나 만들어 재사용, `Button_Close_HoverBorder`)가 버튼 자리·크기를 매 프레임 따라가며 `outset` 5px 크게 그려 둘레만 보인다. 버튼 스프라이트(`button_pill_neutral`)는 어두운 색이라 흰색을 곱할 수 없어 따로 그린다.
-  - 스프라이트 `outlineSprite` = Unity 내장 `UI/Skin/UISprite.psd`(흰 9-slice), 색 흰색 알파 0.95, `cornerScale`(pixelsPerUnitMultiplier) 0.12 — 알약 모양 끝을 둥글게. 비활성 버튼·패널 닫힘(Content 꺼짐) 때 즉시 숨김. 계산 `UiHoverBorder.Step`(테스트 `Editor/UiHoverBorderTests.cs`).
-  - 재생성 메뉴도 같은 컴포넌트·스프라이트를 붙인다.
+- **닫기 버튼 hover** = 버튼 기본 Transition(ColorTint)만 — 마우스를 올리면 아주 살짝(0.96) 어두워지고, 누르면 0.78 로 어두워진다. 할 일 224 의 흰 테두리(`UiHoverBorder`, 버튼 뒤 형제 Image `Button_Close_HoverBorder`)는 **11-05 할 일 228 로 삭제** — 내장 `UISprite` 9-slice 를 `cornerScale` 0.12 로 그려 모서리가 버튼 높이보다 커져 버튼 뒤에 흰 '더하기' 모양으로 겹쳐 보였다. 컴포넌트·테스트·재생성 메뉴 코드 모두 지웠다(셰브론용 `UiHoverOutline`(할 일 109)은 별개라 그대로).
 
 ## ESC
 - 패널은 열려 있을 때만 ESC 를 쓴다. 지금 로비(`LobbySceneManager`)에는 ESC 처리가 없어 충돌은 없다.
@@ -99,7 +96,7 @@
     근거: 10 이하는 1.5초에 칸당 0.15초 이상 — 감속 꼬리(1.05초)에 넣으면 한두 칸이 한참 멈췄다 한 번에 바뀐다. 1000 이상은 꼬리 18% 에도 180칸 이상이 남아 계속 굴러간다. **모든 값은 선형 진행도 1(= 펀치 순간)에 동시에 최종값**(선형·곡선 둘 다 1 에서 1), 섞어도 넘침·되돌아감 없음(테스트로 고정).
   - **카운트업 끝 패널 펀치(할 일 220)**: 카운트업이 끝나는 순간(`countUpDelay + countUpDuration`, 기본 열기부터 1.65초) 창(`Content/Panel` = `scaleTarget`)이 `punchScale` 1.06 까지 커졌다 1 로 돌아온다. `punchDuration` 0.28초, **EuniTween** `Easing.Punch(punchEase=OutQuad)`(커지는 절반 이징, 줄어드는 절반 거울), unscaled. 크기 = 열기 크기 × 펀치(곱) — 열기(0.22초)와는 시간상 안 겹치고, 겹쳐도 튀지 않는다. 지속 0 또는 배율 1 = 펀치 없음(왕관도 기다리지 않음). 카운트업 시간 0(즉시)이면 펀치도 없다.
     닫기 시작·Content 꺼짐·다시 열기 때 펀치를 멈추고 배율 1 로(닫힘 크기 연출이 이어받음, 다시 열면 처음부터).
-  - **등급 도장 '쾅'(할 일 223)**: 소요시간 칸 오른쪽 빗금 칸(닫기 버튼 왼쪽)의 `Content/Panel/GradeStamp`(깔끔한 빨간 원 175px — git 의 흰 원 PNG `Assets/2.Prefabs/UI/Textures/ResultGradeCircle.png`(512px, 가장자리 안티에일리어싱)에 Image 색 빨강(205,32,36) 틴트, 기본 Knob 은 확대 시 흐려서 안 씀. 예전 도장 스프라이트는 11-05 삭제 + 가운데 크림색 TMP 글자 `Text_Grade` S/A/B/C, 결과창 다른 글자와 같은 서울알림 Medium `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`). 로비 결과창에만 있다(5.ResultScene 없음).
+  - **등급 도장 '쾅'(할 일 223)**: 소요시간 칸 오른쪽 빗금 칸(닫기 버튼 왼쪽)의 `Content/Panel/GradeStamp`(깔끔한 빨간 원 120px — git 의 흰 원 PNG `Assets/2.Prefabs/UI/Textures/ResultGradeCircle.png`(512px, 가장자리 안티에일리어싱)에 Image 색 빨강(205,32,36) 틴트, 기본 Knob 은 확대 시 흐려서 안 씀. 예전 도장 스프라이트는 11-05 삭제 + 가운데 크림색 TMP 글자 `Text_Grade` S/A/B/C, 결과창 다른 글자와 같은 서울알림 Medium `Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset`). 로비 결과창에만 있다(5.ResultScene 없음).
     규칙 = `LobbyResultGrade.Evaluate`(순수, 테스트 `Editor/LobbyResultGradeTests.cs`): 소요 시간 ≤ `gradeSMaxMinutes` 6분 = S(4분보다 빠른 경우 포함), ≤ `gradeAMaxMinutes` 9분 = A, ≤ `gradeBMaxMinutes` 12분 = B, 그 위 C. 경계 포함, **화면 표기와 같은 정수 초**(06:00.4 = "06:00" = S). 경계 3칸 = `LobbyResultPanel` 인스펙터(xlsx 노출 안 함). **도장은 클리어 판에만** — 전멸(패배)·중단·결과 없음이면 끈다(`LobbyResultGrade.ShowsStamp`, 사용자 결정 11-05). 등급 자체는 시간만 본다.
     연출(`LobbyResultPanelAnimator`, **EuniTween**, unscaled): **패널 펀치가 끝나면**(`stampDelay` 0 — 기본 열기부터 1.93초) 투명도 0·크기 `stampStartScale` 2.5·기울기 `stampStartAngle` -12° 에서 `stampDropDuration` 0.12초 만에 투명도 1·크기 1·`stampEndAngle` -8° 로 내려찍는다(`stampDropEase` InQuad). 착지 순간 창 본체(`scaleTarget`)가 `stampShakeDuration` 0.12초 흔들리고(`stampShakeAmplitude` 8px 에서 줄어듦, `stampShakeCycles` 3번 왕복, 무작위 없음) 도장이 `stampBounceDuration` 0.16초 동안 `stampBounceScale` 1.08 로 튀었다 자리 잡는다(`Easing.Punch(stampBounceEase=OutQuad)`). 착지 순간 `stampSoundKey`(비우면 무음, 지금 비어 있음).
     **순서 조정**: 왕관 첫 점프는 도장이 자리 잡은 뒤(펀치 0.28 + 도장 0.12 + 0.16 + `crownDelay` 0.05 = 기본 열기부터 2.26초, 예전 1.98초). 카운트업 시간 0(즉시)이면 도장은 처음부터 최종 모습. 닫기 시작·다시 열기 때 흔들림을 멈추고 도장은 최종 모습(다시 열면 처음부터). 도장 투명도용 CanvasGroup 은 프리팹에 있다(클릭 막기 없음).
