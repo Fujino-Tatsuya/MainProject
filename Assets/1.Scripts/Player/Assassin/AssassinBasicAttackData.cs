@@ -13,7 +13,8 @@ public sealed class AssassinBasicAttackStepData
 {
     [DataTableIgnore] [SerializeField] private AnimationClip clip;
     [SerializeField] private float attackDamageMultiplier = 1f;
-    [Tooltip("판정 영역(할 일 153) — 기준점 = 시전자 발밑 + 이 타의 조준 방향(CasterAim). 칼날의 영역(강타)은 길이·폭 배율 복사본(AttackShapeSet.Scaled).")]
+    [Tooltip("판정 영역(할 일 153) — 기준점 = 시전자 발밑 + 이 타의 조준 방향(CasterAim). 일반·변신 = 부채꼴, 강타 = 원(할 일 216 — 강타 VFX 고리에 맞춤). " +
+             "칼날의 영역(강타)은 길이·폭 배율 복사본(AttackShapeSet.Scaled — 원은 반경 × 길이 배율).")]
     [SerializeField] private AttackShapeSet hitArea = new AttackShapeSet();
     // ⚠️ 미사용 2칸(할 일 144·153) — 판정 모양은 위 hitArea(도형)다.
     //    GameData.xlsx Assassin 시트에 행이 있어 지우면 테이블 모드가 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
@@ -51,12 +52,13 @@ public sealed class AssassinBasicAttackStepData
         float playbackSpeed = 3f,
         int hitCount = 1,
         float comboWindowOpen = 0.4f,
-        float comboWindowClose = 0.95f)
+        float comboWindowClose = 0.95f,
+        AttackShape hitShape = null)
     {
         this.attackDamageMultiplier = attackDamageMultiplier;
         this.range = range;
         this.angle = angle;
-        hitArea = new AttackShapeSet(AttackShapeOrigin.CasterAim, StrikeSector(range, angle));
+        hitArea = new AttackShapeSet(AttackShapeOrigin.CasterAim, hitShape ?? StrikeSector(range, angle));
         this.playbackSpeed = playbackSpeed;
         this.hitCount = hitCount;
         this.comboWindowOpen = comboWindowOpen;
@@ -71,6 +73,23 @@ public sealed class AssassinBasicAttackStepData
     /// </summary>
     public static AttackSectorShape StrikeSector(float range, float angle) =>
         new AttackSectorShape(range, angle) { MinHeight = -range, MaxHeight = range };
+
+    /// <summary>
+    /// 강타 판정 도형(할 일 216) — 강타 VFX(<c>FX_Assassin_E_Slash</c>, 소켓 <c>EnhancedSlash</c>)의 바닥 고리에 맞춘 원.
+    /// 중심 = 발밑에서 조준 방향 앞 0.6m(소켓 z 0.606), 반경 1.4m(고리 메시 바깥 1.35m · 슬래시 텍스처 판 반폭 1.4m).
+    /// 높이 = 예전 강타 부채꼴과 같은 발밑 ±1.8m(평면 모양만 바꿈).
+    /// </summary>
+    public const float EnhancedStrikeRadius = 1.4f;
+    public const float EnhancedStrikeForwardOffset = 0.6f;
+    public const float EnhancedStrikeHeight = 1.8f;
+
+    public static AttackCircleShape EnhancedStrikeCircle() =>
+        new AttackCircleShape(EnhancedStrikeRadius)
+        {
+            ForwardOffset = EnhancedStrikeForwardOffset,
+            MinHeight = -EnhancedStrikeHeight,
+            MaxHeight = EnhancedStrikeHeight,
+        };
 }
 
 /// <summary>어쌔신 일반·강타·변신 평타와 전투 대기 수치(character_assassin.md §5·§6·§8.2, 구현 결정).</summary>
@@ -98,7 +117,7 @@ public sealed class AssassinBasicAttackData : ScriptableObject
 
     [Header("일반 E 강타 (Combo_Attack_02_01)")]
     [SerializeField] private AssassinBasicAttackStepData enhancedStep =
-        new AssassinBasicAttackStepData(2.5f, 1.8f, 120f, 2f);
+        new AssassinBasicAttackStepData(2.5f, 1.8f, 120f, 2f, hitShape: AssassinBasicAttackStepData.EnhancedStrikeCircle());
 
     [Tooltip("강타가 시작될 때 조준 방향으로 전진하는 거리(m). 벽·몸 콜라이더 있는 적에 막힌다. 0 = 전진 없음.")]
     [SerializeField, Min(0f)] private float enhancedLungeDistance = 1.2f;

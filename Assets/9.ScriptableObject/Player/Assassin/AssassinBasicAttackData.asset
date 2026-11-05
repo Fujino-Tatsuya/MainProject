@@ -147,16 +147,15 @@ MonoBehaviour:
         angle: 120
         minOffset: 0
     - rid: 7237886701681770745
-      type: {class: AttackSectorShape, ns: , asm: Assembly-CSharp}
+      type: {class: AttackCircleShape, ns: , asm: Assembly-CSharp}
       data:
-        forwardOffset: 0
+        forwardOffset: 0.6
         sideOffset: 0
         yawOffset: 0
         minHeight: -1.8
         maxHeight: 1.8
-        range: 1.8
-        angle: 120
-        minOffset: 0
+        radius: 1.4
+        minRadius: 0
     - rid: 7237886701681770746
       type: {class: AttackSectorShape, ns: , asm: Assembly-CSharp}
       data:
