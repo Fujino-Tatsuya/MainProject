@@ -11,7 +11,9 @@ using UnityEngine;
 /// <item>꺼진 효과는 그리기만 안 한다 — 상태 기계·시간표·섬광 순간(암전 걷힘 등)은 그대로 돈다.</item>
 /// <item>허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>). A6·A7 섬광 시퀀스 칸은 11-04(할 일 211) 런타임에서 빠져 버튼도 뺐다.</item>
 /// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>).</item>
-/// <item>카메라 대상 중심 토글(할 일 196) — 효과 줄 밑 한 줄. '전부 켬'·'암전만' 은 건드리지 않는다(따로 둔 스위치).</item>
+/// <item>카메라 대상 중심 토글(할 일 196) — '전부 켬'·'암전만' 은 건드리지 않는다(따로 둔 스위치).</item>
+/// <item>배치(11-05 정리) — 성격별 접는 섹션(<see cref="Section"/>: 간파 재생 / 단계·버전 / 화이트아웃·제압 / 화면 효과 / 카메라 / 허수아비·서버 / 배속),
+///       같은 폭 버튼 줄, 넘치면 스크롤. 접힘 상태만 PlayerPrefs(<see cref="FoldPrefsPrefix"/>)에 기억 — 칸 값은 저장하지 않는다.</item>
 /// </list>
 /// </summary>
 [DisallowMultipleComponent]
@@ -100,141 +102,212 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
 
     void OnDestroy() => _suppressRepro.Dispose();
 
+    // ---- 화면 배치(11-05 정리) — 성격별 접는 섹션 · 일정한 버튼 폭 · 넘치면 스크롤 ----
+
+    /// <summary>섹션(접기 단위) — 순서 = 화면 순서. 접힘 상태는 PlayerPrefs(<see cref="FoldPrefsPrefix"/> + 이름)에 기억한다.</summary>
+    public enum Section
+    {
+        Replay,        // 간파 재생 — 지금 단계 표시·단계 재현
+        Versions,      // 단계·버전 선택 — 일반·대쉬·제압 V0~V3·암순응·위치
+        Whiteout,      // 화이트아웃·제압 — 3단계 화이트아웃 스위치·단계 에셋
+        Effects,       // 화면 효과 — 효과 칸 켜기/끄기
+        Camera,        // 카메라 — 대상 중심
+        Server,        // 허수아비·서버 — 허수아비 간파 = 제압 간파
+        Speed,         // 배속(슬로우)
+    }
+
+    /// <summary>섹션 제목.</summary>
+    public static string SectionTitle(Section section) => section switch
+    {
+        Section.Replay => "간파 재생",
+        Section.Versions => "단계·버전 선택",
+        Section.Whiteout => "화이트아웃·제압 (219)",
+        Section.Effects => "화면 효과",
+        Section.Camera => "카메라",
+        Section.Server => "허수아비·서버",
+        _ => "배속",
+    };
+
+    /// <summary>접힘 상태 PlayerPrefs 키 앞부분 — 값 1 = 펼침.</summary>
+    public const string FoldPrefsPrefix = "DebugInterruptLab.Fold.";
+
+    // 처음(키 없음)엔 자주 쓰는 재생·버전·배속만 펼친다.
+    static bool DefaultOpen(Section section) => section == Section.Replay || section == Section.Versions || section == Section.Speed;
+
+    const float Gap = 4f;          // 버튼 사이 간격
+    const float RowHeight = 22f;   // 버튼·토글 높이
+    const float PanelPadding = 12f; // 상자 안쪽 여백 + 스크롤 막대 몫
+
+    Vector2 _scroll;
+    GUIStyle _sectionStyle;
+
     void OnGUI()
     {
+        _sectionStyle ??= new GUIStyle(GUI.skin.button) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold };
+
         GUILayout.BeginArea(new Rect(Screen.width - width - 10f, 10f, width, Screen.height - 20f));
         GUILayout.BeginVertical(GUI.skin.box);
 
-        if (GUILayout.Button(expanded ? "▼ 간파 연출 튜닝" : "▶ 간파 연출 튜닝"))
+        if (GUILayout.Button(expanded ? "▼ 간파 연출 튜닝" : "▶ 간파 연출 튜닝", GUILayout.Height(RowHeight)))
             expanded = !expanded;
 
         if (expanded)
         {
-            DrawEffects();
-            DrawCameraCenter();
-            DrawTiers();
-            DrawSuppressRepro();
-            DrawSpeed();
+            _scroll = GUILayout.BeginScrollView(_scroll);
+            InterruptProductionDirector director = InterruptProductionDirector.Instance;
+            if (director == null)
+                GUILayout.Label("디렉터 없음(NetworkManager 대기)");
+            else
+            {
+                DrawSection(Section.Replay, () => DrawReplay(director));
+                DrawSection(Section.Versions, () => DrawTierVersions(director));
+                DrawSection(Section.Whiteout, () => DrawWhiteout(director));
+                DrawSection(Section.Effects, () => DrawEffects(director));
+                DrawSection(Section.Camera, () => DrawCameraCenter(director));
+                DrawSection(Section.Server, DrawSuppressRepro);
+            }
+
+            DrawSection(Section.Speed, DrawSpeed);
+            GUILayout.EndScrollView();
         }
 
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
 
-    void DrawEffects()
+    void DrawSection(Section section, System.Action body)
     {
-        InterruptProductionDirector director = InterruptProductionDirector.Instance;
-        if (director == null)
+        string key = FoldPrefsPrefix + section;
+        bool open = ReadFold(key, DefaultOpen(section));
+        GUILayout.Space(Gap);
+        if (GUILayout.Button((open ? "▼ " : "▶ ") + SectionTitle(section), _sectionStyle, GUILayout.Height(RowHeight)))
         {
-            GUILayout.Label("디렉터 없음(NetworkManager 대기)");
-            return;
+            open = !open;
+            WriteFold(key, open);
         }
 
-        foreach (Row row in Rows)
+        if (open)
         {
-            bool on = row.Get(director);
-            bool next = GUILayout.Toggle(on, row.Label);
-            if (next != on)
-                row.Set(director, next);
+            GUILayout.BeginVertical(GUI.skin.box);
+            body();
+            GUILayout.EndVertical();
         }
+    }
 
+    static bool ReadFold(string key, bool fallback)
+    {
+        try { return PlayerPrefs.GetInt(key, fallback ? 1 : 0) != 0; }
+        catch { return fallback; }
+    }
+
+    static void WriteFold(string key, bool open)
+    {
+        try { PlayerPrefs.SetInt(key, open ? 1 : 0); }
+        catch { /* 기억 못 해도 동작은 그대로 */ }
+    }
+
+    // 섹션 상자 안 한 줄 폭 — 버튼 n 개를 같은 폭으로 나눈다.
+    float ButtonWidth(int count) => Mathf.Max(24f, (width - PanelPadding * 2f - Gap * (count - 1)) / Mathf.Max(1, count));
+
+    /// <summary>같은 폭 버튼 한 줄 — 누른 버튼 번호(없으면 -1).</summary>
+    int ButtonRow(params string[] labels)
+    {
+        int clicked = -1;
+        float w = ButtonWidth(labels.Length);
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("전부 켬"))
-            SetAll(director, true);
-        if (GUILayout.Button("암전만"))
-            SetDefaults(director);
+        for (int i = 0; i < labels.Length; i++)
+        {
+            if (i > 0)
+                GUILayout.Space(Gap);
+            if (GUILayout.Button(labels[i], GUILayout.Width(w), GUILayout.Height(RowHeight)))
+                clicked = i;
+        }
+
         GUILayout.EndHorizontal();
+        return clicked;
     }
 
-    // 카메라 대상 중심(할 일 196) — 이 피어 디렉터 런타임 값만, 다음 간파부터(진행 중인 이동은 그대로 끝난다). 저장 안 함.
-    void DrawCameraCenter()
+    /// <summary>같은 폭 버튼 격자 — 한 줄 <paramref name="perRow"/> 개씩. 누른 버튼 번호(없으면 -1).</summary>
+    int ButtonGrid(string[] labels, int perRow)
     {
-        InterruptProductionDirector director = InterruptProductionDirector.Instance;
-        if (director == null)
-            return;
+        int clicked = -1;
+        for (int start = 0; start < labels.Length; start += perRow)
+        {
+            int count = Mathf.Min(perRow, labels.Length - start);
+            var row = new string[count];
+            System.Array.Copy(labels, start, row, 0, count);
+            int hit = ButtonRow(row);
+            if (hit >= 0)
+                clicked = start + hit;
+        }
 
-        GUILayout.Space(6f);
-        bool on = director.CameraCenterEnabled;
-        bool next = GUILayout.Toggle(on, CameraCenterLabel);
-        if (next != on)
-            director.CameraCenterEnabled = next;
+        return clicked;
     }
+
+    static bool Toggle(bool value, string label) => GUILayout.Toggle(value, label, GUILayout.Height(RowHeight));
 
     // 간파 연출 4단계(할 일 192) — 지금 단계 표시 + 단계 재현 버튼 4개(이 화면만, 슬로우·줌 없음).
-    void DrawTiers()
+    void DrawReplay(InterruptProductionDirector director)
     {
-        InterruptProductionDirector director = InterruptProductionDirector.Instance;
-        if (director == null)
-            return;
+        GUILayout.Label($"내 마지막: {DebugInterruptTierPreview.Label(director.LastOwnerTier)}" +
+                        $"  ·  받은 성공: {DebugInterruptTierPreview.Label(director.LastSuccessTier)}");
 
-        GUILayout.Space(6f);
-        GUILayout.Label($"간파 단계 — 내 마지막: {DebugInterruptTierPreview.Label(director.LastOwnerTier)}" +
-                        $" · 받은 성공: {DebugInterruptTierPreview.Label(director.LastSuccessTier)}");
+        var labels = new string[DebugInterruptTierPreview.All.Length];
+        for (int i = 0; i < labels.Length; i++)
+            labels[i] = DebugInterruptTierPreview.Label(DebugInterruptTierPreview.All[i]);
+        int clicked = ButtonGrid(labels, 2); // 240px 에 4개는 글자가 잘려 2×2
+        if (clicked >= 0)
+            _tierPreview.Begin(director, DebugInterruptTierPreview.All[clicked], Time.unscaledTime);
 
-        GUILayout.BeginHorizontal();
-        foreach (InterruptPresentationTier tier in DebugInterruptTierPreview.All)
-        {
-            if (GUILayout.Button(DebugInterruptTierPreview.Label(tier)))
-                _tierPreview.Begin(director, tier, Time.unscaledTime);
-        }
-
-        GUILayout.EndHorizontal();
         if (!string.IsNullOrEmpty(_tierPreview.Status))
-            GUILayout.Label("  " + _tierPreview.Status);
-
-        DrawTierVersions(director);
-
-        // 3단계 제압 화이트아웃 스위치(할 일 219) — 이 피어 디렉터 런타임 값만, 다음 성공부터. 제압 SO whiteoutFrames 0 이면 켜도 안 나온다.
-        bool whiteout = director.SuppressWhiteout;
-        bool nextWhiteout = GUILayout.Toggle(whiteout, SuppressWhiteoutLabel);
-        if (nextWhiteout != whiteout)
-            director.SuppressWhiteout = nextWhiteout;
-        GUILayout.Label($"  V3 에셋 — 대쉬 {AssetTierLabel(director, InterruptPresentationTier.Dash)} · 제압 {AssetTierLabel(director, InterruptPresentationTier.Suppress)}");
+            GUILayout.Label(_tierPreview.Status);
+        GUILayout.Label("※ 재현은 이 화면만·슬로우 없음(줌·슬로우는 실제 간파)");
     }
 
-    /// <summary>제압 화이트아웃 토글 글자(할 일 219).</summary>
-    public const string SuppressWhiteoutLabel = "제압 화이트아웃 (219)";
-
-    // 그 단계가 실제로 쓰는 V3 에셋 묶음 — 단계 칸이 비면 '1단계 대체'.
-    static string AssetTierLabel(InterruptProductionDirector director, InterruptPresentationTier tier) =>
-        director.ReferenceAssetTier(tier) == tier ? "전용" : "1단계 대체";
-
-    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬·제압(11-04) 단계마다 V0~V3·암순응 가/나·월드 이펙트 위치 무기/대상(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
+    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬·제압 단계마다 V0~V3·암순응 가/나·월드 이펙트 위치(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
     // '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
     void DrawTierVersions(InterruptProductionDirector director)
     {
+        bool first = true;
         foreach (InterruptPresentationTier tier in DebugInterruptTierPreview.VersionTiers)
         {
             InterruptTierProfile profile = director.TierProfile(tier);
             if (profile == null)
                 continue;
 
-            GUILayout.Label($"{DebugInterruptTierPreview.Label(tier)} 버전 — 실제 {DebugInterruptTierPreview.LookLabel(director.SuccessLook(tier))}");
+            if (!first)
+                GUILayout.Space(Gap * 2f);
+            first = false;
+
             GUILayout.BeginHorizontal();
-            foreach (InterruptTierFlash flash in DebugInterruptTierPreview.Versions)
-            {
-                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.VersionLabel(flash), profile.flash == flash);
-                if (GUILayout.Button(label))
-                    SelectVersion(profile, flash);
-            }
-
-            foreach (InterruptDarkAdaptMode mode in DebugInterruptTierPreview.DarkAdaptModes)
-            {
-                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.DarkAdaptLabel(mode), profile.darkAdapt == mode);
-                if (GUILayout.Button(label))
-                    profile.darkAdapt = mode;
-            }
-
-            foreach (InterruptHitLightOrigin origin in DebugInterruptTierPreview.Origins)
-            {
-                string label = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.OriginLabel(origin), profile.hitLightOrigin == origin);
-                if (GUILayout.Button(label))
-                    profile.hitLightOrigin = origin;
-            }
-
-            if (GUILayout.Button("재생"))
+            GUILayout.Label($"{DebugInterruptTierPreview.Label(tier)} — 실제 {DebugInterruptTierPreview.LookLabel(director.SuccessLook(tier))}");
+            if (GUILayout.Button("재생", GUILayout.Width(ButtonWidth(4)), GUILayout.Height(RowHeight)))
                 _tierPreview.Begin(director, tier, Time.unscaledTime);
             GUILayout.EndHorizontal();
+
+            InterruptTierFlash[] versions = DebugInterruptTierPreview.Versions;
+            var versionLabels = new string[versions.Length];
+            for (int i = 0; i < versions.Length; i++)
+                versionLabels[i] = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.VersionLabel(versions[i]), profile.flash == versions[i]);
+            int v = ButtonRow(versionLabels);
+            if (v >= 0)
+                SelectVersion(profile, versions[v]);
+
+            InterruptDarkAdaptMode[] modes = DebugInterruptTierPreview.DarkAdaptModes;
+            var modeLabels = new string[modes.Length];
+            for (int i = 0; i < modes.Length; i++)
+                modeLabels[i] = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.DarkAdaptLabel(modes[i]), profile.darkAdapt == modes[i]);
+            int m = ButtonRow(modeLabels);
+            if (m >= 0)
+                profile.darkAdapt = modes[m];
+
+            InterruptHitLightOrigin[] origins = DebugInterruptTierPreview.Origins;
+            var originLabels = new string[origins.Length];
+            for (int i = 0; i < origins.Length; i++)
+                originLabels[i] = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.OriginLabel(origins[i]), profile.hitLightOrigin == origins[i]);
+            int o = ButtonRow(originLabels);
+            if (o >= 0)
+                profile.hitLightOrigin = origins[o];
         }
     }
 
@@ -250,38 +323,77 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             profile.darkAdapt = darkAdapt.Value;
     }
 
-    // 허수아비 간파 = 제압 간파 재현(179 후속 3, 호스트에서만 효과) — 제압 단계(11-04 부터 V3, 할 일 211)를 실제 서버 성공 경로로 본다.
+    /// <summary>제압 화이트아웃 토글 글자(할 일 219).</summary>
+    public const string SuppressWhiteoutLabel = "제압 화이트아웃 (219)";
+
+    // 3단계 제압 화이트아웃 스위치(할 일 219) — 이 피어 디렉터 런타임 값만, 다음 성공부터. 제압 SO whiteoutFrames 0 이면 켜도 안 나온다.
+    void DrawWhiteout(InterruptProductionDirector director)
+    {
+        bool whiteout = director.SuppressWhiteout;
+        bool next = Toggle(whiteout, SuppressWhiteoutLabel);
+        if (next != whiteout)
+            director.SuppressWhiteout = next;
+        GUILayout.Label($"V3 에셋 — 대쉬 {AssetTierLabel(director, InterruptPresentationTier.Dash)} · 제압 {AssetTierLabel(director, InterruptPresentationTier.Suppress)}");
+    }
+
+    // 그 단계가 실제로 쓰는 V3 에셋 묶음 — 단계 칸이 비면 '1단계 대체'.
+    static string AssetTierLabel(InterruptProductionDirector director, InterruptPresentationTier tier) =>
+        director.ReferenceAssetTier(tier) == tier ? "전용" : "1단계 대체";
+
+    void DrawEffects(InterruptProductionDirector director)
+    {
+        foreach (Row row in Rows)
+        {
+            bool on = row.Get(director);
+            bool next = Toggle(on, row.Label);
+            if (next != on)
+                row.Set(director, next);
+        }
+
+        switch (ButtonRow("전부 켬", "암전만"))
+        {
+            case 0: SetAll(director, true); break;
+            case 1: SetDefaults(director); break;
+        }
+    }
+
+    // 카메라 대상 중심(할 일 196) — 이 피어 디렉터 런타임 값만, 다음 간파부터(진행 중인 이동은 그대로 끝난다). 저장 안 함.
+    static void DrawCameraCenter(InterruptProductionDirector director)
+    {
+        bool on = director.CameraCenterEnabled;
+        bool next = Toggle(on, CameraCenterLabel);
+        if (next != on)
+            director.CameraCenterEnabled = next;
+    }
+
+    // 허수아비 간파 = 제압 간파 재현(179 후속 3, 호스트에서만 효과) — 제압 단계를 실제 서버 성공 경로로 본다(219 — 오너 판정 순간 제압 예측도 덮어씀).
     void DrawSuppressRepro()
     {
-        if (InterruptProductionDirector.Instance == null)
-            return;
-
-        GUILayout.Space(6f);
-        _suppressRepro.Enabled = GUILayout.Toggle(_suppressRepro.Enabled, "허수아비 간파 = 제압 간파(제압 직전)");
+        _suppressRepro.Enabled = Toggle(_suppressRepro.Enabled, "허수아비 간파 = 제압 간파(제압 직전)");
         if (_suppressRepro.Enabled && !DebugSuppressInterruptRepro.IsServer)
-            GUILayout.Label("  ※ 호스트 화면에서만 효과(표식은 서버)");
+            GUILayout.Label("※ 호스트 화면에서만 효과(표식은 서버)");
         else if (_suppressRepro.Enabled)
-            GUILayout.Label($"  허수아비 {_suppressRepro.DummyCount} · 제압 간파 {_suppressRepro.MarkedCount}회");
+            GUILayout.Label($"허수아비 {_suppressRepro.DummyCount} · 제압 간파 {_suppressRepro.MarkedCount}회");
     }
 
     void DrawSpeed()
     {
         if (_timeScale == null)
+        {
+            GUILayout.Label("DebugTimeScale 없음");
             return;
+        }
 
-        GUILayout.Space(6f);
         GUILayout.Label($"배속 ×{_timeScale.Scale:0.00}" +
             (_timeScale.IsHoldingNormalSpeed ? $"  (성공 후 1배속 {_timeScale.NormalSpeedRemaining:0.0}s)" : ""));
         _timeScale.Scale = GUILayout.HorizontalSlider(_timeScale.Scale, DebugTimeScale.MinScale, DebugTimeScale.MaxScale);
 
-        GUILayout.BeginHorizontal();
-        foreach (float preset in SpeedButtons)
-        {
-            if (GUILayout.Button(preset.ToString("0.##")))
-                _timeScale.Scale = preset;
-        }
-
-        GUILayout.EndHorizontal();
+        var labels = new string[SpeedButtons.Length];
+        for (int i = 0; i < SpeedButtons.Length; i++)
+            labels[i] = SpeedButtons[i].ToString("0.##");
+        int clicked = ButtonRow(labels);
+        if (clicked >= 0)
+            _timeScale.Scale = SpeedButtons[clicked];
     }
 
     /// <summary>모든 줄을 켜거나 끈다.</summary>
