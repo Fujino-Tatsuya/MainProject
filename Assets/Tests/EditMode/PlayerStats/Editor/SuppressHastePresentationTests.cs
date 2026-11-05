@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-// 할 일 174 — 제압 가속 연출: 3타 줌인(셈·리셋·펄스 모양·슬로우 줌 중 건너뜀) · 보스 체력바 잔상 멈춤.
+// 할 일 174 — 제압 가속 연출: N타 줌인(기본 4타, 233 — 셈 테스트는 N=3 을 명시해 쓴다)(셈·리셋·펄스 모양·슬로우 줌 중 건너뜀) · 보스 체력바 잔상 멈춤.
 public sealed class SuppressHastePresentationTests
 {
     static readonly SuppressHasteHitZoomValues Values = new SuppressHasteHitZoomValues(3, 0.9f, 0.04f, 0.11f, 0.12f);
@@ -128,7 +128,7 @@ public sealed class SuppressHastePresentationTests
     public void DefaultValues_MatchSheetDefaults()
     {
         SuppressHasteHitZoomValues d = SuppressHasteHitZoomValues.Default;
-        Assert.That(d.EveryHits, Is.EqualTo(3));
+        Assert.That(d.EveryHits, Is.EqualTo(4));   // 할 일 233 — 3타 → 4타
         Assert.That(d.ZoomFactor, Is.EqualTo(0.9f));
         Assert.That(d.InSeconds + d.HoldSeconds, Is.EqualTo(0.15f).Within(1e-4f), "약 0.15초 뒤 복귀 시작");
     }

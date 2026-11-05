@@ -50,7 +50,7 @@ public sealed class UnitCameraFeedbackReporter : MonoBehaviour
         CameraFeedback.Instance?.ReportLocalPlayerDealtDamage();
     }
 
-    // 제압 가속 3타 줌인(할 일 174) — 내가 보스에게 맞힌 타격 1회(서버 확정 RPC 1개 = 1타). 가속 여부·셈은 카메라가 본다.
+    // 제압 가속 N타 줌인(기본 4타, 할 일 174·233) — 내가 보스에게 맞힌 타격 1회(서버 확정 RPC 1개 = 1타). 가속 여부·셈은 카메라가 본다.
     void HandleAttributedHit(ulong attackerClientId)
     {
         if (_unit.Rank != MonsterRank.Boss || !IsLocalAttacker(attackerClientId))

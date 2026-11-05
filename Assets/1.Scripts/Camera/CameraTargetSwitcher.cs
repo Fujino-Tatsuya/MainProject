@@ -54,7 +54,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     private float appliedZoomMultiplier = 1f;
     // 간파 카메라 대상 중심 이동량(할 일 196, 월드) — 0 = 평소.
     private Vector3 appliedCenterShift;
-    // 제압 가속 3타 줌인(할 일 174). 수치는 SuppressHasteData 시트 칸 — 이 컴포넌트의 테이블 칸이 아니다.
+    // 제압 가속 N타 줌인(기본 4타, 할 일 174·233). 수치는 SuppressHasteData 시트 칸 — 이 컴포넌트의 테이블 칸이 아니다.
     private readonly SuppressHasteHitZoom suppressHasteHitZoom = new();
     private SuppressHasteData suppressHasteData;
     private bool suppressHasteDataLoaded;
@@ -365,7 +365,7 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
         float slowMultiplier = ownerSlowZoom.Step(input, Time.unscaledDeltaTime);
-        // 제압 가속 3타 줌인 — 슬로우 줌이 걸린 프레임엔 건너뛴다(1). 두 줌이 동시에 1 이 아닌 경우는 없다(suppress-haste.md §2.2).
+        // 제압 가속 N타 줌인 — 슬로우 줌이 걸린 프레임엔 건너뛴다(1). 두 줌이 동시에 1 이 아닌 경우는 없다(suppress-haste.md §2.2).
         float hitZoomMultiplier = suppressHasteHitZoom.Step(IsLocalSuppressHasteActive(), slowMultiplier != 1f,
             Time.unscaledDeltaTime, LoadHitZoomValues());
         float multiplier = slowMultiplier * hitZoomMultiplier * cinematicDistanceMultiplier;
