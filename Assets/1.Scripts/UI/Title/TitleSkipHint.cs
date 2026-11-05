@@ -6,7 +6,9 @@ using UnityEngine.UI;
 /// 타이틀 접근 연출의 "Esc 건너뛰기" 안내 — 보스 등장 연출 스킵 위젯(<see cref="BossIntroPresentation"/>)의 키캡·문구와 같은 모양.
 /// 오른쪽 아래 키캡(Esc) + "건너뛰기" 만 — 알약 배경·외곽선은 없다(할 일 227). 보스방은 Space 1초 홀드로 둘레가 채워지지만
 /// 타이틀은 <b>누르면 바로</b>라 채움·동의 수는 없다(경석 10-26). 켜고 끄기는 <see cref="TitleFlowDirector"/> 가 이 오브젝트를 켜고 끈다.
+/// 위치·크기 = 씬의 이 RectTransform 값(코드가 덮지 않는다). 에디터에서 오브젝트를 켜면 키캡·문구 미리보기가 생겨(저장 안 됨) 보면서 옮길 수 있다.
 /// </summary>
+[ExecuteAlways]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(RectTransform))]
 public sealed class TitleSkipHint : MonoBehaviour
@@ -17,12 +19,47 @@ public sealed class TitleSkipHint : MonoBehaviour
     private TMP_Text _label;
     private bool _built;
 
-    private void Awake() => Build();
+    private void Awake()
+    {
+        if (Application.isPlaying) Build();
+    }
 
     private void OnEnable()
     {
+        if (!Application.isPlaying)
+        {
+            RebuildPreview();
+            return;
+        }
+
         Build();
         _label.text = UiStrings.BossIntroSkip.Text;   // 현재 언어 — 켤 때마다(설정에서 언어를 바꿨을 수 있다)
+    }
+
+    private void OnDisable()
+    {
+        if (!Application.isPlaying) ClearPreview();
+    }
+
+    // 에디터 미리보기 — 저장 안 되는 자식(DontSave)으로 만들고, 끌 때·다시 켤 때 지운다(도메인 리로드 뒤 중복 방지).
+    private void RebuildPreview()
+    {
+        ClearPreview();
+        _built = false;
+        Build();
+        _label.text = "건너뛰기";
+        foreach (Transform child in GetComponentsInChildren<Transform>(true))
+            if (child != transform) child.gameObject.hideFlags = HideFlags.DontSave | HideFlags.NotEditable;
+    }
+
+    private void ClearPreview()
+    {
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            GameObject child = transform.GetChild(i).gameObject;
+            if ((child.hideFlags & HideFlags.DontSave) != 0) DestroyImmediate(child);
+        }
+        _built = false;
     }
 
     private void Build()
@@ -30,13 +67,7 @@ public sealed class TitleSkipHint : MonoBehaviour
         if (_built) return;
         _built = true;
 
-        const float w = BossIntroPresentation.SkipPillWidth;
-        const float h = BossIntroPresentation.SkipPillHeight;
-
         var root = (RectTransform)transform;
-        root.anchorMin = root.anchorMax = root.pivot = new Vector2(1f, 0f);
-        root.anchoredPosition = new Vector2(-56f, 72f);   // 보스 스킵 위젯 자리
-        root.sizeDelta = new Vector2(w, h);   // 알약은 없지만 키캡·문구 자리는 보스 위젯 알약 기준 그대로
 
         const float kw = BossIntroPresentation.SkipKeycapWidth;
         const float kh = BossIntroPresentation.SkipKeycapHeight;
