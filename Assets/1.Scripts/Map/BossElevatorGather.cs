@@ -3,14 +3,13 @@ using System.Collections.Generic;
 /// <summary>참가자 한 명의 이번 판정 입력 — 서버(<see cref="BossTeleportManager"/>)가 매 프레임 읽어 넣는다.</summary>
 public readonly struct BossElevatorGatherMember
 {
-    public BossElevatorGatherMember(ulong clientId, bool connected, PlayerLifeState lifeState, float health, bool onPad, bool busy)
+    public BossElevatorGatherMember(ulong clientId, bool connected, PlayerLifeState lifeState, float health, bool onPad)
     {
         ClientId = clientId;
         Connected = connected;
         LifeState = lifeState;
         Health = health;
         OnPad = onPad;
-        Busy = busy;
     }
 
     public ulong ClientId { get; }
@@ -25,9 +24,6 @@ public readonly struct BossElevatorGatherMember
 
     /// <summary>본체 위치가 발판(<see cref="BossEnterTrigger"/> 박스) 안.</summary>
     public bool OnPad { get; }
-
-    /// <summary>진행 중 행동(Player.CurrentState 가 Idle/Move 아님) — 카운트 시작만 미룬다.</summary>
-    public bool Busy { get; }
 }
 
 /// <summary>판정 활성 조건 입력 — 하나라도 걸리면 집결 판정을 끈다(끄는 순간 카운트도 0).</summary>
@@ -62,7 +58,7 @@ public readonly struct BossElevatorGatherConditions
 /// <list type="bullet">
 /// <item>참가자 = 접속 중 + PermanentDead 아님(<see cref="BossTeleportManager"/> 의 이동 대상과 같은 기준). 인원 변화 → 카운트 0.</item>
 /// <item>쓰러짐 = Alive 아님 또는 체력 0 이하 — Soul 도 집결로 인정하지 않는다(살아날 때까지 기다린다). 사망·이탈 → 카운트 0, 다시 모이면 처음부터.</item>
-/// <item>진행 중 행동이 있으면 카운트 시작만 미룬다(시작 뒤 행동은 끊지 않는다).</item>
+/// <item>행동 상태(공격·스킬·대시)는 보지 않는다 — 공격하며 올라와도 바로 집결(할 일 231). 확정 순간 진행 중 행동은 발판 잠금이 끊는다.</item>
 /// <item>발판 잠김·강제 카운트다운·연출·도착 대기 중이면 판정하지 않는다(<see cref="BossElevatorGatherConditions"/>).</item>
 /// </list>
 /// </summary>
@@ -104,12 +100,8 @@ public sealed class BossElevatorGather
     public static bool IsIncapacitated(PlayerLifeState lifeState, float health) =>
         lifeState != PlayerLifeState.Alive || health <= 0f;
 
-    /// <summary>진행 중 행동 — Idle/Move 가 아닌 상태(할 일 86 규칙 그대로).</summary>
-    public static bool IsBusy(PlayerActionState state) =>
-        state != PlayerActionState.Idle && state != PlayerActionState.Move;
-
     public static PartyGatherMemberState ToMemberState(BossElevatorGatherMember member) =>
-        new PartyGatherMemberState(member.OnPad, IsIncapacitated(member.LifeState, member.Health), member.Busy);
+        new PartyGatherMemberState(member.OnPad, IsIncapacitated(member.LifeState, member.Health));
 
     /// <summary>
     /// 판정 한 번 — 확정 순간에만 true(1회 래치, <see cref="ResetConfirmation"/> 로만 푼다).

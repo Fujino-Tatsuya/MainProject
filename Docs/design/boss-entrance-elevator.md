@@ -13,7 +13,7 @@
 - **참가자** = 접속 중 + PermanentDead 아님(이동 대상과 같은 기준). 인원이 바뀌면(접속·이탈·완전 사망) 카운트 0.
 - **집결 인정** = 본체 위치가 발판 박스 안 + 쓰러짐 아님(Alive 이고 HP>0). **Soul 은 인정하지 않는다** — 되살아날 때까지 기다린다.
 - 카운트 중 한 명이라도 **나가거나 쓰러지면 즉시 취소**, 다시 모이면 **5초부터 다시**.
-- 행동 중(Idle/Move 아님)인 사람이 있으면 카운트 **시작만** 미룬다. 시작 뒤 행동은 끊지 않는다(86 규칙 그대로).
+- 행동 상태(공격·스킬·대시)는 보지 않는다 — 공격하며 올라와도 바로 집결로 친다(할 일 231, 옛 "행동 중이면 카운트 시작만 미룸" 삭제). 확정 뒤 잠금 순간 진행 중 행동은 끊긴다(`PlayerLifeInputPolicy.CancelCombatActions`, 아래 잠금 설명).
 - 판정 끔: 튜토리얼 발판 잠김(`TutorialBossPath.IsBossPadEnabled` false) · 제한시간 만료/구간 스킵 **강제 카운트다운 중** · 엘리베이터 연출 중 · 도착 대기 중.
 - 유지 시간 = `BossElevatorRig._gatherHoldSeconds`(데이터 테이블 `Map` 시트, 기본 5초 — 리그가 없으면 `PartyGatherRules.DefaultHoldSeconds`).
 - 확정 → **대기 없이** 연출 시작(입력 잠금이 같은 프레임). 확정은 1회 래치 — 재도전 리셋(`ResetForRetryServer`)만 푼다.

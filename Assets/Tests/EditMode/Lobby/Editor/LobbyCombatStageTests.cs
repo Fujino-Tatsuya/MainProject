@@ -14,8 +14,8 @@ public sealed class LobbyCombatStageTests
     const string StepsPath = "Assets/9.ScriptableObject/Lobby/LobbyTutorialSteps.asset";
     const string RulesPath = "Assets/9.ScriptableObject/Lobby/LobbyRules.asset";
 
-    static readonly PartyGatherMemberState In = new PartyGatherMemberState(true, false, false);
-    static readonly PartyGatherMemberState Out = new PartyGatherMemberState(false, false, false);
+    static readonly PartyGatherMemberState In = new PartyGatherMemberState(true, false);
+    static readonly PartyGatherMemberState Out = new PartyGatherMemberState(false, false);
 
     static LobbyTutorialStepTable Steps()
     {

@@ -9,7 +9,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>위치: <see cref="BossEnterTrigger"/> 처럼 플레이어 본체(transform.position)가 박스 안인지 본다. 트리거 Enter/Exit 대신 서버가 매 프레임
 /// 참여자 PlayerObject 를 직접 검사한다(콜라이더 여럿·사망·디스폰으로 Exit 가 안 오는 경우를 따로 정리할 필요가 없다). 박스 회전 반영.</item>
-/// <item>상태: 쓰러짐·사망 = <see cref="PlayerLifeCycleController.State"/> ≠ Alive 또는 체력 0 이하. 진행 중 행동 = <see cref="Player.CurrentState"/> 가 Idle/Move 아님.</item>
+/// <item>상태: 쓰러짐·사망 = <see cref="PlayerLifeCycleController.State"/> ≠ Alive 또는 체력 0 이하. 행동 상태(공격·스킬·대시)는 보지 않는다(할 일 231).</item>
 /// <item>참여자: 기본 = 접속자 전원(접속·퇴장 자동 반영). <see cref="ServerSetParticipants"/> 로 외부(로비 훈련 진행기)가 명단을 넣으면 그 뒤로 접속은 자동 추가하지 않는다.
 /// 연결 종료 확정(OnClientDisconnectCallback)은 어느 쪽이든 명단에서 뺀다.</item>
 /// <item>복제: 활성·집결 n/m·카운트다운 종료 서버 시각·확정 여부. 모두 서버만 쓴다. 표시는 <see cref="PartyGatherStatusView"/>.</item>
@@ -233,9 +233,7 @@ public sealed class PartyGatherZone : NetworkBehaviour
         if (player == null)
             return default;
 
-        var state = player.CurrentState;
-        var busy = state != PlayerActionState.Idle && state != PlayerActionState.Move;
-        return new PartyGatherMemberState(ContainsPoint(player.transform.position), IsIncapacitated(player), busy);
+        return new PartyGatherMemberState(ContainsPoint(player.transform.position), IsIncapacitated(player));
     }
 
     /// <summary>쓰러짐·사망 = <see cref="PlayerLifeCycleController.State"/> ≠ Alive 또는 체력 0 이하 — 집결·영역 볼륨(<see cref="LobbyAreaVolume"/>) 공용.</summary>

@@ -8,7 +8,7 @@ using UnityEngine;
 // 보스룸 이동 관리자 (PLAN §6 개정). 씬 상주 NetworkObject — 이 오브젝트의 위치가 텔레포트 지점이다.
 //
 // 흐름(서버 권한):
-//  1) 파티 집결(할 일 89) — 서버 Update 가 참가자(접속 중 + PermanentDead 아님)마다 발판(BossEnterTrigger) 안·생명·행동 상태를 읽어
+//  1) 파티 집결(할 일 89) — 서버 Update 가 참가자(접속 중 + PermanentDead 아님)마다 발판(BossEnterTrigger) 안·생명 상태를 읽어
 //     BossElevatorGather(= 할 일 86 PartyGatherRules)로 판정한다. 전원이 살아서 발판에 모이면 유지 시간(BossElevatorRig 데이터, 기본 5초) 카운트,
 //     한 명이라도 나가거나 쓰러지거나 인원이 바뀌면 0 — 다시 모이면 처음부터. 발판 잠김(튜토리얼)·강제 카운트다운·연출·도착 대기 중엔 판정하지 않는다.
 //     제한시간 만료 강제 이동(ForceStartEncounter)은 따로 — 집결 상태로 취소되지 않는다.
@@ -246,7 +246,7 @@ public class BossTeleportManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// [서버, 매 프레임] 파티 집결 판정(할 일 89) — 참가자마다 발판 안·생명·행동 상태를 넣고 <see cref="BossElevatorGather"/> 로 판정한다.
+    /// [서버, 매 프레임] 파티 집결 판정(할 일 89) — 참가자마다 발판 안·생명 상태를 넣고 <see cref="BossElevatorGather"/> 로 판정한다.
     /// 집결 카운트다운은 <see cref="_teleportAt"/> 에 그대로 싣는다(강제 카운트다운·연출 중엔 판정이 꺼져 있어 건드리지 않는다).
     /// 확정되면 대기 없이 엘리베이터 연출을 시작한다(입력 잠금 같은 프레임).
     /// </summary>
@@ -311,8 +311,7 @@ public class BossTeleportManager : NetworkBehaviour
             : (health > 0f ? PlayerLifeState.Alive : PlayerLifeState.PermanentDead);
 
         bool onPad = BossEnterTrigger.AnyContains(playerObject.transform.position);
-        bool busy = player != null && BossElevatorGather.IsBusy(player.CurrentState);
-        return new BossElevatorGatherMember(clientId, true, lifeState, health, onPad, busy);
+        return new BossElevatorGatherMember(clientId, true, lifeState, health, onPad);
     }
 
     private void SetGatherCounts(int gathered, int total)
