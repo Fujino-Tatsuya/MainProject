@@ -111,6 +111,20 @@ public sealed class ResultStatsView : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 지금 그려진 행 중 보이는 왕관(1위) — 없으면 null. 로비 결과창 왕관 점프·회전(할 일 215)만 부른다.
+    /// </summary>
+    public RectTransform FindVisibleCrown()
+    {
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            RectTransform crown = _rows[i] != null ? _rows[i].VisibleCrown : null;
+            if (crown != null)
+                return crown;
+        }
+        return null;
+    }
+
     private void RebuildRows(IReadOnlyList<PlayerSessionStats> players, ulong localClientId,
         IReadOnlyList<LobbyResultRankEntry> ranking)
     {

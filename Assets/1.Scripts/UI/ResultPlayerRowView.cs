@@ -34,6 +34,12 @@ public sealed class ResultPlayerRowView : MonoBehaviour
     private PlayerSessionStats _stats;
 
     /// <summary>
+    /// 보이는 왕관(1위 행, <see cref="SetRank"/> 에서 켜짐)의 RectTransform. 왕관이 없거나 꺼져 있으면 null.
+    /// 로비 결과창 왕관 점프·회전 연출(할 일 215)이 읽는다.
+    /// </summary>
+    public RectTransform VisibleCrown => crownImage != null && crownImage.enabled ? crownImage.rectTransform : null;
+
+    /// <summary>
     /// 숫자 칸(피해·처치·간파·사망·회복·입은 피해)을 최종값 × <paramref name="progress"/>(0~1)로 쓴다 — 1 = 최종값.
     /// 로비 결과창 카운트업(할 일 215, <see cref="LobbyResultPanelAnimator"/>)이 매 프레임 부른다. Bind 전이면 아무것도 안 한다.
     /// </summary>

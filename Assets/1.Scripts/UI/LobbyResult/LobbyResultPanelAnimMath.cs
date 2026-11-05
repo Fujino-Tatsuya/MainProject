@@ -1,4 +1,5 @@
 using System;
+using EuniTween;
 using UnityEngine;
 
 /// <summary>
@@ -45,5 +46,97 @@ public static class LobbyResultPanelAnimMath
         if (progress <= 0f)
             return 0;
         return (int)Math.Round(finalValue * (double)progress, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// 카운트업 중 보일 시간(초). 진행도는 0~1 로 자른다 — 1 이면 정확히 최종값, 그 전엔 최종값을 넘지 않는다.
+    /// 표기(mm:ss, 초 아래 버림)는 <see cref="SessionResult.FormatTime"/>.
+    /// </summary>
+    public static float CountUpSeconds(float finalSeconds, float progress)
+    {
+        float final = Mathf.Max(0f, finalSeconds);
+        if (progress >= 1f)
+            return final;
+        if (progress <= 0f)
+            return 0f;
+        return Mathf.Min(final, final * progress);
+    }
+
+    /// <summary>
+    /// 왕관 연출 진행도 — 열기부터 (숫자 지연 + 숫자 시간 + 왕관 지연) 동안 0, 그 뒤 <paramref name="crownDuration"/> 에 걸쳐 0→1.
+    /// = 카운트업이 끝난 직후 <paramref name="crownDelay"/> 만큼 쉬고 시작. 숫자 시간이 0 이하면 숫자 지연 끝에서 잰다.
+    /// </summary>
+    public static float CrownProgress(float sinceOpen, float countUpDelay, float countUpDuration, float crownDelay, float crownDuration)
+    {
+        float start = Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration) + Mathf.Max(0f, crownDelay);
+        return CountUpProgress(sinceOpen, start, crownDuration);
+    }
+
+    /// <summary>
+    /// 왕관 점프 높이(UI 단위) — 0 → <paramref name="height"/> → 0. EuniTween <see cref="Easing.Punch"/>:
+    /// 오르는 절반에 <paramref name="ease"/>(OutQuad 면 위로 갈수록 느려짐), 내려오는 절반은 그 거울(떨어질수록 빨라짐).
+    /// 진행도 0·1 이면 정확히 0(제자리).
+    /// </summary>
+    public static float CrownJumpOffset(float progress, float height, Ease ease)
+    {
+        if (progress <= 0f || progress >= 1f)
+            return 0f;
+        return height * Easing.Punch(ease, progress);
+    }
+
+    /// <summary>
+    /// 왕관 회전 각도(도) — 0 → <paramref name="degrees"/>. EuniTween <see cref="Easing.Evaluate"/> 로 이징.
+    /// 진행도 1 이면 정확히 <paramref name="degrees"/>(360 = 제자리 모습).
+    /// </summary>
+    public static float CrownSpinAngle(float progress, float degrees, Ease ease)
+    {
+        if (progress <= 0f)
+            return 0f;
+        if (progress >= 1f)
+            return degrees;
+        return degrees * Easing.Evaluate(ease, progress);
+    }
+
+    /// <summary>왕관 착지 시각(열기부터 초) = 숫자 지연 + 숫자 시간 + 왕관 지연 + 왕관 시간. 반짝임은 여기서 시작한다.</summary>
+    public static float CrownLandTime(float countUpDelay, float countUpDuration, float crownDelay, float crownDuration) =>
+        Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration) + Mathf.Max(0f, crownDelay) + Mathf.Max(0f, crownDuration);
+
+    /// <summary>
+    /// 반짝임 하나(<paramref name="index"/>, 0..count-1)의 지금 진행도 0~1, 안 보일 때는 -1.
+    /// - 착지 순간 한 번 몰아서: 반짝임 i 는 착지 + i × <paramref name="stagger"/> 에 시작해 <paramref name="duration"/> 동안.
+    /// - 그 뒤 은은한 반복: 몰아치기가 끝나고 <paramref name="repeatInterval"/> 마다 하나씩(0, 1, 2, 0, …) 번갈아. 간격 0 이하 = 반복 없음.
+    /// 간격이 지속보다 짧으면 반복 하나가 다음 차례에 잘린다(다음 반짝임으로 넘어감).
+    /// </summary>
+    public static float SparkleProgress(float sinceLand, int index, int count, float stagger, float duration, float repeatInterval)
+    {
+        if (duration <= 0f || count <= 0 || index < 0 || index >= count || sinceLand < 0f)
+            return -1f;
+
+        stagger = Mathf.Max(0f, stagger);
+        float burstT = (sinceLand - index * stagger) / duration;
+        if (burstT >= 0f && burstT < 1f)
+            return burstT;
+
+        if (repeatInterval <= 0f)
+            return -1f;
+
+        float burstEnd = (count - 1) * stagger + duration;
+        float sinceRepeat = sinceLand - burstEnd - repeatInterval; // 몰아치기 뒤 한 간격 쉬고 첫 반복
+        if (sinceRepeat < 0f)
+            return -1f;
+
+        int turn = Mathf.FloorToInt(sinceRepeat / repeatInterval);
+        if (turn % count != index)
+            return -1f;
+        float t = (sinceRepeat - turn * repeatInterval) / duration;
+        return t < 1f ? t : -1f;
+    }
+
+    /// <summary>반짝임 크기·투명도 0 → 1 → 0(EuniTween <see cref="Easing.Punch"/>). 진행도 0 미만(안 보임)·1 이상이면 0.</summary>
+    public static float SparklePulse(float progress, Ease ease)
+    {
+        if (progress <= 0f || progress >= 1f)
+            return 0f;
+        return Easing.Punch(ease, progress);
     }
 }

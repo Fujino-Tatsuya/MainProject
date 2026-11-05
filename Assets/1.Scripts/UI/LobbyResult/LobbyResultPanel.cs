@@ -140,7 +140,7 @@ public sealed class LobbyResultPanel : MonoBehaviour
         SetCountedOpen(true);
 
         if (Animator != null)
-            Animator.PlayOpen(); // 창 등장 + 숫자 카운트업(표시 전용)
+            Animator.PlayOpen(); // 창 등장 + 숫자·시간 카운트업 + 1위 왕관(표시 전용)
     }
 
     /// <summary>닫는다(결과는 그대로 — 다시 Show 가능).</summary>
@@ -164,10 +164,22 @@ public sealed class LobbyResultPanel : MonoBehaviour
         }
 
         if (playTimeText != null)
-            playTimeText.text = SessionResult.HasValue ? SessionResult.FormatSurvival() : "--:--";
+            playTimeText.text = SessionResult.HasValue ? SessionResult.FormatSurvival() : "--:--"; // 카운트업은 연출이 덮어쓴다
 
         if (outcomeText != null && SessionResult.HasValue)
             outcomeText.color = OutcomeColor(SessionResult.Outcome);
+    }
+
+    /// <summary>
+    /// 소요 시간 값을 최종값 × <paramref name="progress"/>(0~1)로 쓴다(표기는 <see cref="Refresh"/> 와 같은 mm:ss) — 1 = 최종값.
+    /// 로비 결과창 카운트업(할 일 215, <see cref="LobbyResultPanelAnimator"/>)만 부른다. 결과가 없으면 아무것도 안 한다.
+    /// </summary>
+    public void SetPlayTimeCountUp(float progress)
+    {
+        if (playTimeText == null || !SessionResult.HasValue)
+            return;
+        playTimeText.text = SessionResult.FormatTime(
+            LobbyResultPanelAnimMath.CountUpSeconds(SessionResult.SurvivalSeconds, progress));
     }
 
     /// <summary>인스펙터 순위 계수.</summary>

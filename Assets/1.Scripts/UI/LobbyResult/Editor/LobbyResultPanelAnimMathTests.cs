@@ -1,3 +1,4 @@
+using EuniTween;
 using NUnit.Framework;
 
 /// <summary>
@@ -51,5 +52,83 @@ public sealed class LobbyResultPanelAnimMathTests
         Assert.AreEqual(0, LobbyResultPanelAnimMath.CountUpValue(0, 0.7f));
         Assert.AreEqual(int.MaxValue, LobbyResultPanelAnimMath.CountUpValue(int.MaxValue, 1f));
         Assert.LessOrEqual(LobbyResultPanelAnimMath.CountUpValue(int.MaxValue, 0.999999f), int.MaxValue);
+    }
+
+    [Test]
+    public void CountUpSeconds_ZeroToFinal_FormattedNeverExceedsFinal()
+    {
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpSeconds(754.4f, 0f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpSeconds(754.4f, -1f), 1e-6f);
+        Assert.AreEqual(377.2f, LobbyResultPanelAnimMath.CountUpSeconds(754.4f, 0.5f), 1e-3f);
+        Assert.AreEqual(754.4f, LobbyResultPanelAnimMath.CountUpSeconds(754.4f, 1f), 1e-6f);
+        Assert.AreEqual(754.4f, LobbyResultPanelAnimMath.CountUpSeconds(754.4f, 1.4f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpSeconds(-3f, 0.5f), 1e-6f);
+
+        // 표기 = 기존 mm:ss(초 아래 버림). 진행 중 어떤 값도 최종 표기보다 크지 않다.
+        Assert.AreEqual("12:34", SessionResult.FormatTime(754.4f));
+        Assert.AreEqual("00:00", SessionResult.FormatTime(-1f));
+        Assert.AreEqual("06:17", SessionResult.FormatTime(LobbyResultPanelAnimMath.CountUpSeconds(754.4f, 0.5f)));
+        for (float p = 0f; p < 1f; p += 0.01f)
+            Assert.LessOrEqual(LobbyResultPanelAnimMath.CountUpSeconds(754.4f, p), 754.4f);
+    }
+
+    [Test]
+    public void CrownProgress_StartsRightAfterCountUp()
+    {
+        // 숫자 지연 0.15 + 숫자 0.8 + 왕관 지연 0.05 = 1.0 초에 시작, 0.6 초 동안
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownProgress(0.9f, 0.15f, 0.8f, 0.05f, 0.6f), 1e-6f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.CrownProgress(1.3f, 0.15f, 0.8f, 0.05f, 0.6f), 1e-4f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CrownProgress(3f, 0.15f, 0.8f, 0.05f, 0.6f), 1e-6f);
+        Assert.AreEqual(1.6f, LobbyResultPanelAnimMath.CrownLandTime(0.15f, 0.8f, 0.05f, 0.6f), 1e-5f);
+        // 음수 칸은 0 취급
+        Assert.AreEqual(0.6f, LobbyResultPanelAnimMath.CrownLandTime(-1f, -1f, -1f, 0.6f), 1e-6f);
+    }
+
+    [Test]
+    public void CrownJumpAndSpin_ReturnToRestAtEnds()
+    {
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownJumpOffset(0f, 28f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(28f, LobbyResultPanelAnimMath.CrownJumpOffset(0.5f, 28f, Ease.OutQuad), 1e-4f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownJumpOffset(1f, 28f, Ease.OutQuad), 1e-6f);
+        float rising = LobbyResultPanelAnimMath.CrownJumpOffset(0.25f, 28f, Ease.OutQuad);
+        Assert.Greater(rising, 0f);
+        Assert.Less(rising, 28f);
+
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownSpinAngle(0f, 360f, Ease.InOutCubic), 1e-6f);
+        Assert.AreEqual(180f, LobbyResultPanelAnimMath.CrownSpinAngle(0.5f, 360f, Ease.InOutCubic), 1e-3f);
+        Assert.AreEqual(360f, LobbyResultPanelAnimMath.CrownSpinAngle(1f, 360f, Ease.InOutCubic), 1e-6f);
+        Assert.AreEqual(360f, LobbyResultPanelAnimMath.CrownSpinAngle(2f, 360f, Ease.InOutCubic), 1e-6f);
+    }
+
+    [Test]
+    public void Sparkle_BurstAtLandingThenRepeatsOneAtATime()
+    {
+        const int count = 3;
+        const float stagger = 0.08f, duration = 0.4f, interval = 1.6f;
+
+        // 착지 전 = 없음
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SparkleProgress(-0.01f, 0, count, stagger, duration, interval));
+        // 몰아치기: 0 번은 0 초, 2 번은 0.16 초에 시작
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.SparkleProgress(0.2f, 0, count, stagger, duration, interval), 1e-5f);
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SparkleProgress(0.1f, 2, count, stagger, duration, interval));
+        Assert.AreEqual(0.1f, LobbyResultPanelAnimMath.SparkleProgress(0.2f, 2, count, stagger, duration, interval), 1e-5f);
+
+        // 몰아치기 끝 = 0.56 초, 한 간격 쉬고 2.16 초부터 0 → 1 → 2 차례로
+        float firstRepeat = (count - 1) * stagger + duration + interval;
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SparkleProgress(firstRepeat - 0.01f, 0, count, stagger, duration, interval));
+        Assert.AreEqual(0.25f, LobbyResultPanelAnimMath.SparkleProgress(firstRepeat + 0.1f, 0, count, stagger, duration, interval), 1e-4f);
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SparkleProgress(firstRepeat + 0.1f, 1, count, stagger, duration, interval));
+        Assert.AreEqual(0.25f, LobbyResultPanelAnimMath.SparkleProgress(firstRepeat + interval + 0.1f, 1, count, stagger, duration, interval), 1e-4f);
+        Assert.AreEqual(0.25f, LobbyResultPanelAnimMath.SparkleProgress(firstRepeat + 3f * interval + 0.1f, 0, count, stagger, duration, interval), 1e-4f);
+
+        // 반복 간격 0 = 몰아치기 뒤 끝
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SparkleProgress(5f, 0, count, stagger, duration, 0f));
+        // 잘못된 입력
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SparkleProgress(0.1f, 3, count, stagger, duration, interval));
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SparkleProgress(0.1f, 0, count, stagger, 0f, interval));
+
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.SparklePulse(-1f, Ease.OutCubic), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.SparklePulse(0.5f, Ease.OutCubic), 1e-5f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.SparklePulse(1f, Ease.OutCubic), 1e-6f);
     }
 }
