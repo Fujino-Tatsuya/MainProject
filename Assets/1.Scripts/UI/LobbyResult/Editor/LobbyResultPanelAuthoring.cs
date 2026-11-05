@@ -436,7 +436,7 @@ public static class LobbyResultPanelAuthoring
     const float GradeStampCenterX = 1150f;
     const float GradeStampCenterY = 903f;
     const float GradeStampSize = 120f;      // 사용자 조정(223 — 175 → 120)
-    const float GradeLetterSize = 77f;      // 원 크기 비율(예전 175px 에 112)
+    const float GradeLetterSize = 112f;     // 사용자: 원만 줄이고 글자는 그대로
     const float GradeStampAngle = -8f; // 최종 기울기 — 연출(LobbyResultPanelAnimator.stampEndAngle)과 같은 값
     static readonly Color GradeLetterColor = new Color(1f, 0.95f, 0.84f, 1f); // 크림색
     // 글자 폰트 = 결과창 다른 글자(프리팹)가 실제로 쓰는 서울알림 Medium. 위 FontPath(NotoSansKR)는 처음 저작 때 값이라 도장에는 쓰지 않는다.
