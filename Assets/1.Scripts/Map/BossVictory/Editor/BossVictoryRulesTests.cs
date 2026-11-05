@@ -209,4 +209,89 @@ public sealed class BossVictoryRulesTests
         Assert.That(float.IsNaN(c.Final.Position.x), Is.False);
         Assert.That(float.IsNaN(c.Final.Rotation.x), Is.False);
     }
+
+    // ── 벽 밖 방지(할 일 234) ──
+
+    static readonly Vector3 MeleeLook = new Vector3(0f, 1.5f, 2f);
+
+    static BossVictoryRules.Framing WithRoom(BossVictoryRules.Arena room, float margin = 1f)
+    {
+        BossVictoryRules.Framing f = Framing();
+        f.Room = room;
+        f.WallMargin = margin;
+        return f;
+    }
+
+    static void AssertLooksAt(BossVictoryRules.Pose pose, Vector3 look)
+    {
+        Vector3 fwd = pose.Rotation * Vector3.forward;
+        Assert.That(Vector3.Angle(fwd, look - pose.Position), Is.LessThan(0.5f), "당겨도 주시점을 본다");
+    }
+
+    [Test]
+    public void Arena_Contains_UsesRoomLocalAxes()
+    {
+        // 방이 90° 돌아 배치 — 방 로컬 X(−2~2)·Z(−10~10) = 월드 Z(−2~2)·X(−10~10) 근처.
+        Matrix4x4 m = Matrix4x4.TRS(Vector3.zero, Quaternion.Euler(0f, 90f, 0f), Vector3.one);
+        BossVictoryRules.Arena a = BossVictoryRules.Arena.FromRect(m, -2f, 2f, -10f, 10f);
+        Assert.That(a.Contains(new Vector3(8f, 50f, 0f), 0.5f), Is.True, "높이는 보지 않는다");
+        Assert.That(a.Contains(new Vector3(0f, 0f, 8f), 0.5f), Is.False);
+        Assert.That(a.Contains(new Vector3(9.8f, 0f, 0f), 0.5f), Is.False, "여유 거리 안쪽만");
+        Assert.That(default(BossVictoryRules.Arena).Contains(new Vector3(999f, 0f, 999f), 1f), Is.True, "경계 없음 = 제한 없음");
+    }
+
+    [Test]
+    public void Arena_PullInside_StaysOnLineToLook()
+    {
+        BossVictoryRules.Arena a = BossVictoryRules.Arena.FromRect(Matrix4x4.identity, -10f, 10f, -10f, 10f);
+        Vector3 look = new Vector3(0f, 1.5f, 0f);
+        Vector3 pos = new Vector3(4f, 9f, -20f);
+        Vector3 pulled = a.PullInside(look, pos, 1f);
+        Assert.That(pulled.z, Is.EqualTo(-9f).Within(Eps), "벽 안쪽 면 − 여유");
+        Assert.That(Vector3.Angle(pulled - look, pos - look), Is.LessThan(0.01f), "같은 선 위");
+        Assert.That(a.PullInside(look, new Vector3(3f, 5f, 3f), 1f), Is.EqualTo(new Vector3(3f, 5f, 3f)), "이미 안이면 그대로");
+    }
+
+    // 넓은 방 — 벽 제한이 있어도 예전과 같은 구도.
+    [Test]
+    public void Compose_WideRoom_SameAsUnconstrained()
+    {
+        BossVictoryRules.Subjects s = Melee(new Vector3(-4f, 0f, 2f), new Vector3(4f, 0f, 5f));
+        BossVictoryRules.Composition free = BossVictoryRules.Compose(s, Framing());
+        BossVictoryRules.Composition room = BossVictoryRules.Compose(s,
+            WithRoom(BossVictoryRules.Arena.FromRect(Matrix4x4.identity, -100f, 100f, -100f, 100f)));
+        Assert.That(room.Final.Position, Is.EqualTo(free.Final.Position));
+        Assert.That(room.EndPose.Position, Is.EqualTo(free.EndPose.Position));
+    }
+
+    // 막타 바로 뒤가 벽 — 벽 무시 구도는 벽 밖, 제한 구도는 24°·32° 둘 다 벽 안이고 주시점을 본다.
+    [Test]
+    public void Compose_WallBehindKiller_KeepsBothPosesInside()
+    {
+        BossVictoryRules.Subjects s = Melee(new Vector3(-4f, 0f, 2f), new Vector3(4f, 0f, 5f));
+        BossVictoryRules.Arena room = BossVictoryRules.Arena.FromRect(Matrix4x4.identity, -30f, 30f, -4f, 30f);
+        BossVictoryRules.Composition free = BossVictoryRules.Compose(s, Framing());
+        Assume.That(room.Contains(free.Final.Position, 1f) && room.Contains(free.EndPose.Position, 1f), Is.False,
+            "전제: 벽 무시 구도가 벽 밖이어야 이 테스트가 의미 있다");
+
+        BossVictoryRules.Composition c = BossVictoryRules.Compose(s, WithRoom(room));
+        Assert.That(room.Contains(c.Final.Position, 1f - Eps), Is.True, "24° 정지 구도 벽 안");
+        Assert.That(room.Contains(c.EndPose.Position, 1f - Eps), Is.True, "32° 종료 구도 벽 안");
+        AssertLooksAt(c.Final, MeleeLook);
+        AssertLooksAt(c.EndPose, MeleeLook);
+    }
+
+    // 아주 좁은 방 — 벽 안 후보가 없어도 당겨서 벽 안(NaN 없음).
+    [Test]
+    public void Compose_TinyRoom_FallsBackToPullInside()
+    {
+        BossVictoryRules.Subjects s = Melee();
+        BossVictoryRules.Arena room = BossVictoryRules.Arena.FromRect(Matrix4x4.identity, -3f, 3f, -2f, 5f);
+        BossVictoryRules.Composition c = BossVictoryRules.Compose(s, WithRoom(room));
+        Assert.That(float.IsNaN(c.Final.Position.x), Is.False);
+        Assert.That(room.Contains(c.Final.Position, 1f - Eps), Is.True);
+        Assert.That(room.Contains(c.EndPose.Position, 1f - Eps), Is.True);
+        AssertLooksAt(c.Final, MeleeLook);
+        AssertLooksAt(c.EndPose, MeleeLook);
+    }
 }
