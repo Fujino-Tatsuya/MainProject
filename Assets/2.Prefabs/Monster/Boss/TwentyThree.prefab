@@ -1675,6 +1675,7 @@ GameObject:
   - component: {fileID: 4009453750288028855}
   - component: {fileID: 1692798668637704783}
   - component: {fileID: 288923889857305099}
+  - component: {fileID: 2473014749982555177}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -4658,3 +4659,29 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8825124791861564085, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
   m_PrefabInstance: {fileID: 1567392425763977719}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &2473014749982555177
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6928635095488946580}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f64683ecfd517aae4c1dd0b0b55a488e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::No23GrabTelegraphVfx
+  boss: {fileID: 3496395017441729605}
+  handSocket: {fileID: 5812967423476021960}
+  targetRing: {fileID: 11400000, guid: 24bcca9a432d3d6d69e453a1d136d65a, type: 2}
+  pullTrail: {fileID: 11400000, guid: 5e0685961a91693989e0ad9cf7f741f3, type: 2}
+  groundScuff: {fileID: 11400000, guid: aae281b3756cdd2bbbd1b5770e7d62a0, type: 2}
+  pullTether: {fileID: 11400000, guid: 3d101b835b676f8ef30a9b5c5ceef9cd, type: 2}
+  landingSpark: {fileID: 11400000, guid: 677ad200e857fc3102e6b8fc63d80da2, type: 2}
+  warningTexture: {fileID: 2800000, guid: 9a71cfa28a6294907de6a501cf6950a6, type: 3}
+  ringStartRadius: 1.15
+  ringEndRadius: 0.43
+  groundHeight: 0.035
+  trailSeconds: 0.4
+  scuffSeconds: 0.65
+  sparkSeconds: 0.3

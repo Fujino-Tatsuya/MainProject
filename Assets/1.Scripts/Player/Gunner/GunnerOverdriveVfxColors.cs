@@ -20,6 +20,21 @@ public sealed class GunnerOverdriveVfxColors : ScriptableObject
     [Tooltip("원래 채도에 곱하는 값(1 = 그대로). 흰 심은 이 값과 무관하게 흰 채로 남는다")]
     [SerializeField, Min(0f)] private float saturation = 1f;
 
+    /// <summary>
+    /// 단계(1~3)의 색 그 자체 — 색을 "바꿔 칠하는" 이펙트가 아니라 색을 직접 쓰는 곳(과열 림 <c>GunnerHeatRim</c>)용.
+    /// 채도 배율을 바른 값(밝기·알파는 그대로). 0 이하 = 1단계 색.
+    /// </summary>
+    public Color ColorFor(int stage)
+    {
+        Color c = stage >= 3 ? stage3 : stage == 2 ? stage2 : stage1;
+        if (Mathf.Approximately(saturation, 1f))
+            return c;
+        Color.RGBToHSV(c, out float h, out float s, out float v);
+        Color r = Color.HSVToRGB(h, Mathf.Clamp01(s * saturation), v);
+        r.a = c.a;
+        return r;
+    }
+
     /// <summary>단계(1~3)의 색. 0 이하 = 원래 색(<see cref="EffectTint.None"/>).</summary>
     public EffectTint TintFor(int stage)
     {

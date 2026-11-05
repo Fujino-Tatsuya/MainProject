@@ -1986,6 +1986,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         BossAttackEntry e = EntryFor(slot);
         if (e == null) return;
+        No23GrabVfxSignals.Telegraph(this, e, growTime);
         if (e.coneRadius <= 0f && e.lungePathRadius <= 0f && e.boxWidth <= 0f) return;
 
         // 훅·어퍼 바닥 예고 토글(PLAN-boss-combo-chain C6) — 표시만 끈다. 준비 자세 시간·판정은 그대로.
@@ -2019,7 +2020,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     }
 
     [ClientRpc]
-    void HideAttackConeClientRpc() => AttackCone.Hide();
+    void HideAttackConeClientRpc()
+    {
+        No23GrabVfxSignals.ConeHidden(this);
+        AttackCone.Hide();
+    }
 
     // 예고로 그릴 도형이 하나라도 있는가(끝점 부채꼴 또는 전진 경로 띠).
     static bool HasTelegraphShape(BossAttackEntry e) =>
@@ -2505,6 +2510,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void StartGrabbedElectricClientRpc(NetworkObjectReference target)
     {
+        No23GrabVfxSignals.Acquired(this, target);
         if (grabbedElectric == null)
         {
             WarnNoGrabbedAnchorOnce();
@@ -2523,6 +2529,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void StopGrabbedElectricClientRpc()
     {
+        No23GrabVfxSignals.Ended(this);
         if (grabbedElectric != null) grabbedElectric.Stop();   // 미배선은 시작 시점에 1회 알렸다
     }
 
@@ -4045,6 +4052,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void StopGrabPulseClientRpc()
     {
+        No23GrabVfxSignals.Ended(this);
         // 여기서는 경고하지 않는다 — 미배선은 시작 시점에 이미 1회 알렸고,
         // 끝나는 길이 넷이라 여기서 또 뿌리면 진짜 신호가 묻힌다(교훈 #8).
         if (grabPulse != null) grabPulse.Stop();
@@ -4077,6 +4085,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void StopMagneticPullClientRpc()
     {
+        No23GrabVfxSignals.Ended(this);
         // SpinnerBot.StopSpinEffect 와 같은 관용구 — EffectAnimEvents 는 루트에 있다.
         if (_effects == null && !TryGetComponent(out _effects)) return;
         _effects.StopEffect(magneticPullEffectId);

@@ -6492,6 +6492,7 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 8c6f47891fd8bc44aa2e8f2e77f3b13f, type: 2}
   - {fileID: 2100000, guid: a737cc46945c46147a00ddcaade0fdaf, type: 2}
   - {fileID: 2100000, guid: b3aeb4f9e72ea1748a21f48bd8d7be3e, type: 2}
+  stageColors: {fileID: 11400000, guid: 04c5f7c72031487c923d4ee6481d5e20, type: 2}
   fadeInDuration: 0.12
   fadeOutDuration: 0.35
   flashStrength: 3
