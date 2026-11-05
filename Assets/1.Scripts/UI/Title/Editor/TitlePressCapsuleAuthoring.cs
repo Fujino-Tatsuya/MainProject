@@ -121,7 +121,7 @@ public static class TitlePressCapsuleAuthoring
 
     const string SkipFontPath = "Assets/Fonts/SeoulAlrim/SeoulAlrimTTF-Medium SDF.asset";   // 보스 스킵 위젯과 같은 글꼴
 
-    /// <summary>접근 연출 "Esc 건너뛰기" 안내를 보스 스킵 위젯 모양(<see cref="TitleSkipHint"/>)으로. 옛 "ESC SKIP" 글자는 지운다. 멱등.</summary>
+    /// <summary>접근 연출 "Esc 건너뛰기" 안내를 보스 스킵 위젯의 키캡·문구 모양(<see cref="TitleSkipHint"/>, 알약 없음 — 227)으로. 옛 "ESC SKIP" 글자는 지운다. 멱등.</summary>
     [MenuItem("Tools/Title/Authoring/Esc 건너뛰기 안내 배치 (멱등)")]
     static void RunSkipHint()
     {
@@ -147,7 +147,6 @@ public static class TitlePressCapsuleAuthoring
             var hint = root.GetComponent<TitleSkipHint>();
             if (hint == null) hint = root.AddComponent<TitleSkipHint>();
             var so = new SerializedObject(hint);
-            so.FindProperty("pillSprite").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Sprite>(PillPath);
             so.FindProperty("font").objectReferenceValue = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(SkipFontPath);
             so.ApplyModifiedPropertiesWithoutUndo();
 

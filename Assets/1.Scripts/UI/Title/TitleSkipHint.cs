@@ -3,16 +3,14 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 타이틀 접근 연출의 "Esc 건너뛰기" 안내 — 보스 등장 연출 스킵 위젯(<see cref="BossIntroPresentation"/>)과 같은 모양.
-/// 오른쪽 아래 알약 + 키캡(Esc) + "건너뛰기". 보스방은 Space 1초 홀드로 둘레가 채워지지만 타이틀은 <b>누르면 바로</b>라
-/// 채움·동의 수는 없다(경석 10-26). 켜고 끄기는 <see cref="TitleFlowDirector"/> 가 이 오브젝트를 켜고 끈다.
+/// 타이틀 접근 연출의 "Esc 건너뛰기" 안내 — 보스 등장 연출 스킵 위젯(<see cref="BossIntroPresentation"/>)의 키캡·문구와 같은 모양.
+/// 오른쪽 아래 키캡(Esc) + "건너뛰기" 만 — 알약 배경·외곽선은 없다(할 일 227). 보스방은 Space 1초 홀드로 둘레가 채워지지만
+/// 타이틀은 <b>누르면 바로</b>라 채움·동의 수는 없다(경석 10-26). 켜고 끄기는 <see cref="TitleFlowDirector"/> 가 이 오브젝트를 켜고 끈다.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(RectTransform))]
 public sealed class TitleSkipHint : MonoBehaviour
 {
-    [Tooltip("알약 배경 — 보스 스킵 위젯과 같은 button_pill_neutral.")]
-    [SerializeField] private Sprite pillSprite;
     [Tooltip("글꼴 — 보스 스킵 위젯과 같은 서울알림 Medium SDF.")]
     [SerializeField] private TMP_FontAsset font;
 
@@ -38,19 +36,7 @@ public sealed class TitleSkipHint : MonoBehaviour
         var root = (RectTransform)transform;
         root.anchorMin = root.anchorMax = root.pivot = new Vector2(1f, 0f);
         root.anchoredPosition = new Vector2(-56f, 72f);   // 보스 스킵 위젯 자리
-        root.sizeDelta = new Vector2(w, h);
-
-        if (pillSprite != null)
-        {
-            Image bg = NewImage(root, "Background", pillSprite, Color.white);
-            Stretch(bg.rectTransform);
-            bg.type = Image.Type.Sliced;
-            bg.pixelsPerUnitMultiplier = 2f;   // 보스 위젯과 같다 — 72 높이에 양 끝 반원
-        }
-
-        Image outline = NewImage(root, "Outline",
-            BossIntroPresentation.RoundedOutlineSprite((int)w, (int)h, h * 0.5f - 1f, 4f), BossIntroPresentation.SkipIdleColor);
-        Stretch(outline.rectTransform);
+        root.sizeDelta = new Vector2(w, h);   // 알약은 없지만 키캡·문구 자리는 보스 위젯 알약 기준 그대로
 
         const float kw = BossIntroPresentation.SkipKeycapWidth;
         const float kh = BossIntroPresentation.SkipKeycapHeight;
