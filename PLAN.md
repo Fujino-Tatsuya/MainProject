@@ -1,4 +1,77 @@
-# ▶▶▶ 계획 = **추격의 궤적(ASN_4_Q_TRAIL) VFX — 경로 잔상 일섬(b) vs 그림자 자국 + 베기 줄(c) 비교** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 비교 → **C안** 선택(경로·끝점 섬광 뺌) · ✅ 연결(컴파일 0 · 랩 로그 확인) · ✅ 재제작 4 — 민경 수정본(공중 줄 z 0.5·바닥 자국 늘이기) MainProject 교체·연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · ⏳ SVN · 핸드오프 [handoff-pursuit-trail-vfx.md](Docs/tech/handoff-pursuit-trail-vfx.md))
+# ▶▶▶ 계획 = **진격의 충격(FX_QBlast) 2차 — UI 느낌 걷어내기 · 바닥 안개 · 바람 · 팔라딘 방패 텍스처** (2026-11-05 · grill 확정 · ✅ 민경 구현 요청 · ✅ Codex 파일 구현·정적 검증 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-05). **기획 = Claude, 구현 = Codex 세션 "Add Blender MCP server"**(Unity·Codex 앱 끈 상태). 코드·판정 무변경.
+
+## 사실(진단)
+- `B_Wave_Fill` = 단색 `White.png` 부채꼴 · `B_Wave_Wall`·`B_Wave_Front` = 매끈한 그라데이션 띠, 노이즈·결 없음 → 벡터 도형(UI) 같다.
+- 띠·벽·채움이 같은 0.3초 곡선으로 똑같이 커진다. 색 = 금색 하나. 재질 대부분 `Shader_IntegratedEffect`(알파 제곱).
+- 쓸 수 있는 Piloto 에셋(MainProject): `Wind_floor_Ring_accent_add_Soft`·`Wind_Stuff_something_idk_1_add_Soft 1`·`Wind_Radial_disk_add_Soft`(재질, `50.Art/VFX/_Materials/PilotoStudio/`).
+- 팔라딘 방패(`50.Art/Char/Weapons/Handpainted_20261026/Textures/Paladin_Shield_BaseColor.png`) = 히터 방패 · 마디 진 금 베벨 테두리 · 은백 면 + 기사단 십자.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 앞 띠 `B_Wave_Front` | **모양·텍스처 유지** |
+| 벽 `B_Wave_Wall`(Q8) | 새 텍스처 — 아래 진하고 위로 **불꽃처럼 찢긴 노이즈 가장자리** + 세로 바람 결, **위로 흐르는 UV 스크롤** |
+| 채움 `B_Wave_Fill`(Q9) | 새 텍스처 — **호 형태 가로 물결 무늬(파동처럼 퍼지는 동심 호)** + 얼룩 노이즈, **바깥으로 흐르는 UV 스크롤** |
+| 바닥 안개(Q1·Q10) | 새 레이어 — 부채꼴 판, 부드러운 노이즈 **두 겹을 서로 다른 방향으로 흘려** 섞음, 채움보다 늦게 퍼지고 ≈0.6초 남음 |
+| 셰이더(Q11) | 채움·벽·안개·바람은 **Piloto `UberFXSG`**(원래 Q 와 같은 셰이더). 앞 띠는 그대로 |
+| 박자(Q4) | 앞 띠가 먼저 치고 나가고 벽·채움·안개가 엇갈려 뒤따름 |
+| 색 | **끝까지 밝은 금빛 유지**(주황·흙색으로 가라앉히지 않음) |
+| 추가(Q5) | (i) 바람 줄기 `Wind_Stuff…` 가 부채꼴을 따라 방사형으로 긁고 감 · (ii) 바닥 바람 링 `Wind_floor_Ring_accent` 가 앞 띠 아래로 퍼짐 |
+| 방패(Q6·Q12) | 유지 + 새 텍스처 — 히터 방패 실루엣 · **두 겹 금 테두리**(안쪽 얇은 선 + 바깥 두꺼운 마디 베벨, 바깥 더 밝게) · **빛나는 금 십자** · 반투명 밝은 금빛 면(위 밝음 → 아래 옅음) + 사선 반사광. 박자는 새 앞 띠에 맞춤 |
+| 방패 적용 범위(Q13) | **E 방어(수호자의 의지) 방패도 같은 새 텍스처**(공용 재질 `M_GuardianWill_ShieldProj` 를 교체) |
+
+## 구현·검증 (2026-11-05 · Codex · 2차)
+- 앞 띠 파티클·재질·텍스처 SHA256 보존. 벽/채움은 기존 재질 GUID를 유지하며 UberFXSG로 교체하고 새 PNG로 분리. 새 안개 재질은 FuzzAlpha_Soft 복제, 서로 반대 방향의 메인/디테일 노이즈 패닝.
+- 지연/수명(초): 벽 0.02/0.36, 채움 0.04/0.44, 안개 0.08/0.60, 바람 8획 0/0.28, 바닥 링 0/0.30. 방패 3개 타이밍 보존. 엔트리 0.80초(최장 방패 흩어짐 종료 0.72초 + 0.08초).
+- 채움 UV U=각도·V=반지름, 벽 UV V=높이. V 패닝 -0.75/-0.65로 바깥/위쪽 이동. 새 메시 4개는 공간 알파·안개 경계 페이드·8획·90° 링용이며 기존 메시 파일은 보존.
+- 새 PNG 4개: WallFlame/FillRipple/FogNoise 512² RGBA, Paladin_ShieldEmblem 1024² RGBA. 벽 가로 및 물결/안개 양축 RGBA 경계 불일치 0. 공용 방패 재질 `_MainTex` 교체, E 방어 참조도 확인(UV 전체 0~1).
+- YAML 56개 객체 해석(미해석 0), fileID 충돌 0, 내부 참조 정상, 루트 자식 10→13. 기존 `.meta` 변경 0. 임시 스크립트·검증 보고서는 OS Temp에만 저장. Unity import·Play·MPPM은 미실행.
+- 전체 파일 목록·레이어 표·제약은 [handoff-q-blast-vfx.md](Docs/tech/handoff-q-blast-vfx.md) 2차 절 참조.
+
+### 2차-2(11-05 민경 피드백)
+- 안개 `B_Wave_Fog` = **흰빛에 가까운 안개**(거의 흰색 + 금빛 살짝, 가산), 두 겹 흐름 유지.
+- 무늬 = E 방어 `T_GuardianWill_Wall`·`_Ground` 처럼 **단색 + 기하 선 + 반투명 알파**: 벽 = **마름모 격자**(마디 반짝, 아래 밝은 단색 띠 + 가는 선) · 채움 = **동심 호 물결선 + 눈금(룬 틱) 띠**.
+- 채움 **림 라이트 외곽선** = 바깥 호 + 좌우 직선 가장자리, 밝은 단색 선(반지름 ≈3~4%, 바깥 가장 밝고 안쪽으로 살짝 번짐).
+- 흐름: 벽 무늬 위로·채움 물결선 바깥으로 계속 흐름, **외곽선·눈금 띠는 고정**(무늬 층과 외곽선을 레이어/텍스처로 분리).
+
+#### 구현·검증 (Codex · ✅ 파일 구현 · ⏳ 민경 Play)
+- 벽 격자 `T_QBlast_WallLattice`·채움 물결 `T_QBlast_FillWaveLines`로 기존 재질의 텍스처만 교체. 고정 자식 `B_Wave_WallBaseBand`·`B_Wave_FillRunes`·`B_Wave_FillRim` 추가(모두 UberFXSG 가산).
+- 고정 하단 띠/가는 선·눈금은 별도 PNG/재질, 림은 새 메시(90° 바깥 호 + 좌우 끝까지, 본체 0.035 + 안쪽 번짐 0.02, 460정점·2016인덱스). 움직이는 패닝은 현재 튜닝 값인 벽 V=-2, 채움 V=-0.75 유지.
+- 안개는 FuzzAdd 계열 `SrcAlpha/One`, StartColor (1,0.97,0.88,1). 메인/디테일 모두 FogNoise, 패닝 (0.08,-0.18)/(-0.12,0.09), 기존 수명·알파·크기 곡선 유지.
+- 입력 파일의 벽 지연은 0초였으므로 이번 요청에 명시된 0.02초로 벽·고정 띠를 맞춤(벽 수명은 현재 0.30초 유지). 채움·림·눈금 0.04/0.44초, 안개 0.08/0.60초. 엔트리 0.80초 보존.
+- YAML 68객체, 미해석·fileID 충돌 0, 루트 자식 13→16. 기존 56객체 중 안개 StartColor·벽 startDelay·루트 자식 목록 외 53개 동일. 기존 `.meta`·앞 띠·방패·바람 등 보존. 임시 파일은 OS Temp에만 저장. 상세는 핸드오프 2차-2 절.
+
+---
+
+# 계획(이전) = **진격의 충격(FX_QBlast) — 앞 띠를 따라 밀려 나가며 커지는 방패** (2026-11-05 · grill 확정 · ✅ 민경 "제안대로" · ✅ Codex 파일 구현·정적 검증 · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-05). **기획 설계 = Claude, 구현 = Codex 세션 "Add Blender MCP server"**(Unity·Codex 앱 끈 상태). 코드·판정 무변경.
+
+## 사실
+- `FX_QBlast` = 길이 1 저작, 재생 배율 = 판정 부채꼴 range(현재 2, `PaladinSkillView.PlayQBlast`). `B_Wave_Front` = 90° 부채꼴 바깥 띠(메시 z 0.42~1.0), **이동이 아니라 크기 곡선**(0.3초, 0.08 → 1.0, 원점 기준)으로 앞으로 밀려 나간다. 알파 1 → 0.8(60%) → 0.
+- E 방어 `FX_GuardianWill_Barrier/B_Shield` = `SM_GuardianWill_ShieldPanel`(1.1 × 1.35m 판) · `M_GuardianWill_ShieldProj`.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 붙이는 법(Q1) | 방패 메시를 앞 띠 자리로 **구워 옮긴 새 메시** + `B_Wave_Front` 와 **같은 크기 곡선·원점** → 띠와 맞물려 앞으로 나가며 커짐(range 배율도 자동) |
+| 위치·크기(Q2) | 띠 가운데 바깥 끝(z 1.0), 최종(range 2) = `B_Shield` 와 같은 1.1 × 1.35m, 가운데 높이 ≈0.85m → 길이 1 기준 메시 = 패널 × 0.5 + (0, 0.425, 1.0) |
+| 재질(Q3) | `M_GuardianWill_ShieldProj` 그대로 |
+| 사라짐(Q4) | 띠보다 밝게 버티다(80% 까지 1) 끝에 빠르게 0 |
+| 추가(Q5) | (i) 다 나간 순간 방패가 빛 입자로 흩어짐(`M_GuardianWill_Mote`) · (ii) 이동 중 방패 면 반짝임 한 번(`M_GuardianWill_WallGlint`) |
+| 엔트리 | 흩어짐까지 담도록 `FX_QBlast_Entry` 수명 0.65 → 필요 시 늘림 |
+
+## 구현·검증 (2026-11-05 · Codex)
+- `SM_QBlast_Shield` = 원본 패널 정점 ×0.5 + (0, 0.425, 1), 법선·UV·색·삼각형 유지. AABB center ≈(0, 0.425, 0.965), extent ≈(0.275, 0.3375, 0.035).
+- `B_Shield`·`B_ShieldGlint`: `B_Wave_Front` 복제, 크기 곡선 전체·수명 0.3초 동일. `B_ShieldShatter`: 0.27초 지연, 16개, World·Shape 배율, 최장 종료 0.72초. 엔트리 0.75초.
+- 에디터 없이 파일 수정. Unity YAML 부분집합 파서로 48개 객체 해석(미해석 0·잘림 없음), fileID 충돌·내부 참조·루트 자식 11개 확인. 기존 레이어 객체·기존 `.meta` 보존. 실제 Unity import·Play·MPPM은 미실행.
+- 상세: [handoff-q-blast-vfx.md](Docs/tech/handoff-q-blast-vfx.md) 후속 방패 레이어.
+
+---
+
+# 계획(이전) = **추격의 궤적(ASN_4_Q_TRAIL) VFX — 경로 잔상 일섬(b) vs 그림자 자국 + 베기 줄(c) 비교** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 비교 → **C안** 선택(경로·끝점 섬광 뺌) · ✅ 연결(컴파일 0 · 랩 로그 확인) · ✅ 재제작 4 — 민경 수정본(공중 줄 z 0.5·바닥 자국 늘이기) MainProject 교체·연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · ⏳ SVN · 핸드오프 [handoff-pursuit-trail-vfx.md](Docs/tech/handoff-pursuit-trail-vfx.md))
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04). 판정·수치·네트워크 무변경, 새 RPC 없음.
 
