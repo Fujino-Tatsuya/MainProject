@@ -9,7 +9,8 @@ using UnityEngine.UI;
 /// (a) 창 등장: 열 때 크기(<c>hiddenScale</c>→1)·투명도(0→1), 닫을 때 반대(짧게).
 /// (c) 숫자 카운트업: 열 때 플레이어 행 숫자(<see cref="ResultStatsView.SetCountUpProgress"/>)와 소요 시간
 ///     (<see cref="LobbyResultPanel.SetPlayTimeCountUp"/>)이 같은 진행도로 0 에서 최종값까지 올라간다.
-/// (d) 1위 왕관: 카운트업이 끝난 직후 점프하며 한 바퀴(기본 Y축) 돌고, 착지 순간 반짝임이 터진 뒤 은은하게 반복한다(EuniTween 이징).
+/// (d) 1위 왕관: 카운트업이 끝난 직후부터 <c>crownRepeatInterval</c>(3초)마다 점프하며 한 바퀴(기본 Y축) 돌고,
+///     착지마다 반짝임이 크게 터진 뒤 다음 점프 전까지 은은하게 반복한다(EuniTween 이징). 행 밖으로 튀어나가도 자르지 않는다.
 ///
 /// - 시간 = <c>Time.unscaledDeltaTime</c>(슬로모션 영향 없음). 곡선·지속시간 = 이 컴포넌트 인스펙터.
 /// - 열고 닫기 판단·<c>Closed</c> 이벤트·ESC 점유는 패널이 그대로 한다. 이 컴포넌트는 닫힘 연출이 끝난 뒤
@@ -55,6 +56,8 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     [SerializeField] private float crownDelay = 0.05f;
     [Tooltip("점프 + 한 바퀴 시간(초, unscaled). 0 이하면 왕관 연출 없음(반짝임만 착지 시각에).")]
     [SerializeField] private float crownDuration = 0.6f;
+    [Tooltip("점프·회전 반복 주기(초, 시작→다음 시작, unscaled). 첫 점프는 카운트업 직후, 그 뒤 이 간격마다. 0 이하면 1회만. 점프 시간보다 짧으면 점프 시간.")]
+    [SerializeField] private float crownRepeatInterval = 3f;
     [Tooltip("점프 높이(UI 단위, 캔버스 기준 px).")]
     [SerializeField] private float crownJumpHeight = 28f;
     [Tooltip("점프 이징 — 오르는 절반에 적용, 내려오는 절반은 거울(EuniTween Easing.Punch). OutQuad = 포물선처럼 위에서 느려짐.")]
@@ -79,8 +82,8 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     [SerializeField] private float sparkleDuration = 0.4f;
     [Tooltip("착지 순간 몰아칠 때 반짝임 사이 간격(초).")]
     [SerializeField] private float sparkleStagger = 0.08f;
-    [Tooltip("그 뒤 은은한 반복 간격(초) — 하나씩 번갈아. 0 이하면 착지 때 한 번만.")]
-    [SerializeField] private float sparkleRepeatInterval = 1.6f;
+    [Tooltip("착지 몰아치기 뒤 은은한 반복 간격(초) — 하나씩 번갈아. 다음 착지에서 다시 몰아치기부터. 0 이하면 착지 때만. 점프 중엔 반짝임을 끈다.")]
+    [SerializeField] private float sparkleRepeatInterval = 0.7f;
     [Tooltip("반복 반짝임 크기 배율(착지 때 = 1). 은은하게 = 1 보다 작게.")]
     [SerializeField] private float sparkleRepeatScale = 0.7f;
     [Tooltip("반짝임 하나가 켜졌다 꺼지는 동안 도는 각도(도, 화면 안).")]
@@ -276,24 +279,30 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
             return;
         }
 
-        float progress = crownDuration > 0f
-            ? LobbyResultPanelAnimMath.CrownProgress(_crownElapsed, countUpDelay, countUpDuration, crownDelay, crownDuration)
-            : 1f;
+        float firstStart = LobbyResultPanelAnimMath.CrownFirstStart(countUpDelay, countUpDuration, crownDelay);
+        float progress = LobbyResultPanelAnimMath.CrownCycleProgress(_crownElapsed, firstStart, crownDuration, crownRepeatInterval);
         float jump = LobbyResultPanelAnimMath.CrownJumpOffset(progress, crownJumpHeight, crownJumpEase);
         float angle = LobbyResultPanelAnimMath.CrownSpinAngle(progress, crownSpinDegrees, crownSpinEase);
         _crown.anchoredPosition = _crownBasePosition + new Vector2(0f, jump);
         // 한 바퀴 끝(360°)은 제자리 모습 — 부동소수 찌꺼기 없이 원래 회전으로 맞춘다.
-        _crown.localRotation = progress >= 1f || crownSpinAxis == Vector3.zero
+        bool jumping = progress > 0f && progress < 1f;
+        _crown.localRotation = !jumping || crownSpinAxis == Vector3.zero
             ? _crownBaseRotation
             : _crownBaseRotation * Quaternion.AngleAxis(angle, crownSpinAxis);
 
-        float landTime = LobbyResultPanelAnimMath.CrownLandTime(countUpDelay, countUpDuration, crownDelay, crownDuration);
-        ApplySparkles(_crownElapsed - landTime);
+        // 반짝임은 착지 기준 — 착지마다 크게 한 번 + 사이엔 은은한 반복. 점프 중엔 끈다(Y 회전에 같이 납작해지지 않게).
+        float sinceLand = LobbyResultPanelAnimMath.SinceLastCrownLand(_crownElapsed, firstStart, crownDuration, crownRepeatInterval);
+        if (jumping)
+            HideSparkles();
+        else
+            ApplySparkles(sinceLand);
 
-        // 반복 반짝임이 없으면 다 끝난 뒤 멈춘다(반복이 있으면 열려 있는 동안 계속).
+        // 반복 점프가 없을 때만 멈춘다: 점프가 끝났고 반짝임도(반복 반짝임이 없으면) 다 끝났다. 반복이 있으면 열려 있는 동안 계속.
+        if (crownRepeatInterval > 0f || progress < 1f)
+            return;
         int sparkleCount = sparkleOffsets != null ? sparkleOffsets.Length : 0;
-        if (progress >= 1f && (sparkleRepeatInterval <= 0f || sparkleSprite == null || sparkleCount == 0)
-            && _crownElapsed - landTime >= Mathf.Max(0f, sparkleStagger) * sparkleCount + Mathf.Max(0f, sparkleDuration))
+        bool sparkleLoops = sparkleRepeatInterval > 0f && sparkleSprite != null && sparkleCount > 0 && sparkleDuration > 0f;
+        if (!sparkleLoops && sinceLand >= Mathf.Max(0f, sparkleStagger) * sparkleCount + Mathf.Max(0f, sparkleDuration))
         {
             _crownPlaying = false;
             HideSparkles();

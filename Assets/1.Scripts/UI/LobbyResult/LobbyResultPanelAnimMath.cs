@@ -62,15 +62,43 @@ public static class LobbyResultPanelAnimMath
         return Mathf.Min(final, final * progress);
     }
 
+    /// <summary>왕관 첫 점프 시작 시각(열기부터 초) = 숫자 지연 + 숫자 시간 + 왕관 지연 — 카운트업이 끝난 직후. 음수 칸은 0 취급.</summary>
+    public static float CrownFirstStart(float countUpDelay, float countUpDuration, float crownDelay) =>
+        Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration) + Mathf.Max(0f, crownDelay);
+
     /// <summary>
-    /// 왕관 연출 진행도 — 열기부터 (숫자 지연 + 숫자 시간 + 왕관 지연) 동안 0, 그 뒤 <paramref name="crownDuration"/> 에 걸쳐 0→1.
-    /// = 카운트업이 끝난 직후 <paramref name="crownDelay"/> 만큼 쉬고 시작. 숫자 시간이 0 이하면 숫자 지연 끝에서 잰다.
+    /// 왕관 점프 주기(시작→다음 시작, 초). 반복 간격 0 이하 = 0(1회만). 간격이 점프 시간보다 짧으면 점프 시간(겹치지 않게).
     /// </summary>
-    public static float CrownProgress(float sinceOpen, float countUpDelay, float countUpDuration, float crownDelay, float crownDuration)
+    public static float CrownPeriod(float crownDuration, float repeatInterval) =>
+        repeatInterval <= 0f ? 0f : Mathf.Max(repeatInterval, Mathf.Max(0f, crownDuration));
+
+    /// <summary>
+    /// 지금 왕관 점프 진행도 0~1 — 첫 시작 전 0, 점프 중 0→1, 다음 점프까지 1(제자리).
+    /// 반복이 있으면 <see cref="CrownPeriod"/> 마다 다시 0 부터. 점프 시간 0 이하 = 늘 1(연출 없음).
+    /// </summary>
+    public static float CrownCycleProgress(float sinceOpen, float firstStart, float crownDuration, float repeatInterval)
     {
-        float start = Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration) + Mathf.Max(0f, crownDelay);
-        return CountUpProgress(sinceOpen, start, crownDuration);
+        float t = sinceOpen - Mathf.Max(0f, firstStart);
+        if (t < 0f)
+            return 0f;
+        if (crownDuration <= 0f)
+            return 1f;
+        return Progress(Repeat(t, CrownPeriod(crownDuration, repeatInterval)), crownDuration);
     }
+
+    /// <summary>
+    /// 가장 최근 착지부터 지난 시간(초). 아직 한 번도 착지 안 했으면 -1. 반복이 있으면 착지마다 0 으로 돌아간다(반짝임 기준).
+    /// </summary>
+    public static float SinceLastCrownLand(float sinceOpen, float firstStart, float crownDuration, float repeatInterval)
+    {
+        float t = sinceOpen - Mathf.Max(0f, firstStart) - Mathf.Max(0f, crownDuration);
+        if (t < 0f)
+            return -1f;
+        return Repeat(t, CrownPeriod(crownDuration, repeatInterval));
+    }
+
+    // t ≥ 0 을 주기로 접는다. 주기 0 이하 = 그대로.
+    private static float Repeat(float t, float period) => period > 0f ? t - Mathf.Floor(t / period) * period : t;
 
     /// <summary>
     /// 왕관 점프 높이(UI 단위) — 0 → <paramref name="height"/> → 0. EuniTween <see cref="Easing.Punch"/>:
@@ -96,10 +124,6 @@ public static class LobbyResultPanelAnimMath
             return degrees;
         return degrees * Easing.Evaluate(ease, progress);
     }
-
-    /// <summary>왕관 착지 시각(열기부터 초) = 숫자 지연 + 숫자 시간 + 왕관 지연 + 왕관 시간. 반짝임은 여기서 시작한다.</summary>
-    public static float CrownLandTime(float countUpDelay, float countUpDuration, float crownDelay, float crownDuration) =>
-        Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration) + Mathf.Max(0f, crownDelay) + Mathf.Max(0f, crownDuration);
 
     /// <summary>
     /// 반짝임 하나(<paramref name="index"/>, 0..count-1)의 지금 진행도 0~1, 안 보일 때는 -1.

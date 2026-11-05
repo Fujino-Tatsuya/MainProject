@@ -73,15 +73,34 @@ public sealed class LobbyResultPanelAnimMathTests
     }
 
     [Test]
-    public void CrownProgress_StartsRightAfterCountUp()
+    public void CrownCycle_FirstRightAfterCountUp_ThenEveryInterval()
     {
-        // 숫자 지연 0.15 + 숫자 0.8 + 왕관 지연 0.05 = 1.0 초에 시작, 0.6 초 동안
-        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownProgress(0.9f, 0.15f, 0.8f, 0.05f, 0.6f), 1e-6f);
-        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.CrownProgress(1.3f, 0.15f, 0.8f, 0.05f, 0.6f), 1e-4f);
-        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CrownProgress(3f, 0.15f, 0.8f, 0.05f, 0.6f), 1e-6f);
-        Assert.AreEqual(1.6f, LobbyResultPanelAnimMath.CrownLandTime(0.15f, 0.8f, 0.05f, 0.6f), 1e-5f);
-        // 음수 칸은 0 취급
-        Assert.AreEqual(0.6f, LobbyResultPanelAnimMath.CrownLandTime(-1f, -1f, -1f, 0.6f), 1e-6f);
+        // 숫자 지연 0.15 + 숫자 0.8 + 왕관 지연 0.05 = 1.0 초에 첫 점프, 0.6 초 동안
+        float first = LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 0.8f, 0.05f);
+        Assert.AreEqual(1f, first, 1e-5f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownFirstStart(-1f, -1f, -1f), 1e-6f);
+
+        Assert.AreEqual(3f, LobbyResultPanelAnimMath.CrownPeriod(0.6f, 3f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownPeriod(0.6f, 0f), 1e-6f);
+        Assert.AreEqual(0.6f, LobbyResultPanelAnimMath.CrownPeriod(0.6f, 0.2f), 1e-6f); // 점프보다 짧은 간격 = 점프 시간
+
+        // 1회만(간격 0)
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CrownCycleProgress(0.9f, first, 0.6f, 0f), 1e-6f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.CrownCycleProgress(1.3f, first, 0.6f, 0f), 1e-4f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CrownCycleProgress(10f, first, 0.6f, 0f), 1e-6f);
+        // 3초 주기: 1.0 · 4.0 · 7.0 초에 다시 시작, 사이엔 제자리(1)
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CrownCycleProgress(2f, first, 0.6f, 3f), 1e-6f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.CrownCycleProgress(4.3f, first, 0.6f, 3f), 1e-3f);
+        Assert.AreEqual(0.25f, LobbyResultPanelAnimMath.CrownCycleProgress(7.15f, first, 0.6f, 3f), 1e-3f);
+        // 점프 시간 0 = 늘 제자리
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CrownCycleProgress(1.3f, first, 0f, 3f), 1e-6f);
+
+        // 마지막 착지부터 — 착지 1.6 · 4.6 · 7.6 초
+        Assert.AreEqual(-1f, LobbyResultPanelAnimMath.SinceLastCrownLand(1.5f, first, 0.6f, 3f));
+        Assert.AreEqual(0.4f, LobbyResultPanelAnimMath.SinceLastCrownLand(2f, first, 0.6f, 3f), 1e-4f);
+        Assert.AreEqual(2.7f, LobbyResultPanelAnimMath.SinceLastCrownLand(4.3f, first, 0.6f, 3f), 1e-3f); // 다음 점프 중(착지 전)
+        Assert.AreEqual(0.1f, LobbyResultPanelAnimMath.SinceLastCrownLand(4.7f, first, 0.6f, 3f), 1e-3f);
+        Assert.AreEqual(3.4f, LobbyResultPanelAnimMath.SinceLastCrownLand(5f, first, 0.6f, 0f), 1e-4f); // 1회만이면 계속 늘어남
     }
 
     [Test]
