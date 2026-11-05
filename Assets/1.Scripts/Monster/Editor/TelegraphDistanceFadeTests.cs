@@ -149,7 +149,9 @@ public sealed class TelegraphDistanceFadeTests
         foreach (string path in new[] { DecalGraphs[4], DecalGraphs[5] })
         {
             string text = File.ReadAllText(path);
-            StringAssert.Contains("\"m_FunctionName\": \"DecalDistanceFade\"", text, path);
+            // 할 일 221 — 스킬 범위 그래프는 거리 감쇠 × 바닥 블렌딩을 한 함수(SkillRangeDecalFade, 안에서 DecalDistanceFadeAt)로 부른다.
+            string fn = path == DecalGraphs[4] ? "SkillRangeDecalFade" : "DecalDistanceFade";
+            StringAssert.Contains("\"m_FunctionName\": \"" + fn + "\"", text, path);
             StringAssert.Contains("\"angleFade\": true", text, path);
         }
     }

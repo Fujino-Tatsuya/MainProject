@@ -174,3 +174,12 @@ Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드,
 - 그리기 = `SkillLineIndicator` Arrow 쿼드(`SkillLineArrow.mat`, 셰이더 `ArrowC3`) — 기존 이동 미리보기 화살표와 같은 모양·같은 면 그라데이션(촉으로 갈수록 진함). **화살표 규칙(전 캐릭터 공통, 11-04 사용자)**: 모든 Arrow(어쌔신 대시 일격·변신 Q, 거너 쿨 백스텝, 거너 간파의 화살표)는 Length Fade Curve·Edge Line Curve 와 무관하게 몸통+촉 전체를 끝까지 온전히 그리고, 같은 컴포넌트의 **Edge Line Width/Color** 로 윤곽(몸통·머리) 안쪽에 흰 라인을 **길이 방향 페이드 없이 균일하게** 덧그린다(Width 0 이면 없음). 텍스처 `SkillLineArrow.mat` Side Edge Line Texture = white_512.
 - 커브 칸(Length Fade Curve·Edge Line Curve)은 거너 Q 사각형 전용 그대로(§8-1). `Player_Assassin.prefab` 에는 커브 오버라이드를 두지 않는다.
 - 화살표 폭 = `SkillLineIndicator.arrowWidth`(0.9). 거리 감쇠(`_DecalFade`)는 화살표에 걸지 않는다.
+
+## 9. 바닥 블렌딩 — 채움 알파 배율·바깥 끝 소프트 (할 일 221, 2026-11-05)
+
+- 모든 예고(C3 데칼 외곽선·채움, C3 바닥 판, `TelegraphQuad` 판, 23호 차징 오라 원판)의 **안쪽(채움·띠 그라데이션·쐐기) 알파**에 공용 배율을 곱해 바닥이 비치게 한다. **외곽선·안쪽 선은 그대로**, 바깥 외곽선의 바깥 끝만 소프트.
+- 칸: `Assets/Resources/Rendering/DecalFloorBlendSettings.asset` 의 `telegraphFillAlphaScale`·`telegraphEdgeSoftness`·`telegraphPlateFillAlphaScale`(스킬 인디케이터 칸과 별도). 코드 기본 1·0·1 = 이전 화면, 에셋 시작값 0.6·0.15·1.
+- **§3 의 "최종 불투명도 = 색 알파 × 모양 × 마스크" 에 바닥 블렌딩 배율이 한 번 더 곱해진다**(채움 층만). 거리 감쇠(§8)와도 곱.
+- 🔴 회피 신호 — 빨강/파랑 구분(§2)과 함께 채움이 너무 옅어지지 않게. 경계는 외곽선이 지킨다.
+- 미적용: 건틀렛 스매시 원(미리 구운 sprite), `shapeTexture` 를 쓰는 `AoeTelegraph`(SG_TelegraphDecal), 보스 방향 표식 전/후방 재질 색(모양 호는 C3 채움이라 적용).
+- 상세·대상 표·확인 씬: [decal.md](decal.md) "스킬·공격 예고 데칼 바닥 블렌딩".

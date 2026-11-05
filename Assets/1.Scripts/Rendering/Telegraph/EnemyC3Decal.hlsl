@@ -21,6 +21,7 @@
 #include "Assets/1.Scripts/Rendering/Telegraph/EnemyC3Sdf.hlsl"
 #include "Assets/1.Scripts/Rendering/Telegraph/TelegraphMask.hlsl"
 #include "Assets/1.Scripts/Rendering/Telegraph/DecalDistanceFade.hlsl"
+#include "Assets/1.Scripts/Rendering/Telegraph/DecalFloorBlend.hlsl"
 
 // Bake.Decal 의 한 픽셀(감마, 직선 알파). uv = 데칼 UV(0~1, +V = 정면).
 float4 EnemyC3DecalGamma(float2 uv)
@@ -52,10 +53,13 @@ float4 EnemyC3DecalGamma(float2 uv)
             marker = EnemyC3Fins(q, _C3Path.x, _C3Path.y, unit, _C3Fins.x, _C3Fins.y, _C3Fins.z, _C3Geom.z, _C3Geom.y, aa);
     }
 
+    // 할 일 221 — 바닥 블렌딩(예고 전역 값). 안쪽(띠 그라데이션·쐐기)만 채움 배율, 외곽선·안쪽 선은 그대로 + 바깥 끝 소프트.
+    float3 floorBlend = DecalFloorBlendResolve(_DecalFloorBlendTelegraph);
     EnemyC3Palette pal;
     pal.outline = _C3Outline; pal.innerLine = _C3InnerLine; pal.band = _C3Band;
     pal.fill = float4(0, 0, 0, 0); pal.markers = _C3Markers;
-    return EnemyC3Boundary(d, aa, unit, bandCover, marker, false, _C3Geom.x, _C3Geom.y, _C3Geom.z, pal);
+    pal.band.a *= floorBlend.x; pal.markers.a *= floorBlend.x;
+    return EnemyC3BoundarySoft(d, aa, unit, bandCover, marker, false, _C3Geom.x, _C3Geom.y, _C3Geom.z, floorBlend.y, pal);
 }
 
 // ── 채움(할 일 57 S4a) — BossAttackConeTelegraph 의 채움 프로젝터. 같은 그래프·재질, 모양 번호만 다르다.
@@ -145,6 +149,20 @@ void EnemyC3DecalShade_float(float2 UV, float3 WorldPos, out float3 Color, out f
     {
         // 채움 — 예전 텍스처처럼 흰색 + 모양 알파. 색은 _BaseColor(채움 색 · 방향 표식 색 · 장판 색)가 입힌다.
         baseRGBA = float4(1.0, 1.0, 1.0, EnemyC3FillAlpha(UV));
+        // 할 일 221 — 채움은 안쪽이라 채움 배율. 원판(6, 23호 차징 오라 등)만 테두리(rim)를 가장자리로 보고 그대로 + 바깥 끝 소프트.
+        float3 floorBlend = DecalFloorBlendResolve(_DecalFloorBlendTelegraph);
+        float edge = 0.0, outerSoft = 1.0;
+        if (_C3Shape.x > 5.5)
+        {
+            float r = length(UV - 0.5) * 2.0;
+            float rimW = clamp(_C3Shape.w, 0.0, 0.5);
+            if (rimW > 0.0)
+            {
+                edge = saturate((r - (1.0 - rimW)) / rimW);
+                outerSoft = DecalFloorBlendOuterSoft((1.0 - r) / rimW, floorBlend.y);
+            }
+        }
+        baseRGBA.a *= DecalFloorBlendFill(edge, floorBlend.x) * outerSoft;
     }
     else
     {

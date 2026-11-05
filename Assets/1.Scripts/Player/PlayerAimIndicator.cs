@@ -33,6 +33,7 @@ public class PlayerAimIndicator : NetworkBehaviour
     private Material indicatorMaterial; // 인스턴스 — 프리팹 애셋 오염 금지
     private Color indicatorBaseColor;
     private bool? lastDashDimmed;
+    private float lastFloorBlendAlpha = -1f;
 
     /// <summary>조준 쿼드 오브젝트(렌더러가 이 아래). 다른 화면이 잠깐 감출 때 쓴다(캐릭터 선택 — 할 일 199, forceRenderingOff).</summary>
     public Transform IndicatorTransform => indicator;
@@ -132,17 +133,29 @@ public class PlayerAimIndicator : NetworkBehaviour
 
     // 재충전 중엔 어둡게, 충전되면 원래 색. 오너 예측 장부 기준이라 로컬 플레이어에만 의미가 있다.
     // 틴트를 끄면 어두운 상태가 남지 않도록 원래 색으로 되돌린다.
+    // 할 일 221 — 조준 쿼드는 URP Lit 투명이라 셰이더를 못 고친다. 바닥 블렌딩(스킬 전역 값)의 판 채움 배율을 알파에만 곱한다
+    // (그림 전체가 한 장이라 가장자리·채움 구분 없음, 소프트 없음). 전역 값이 없으면 1 = 그대로.
     private void UpdateDashTint()
     {
-        if (indicatorMaterial == null || dash == null)
+        if (indicatorMaterial == null)
             return;
 
-        bool dimmed = IsDashTintDimmed(tintOnDashCooldown, dash.IsReady);
-        if (lastDashDimmed == dimmed)
+        bool dimmed = dash != null && IsDashTintDimmed(tintOnDashCooldown, dash.IsReady);
+        float floorAlpha = DecalFloorBlend.PlateFill(Shader.GetGlobalVector(DecalFloorBlend.SkillGlobalId));
+        if (lastDashDimmed == dimmed && Mathf.Approximately(lastFloorBlendAlpha, floorAlpha))
             return;
 
         lastDashDimmed = dimmed;
-        indicatorMaterial.SetColor(BaseColorId, dimmed ? indicatorBaseColor * dashCooldownTint : indicatorBaseColor);
+        lastFloorBlendAlpha = floorAlpha;
+        indicatorMaterial.SetColor(BaseColorId, AimIndicatorColor(indicatorBaseColor, dimmed ? dashCooldownTint : Color.white, floorAlpha));
+    }
+
+    /// <summary>조준 쿼드 색 = 원래 색 × 틴트, 알파에만 바닥 블렌딩 배율(할 일 221).</summary>
+    public static Color AimIndicatorColor(Color baseColor, Color tint, float floorBlendAlpha)
+    {
+        Color c = baseColor * tint;
+        c.a *= Mathf.Clamp01(floorBlendAlpha);
+        return c;
     }
 
     private void UpdateAimDirection()

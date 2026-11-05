@@ -75,6 +75,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 half4 _EdgeLineColor;
             CBUFFER_END
             #include "Assets/1.Scripts/Rendering/Telegraph/DecalDistanceFade.hlsl"
+            #include "Assets/1.Scripts/Rendering/Telegraph/DecalFloorBlend.hlsl"
             Varyings Vert(Attributes input)
             {
                 Varyings output;
@@ -158,13 +159,15 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float innerWidth=max(0.0,_InnerPixels)*unit;
                 half outer=1.0h-smoothstep(outerWidth-aa,outerWidth+aa,sd);
                 half inner=smoothstep(innerStart-aa,innerStart+aa,sd)*(1.0h-smoothstep(innerStart+innerWidth-aa,innerStart+innerWidth+aa,sd));
-                half face=_MarkerColor.a*lerp(0.55h,1.0h,saturate(uv.y));
+                // 221: floor blend (skill global) - face = fill (x * plate z), outline/inner line kept, outer end soft.
+                float3 floorBlend=DecalFloorBlendResolve(_DecalFloorBlendSkill);
+                half face=_MarkerColor.a*lerp(0.55h,1.0h,saturate(uv.y))*(half)(floorBlend.x*floorBlend.z);
                 half4 result=half4(_MarkerColor.rgb*face,face);
                 Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
                 Over(result,_InnerColor.rgb,inner*_InnerColor.a);
                 half visibility=saturate(_Alpha/max(_ArrowReferenceAlpha,0.01h));
                 half3 baseRgb=result.rgb/max(result.a,0.0001h);
-                half baseA=result.a*shape*visibility*_Color.a;
+                half baseA=result.a*shape*visibility*_Color.a*(half)DecalFloorBlendOuterSoft(sd/max(outerWidth,0.0001),floorBlend.y);
                 // 213: white edge line along every arrow silhouette, uniform (no length curve - arrow stays whole), drawn on top.
                 if(_EdgeLineOn>0.5h)
                 {
@@ -172,7 +175,7 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                     half edgeMask=edgeWidth>0.0?(1.0h-smoothstep(edgeWidth-aa,edgeWidth+aa,sd))*shape:0.0h;
                     float2 edgeUv=float2(saturate(sd/max(edgeWidth,0.0001)),uv.y)*_EdgeTex_ST.xy+_EdgeTex_ST.zw;
                     half4 edgeTex=SAMPLE_TEXTURE2D_LOD(_EdgeTex,sampler_EdgeTex,edgeUv,0);
-                    half edgeA=edgeMask*edgeTex.a*_EdgeLineColor.a;
+                    half edgeA=edgeMask*edgeTex.a*_EdgeLineColor.a*(half)DecalFloorBlendOuterSoft(sd/max(edgeWidth,0.0001),floorBlend.y);
                     half outA=edgeA+baseA*(1.0h-edgeA);
                     half3 outRgb=(edgeTex.rgb*_EdgeLineColor.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
                     return half4(outRgb,outA);
@@ -206,7 +209,10 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 // C3 interior ramp gets denser toward the far end. 202: with the length fade on it would
                 // cancel the fade (ramp x fade ~ flat), so the fade replaces the ramp (interior = _FillOpacity x fade).
                 half lengthFadeOn=saturate(_LineFadeOn);
-                half face=_FillOpacity*lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn);
+                // 221: floor blend (skill global) - interior face and fins = fill (x * plate z), lines/end bar kept, outer end soft.
+                float3 floorBlend=DecalFloorBlendResolve(_DecalFloorBlendSkill);
+                half innerScale=(half)(floorBlend.x*floorBlend.z);
+                half face=_FillOpacity*lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn)*innerScale;
                 half4 result=half4(_Color.rgb*face,face);
                 Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
                 Over(result,_InnerColor.rgb,inner*_InnerColor.a);
@@ -234,14 +240,14 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 // Fade in only once the complete fin fits before the end contour.
                 float remaining=size.y-(center+0.047*finScale+innerStart+innerWidth);
                 half room=index>=0.0?smoothstep(0.0,max(unit*8.0,0.01),remaining):0.0h;
-                Over(result,_MarkerColor.rgb,fins*_MarkerColor.a*detailVisibility*room);
+                Over(result,_MarkerColor.rgb,fins*_MarkerColor.a*detailVisibility*room*innerScale);
                 float endDistance=(1.0-input.uv.y)*size.y;
                 half endBar=(1.0h-smoothstep(outerWidth-aa,outerWidth+aa,endDistance))*(1.0h-smoothstep(size.x*0.435,size.x*0.445,abs(samplePos.x)));
                 Over(result,_EndColor.rgb,endBar*_EndColor.a*rangeVisibility);
                 half lengthFade=(half)lerp(1.0,saturate(LineLengthFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y)),lengthFadeOn);
                 half distanceFade=(half)DecalDistanceFadeAt(input.positionWS,_DecalFade.xyz);
                 half3 baseRgb=result.rgb/max(result.a,0.0001h);
-                half baseA=result.a*inside*_Color.a*lengthFade*distanceFade;
+                half baseA=result.a*inside*_Color.a*lengthFade*distanceFade*(half)DecalFloorBlendOuterSoft(nearest/max(outerWidth,0.0001),floorBlend.y);
                 // 202: white side edge lines on top (own curve, gunner Q only via _EdgeLineOn). Inside the quad width.
                 if(_EdgeLineOn>0.5h)
                 {
@@ -250,7 +256,8 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                     half edgeMask=edgeWidth>0.0?1.0h-smoothstep(edgeWidth-aa,edgeWidth+aa,fromSide):0.0h;
                     float2 edgeUv=float2(saturate(fromSide/max(edgeWidth,0.0001)),input.uv.y)*_EdgeTex_ST.xy+_EdgeTex_ST.zw;
                     half4 edgeTex=SAMPLE_TEXTURE2D_LOD(_EdgeTex,sampler_EdgeTex,edgeUv,0);
-                    half edgeA=edgeMask*inside*edgeTex.a*_EdgeLineColor.a*(half)saturate(EdgeLineFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y))*distanceFade;
+                    half edgeA=edgeMask*inside*edgeTex.a*_EdgeLineColor.a*(half)saturate(EdgeLineFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y))*distanceFade
+                              *(half)DecalFloorBlendOuterSoft(fromSide/max(edgeWidth,0.0001),floorBlend.y);
                     half outA=edgeA+baseA*(1.0h-edgeA);
                     half3 outRgb=(edgeTex.rgb*_EdgeLineColor.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
                     return half4(outRgb,outA);

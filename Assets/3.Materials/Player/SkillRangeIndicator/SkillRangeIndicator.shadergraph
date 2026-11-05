@@ -62,11 +62,42 @@
         },
         {
             "m_Id": "c4bcab13f95ce5a3edcfc5c01eda0043"
+        },
+        {
+            "m_Id": "fc76db713fd4c1836dd29db72ee2dfdd"
         }
     ],
     "m_GroupDatas": [],
     "m_StickyNoteDatas": [],
     "m_Edges": [
+        {
+            "m_OutputSlot": {
+                "m_Node": {
+                    "m_Id": "fc76db713fd4c1836dd29db72ee2dfdd"
+                },
+                "m_SlotId": 0
+            },
+            "m_InputSlot": {
+                "m_Node": {
+                    "m_Id": "feb010da4325641cc795ee244bcc325c"
+                },
+                "m_SlotId": 2
+            }
+        },
+        {
+            "m_OutputSlot": {
+                "m_Node": {
+                    "m_Id": "6d96ed5dc61a4de3a900a1c386c73f90"
+                },
+                "m_SlotId": 7
+            },
+            "m_InputSlot": {
+                "m_Node": {
+                    "m_Id": "feb010da4325641cc795ee244bcc325c"
+                },
+                "m_SlotId": 3
+            }
+        },
         {
             "m_OutputSlot": {
                 "m_Node": {
@@ -1360,7 +1391,7 @@
     "m_Group": {
         "m_Id": ""
     },
-    "m_Name": "DecalDistanceFade (Custom Function)",
+    "m_Name": "SkillRangeDecalFade (Custom Function)",
     "m_DrawState": {
         "m_Expanded": true,
         "m_Position": {
@@ -1368,12 +1399,18 @@
             "x": -520,
             "y": 260,
             "width": 220,
-            "height": 94
+            "height": 142
         }
     },
     "m_Slots": [
         {
             "m_Id": "2fc74dcf2ebea57a17b9f3e989958aec"
+        },
+        {
+            "m_Id": "d33556371553e6e95329c26c302e7189"
+        },
+        {
+            "m_Id": "94cb51452fc63821b5ee64d7610b6b45"
         },
         {
             "m_Id": "e288462a795fefdde8a58ef62286b124"
@@ -1391,8 +1428,8 @@
         "m_SerializableColors": []
     },
     "m_SourceType": 0,
-    "m_FunctionName": "DecalDistanceFade",
-    "m_FunctionSource": "b37514d5ef409022ef8f9bf8c6ccefac",
+    "m_FunctionName": "SkillRangeDecalFade",
+    "m_FunctionSource": "6728156b27c81b21676480e08a0831ff",
     "m_FunctionBody": ""
 }
 
@@ -1619,5 +1656,104 @@
         "e32": 0,
         "e33": 1
     }
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.UVNode",
+    "m_ObjectId": "fc76db713fd4c1836dd29db72ee2dfdd",
+    "m_Group": {
+        "m_Id": ""
+    },
+    "m_Name": "UV",
+    "m_DrawState": {
+        "m_Expanded": true,
+        "m_Position": {
+            "serializedVersion": "2",
+            "x": -720,
+            "y": 300,
+            "width": 145,
+            "height": 130
+        }
+    },
+    "m_Slots": [
+        {
+            "m_Id": "43f7e6fac87e2538975629cae82f2eab"
+        }
+    ],
+    "synonyms": [
+        "texcoords",
+        "coords",
+        "coordinates"
+    ],
+    "m_Precision": 0,
+    "m_PreviewExpanded": false,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 0,
+    "m_CustomColors": {
+        "m_SerializableColors": []
+    },
+    "m_OutputChannel": 0
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector4MaterialSlot",
+    "m_ObjectId": "43f7e6fac87e2538975629cae82f2eab",
+    "m_Id": 0,
+    "m_DisplayName": "Out",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "Out",
+    "m_StageCapability": 3,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector2MaterialSlot",
+    "m_ObjectId": "d33556371553e6e95329c26c302e7189",
+    "m_Id": 2,
+    "m_DisplayName": "UV",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "UV",
+    "m_StageCapability": 2,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0
+    },
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
+    "m_ObjectId": "94cb51452fc63821b5ee64d7610b6b45",
+    "m_Id": 3,
+    "m_DisplayName": "TexAlpha",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "TexAlpha",
+    "m_StageCapability": 2,
+    "m_Value": 0.0,
+    "m_DefaultValue": 0.0,
+    "m_Labels": []
 }
 
