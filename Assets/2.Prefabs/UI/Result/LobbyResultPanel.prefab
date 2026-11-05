@@ -1916,14 +1916,9 @@ MonoBehaviour:
     m_RotationOrder: 4
   linearMaxSteps: 10
   curveFullSteps: 1000
-  punchRiseTime: 0.06
-  punchFallTime: 0.06
-  punchSettleTime: 0.08
-  punchScale: 1.12
-  punchUndershoot: 0.97
-  punchRiseEase: 8
-  punchFallEase: 3
-  punchSettleEase: 5
+  punchDuration: 0.28
+  punchScale: 1.06
+  punchEase: 5
   crownDelay: 0.05
   crownDuration: 0.6
   crownJumpHeight: 28

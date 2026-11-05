@@ -11,7 +11,7 @@ using UnityEngine.UI;
 ///     (<see cref="LobbyResultPanel.SetPlayTimeCountUp"/>)이 같은 진행도로 0 에서 최종값까지 올라간다.
 ///     기본 곡선은 강한 감속 — 82% 까지 빠르게, 남은 자리는 시간의 70% 동안 천천히(할 일 220).
 ///     값이 작을수록 선형 쪽으로 섞어(<c>linearMaxSteps</c>~<c>curveFullSteps</c>) 정수가 고르게 오르고, 모든 값이 같은 순간 최종값.
-/// (c2) 카운트업이 끝나는 순간(최종값 도달) 창 본체가 짧고 세게 '탁' 커졌다(1.12) 살짝 작아졌다(0.97) 1 로 — 0.2초 펀치(EuniTween, 할 일 220).
+/// (c2) 카운트업이 끝나는 순간(최종값 도달) 창 본체가 살짝 커졌다 돌아오는 펀치(EuniTween <c>Easing.Punch</c>, 할 일 220)
 /// (d) 1위 왕관: 카운트업 끝 펀치가 끝난 직후부터 <c>crownRepeatInterval</c>(3초)마다 점프하며 한 바퀴(기본 Y축) 돌고,
 ///     착지마다 반짝임이 크게 터진 뒤 다음 점프 전까지 은은하게 반복한다(EuniTween 이징). 행 밖으로 튀어나가도 자르지 않는다.
 ///
@@ -59,22 +59,12 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     [SerializeField] private float curveFullSteps = 1000f;
 
     [Header("카운트업 끝 패널 펀치 (EuniTween)")]
-    [Tooltip("① 급확대 시간(초, unscaled) — 카운트업 끝 순간 1 → punchScale. 0 이하면 바로 최대.")]
-    [SerializeField] private float punchRiseTime = 0.06f;
-    [Tooltip("② 되돌아오며 언더슈트까지(초, unscaled) — punchScale → punchUndershoot. 0 이하면 바로.")]
-    [SerializeField] private float punchFallTime = 0.06f;
-    [Tooltip("③ 언더슈트에서 1 로 자리 잡기(초, unscaled). 0 이하면 바로 1. 세 구간 합 = 펀치 길이(기본 0.2초), 왕관 첫 점프는 그 뒤.")]
-    [SerializeField] private float punchSettleTime = 0.08f;
-    [Tooltip("펀치 최대 크기 배율(열기 크기 위에 곱한다). 최대·언더슈트 둘 다 1 이면 펀치 없음.")]
-    [SerializeField] private float punchScale = 1.12f;
-    [Tooltip("되돌아올 때 살짝 작아지는 배율(1 = 언더슈트 없음).")]
-    [SerializeField] private float punchUndershoot = 0.97f;
-    [Tooltip("① 급확대 이징(EuniTween). OutCubic = 순간 확 커지고 꼭대기에서 멈칫.")]
-    [SerializeField] private Ease punchRiseEase = Ease.OutCubic;
-    [Tooltip("② 되돌아오기 이징(EuniTween). InOutSine = 꼭대기를 떠나 언더슈트에 부드럽게 닿음(구간 사이 꺾임 없음).")]
-    [SerializeField] private Ease punchFallEase = Ease.InOutSine;
-    [Tooltip("③ 자리 잡기 이징(EuniTween). OutQuad = 1 에 사뿐히.")]
-    [SerializeField] private Ease punchSettleEase = Ease.OutQuad;
+    [Tooltip("카운트업이 끝나는 순간(최종값 도달) 창 본체(scaleTarget)가 커졌다 돌아오는 시간(초, unscaled). 0 이하면 펀치 없음. 왕관 첫 점프는 펀치가 끝난 뒤.")]
+    [SerializeField] private float punchDuration = 0.28f;
+    [Tooltip("펀치 최대 크기 배율(1 = 펀치 없음). 열기 크기 위에 곱한다.")]
+    [SerializeField] private float punchScale = 1.06f;
+    [Tooltip("펀치 이징 — 커지는 절반에 적용, 줄어드는 절반은 거울(EuniTween Easing.Punch). OutQuad = 빠르게 커졌다 꼭대기에서 멈칫.")]
+    [SerializeField] private Ease punchEase = Ease.OutQuad;
 
     [Header("1위 왕관 점프·회전 (EuniTween)")]
     [Tooltip("카운트업 끝 패널 펀치가 끝나고(펀치 없으면 카운트업 끝) 왕관이 뛰기 시작할 때까지(초, unscaled).")]
@@ -315,7 +305,7 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
             return;
         }
 
-        float firstStart = LobbyResultPanelAnimMath.CrownFirstStart(countUpDelay, countUpDuration, PunchEnabled ? PunchLength : 0f, crownDelay);
+        float firstStart = LobbyResultPanelAnimMath.CrownFirstStart(countUpDelay, countUpDuration, PunchEnabled ? punchDuration : 0f, crownDelay);
         float progress = LobbyResultPanelAnimMath.CrownCycleProgress(_crownElapsed, firstStart, crownDuration, crownRepeatInterval);
         float jump = LobbyResultPanelAnimMath.CrownJumpOffset(progress, crownJumpHeight, crownJumpEase);
         float angle = LobbyResultPanelAnimMath.CrownSpinAngle(progress, crownSpinDegrees, crownSpinEase);
@@ -424,15 +414,13 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
 
     // ── 카운트업 끝 패널 펀치(할 일 220) ─────────────────────────
 
-    private float PunchLength => LobbyResultPanelAnimMath.PanelPunchLength(punchRiseTime, punchFallTime, punchSettleTime);
-    private bool PunchEnabled => PunchLength > 0f && !(Mathf.Approximately(punchScale, 1f) && Mathf.Approximately(punchUndershoot, 1f));
+    private bool PunchEnabled => punchDuration > 0f && !Mathf.Approximately(punchScale, 1f);
 
     private void ApplyPunch()
     {
         float since = _countUpElapsed - LobbyResultPanelAnimMath.CountUpEnd(countUpDelay, countUpDuration);
-        _punchMultiplier = LobbyResultPanelAnimMath.PanelPunchScale(since, punchRiseTime, punchFallTime, punchSettleTime,
-            punchScale, punchUndershoot, punchRiseEase, punchFallEase, punchSettleEase);
-        if (since >= PunchLength)
+        _punchMultiplier = LobbyResultPanelAnimMath.PanelPunchScale(since, punchDuration, punchScale, punchEase);
+        if (since >= punchDuration)
         {
             _punching = false;
             _punchMultiplier = 1f;

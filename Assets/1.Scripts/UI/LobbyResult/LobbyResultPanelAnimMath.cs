@@ -97,31 +97,15 @@ public static class LobbyResultPanelAnimMath
     public static float CountUpEnd(float countUpDelay, float countUpDuration) =>
         Mathf.Max(0f, countUpDelay) + Mathf.Max(0f, countUpDuration);
 
-    /// <summary>카운트업 끝 패널 펀치 길이(초) = ① 급확대 + ② 언더슈트까지 + ③ 자리 잡기. 음수 칸은 0 취급.</summary>
-    public static float PanelPunchLength(float riseTime, float fallTime, float settleTime) =>
-        Mathf.Max(0f, riseTime) + Mathf.Max(0f, fallTime) + Mathf.Max(0f, settleTime);
-
     /// <summary>
-    /// 카운트업 끝 패널 펀치 크기 배율(할 일 220) — 짧고 세게 '탁':
-    /// ① <paramref name="riseTime"/> 동안 1 → <paramref name="peakScale"/>(<paramref name="riseEase"/>),
-    /// ② <paramref name="fallTime"/> 동안 → <paramref name="undershootScale"/>(<paramref name="fallEase"/>),
-    /// ③ <paramref name="settleTime"/> 동안 → 1(<paramref name="settleEase"/>). 이징 = EuniTween <see cref="Easing.Evaluate"/>.
-    /// 구간 경계에서 값이 이어진다. 펀치 전(경과 0 이하)·후(길이 이상)·길이 0 은 정확히 1. 시간 0 인 구간은 건너뛴다.
+    /// 카운트업 끝 패널 펀치 크기 배율(할 일 220) — 1 → <paramref name="peakScale"/> → 1. EuniTween <see cref="Easing.Punch"/>:
+    /// 커지는 절반에 <paramref name="ease"/>, 줄어드는 절반은 그 거울. 펀치 전·후(경과 0 이하·지속 이상)와 지속 0 이하는 정확히 1.
     /// </summary>
-    public static float PanelPunchScale(float sinceCountUpEnd, float riseTime, float fallTime, float settleTime,
-        float peakScale, float undershootScale, Ease riseEase, Ease fallEase, Ease settleEase)
+    public static float PanelPunchScale(float sinceCountUpEnd, float duration, float peakScale, Ease ease)
     {
-        float rise = Mathf.Max(0f, riseTime), fall = Mathf.Max(0f, fallTime), settle = Mathf.Max(0f, settleTime);
-        float t = sinceCountUpEnd;
-        if (t <= 0f || t >= rise + fall + settle)
+        if (duration <= 0f || sinceCountUpEnd <= 0f || sinceCountUpEnd >= duration)
             return 1f;
-        if (t < rise)
-            return Mathf.LerpUnclamped(1f, peakScale, Easing.Evaluate(riseEase, t / rise));
-        t -= rise;
-        if (t < fall)
-            return Mathf.LerpUnclamped(peakScale, undershootScale, Easing.Evaluate(fallEase, t / fall));
-        t -= fall;
-        return Mathf.LerpUnclamped(undershootScale, 1f, Easing.Evaluate(settleEase, t / settle));
+        return 1f + (peakScale - 1f) * Easing.Punch(ease, sinceCountUpEnd / duration);
     }
 
     /// <summary>
