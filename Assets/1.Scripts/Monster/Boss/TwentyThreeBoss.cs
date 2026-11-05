@@ -47,6 +47,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         NetworkVariableWritePermission.Server);
     float _bossCounterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
 
+    // 지금 열린 간파 창이 '제압 간파 연출' 창인가(할 일 232 — 북진 압박 3번째 간파). 연출 예측 전용: 오너가 판정 순간 3단계를 고르는 데만 읽는다
+    // (WouldSuppressOnInterrupt). 서버 표식(ServerMarkSuppressInterrupt)이 정답이고 이건 클라 오너 예측용 복제값 — 창이 닫히면(SetCounterWindow(false)) 같이 끈다.
+    readonly NetworkVariable<bool> _counterWindowSuppressFx = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     // [G6] 인터럽트 성공 리액션이 **오른쪽인가**. 잡기는 항상 오른쪽, 돌진은 L·R 난수다(팀장 확정 R1).
     // 🔴 RPC 가 아니라 **상태 복제**로 보낸다 — 난수를 피어마다 뽑으면 화면이 갈리고,
     //    RPC 는 늦게 들어온 클라에게 재전달되지 않는다.
@@ -7099,6 +7106,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// 같은 계산을 복제된 남은 칸으로 한다. 기믹 중(칸 유지)·구출 성공은 서버만 정확히 안다 — 틀리면 서버 성공 표식이 바로잡는다(보험).
     /// </summary>
     public bool WouldSuppressOnInterrupt =>
+        _counterWindowSuppressFx.Value ||   // 기믹이 '이 창은 제압 연출'로 연 창(북진 압박 3번째 간파 — 할 일 232)
         !IsInGimmick && SuppressSegmentsRemaining > 0 &&
         BossCounterProgress.ResolveSegments(SuppressSegmentsRemaining, SuppressSegmentTotal,
             _boss != null ? _boss.counterSegmentStep : 1, 0f, 0f).IsSuppress;
@@ -7136,6 +7144,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         //    어긋남이 더 컸다(Codex 10-20). 그래서 표시는 판정 창의 개폐만 따라간다. 공용 상수(MonsterBase)는 그대로 — 중간보스 무변경.
         _bossCounterVisualOffAt = -1f;
         if (_counterVisual.Value != open) _counterVisual.Value = open;
+        if (!open && _counterWindowSuppressFx.Value) _counterWindowSuppressFx.Value = false;   // 제압 연출 창 표시(232)도 창과 같이 닫는다
 
         if (_counterWindow.Value == open)
         {

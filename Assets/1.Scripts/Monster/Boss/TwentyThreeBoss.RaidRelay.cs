@@ -732,6 +732,7 @@ public partial class TwentyThreeBoss
     // 🔴 BeginCharge 를 다시 부르지 않는다 — 부르면 중앙으로 돌아간다(Codex 10-20). 탑은 _charge.Begin 을 회차마다 다시 부른다(연속 Begin 허용).
     int _pnRound;
     bool _pnCounterTaken;
+    int _pnCounterCount;    // 이번 기믹의 성공 간파 수(232 — N번째 = 제압 간파 연출)
     Vector3 _pnGoalPoint;   // 위 꼭짓점 칸 중심
     float _pnStepLen;       // 간파 1회 밀림(m) — 화면 위로 대각 한 칸
 
@@ -768,6 +769,7 @@ public partial class TwentyThreeBoss
         _pnStepLen = Mathf.Max(0.5f, step * Mathf.Max(0.25f, _boss.pushNorthStepTiles));
 
         _pnRound = 0;
+        _pnCounterCount = 0;
         FaceDirection(_relaySouth);
         ShowRaidSubtitleServer("BOSS_RAID_PushNorthGuide");
         FightLog("북진 압박 시작");
@@ -831,6 +833,8 @@ public partial class TwentyThreeBoss
                 {
                     CleanupPushNorthRound();
                     SetCounterWindow(true, _boss.pushNorthStunTime);   // 보라색 = 판정 창(같이 꺼진다)
+                    // 이 창의 간파가 N번째(기본 3번째)면 오너가 판정 순간 제압 간파 연출을 고르게 복제한다(232 — 창이 닫히면 SetCounterWindow 가 끈다).
+                    _counterWindowSuppressFx.Value = PushNorthCounterIsSuppressFx(_pnCounterCount + 1);
                     // 무력화 = 그로기 클립(Boss_23_.groggy) 끝의 **쓰러진 자세로 멈춰** 간파를 기다린다(경석 10-23).
                     PlayPushNorthDownPoseClientRpc();
                     FightLog($"북진 {_pnRound}회차 — 탑 파괴 → 무력화");
@@ -929,9 +933,19 @@ public partial class TwentyThreeBoss
         if (IsSpawned) ReleasePushNorthDownPoseClientRpc();
     }
 
+    /// <summary>
+    /// [서버] 이번 기믹의 <paramref name="counterNumber"/>번째 성공 간파가 '제압 간파 연출'인가(할 일 232 — 데이터 칸
+    /// <see cref="BossDataSO.pushNorthSuppressFxCounterNumber"/>, 기본 3번째만). 연출만 — 밀림·파훼 제압(EndPushNorthPush)은 그대로.
+    /// </summary>
+    bool PushNorthCounterIsSuppressFx(int counterNumber) =>
+        _boss != null && BossRaidRules.IsPushNorthSuppressFxCounter(counterNumber, _boss.pushNorthSuppressFxCounterNumber);
+
     void OnPushNorthCounter()
     {
         _pnCounterTaken = true;
+        _pnCounterCount++;
+        // N번째 간파 = 제압 간파 연출 — 23호 칸 0 분기와 같은 표식(슬로우 Start 이벤트 bit0, 새 RPC 없음). 같은 프레임의 성공 사건이 소비한다.
+        if (PushNorthCounterIsSuppressFx(_pnCounterCount)) InterruptProductionDirector.ServerMarkSuppressInterrupt();
         Vector3 north = -_relaySouth;
         Vector3 from = transform.position;
         float remain = Mathf.Max(0f, Vector3.Dot(_pnGoalPoint - from, north));

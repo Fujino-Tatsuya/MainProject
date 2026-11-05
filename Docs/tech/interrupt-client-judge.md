@@ -227,7 +227,7 @@ InterruptManager (서버)  InterruptClaimServer.Process
 | 17 | 릴레이 `Prepare` 끝 | 닫힘 | 제때 |
 | 18 | 연쇄 간파 `ChainMark` 끝 → `ChainWindow` | 열림 | `chainCounterWindow` · **지목자 = 지목 대상 clientId** |
 | 19 | 연쇄 간파 창 도중 지목 대상 쓰러짐 / 창 끝 | 닫힘 | 조기 / 제때 |
-| 20 | 밀어내기 `PnCharge` 송전탑 전부 파괴 → 무력화 | 열림 | `pushNorthStunTime` |
+| 20 | 밀어내기 `PnCharge` 송전탑 전부 파괴 → 무력화 | 열림 | `pushNorthStunTime` · 3번째 간파 창(`pushNorthSuppressFxCounterNumber`)이면 복제값 `_counterWindowSuppressFx` 켬(232 — 오너 제압 연출 예측, 창 닫힘과 같이 꺼짐) |
 | 21 | 밀어내기 `PnStun` 끝 | 닫힘 | 제때 |
 
 - 공격 시작 시각: 공격 상태(레이드 기믹 밖)면 `StartAttack` 시각, 기믹 창은 열림 시각과 같다.
