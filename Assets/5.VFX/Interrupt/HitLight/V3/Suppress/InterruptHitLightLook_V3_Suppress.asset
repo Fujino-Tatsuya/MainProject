@@ -85,7 +85,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  gradeProfile: {fileID: 11400000, guid: a67471230d944f845b61947309924799, type: 2}
+  gradeProfile: {fileID: 11400000, guid: 57514ed0267d78ec5e38b2715b67512b, type: 2}
   gradeDuration: 0.9
   gradeCurve:
     serializedVersion: 2

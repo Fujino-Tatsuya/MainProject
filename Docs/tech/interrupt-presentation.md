@@ -910,7 +910,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 > 계획: `_lane-artifacts/Work1/219/PLAN.md`(grill 확정 11-05). 코드: `InterruptPresentationTierRules.SelectReferenceAssetTier`·`WhiteoutFrames(look, tier, …)`·`OwnerJudgeTier`·`ServerCorrectsOwner` · 디렉터 `HitLightLookFor(look, tier)`·`ReferenceAssetTier` · 진행기 요청 `Tier`·`SuppressWhiteout`(에셋 창구 `IInterruptHitLightAssets`) · 저작 메뉴 `Tools/Interrupt/간파 단계별 V3 강화 에셋 만들기 (219)`(없을 때만 생성·빈 칸만 연결) · 테스트 `InterruptTierScalingTests`.
 
-- **1단계(일반) = 지금 V3 그대로**(`InterruptHitLightLook_V3`·`FX_InterruptHitLight_V3` — 값 변화 0). 대쉬·제압은 V3 를 **복제**한 SO·블룸 프로필·프리팹(`V3/Dash/`·`V3/Suppress/`)을 단계 칸으로 고른다. 재질·메시·셰이더·색 보정 프로필(`VP_InterruptHitLight_V3_Grade`)은 공유.
+- **1단계(일반) = 지금 V3 그대로**(`InterruptHitLightLook_V3`·`FX_InterruptHitLight_V3` — 값 변화 0). 대쉬·제압은 V3 를 **복제**한 SO·블룸 프로필·프리팹(`V3/Dash/`·`V3/Suppress/`)을 단계 칸으로 고른다. 재질·메시·셰이더는 공유. **색 보정 프로필도 단계별**(11-05 후속): `V3/Dash/VP_InterruptHitLight_V3_Dash_Grade`·`V3/Suppress/VP_InterruptHitLight_V3_Suppress_Grade` = 일반 `VP_InterruptHitLight_V3_Grade` 복사(시작값 같음 — 동작 변화 0, 219 배율은 블룸 프로필에만 있어 옮길 값 없음). 단계 SO `gradeProfile` 이 각자 가리키고, **칸이 비면 일반 V3 프로필**로 대체(`InterruptHitLightRules.SelectGrade` · 디렉터 `HitLightGradeFor` · 에셋 창구 `IInterruptHitLightAssets.GradeFor`). 저작 메뉴는 프로필이 없을 때만 복사하고, 단계 SO 칸이 일반 프로필을 가리킬 때만 단계 프로필로 바꾼다.
 - **빈 칸 = 1단계**: 단계 SO·프리팹 둘 다 있을 때만 그 단계 것, 하나라도 비면 1단계 묶음(섞어 쓰지 않음). V3 일 때만 — V0~V2 는 단계 무관.
 - 모든 피어가 같은 단계 에셋을 튼다(성공 사건의 단계 = 표식 비트). 오너는 판정 순간 단계(§8.2 제압 예측), 서버 단계가 다르면 보정.
 
@@ -919,6 +919,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | 불꽃 개수 | 프리팹 `Sparks` 버스트(최대 입자) | 55~70 (96) | ×1.6 = 88~112 (128) | ×2.5 = 138~175 (200) |
 | 포인트 라이트 세기 | SO `lightIntensity` | 10 | ×1.5 = 15 | ×2.5 = 25 |
 | 블룸 세기 | 단계별 프로필 `VP_InterruptHitLight_V3_{Dash,Suppress}_Bloom` intensity | 5 | ×1.4 = 7 | ×2.5 = 12.5 |
+| 색 보정 | 단계별 프로필 `VP_InterruptHitLight_V3_{Dash,Suppress}_Grade`(11-05) | 일반 프로필 값(노출·대비·채도·색 필터) | 일반과 같음(복사) | 일반과 같음(복사) |
 | 암순응 나 깊이 | SO `sunDimDepth`·`ambientDimDepth` | 0.95·0.9 | 1·1(최대) | 1·1 |
 | 암순응 지속 | SO `sceneDimDuration`·`darkAdaptDuration` | 0.9 | ×1.3 = 1.17 | ×2.5 = 2.25 |
 | 가로 빛줄 크기 | 프리팹 `Streak` Start Size | 2.6 | ×1.5 = 3.9 | ×2.5 = 6.5 |

@@ -198,6 +198,9 @@ public sealed class InterruptTierScalingTests
 
         public InterruptHitLightFx FxFor(in InterruptHitLightRequest request) =>
             Fxs.TryGetValue(request.Tier, out InterruptHitLightFx fx) ? fx : null;
+
+        public UnityEngine.Rendering.VolumeProfile GradeFor(in InterruptHitLightRequest request) =>
+            InterruptHitLightRules.SelectGrade(LookFor(request), Looks.TryGetValue(InterruptPresentationTier.Normal, out InterruptHitLightLook normal) ? normal : null);
     }
 
     private sealed class FakeOverlay : IInterruptHitFlashOverlayOutput
@@ -285,8 +288,52 @@ public sealed class InterruptTierScalingTests
         Assert.AreEqual(InterruptHitLightTierAuthoring.SuppressBloomPath, AssetDatabase.GetAssetPath(suppress.BloomProfile));
         Assert.AreEqual(0, dash.WhiteoutFrames, "2단계 화이트아웃 없음");
         Assert.Greater(suppress.WhiteoutFrames, 0, "3단계 화이트아웃 켬(시작값 3)");
-        Assert.AreSame(normal.GradeProfile, suppress.GradeProfile, "색 보정 프로필은 공유");
+        // 색 보정도 단계별(219 후속 11-05) — 서로 다른 에셋, 시작값은 일반과 같다.
+        Assert.AreEqual(InterruptHitLightReferenceAuthoring.GradeProfilePath, AssetDatabase.GetAssetPath(normal.GradeProfile));
+        Assert.AreEqual(InterruptHitLightTierAuthoring.DashGradePath, AssetDatabase.GetAssetPath(dash.GradeProfile));
+        Assert.AreEqual(InterruptHitLightTierAuthoring.SuppressGradePath, AssetDatabase.GetAssetPath(suppress.GradeProfile));
+        Assert.AreNotSame(normal.GradeProfile, dash.GradeProfile);
+        Assert.AreNotSame(normal.GradeProfile, suppress.GradeProfile);
+        Assert.AreNotSame(dash.GradeProfile, suppress.GradeProfile);
+        Assert.IsTrue(dash.GradeProfile.TryGet(out UnityEngine.Rendering.Universal.ColorAdjustments _));
+        Assert.IsTrue(suppress.GradeProfile.TryGet(out UnityEngine.Rendering.Universal.ColorAdjustments _));
         Assert.LessOrEqual(suppress.GapRayCount, 16);
+    }
+
+    private InterruptHitLightLook WithGrade(InterruptHitLightLook look, out UnityEngine.Rendering.VolumeProfile profile)
+    {
+        profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>();
+        _objects.Add(profile);
+        var so = new SerializedObject(look);
+        so.FindProperty("gradeProfile").objectReferenceValue = profile;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return look;
+    }
+
+    [Test]
+    public void 단계_색_보정은_단계_것_비면_일반_것_단계_SO_없으면_없음()
+    {
+        InterruptHitLightLook normal = WithGrade(CreateLook(0), out UnityEngine.Rendering.VolumeProfile normalGrade);
+        InterruptHitLightLook dash = WithGrade(CreateLook(0), out UnityEngine.Rendering.VolumeProfile dashGrade);
+        InterruptHitLightLook empty = CreateLook(3);
+
+        Assert.AreSame(dashGrade, InterruptHitLightRules.SelectGrade(dash, normal), "단계 프로필");
+        Assert.AreSame(normalGrade, InterruptHitLightRules.SelectGrade(empty, normal), "단계 칸 비면 일반");
+        Assert.AreSame(normalGrade, InterruptHitLightRules.SelectGrade(normal, normal), "일반 = 일반");
+        Assert.IsNull(InterruptHitLightRules.SelectGrade(null, normal), "단계 SO 없음 = 없음");
+        Assert.IsNull(InterruptHitLightRules.SelectGrade(empty, null));
+    }
+
+    [Test]
+    public void 색_보정_칸이_빈_단계는_일반_프로필로_길이와_가중치를_센다()
+    {
+        InterruptHitLightLook normal = WithGrade(CreateLook(0), out UnityEngine.Rendering.VolumeProfile normalGrade);
+        InterruptHitLightLook empty = CreateLook(0);
+        UnityEngine.Rendering.VolumeProfile grade = InterruptHitLightRules.SelectGrade(empty, normal);
+        Assert.AreSame(normalGrade, grade);
+        Assert.AreEqual(InterruptHitLightRules.GradeWeight(normal, 0f), InterruptHitLightRules.GradeWeight(empty, grade, 0f), 1e-6f);
+        Assert.AreEqual(0f, InterruptHitLightRules.GradeWeight(empty, 0f), "옛 1인자 = SO 칸만 본다");
+        Assert.AreEqual(InterruptHitLightRules.Duration(normal), InterruptHitLightRules.Duration(empty, grade), 1e-6f);
     }
 
     // 11-05 사용자 결정 — V3(일반·대쉬·제압)에서 파편(Debris) 파티클 삭제. V1·V2(FX_InterruptHitLight)는 그대로.

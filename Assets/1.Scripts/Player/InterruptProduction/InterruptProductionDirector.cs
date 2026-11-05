@@ -298,6 +298,19 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     InterruptHitLightFx IInterruptHitLightAssets.FxFor(in InterruptHitLightRequest request) => EnsureHitLightFx(request.Look, request.Tier);
 
+    /// <summary>
+    /// 이 섬광 종류·단계의 색 보정 프로필(219 후속 11-05) — V3 는 단계 SO 의 것(대쉬·제압 칸이 비면 일반 V3 의 것), V1·V2 는 그 SO 의 것(없음).
+    /// </summary>
+    public UnityEngine.Rendering.VolumeProfile HitLightGradeFor(InterruptSuccessLook look, InterruptPresentationTier tier)
+    {
+        InterruptHitLightLook tierLook = HitLightLookFor(look, tier);
+        if (!InterruptPresentationTierRules.UsesReferenceLook(look))
+            return tierLook != null ? tierLook.GradeProfile : null;
+        return InterruptHitLightRules.SelectGrade(tierLook, hitLightLookReference);
+    }
+
+    UnityEngine.Rendering.VolumeProfile IInterruptHitLightAssets.GradeFor(in InterruptHitLightRequest request) => HitLightGradeFor(request.Look, request.Tier);
+
     /// <summary>단계 설정(할 일 192). 실패는 설정이 없다(null).</summary>
     public InterruptTierProfile TierProfile(InterruptPresentationTier tier)
     {

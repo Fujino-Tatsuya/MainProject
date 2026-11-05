@@ -21,9 +21,11 @@ internal static class InterruptHitLightTierAuthoring
     public const string DashLookPath = DashFolder + "/InterruptHitLightLook_V3_Dash.asset";
     public const string DashPrefabPath = DashFolder + "/FX_InterruptHitLight_V3_Dash.prefab";
     public const string DashBloomPath = DashFolder + "/VP_InterruptHitLight_V3_Dash_Bloom.asset";
+    public const string DashGradePath = DashFolder + "/VP_InterruptHitLight_V3_Dash_Grade.asset";
     public const string SuppressLookPath = SuppressFolder + "/InterruptHitLightLook_V3_Suppress.asset";
     public const string SuppressPrefabPath = SuppressFolder + "/FX_InterruptHitLight_V3_Suppress.prefab";
     public const string SuppressBloomPath = SuppressFolder + "/VP_InterruptHitLight_V3_Suppress_Bloom.asset";
+    public const string SuppressGradePath = SuppressFolder + "/VP_InterruptHitLight_V3_Suppress_Grade.asset";
 
     /// <summary>단계 배율 묶음(1단계 대비) — PLAN 219 §3 표.</summary>
     public readonly struct Scaling
@@ -59,14 +61,14 @@ internal static class InterruptHitLightTierAuthoring
             return;
         }
 
-        Build(DashFolder, DashBloomPath, DashLookPath, DashPrefabPath, Dash);
-        Build(SuppressFolder, SuppressBloomPath, SuppressLookPath, SuppressPrefabPath, Suppress);
+        Build(DashFolder, DashBloomPath, DashGradePath, DashLookPath, DashPrefabPath, Dash);
+        Build(SuppressFolder, SuppressBloomPath, SuppressGradePath, SuppressLookPath, SuppressPrefabPath, Suppress);
         WireDirector();
         AssetDatabase.SaveAssets();
         Debug.Log("[InterruptHitLight] 219 단계별 V3 에셋 확인 완료 — 없던 것만 만들고 빈 디렉터 칸만 이었다");
     }
 
-    static void Build(string folder, string bloomPath, string lookPath, string prefabPath, Scaling scaling)
+    static void Build(string folder, string bloomPath, string gradePath, string lookPath, string prefabPath, Scaling scaling)
     {
         Directory.CreateDirectory(folder);
         AssetDatabase.Refresh();
@@ -81,6 +83,11 @@ internal static class InterruptHitLightTierAuthoring
                 EditorUtility.SetDirty(bloom);
             }
         }
+
+        // 색 보정(219 후속 11-05) — 일반 V3 프로필을 그대로 복사(시작값 = 일반, 동작 변화 없음). 있으면 손대지 않는다.
+        if (AssetDatabase.LoadAssetAtPath<VolumeProfile>(gradePath) == null)
+            AssetDatabase.CopyAsset(InterruptHitLightReferenceAuthoring.GradeProfilePath, gradePath);
+        var grade = AssetDatabase.LoadAssetAtPath<VolumeProfile>(gradePath);
 
         if (AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>(lookPath) == null &&
             AssetDatabase.CopyAsset(InterruptHitLightReferenceAuthoring.LookPath, lookPath))
@@ -97,7 +104,20 @@ internal static class InterruptHitLightTierAuthoring
             Scale(so, "rayScreenBrightness", scaling.Rays);
             so.FindProperty("whiteoutFrames").intValue = scaling.WhiteoutFrames;
             so.FindProperty("bloomProfile").objectReferenceValue = AssetDatabase.LoadAssetAtPath<VolumeProfile>(bloomPath);
+            so.FindProperty("gradeProfile").objectReferenceValue = grade;
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
+        else
+        {
+            // 219 때 만든 단계 SO 는 일반 색 보정을 같이 가리킨다 — 그 경우만 단계 프로필로 바꾼다(다른 프로필로 손 튜닝한 칸은 그대로).
+            var existing = AssetDatabase.LoadAssetAtPath<InterruptHitLightLook>(lookPath);
+            var shared = AssetDatabase.LoadAssetAtPath<VolumeProfile>(InterruptHitLightReferenceAuthoring.GradeProfilePath);
+            if (existing != null && grade != null && existing.GradeProfile == shared)
+            {
+                var so = new SerializedObject(existing);
+                so.FindProperty("gradeProfile").objectReferenceValue = grade;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
         }
 
         if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null &&

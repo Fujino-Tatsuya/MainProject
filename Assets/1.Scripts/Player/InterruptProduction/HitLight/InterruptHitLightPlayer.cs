@@ -28,6 +28,9 @@ public interface IInterruptHitLightAssets
 {
     InterruptHitLightLook LookFor(in InterruptHitLightRequest request);
     InterruptHitLightFx FxFor(in InterruptHitLightRequest request);
+
+    /// <summary>색 보정 Volume 프로필(219 후속 11-05 — 단계별). V3 대쉬·제압 SO 칸이 비면 일반 V3 프로필, V1·V2 는 없음(null).</summary>
+    VolumeProfile GradeFor(in InterruptHitLightRequest request);
 }
 
 /// <summary>
@@ -218,11 +221,12 @@ public sealed class InterruptHitLightPlayer : IDisposable
         float elapsed = now - _startTime;
         float bloom = look != null ? InterruptEffectLight.Pulse(look.BloomCurve, 1f, elapsed, look.BloomDuration) : 0f;
         _bloomVolume = ApplyVolume(_bloomVolume, "Bloom", look != null ? look.BloomProfile : null, bloom);
-        _gradeVolume = ApplyVolume(_gradeVolume, "Grade", look != null ? look.GradeProfile : null, InterruptHitLightRules.GradeWeight(look, elapsed));
+        VolumeProfile grade = look != null ? _assets.GradeFor(_request) : null;
+        _gradeVolume = ApplyVolume(_gradeVolume, "Grade", grade, InterruptHitLightRules.GradeWeight(look, grade, elapsed));
         ApplyDarkAdapt(look, elapsed);
         ApplyWhiteout(frame);
 
-        if (InterruptHitLightRules.Finished(look, elapsed) && _whiteoutFrames == 0)
+        if (InterruptHitLightRules.Finished(look, grade, elapsed) && _whiteoutFrames == 0)
             Finish();
     }
 
@@ -395,6 +399,11 @@ public sealed class InterruptHitLightPlayer : IDisposable
 
         public InterruptHitLightLook LookFor(in InterruptHitLightRequest request) => _look?.Invoke(request.Look);
         public InterruptHitLightFx FxFor(in InterruptHitLightRequest request) => _fx?.Invoke(request.Look);
+        public VolumeProfile GradeFor(in InterruptHitLightRequest request)
+        {
+            InterruptHitLightLook look = LookFor(request);
+            return look != null ? look.GradeProfile : null;
+        }
     }
 }
 
@@ -402,19 +411,36 @@ public sealed class InterruptHitLightPlayer : IDisposable
 public static class InterruptHitLightRules
 {
     /// <summary>모든 곡선(라이트·블룸·암순응)이 끝났는가. 데이터가 없으면 끝.</summary>
-    public static bool Finished(InterruptHitLightLook look, float elapsed) =>
-        look == null || elapsed >= Duration(look);
+    public static bool Finished(InterruptHitLightLook look, float elapsed) => Finished(look, look != null ? look.GradeProfile : null, elapsed);
+
+    /// <summary><see cref="Finished(InterruptHitLightLook, float)"/> — 색 보정 프로필을 따로 받는다(219 후속 단계별 프로필·빈 칸 대체).</summary>
+    public static bool Finished(InterruptHitLightLook look, VolumeProfile grade, float elapsed) =>
+        look == null || elapsed >= Duration(look, grade);
 
     /// <summary>진행기 길이 — 곡선 길이 중 가장 긴 것. 색 보정은 프로필이 있을 때만 센다(V1·V2 는 비어 있다).</summary>
-    public static float Duration(InterruptHitLightLook look) =>
+    public static float Duration(InterruptHitLightLook look) => Duration(look, look != null ? look.GradeProfile : null);
+
+    /// <summary><see cref="Duration(InterruptHitLightLook)"/> — 색 보정 프로필을 따로 받는다.</summary>
+    public static float Duration(InterruptHitLightLook look, VolumeProfile grade) =>
         look == null
             ? 0f
             : Mathf.Max(Mathf.Max(Mathf.Max(look.LightDuration, look.BloomDuration), Mathf.Max(look.DarkAdaptDuration, look.SceneDimDuration)),
-                look.GradeProfile != null ? look.GradeDuration : 0f);
+                grade != null ? look.GradeDuration : 0f);
 
     /// <summary>색 보정(채도) Volume 가중치(194 후속 V3) — 프로필이 있으면 곡선대로 [0, 1], 없거나 끝이면 0.</summary>
-    public static float GradeWeight(InterruptHitLightLook look, float elapsed) =>
-        look != null && look.GradeProfile != null ? Mathf.Clamp01(InterruptEffectLight.Pulse(look.GradeCurve, 1f, elapsed, look.GradeDuration)) : 0f;
+    public static float GradeWeight(InterruptHitLightLook look, float elapsed) => GradeWeight(look, look != null ? look.GradeProfile : null, elapsed);
+
+    /// <summary><see cref="GradeWeight(InterruptHitLightLook, float)"/> — 색 보정 프로필을 따로 받는다.</summary>
+    public static float GradeWeight(InterruptHitLightLook look, VolumeProfile grade, float elapsed) =>
+        look != null && grade != null ? Mathf.Clamp01(InterruptEffectLight.Pulse(look.GradeCurve, 1f, elapsed, look.GradeDuration)) : 0f;
+
+    /// <summary>
+    /// 단계 색 보정 프로필(219 후속 11-05) — 단계 SO 에 있으면 그것, 비면 일반 V3 SO 의 것. 단계 SO 자체가 없으면 없음.
+    /// </summary>
+    public static VolumeProfile SelectGrade(InterruptHitLightLook tierLook, InterruptHitLightLook normalLook) =>
+        tierLook == null ? null
+        : tierLook.GradeProfile != null ? tierLook.GradeProfile
+        : normalLook != null ? normalLook.GradeProfile : null;
 
     /// <summary>암순응 가 최대 어둡힘 — 본인 화면 = self, 팀원 화면 = others(Q9).</summary>
     public static float DarkAdaptPeak(bool viewerIsCaster, float self, float others) =>
