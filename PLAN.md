@@ -1,4 +1,34 @@
-# ▶▶▶ 계획 = **진격의 충격(FX_QBlast) 2차 — UI 느낌 걷어내기 · 바닥 안개 · 바람 · 팔라딘 방패 텍스처** (2026-11-05 · grill 확정 · ✅ 민경 구현 요청 · ✅ Codex 파일 구현·정적 검증 · ⏳ 민경 Play)
+# ▶▶▶ 계획 = **23호 잡기 — 끌려갈 대상 표식 + 끌려갈 때 VFX** (2026-11-05 · grill 확정 · ✅ 민경 "추천대로" · ✅ Codex 파일 제작·연결·오프라인 검증 · ⏳ 민경 Play·MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-05). **기획 = Claude, 제작·연결 = Codex 세션 "Add Blender MCP server"**(Unity·Codex 앱 끈 상태).
+> 23호 코드·프리팹 = **경석 영역** → 새 RPC 없음, 보스 코드는 기존 ClientRpc 안에서 C# 이벤트만 알림(전 피어, 네트워크 무변경) + 핸드오프 `Docs/tech/handoff-no23-grab-vfx.md`.
+
+## 사실(코드 — TwentyThreeBoss.cs, 잡기 사이클 1.4배속)
+- 룰렛 쿨타임 20초 = 잡기를 다시 못 고르게 할 뿐 **대상 없음**.
+- ① 예고 0.7초: 보스가 어그로 대상을 한 번 바라보고 바닥 부채꼴(반경 8 · 90°, 데이터 No23_B Grab 행) 차오름 — 대상은 서버만. 예고 시작 = `StartGrabPulseClientRpc`(팔 맥동).
+- ② 끌어오기 ≈1.18초: 예고 끝에 **부채꼴 안 플레이어 전부**를 보스 앞 ≈2.24m 로 매 틱 박아 넣음(사실상 한 번에 확) — `StartMagneticPullClientRpc`(보스 중심 자기장). 끌려가는 사람 목록은 서버만(슈퍼아머 제외).
+- ③ 붙잡기: 끌려온 사람 중 **보스에 가장 가까운 1명**만 손(GrabSocket)에, 나머지 4m 넉백 — `StartGrabbedElectricClientRpc(target)` = 처음 대상 공개(기존 `GrabbedEffectAnchor`). 실패·간파·중단 = `StopGrabPulseClientRpc`·`AbortAttackChain`.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 표식 시점·대상(Q1) | **예고 0.7초 동안 부채꼴 안에 서 있는 플레이어 전부** — 각 피어가 데이터(반경·각도) + 보스 위치로 계산, 새 네트워크 없음. 쿨타임 내내 표시는 범위 밖(대상 규칙 변경 = 경석) |
+| 끌림 신호(Q2) | 새 RPC 없음 — 예고 끝(끌어오기 시작) 순간 부채꼴 안이던 플레이어들에게 각 피어가 끌림 연출. 보스 쪽은 기존 신호에 붙임 |
+| 표식 모양(Q3) | 발밑 **조준 고리**(전기·자기장 색)가 0.7초 동안 **조여듦**(다 조이는 순간 = 끌려감) + 보스 손 → 대상 **자기장 선**이 점점 진해짐 |
+| 끌림 연출(Q4) | 원래 자리 → 보스 앞 **끌림 궤적**(전기 잔상 줄기) + 원래 자리 **바닥 긁힘·먼지** + 손 ↔ 플레이어 **전기 테더**(끌어오기 동안, 붙잡힘 뒤 기존 `GrabbedElectric` 으로 이어짐) + 도착 지점 **착지 스파크** |
+| 보는 사람(Q5) | 전 피어 같게 + **표식 대상 본인 화면만** 가장자리 붉은 경고 |
+| 작업(Q6) | Codex 제작·연결, VFX 쪽 새 컴포넌트(보스 프리팹에 부착), 보스 코드엔 기존 ClientRpc 안 이벤트 알림만, 핸드오프 |
+
+## 구현·검증 (2026-11-05 · Codex)
+- 보스 RPC 알림 6줄: ShowAttackCone→Grab 예고 시작(실제 growTime), HideAttackCone→끌림 후보, StartGrabbedElectric→획득, Stop 3곳→종료. **StartMagneticPull은 실제로 예고 시작에 불리므로 끌림 시작으로 쓰지 않음.** Hide/Stop 취소를 한 프레임 모아 LateUpdate에서 확정한다. 새 RPC·NetworkVariable 0, 판정·이동·공격 시간 무변경.
+- `No23GrabTelegraphVfx`를 TwentyThree 루트에 부착(Raid Variant 상속). 각 피어 `PlayerLifeCycleController.Active`의 살아 있는 플레이어를 매 프레임 Grab 부채꼴로 검사. 고리 1.15→0.43m·손/몸 자기장 선·본인 화면만 붉은 테두리 경고. 직전 프레임 위치/집합으로 궤적 0.4초·긁힘/먼지 0.65초·전기 테더·도착 스파크 0.3초를 재생·정리한다.
+- 새 `No23GrabFxView`·아트 프리팹/엔트리 6쌍·UberFXSG 재질 3개·텍스처 3개. 기존 EffectManager 루프/회수 가능한 원샷/GetInstances API 사용(새 드라이버 없음). 기존 아트·데이터·GUID 보존.
+- 실제 Unity DLL 참조 신규 C# 오프라인 컴파일 오류 0, Mono 기하 테스트 9/9 통과, 아트 YAML 15파일/48객체·보스 164→165객체 참조/변경 범위 확인. 에디터·Unity import/NGO ILPP·Play·MPPM은 미실행.
+- 경석 핸드오프: [handoff-no23-grab-vfx.md](Docs/tech/handoff-no23-grab-vfx.md)(RPC 위치·파일 목록·피어 로컬 추정/슈퍼아머/취소 RPC 프레임 차이/별도 Solo 복제본 한계).
+
+---
+
+# 계획(이전) = **진격의 충격(FX_QBlast) 2차 — UI 느낌 걷어내기 · 바닥 안개 · 바람 · 팔라딘 방패 텍스처** (2026-11-05 · grill 확정 · ✅ 민경 구현 요청 · ✅ Codex 파일 구현·정적 검증 · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-05). **기획 = Claude, 구현 = Codex 세션 "Add Blender MCP server"**(Unity·Codex 앱 끈 상태). 코드·판정 무변경.
 

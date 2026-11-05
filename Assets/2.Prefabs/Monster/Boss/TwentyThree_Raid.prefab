@@ -20,6 +20,10 @@ PrefabInstance:
       propertyPath: InScenePlacedSourceGlobalObjectIdHash
       value: 373754331
       objectReference: {fileID: 0}
+    - target: {fileID: 2473014749982555177, guid: f3f87bba52188544aa5e032c28ce9d60, type: 3}
+      propertyPath: tetherWidth
+      value: 0.1
+      objectReference: {fileID: 0}
     - target: {fileID: 3496395017441729605, guid: f3f87bba52188544aa5e032c28ce9d60, type: 3}
       propertyPath: data
       value: 
