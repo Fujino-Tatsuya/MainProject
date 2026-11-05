@@ -33,6 +33,12 @@ public sealed class BossVictoryConfig : ScriptableObject
     [Tooltip("방위각 후보(도, 막타 뒤 기준). 음수 = 카메라가 막타 오른쪽 뒤 → 막타가 화면 왼쪽. 앞에 있을수록 먼저 본다(같은 점수면 먼저 것).")]
     public float[] yawCandidates = { -25f, -35f, -15f, -45f, -55f, -5f, 15f, 30f };
 
+    [Header("벽 밖 방지(할 일 234)")]
+    [Tooltip("켜면 연출 카메라(24° 정지·32° 종료 구도)를 보스방 벽(InvisibleBoundaries 안쪽 면) 안에 둔다. 벽 안 후보가 없으면 주시점 쪽으로 당긴다. 평소 카메라는 무관.")]
+    public bool keepCameraInsideRoom = true;
+    [Tooltip("카메라가 벽 안쪽 면에서 떨어질 최소 거리(m). 카메라 near·벽 두께감 때문에 약간 띄운다.")]
+    [Min(0f)] public float wallMargin = 1f;
+
     [Header("색(기획 v02 §4 — 최종 화면 목표색, sRGB)")]
     public Color backgroundTop = new Color32(0xED, 0x9B, 0x25, 0xFF);
     public Color backgroundBottom = new Color32(0xD6, 0x7A, 0x16, 0xFF);
@@ -145,8 +151,11 @@ public sealed class BossVictoryConfig : ScriptableObject
         return _cached;
     }
 
-    public BossVictoryRules.Framing ToFraming() => new BossVictoryRules.Framing
+    /// <summary>구도 파라미터. <paramref name="room"/> = 보스방 경계(없으면 default) — <see cref="keepCameraInsideRoom"/> 이 꺼지면 버린다.</summary>
+    public BossVictoryRules.Framing ToFraming(BossVictoryRules.Arena room = default) => new BossVictoryRules.Framing
     {
+        Room = keepCameraInsideRoom ? room : default,
+        WallMargin = wallMargin,
         FinalPitch = finalPitch,
         EndPitch = endPitch,
         Fov = fov,
