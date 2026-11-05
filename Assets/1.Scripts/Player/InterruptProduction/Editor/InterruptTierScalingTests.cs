@@ -288,4 +288,17 @@ public sealed class InterruptTierScalingTests
         Assert.AreSame(normal.GradeProfile, suppress.GradeProfile, "색 보정 프로필은 공유");
         Assert.LessOrEqual(suppress.GapRayCount, 16);
     }
+
+    // 11-05 사용자 결정 — V3(일반·대쉬·제압)에서 파편(Debris) 파티클 삭제. V1·V2(FX_InterruptHitLight)는 그대로.
+    [TestCase(InterruptHitLightReferenceAuthoring.PrefabPath)]
+    [TestCase(InterruptHitLightTierAuthoring.DashPrefabPath)]
+    [TestCase(InterruptHitLightTierAuthoring.SuppressPrefabPath)]
+    public void V3_프리팹에는_파편_파티클이_없다(string path)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        Assert.IsNotNull(prefab, path);
+        Assert.IsNull(prefab.transform.Find("Debris"), path + " — 파편 삭제(11-05)");
+        foreach (string child in new[] { "Rays", "Sparks", "Streak", "Core" })
+            Assert.IsNotNull(prefab.transform.Find(child), path + " " + child + " 는 그대로");
+    }
 }

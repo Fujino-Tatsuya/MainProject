@@ -833,7 +833,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - **V1·V2 값은 그대로**(버전 보존) — V3 는 같은 형식의 별도 SO·프리팹·Volume 프로필. 디렉터 칸 `hitLightLookReference`·`hitLightVfxReference`, 둘 중 하나라도 비면 V3 → V0. 저작 메뉴 `Tools/Interrupt/적중 라이트 V3 레퍼런스 에셋 만들기 (194)`(SO·프로필·재질은 있으면 값 유지, 메시·프리팹은 같은 guid 로 다시 짓는다).
 - 기본값: 처음엔 안 바꿨다가(일반 V1·대쉬 V2) 사용자가 랩 비교 뒤 **11-03 일반·대쉬·제압 모두 V3** 로 결정(§9.1·§9.7 — 제압은 11-04 할 일 211 부터 시퀀스 없이 V3 만). 랩 `V3` 버튼은 그 단계 암순응을 **나** 로 함께 맞춘다(`DefaultDarkAdapt`, 누른 뒤 가로 바꿀 수 있음).
 - **에셋 위치(11-03 정리)**: V3 전용은 `Assets/5.VFX/Interrupt/HitLight/V3/` — `InterruptHitLightLook_V3`·`VP_InterruptHitLight_V3_Bloom`·`VP_InterruptHitLight_V3_Grade`·`FX_InterruptHitLight_V3`·`M_InterruptHitLight_Core`·`M_InterruptHitLight_Streak`·`M_InterruptHitLight_Spark_V3`·`Mesh_InterruptHitLight_Core`.
-  V1 과 함께 쓰는 것은 상위 `HitLight/` 에 남는다 — `Mesh_InterruptHitLight_Streak`(V1 틈 수직 `gapRaysMesh`)·`Mesh/M_InterruptHitLight_Rays`·`Mesh/M_InterruptHitLight_Debris`·셰이더 `InterruptHitLightRays`. 경로 상수 = `InterruptHitLightReferenceAuthoring`.
+  V1 과 함께 쓰는(또는 V1·V2 만 쓰는) 것은 상위 `HitLight/` 에 남는다 — `Mesh_InterruptHitLight_Streak`(V1 틈 수직 `gapRaysMesh`)·`Mesh/M_InterruptHitLight_Rays`·`Mesh/M_InterruptHitLight_Debris`·셰이더 `InterruptHitLightRays`. 경로 상수 = `InterruptHitLightReferenceAuthoring`.
 - 아래 표는 **시작값**이다. 현재 값은 사용자가 에디터에서 직접 튜닝한 값(11-03 `3a95c486` — 라이트 10·반경 100·그림자, 블룸 threshold 0.19·intensity 5, 노출 −5·대비 55·채도 40·색 필터 흰색)이고, 테스트는 V3 절대값을 단언하지 않는다.
 
 | 요소 | V3 시작값 | 칸 |
@@ -847,7 +847,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | 불꽃 `Sparks` | 55~70개 · 크기 0.025~0.045 · 속도 9~18 · lengthScale 4 · 중력 0.4 · 재질 HDR 7 | 재질 `M_InterruptHitLight_Spark_V3` |
 | 빛줄기 `Rays` | V1 메시·재질 그대로, 크기 0.8~1.2 · 알파 0.4 | 프리팹 파티클 |
 | 빛줄기 공간(11-03 렌즈 연출) | **V3 = 화면**: 틈 원점을 게임 카메라로 투영한 화면 점에 카메라 정면·깊이 무시(ZTest Always·Overlay 큐)·화면 높이 비율 크기로 그린다(카메라 거리·줌 무관, 원점이 화면 밖·카메라 뒤면 안 그림). 월드 원점·방향은 성공 순간 고정, 화면 투영은 카메라 렌더마다(`beginCameraRendering`, `Camera.main` 만). 크기 = 프리팹 Start Size × `rayScreenSize`(화면 높이 비율 — 0.05 면 Start Size 8 = 중심~날개 끝 화면 높이 40%) · 길이 = `rayScreenLength`(줄 방향만) · 밝기 = `rayScreenBrightness`(재질 `_Intensity`). V1·V2 = 월드 그대로. 불꽃·파편·라이트·중심 점·가로 빛줄은 늘 월드 | SO `raySpace`·`rayScreenSize`·`rayScreenLength`·`rayScreenBrightness`·`rayScreenMaterial`(V3 `M_InterruptHitLight_Rays_Screen`, 셰이더 V3 `InterruptHitLightRaysScreen` = V1 셰이더 복제 + ZTest Always·`_Intensity`) |
-| 파편 `Debris` | V1 과 같음 | 프리팹 파티클 |
+| ~~파편 `Debris`~~ | **11-05 삭제**(사용자 "새 파티클 어색" — 섬광 주변 주황 알갱이). V3·대쉬·제압 프리팹에서 게임오브젝트째 제거, 저작 코드(`InterruptHitLightReferenceAuthoring`·`InterruptHitLightTierAuthoring` 배율)도 뺐다. V1·V2(`FX_InterruptHitLight`)는 그대로라 재질·메시 에셋은 남긴다 | — |
 | 화이트아웃 | 없음(0) | SO `whiteoutFrames` |
 
 - 4.MapScene(보스방 포함, 같은 씬) 기준: 태양광 0.75(실시간)·환경광 Trilight·전역 Volume `VP_CombatLevel_Toon`(노출 +0.25·채도 +8·대비 12·블룸 threshold 1.1/intensity 0.35·Neutral 톤매핑·비네트 0.22). V3 색 보정은 우선순위가 높아 가중치 1 에서 노출·채도·색 필터를 덮고(대비는 맵 값 유지), V3 블룸 threshold 2 는 맵(1.1)보다 높아 HDR 이펙트만 번진다. 랩(흰 체크 바닥·태양광 1·Volume 없음)보다 맵이 원래 어두워 V3 는 더 어둡게 보일 수 있다 — Play 로 확인.
@@ -923,8 +923,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | 암순응 지속 | SO `sceneDimDuration`·`darkAdaptDuration` | 0.9 | ×1.3 = 1.17 | ×2.5 = 2.25 |
 | 가로 빛줄 크기 | 프리팹 `Streak` Start Size | 2.6 | ×1.5 = 3.9 | ×2.5 = 6.5 |
 | 빛줄기 양 | SO `gapRayCount`·`rayScreenBrightness`(+ 프리팹 `Rays` 버스트·최대 입자) | 5 · 1 (버스트 2 · 최대 4) | 8 · 1.5 (3 · 16) | 13 · 2.5 (5 · 16) |
-| 파편 개수 | 프리팹 `Debris` 버스트(최대 입자) | 5~8 (16) | ×1.6 = 8~13 (16) | ×2.5 = 13~20 (24) |
-| 파편 거리(속도)·크기 | 프리팹 `Debris` Start Speed·Size | 3~6.5 · 0.6~1.2 | ×1.4 = 4.2~9.1 · 0.84~1.68 | ×2.5 = 7.5~16.25 · 1.5~3 |
+| ~~파편 개수~~ | 11-05 삭제(V3 에 `Debris` 없음) | — | — | — |
 | 중심 점 크기 | 프리팹 `Core` Start Size | 0.45 | 그대로 | ×2.5 = 1.125 |
 | 화이트아웃 | SO `whiteoutFrames` + 디렉터 `suppressWhiteout` | 0 | 0 | **3프레임**(본인 화면, 기존 V2 화이트아웃 경로 재사용) |
 | 성공 슬로우 | 슬로우 SO | ③(중립) | ③(중립) | **③-2** (§9.8) |

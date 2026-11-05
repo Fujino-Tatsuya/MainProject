@@ -134,10 +134,6 @@ internal static class InterruptHitLightReferenceAuthoring
         Mesh raysMesh = AssetDatabase.LoadAssetAtPath<Mesh>(InterruptHitLightAuthoring.RaysMeshPath);
         if (raysMesh == null)
             raysMesh = InterruptHitLightAuthoring.EnsureRaysMesh();
-        Mesh debrisMesh = AssetDatabase.LoadAssetAtPath<Mesh>(InterruptHitLightAuthoring.DebrisMeshPath);
-        if (debrisMesh == null)
-            debrisMesh = InterruptHitLightAuthoring.EnsureDebrisMesh();
-        Material debrisMaterial = InterruptHitLightAuthoring.EnsureDebrisMaterial();
 
         var root = new GameObject("FX_InterruptHitLight_V3");
         try
@@ -147,7 +143,6 @@ internal static class InterruptHitLightReferenceAuthoring
             BuildStreak(root.transform, streakMesh, streakMaterial);
             BuildRays(root.transform, raysMesh, raysMaterial);
             BuildSparks(root.transform, sparkMaterial);
-            InterruptHitLightAuthoring.BuildDebris(root.transform, debrisMesh, debrisMaterial);
             return PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
         }
         finally

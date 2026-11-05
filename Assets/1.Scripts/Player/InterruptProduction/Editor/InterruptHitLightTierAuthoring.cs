@@ -28,11 +28,11 @@ internal static class InterruptHitLightTierAuthoring
     /// <summary>단계 배율 묶음(1단계 대비) — PLAN 219 §3 표.</summary>
     public readonly struct Scaling
     {
-        public readonly float Sparks, Light, Bloom, DarkDuration, Streak, Rays, DebrisCount, DebrisMotion, Core;
+        public readonly float Sparks, Light, Bloom, DarkDuration, Streak, Rays, Core;
         public readonly int WhiteoutFrames;
 
-        public Scaling(float sparks, float light, float bloom, float darkDuration, float streak, float rays, float debrisCount,
-            float debrisMotion, float core, int whiteoutFrames)
+        public Scaling(float sparks, float light, float bloom, float darkDuration, float streak, float rays,
+            float core, int whiteoutFrames)
         {
             Sparks = sparks;
             Light = light;
@@ -40,15 +40,13 @@ internal static class InterruptHitLightTierAuthoring
             DarkDuration = darkDuration;
             Streak = streak;
             Rays = rays;
-            DebrisCount = debrisCount;
-            DebrisMotion = debrisMotion;
             Core = core;
             WhiteoutFrames = whiteoutFrames;
         }
     }
 
-    public static readonly Scaling Dash = new Scaling(1.6f, 1.5f, 1.4f, 1.3f, 1.5f, 1.5f, 1.6f, 1.4f, 1f, 0);
-    public static readonly Scaling Suppress = new Scaling(2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 3);
+    public static readonly Scaling Dash = new Scaling(1.6f, 1.5f, 1.4f, 1.3f, 1.5f, 1.5f, 1f, 0);
+    public static readonly Scaling Suppress = new Scaling(2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 2.5f, 3);
 
     [MenuItem("Tools/Interrupt/간파 단계별 V3 강화 에셋 만들기 (219)")]
     public static void BuildAll()
@@ -119,7 +117,7 @@ internal static class InterruptHitLightTierAuthoring
         property.floatValue *= factor;
     }
 
-    // 자식 이름(Rays·Sparks·Debris·Streak·Core)마다 PLAN §3 칸만 배율.
+    // 자식 이름(Rays·Sparks·Streak·Core — 파편 Debris 는 11-05 삭제)마다 PLAN §3 칸만 배율.
     static void ScaleParticles(ParticleSystem system, Scaling scaling)
     {
         ParticleSystem.MainModule main = system.main;
@@ -132,12 +130,6 @@ internal static class InterruptHitLightTierAuthoring
             case "Sparks":
                 ScaleBurst(system, scaling.Sparks);
                 main.maxParticles = Mathf.CeilToInt(main.maxParticles * scaling.Sparks / 8f) * 8;
-                break;
-            case "Debris":
-                ScaleBurst(system, scaling.DebrisCount);
-                main.startSpeed = ScaleCurve(main.startSpeed, scaling.DebrisMotion);
-                main.startSize = ScaleCurve(main.startSize, scaling.DebrisMotion);
-                main.maxParticles = Mathf.CeilToInt(main.maxParticles * scaling.DebrisCount / 8f) * 8;
                 break;
             case "Streak":
                 main.startSize = ScaleCurve(main.startSize, scaling.Streak);
