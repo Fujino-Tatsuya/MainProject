@@ -52,9 +52,9 @@ public static class BuildWindowsPlayer
     }
 
     /// <summary>
-    /// 측정용 개발 빌드(PLAN-cleanup-optimization §S6). ProfilerHUD·ZonePerfRecorder 는 DEVELOPMENT_BUILD 에서만 살아 있다.
+    /// 측정용 개발 빌드(PLAN-cleanup-optimization §S6). (ProfilerHUD·ZonePerfRecorder 는 11-05 Legacy 로 보관 — 어느 씬에도 없다.)
     /// 프로파일러 자동 연결·딥 프로파일은 켜지 않는다 — 그 자체가 프레임 비용이라 측정을 오염시킨다.
-    /// 출력 폴더를 릴리스와 분리해 덮어쓰지 않는다. 결과 CSV = exe 옆 <c>ZonePerf/</c>.
+    /// 출력 폴더를 릴리스와 분리해 덮어쓰지 않는다. (옛 ZonePerfRecorder 결과 CSV = exe 옆 <c>ZonePerf/</c>.)
     /// 두 메뉴 모두 <c>DataTableBuild.WithTableValues</c> 로 감싸 **xlsx 값**으로 빌드한다(10-07 — 전엔 Build 버튼 훅을
     /// 안 거쳐 인스펙터 값으로 빌드됐다).
     /// </summary>

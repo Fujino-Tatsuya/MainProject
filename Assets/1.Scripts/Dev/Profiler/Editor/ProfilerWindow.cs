@@ -9,7 +9,7 @@
 // 카테고리 마커는 ProfilerRecorderHandle.GetAvailable 로 "실제 존재하는 것만" 선택 → 버전/플랫폼 차이에 강함.
 // 깊은 분석은 버튼으로 Profiler / Frame Debugger / Rendering Debugger 를 연다.
 //
-// Editor 폴더에 있으므로 빌드 제외. 실기기 프로파일링은 런타임 IMGUI HUD(ProfilerHUD.cs) 병행.
+// Editor 폴더에 있으므로 빌드 제외. (런타임 IMGUI HUD ProfilerHUD 는 11-05 Legacy 로 보관.)
 
 using System.Collections.Generic;
 using Unity.Profiling;

@@ -1,4 +1,5 @@
 // ProfilerHUD.cs
+// 🗄️ Legacy(2026-11-05, 226 후속) — 어느 씬·프리팹에도 배치하지 않는다. 보관 프리팹 2.Prefabs/ProfillingHUD/Legacy/ProfilerHUD.prefab 이 Missing Script 가 되지 않게 컴파일만 유지한다.
 // 런타임 프로파일링 오버레이 HUD — 에디터/개발 빌드/DEV_HOTKEYS 빌드 전용 (심볼 없는 릴리스 빌드에서는 컴파일 제외).
 // 외부 패키지 의존성 없음 (IMGUI + ProfilerRecorder + FrameTimingManager).
 // 프로젝트 기준: Unity 6000.3.16f1 / URP 17.3 / 신 Input System.

@@ -1,4 +1,5 @@
 // ZonePerfRecorder.cs
+// 🗄️ Legacy(2026-11-05, 226 후속) — 어느 씬·프리팹에도 배치하지 않는다. 보관 프리팹 2.Prefabs/ProfillingHUD/Legacy/ProfilerHUD.prefab 이 Missing Script 가 되지 않게 컴파일만 유지한다.
 // 존별 실시간 성능 기록기 — 로컬 플레이어가 서 있는 존마다 프레임 비용을 쌓아 CSV 로 남긴다(PLAN-cleanup-optimization §S6).
 //
 // 왜 존별인가: 존은 맵 시작 때 전부 생성되고 계속 켜져 있다(MapContentSpawner). 그래서 위치마다 비용이 다른 이유는
