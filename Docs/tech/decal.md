@@ -96,3 +96,79 @@ Add Renderer Feature → Decal
 
 ### 남은 선택지(바닥 셰이더 수정 필요 — 하지 않음)
 - 데칼 색을 바닥 색과 **곱/오버레이**로 섞으려면 바닥 셰이더(`Generic_Standard.shadergraph`, SVN)가 DBuffer 를 직접 읽어 곱해야 한다(URP Lit 기본 적용 대신 커스텀). 필요하면 별도 할 일로.
+
+---
+
+## 스킬·공격 예고 데칼 바닥 블렌딩 (할 일 221, 2026-11-05 — 1차 + 후속 외곽선 물들임)
+
+### 무엇을 하나
+- 스킬 범위 데칼과 몬스터 공격 예고가 바닥 위에 스티커처럼 떠 보이지 않게, **안쪽(채움) 알파를 공용 배율로 낮춰 바닥 무늬·명암이 비치게** 한다(1차).
+- **후속("외곽선이 너무 붕 뜸")**: 외곽선(바깥 외곽선·안쪽 선)도 바닥에 **물들게** — 외곽선 알파 배율 + 물들임(0 = 일반 섞기, 1 = 완전 물들임) + 모드(밝기 보존 / 곱하기).
+- 소프트는 **외곽선의 안·밖 가장자리 둘 다**에 건다(1차는 바깥 끝만이었다).
+
+```
+채움   알파 = 기존 알파 × lerp(채움 배율, 1, 가장자리 가중치) × 소프트
+외곽선 (색, 알파) = 물들임(기존 색, 기존 알파 × 외곽선 알파 배율)   — 가장자리 가중치만큼 섞음
+소프트 = smoothstep(0, s, t) × smoothstep(0, s, 1 − t)   (t = 외곽선 폭 안 위치 0~1, s = 소프트)
+```
+
+### 물들임 근사 — DBuffer 는 바닥 색을 못 읽는다
+- 투영 데칼(DBuffer)은 바닥 알베도와 **lerp(덮기)만** 된다. 그래서 "기준 바닥 밝기(감마 0.3 = 선형 0.0732 — 맵 바닥 `Generic_01_A` 쯤)에서 목표 섞기와 같아지는 (색, 알파)" 로 근사한다. 투명 판도 **같은 근사**(같은 느낌, 판은 블렌드 상태를 안 바꾼다).
+- 완전 물들임(1)에서 알파 = 원래 × 0.5 → 바닥 무늬·명암이 절반 남는다. 그 사이는 premultiplied 로 물들임 값만큼 보간.
+  - **모드 0 밝기 보존(기본)** — 색조는 그대로, 밝기만 기준 바닥 쪽으로 절반 당김. 흰 선은 옅은 색 선이 되고 **어두운 바닥에서도 밝게 남는다**.
+  - **모드 1 곱하기** — 기준 바닥에서 `바닥 × 색` 과 같게. 밝은 바닥에서 선이 회색으로 진해 더 잘 보이고, 어두운 바닥에서는 조금 더 탁·어둡다.
+- 기본을 밝기 보존으로 둔 이유: 실제 맵 바닥이 어두운 편이고, 어두운 바닥 비교에서 예고 외곽선이 덜 묻혔다. 밝은 바닥(로비·흰 바닥)에서 선이 너무 옅으면 모드를 곱하기로.
+- 비교 이미지: `C:\UnityProject\_lane-artifacts\Work2\221\compare\`(레포 밖) — `sheet_<시점>.png` = 왼쪽부터 끔 | 1차 | 밝기 보존 | 곱하기. 다시 찍기 = batchmode `-executeMethod DecalFloorBlendLabCapture.Capture`(`Dev/DecalFloorBlendLab/Editor/DecalFloorBlendLabCapture.cs`, Unity 닫고).
+
+### 어디서 고치나 — `Assets/Resources/Rendering/DecalFloorBlendSettings.asset`
+| 칸 | 뜻 | 코드 기본 | 에셋 시작값 |
+|---|---|---|---|
+| `skillFillAlphaScale` | 플레이어 스킬 인디케이터 안쪽 채움 배율(1 = 그대로) | 1 | 0.6 |
+| `skillEdgeSoftness` | 외곽선 폭 중 안·밖 가장자리에서 이 비율만큼 흐림(0 = 그대로) | 0 | 0.5 |
+| `skillPlateFillAlphaScale` | 판(투명 쿼드) 전용 채움 추가 배율 — 투영 데칼과 진하기 맞출 때 | 1 | 1 |
+| `skillOutlineAlphaScale` | 외곽선·안쪽 선 알파 배율(1 = 그대로) | 1 | 0.9 |
+| `skillOutlineStain` | 외곽선 물들임(0 = 일반 섞기, 1 = 완전 물들임) | 0 | 0.7 |
+| `skillStainMode` | 물들임 모드 — `LuminanceKeep`(밝기 보존) / `Multiply`(곱하기) | 밝기 보존 | 밝기 보존 |
+| `telegraphFillAlphaScale` | 몬스터 공격 예고 안쪽(채움·띠 그라데이션·쐐기) 배율 | 1 | 0.6 |
+| `telegraphEdgeSoftness` | 예고 외곽선 안·밖 소프트 | 0 | 0.5 |
+| `telegraphPlateFillAlphaScale` | 예고 판(C3 바닥 판·TelegraphQuad) 전용 채움 추가 배율 | 1 | 1 |
+| `telegraphOutlineAlphaScale` | 예고 외곽선·안쪽 선 알파 배율 | 1 | 0.9 |
+| `telegraphOutlineStain` | 예고 외곽선 물들임 — 회피 신호라 스킬보다 약하게 | 0 | 0.6 |
+| `telegraphStainMode` | 예고 물들임 모드 | 밝기 보존 | 밝기 보존 |
+
+- **코드 기본값(1·0·1 / 1·0·밝기 보존) = 221 이전 화면과 같다.** 에셋 값은 비교용 시작값 — 최종은 사용자 Play.
+- 🔴 예고는 회피 신호 — 채움·외곽선을 너무 낮추지 말 것. 예고 외곽선 알파 ≥ 0.7·물들임 ≤ 0.8 을 테스트가 지킨다(에셋 값 검사).
+- 전역 값은 4개 — `_DecalFloorBlendSkillEdge`·`_DecalFloorBlendTelegraphEdge` = (외곽선 알파, 물들임, 모드, 유효 1) 가 추가됐다.
+- Play 중 에셋 값을 바꾸면 바로 보인다(Play 값이 에셋에 남는다 — 재질과 같음). 데이터 테이블(xlsx)에는 내지 않는다(렌더 룩 값).
+
+### 적용 방식 — 전역 셰이더 값 한 곳
+- `DecalFloorBlendDriver`(씬 배치 없이 스스로 생김 — `DecalDistanceFadeDriver` 와 같은 방식)가 매 프레임 설정을 전역 값 2개로 넣는다:
+  `_DecalFloorBlendSkill`·`_DecalFloorBlendTelegraph` = (채움, 소프트, 판 추가, 유효 1). DecalProjector 는 속성 블록을 못 쓰고 예고는 재질 인스턴스가 많아서 전역 값이 가장 단순하다.
+- 값이 없으면(w = 0 — 에디터 Play 밖·EditMode 테스트·픽셀 비교·에셋 없음) 셰이더는 221 이전 화면이다. **그래서 바닥 블렌딩은 Play 에서만 보인다.**
+- 식: 셰이더 `Rendering/Telegraph/DecalFloorBlend.hlsl` = C# `DecalFloorBlend.cs`(테스트 기준).
+
+### 대상별 — 무엇이 가장자리이고 무엇이 채움인가
+| 대상 | 셰이더 | 채움(배율) | 가장자리(그대로) · 소프트 기준 |
+|---|---|---|---|
+| 사거리 원·대상 원·지면 마커 | `SkillRangeIndicator.shadergraph`(Custom Function `SkillRangeDecalFade`, `SkillRangeDecalAlpha.hlsl`) | 텍스처 알파 0.45 이하(안쪽 그라데이션) | 알파 0.7 이상(선·흰 테두리), 소프트 = 흰 바깥 테두리(반경 0.979~0.996) |
+| 예고 C3 데칼 외곽선(부채꼴·띠·열쇠구멍) | `SG_EnemyC3Decal`(`EnemyC3Decal.hlsl`) | 띠 그라데이션·쐐기 | 외곽선·안쪽 선, 소프트 = 바깥 외곽선 |
+| 예고 C3 데칼 채움(부채꼴·띠·열쇠구멍·방향 표식 호) | 〃 | 전부 | — |
+| 원판(`AoeTelegraph` 코드 원판 — `shapeTexture` 없는 것만) | 〃(원판 모드 6) | 안쪽 채움 | 테두리(rim) 띠, 소프트 = rim |
+| 건틀렛 스매시 원(09) | `Monster/EnemyC3Plate` 판 — `EnemyC3SmashPlate`(221 후속, 구운 sprite 대체) | 채움 아래 깔기·띠·핀 | 외곽선·안쪽 선, 소프트 = 바깥 외곽선 |
+| C3 바닥 판(드론·박격포·전기 장판·점프 착지) | `Monster/EnemyC3Plate` | 채움·띠·쐐기(× 판 추가) | 외곽선·안쪽 선, 소프트 = 바깥 외곽선 |
+| `TelegraphQuad` 판(코드 사각·원판·텍스처) | `Monster/TelegraphQuad` | 알파 0.6 이하(채움 0.55, × 판 추가) | 알파 0.95 이상(테두리 1), 소프트 = 코드 사각·원판만 |
+| 거너 Q 직선·대시 화살표 | `SkillLineIndicator.shader` | 안쪽 면·쐐기(× 판 추가) | 외곽선·안쪽 선·끝선, 소프트 = 바깥 외곽선 + 양옆 흰 라인 |
+| 조준 표시 | URP Lit 투명(`AimIndicator3D.mat`) — 셰이더 못 고침 | `PlayerAimIndicator` 가 `_BaseColor` 알파에 판 채움(채움 × 판 추가)만 곱함 | 그림 한 장이라 구분·소프트 없음 |
+
+### 한계(1차)
+- **건틀렛 스매시 원 = 적용(221 후속)** — 예전 미리 구운 sprite(`EnemyC3_Smash09.png`·굽기 메뉴 `Tools/Enemy C3/Bake smash 09 sprite`)는 **삭제**. 이제 `EnemyC3Visuals.ApplySmash` 가 VFX 스프라이트(`FX_Mob_Smah_Warning/L_circle`, SVN 무수정) 자식에 C3 판(원 09 경계 = 구운 sprite 와 같은 CPU 식, `EnemyC3PlateShaderTests` Plate_09 픽셀 비교)을 스프라이트 평면에 붙이고 스프라이트는 끈다. 크기 = 원본 sprite 폭 × `OuterScale("09")`(예전과 같음). 알파는 `FadeInHoldEffect` 가 `IFadeInHoldAlphaTarget` 로 판 MaterialPropertyBlock `_Color.a` 에 넘긴다. 풀 재사용 시 판 재사용.
+- **23호 차징 오라 = 미적용(사용자 결정 11-05, 그대로 둠)** — `No23*.asset` 의 `chargeAuraTelegraphPrefab` = `AoeDecalTelegraph.prefab` 에 `shapeTexture` 가 물려 있어 `SG_TelegraphDecal` 경로다(C3 원판 아님). (1차 문서의 "적용됨" 은 틀렸다 — 정정.)
+- `SG_TelegraphDecal`·`SG_DecalFloorOnly`·`SG_ColoredDecal`(옛·대체 예고 데칼)·`AimIndicator.shadergraph`(보관용 프리팹 전용)은 손대지 않았다.
+- **`Mobile_Renderer` 에는 Decal 피처가 없다** — 투영 데칼은 원래 안 보이고, 판(투명 쿼드) 경로에만 적용된다(지금과 같은 상태).
+- 물들임은 **근사**다 — 기준 바닥(감마 0.3)에서 맞고, 아주 밝은·아주 어두운 바닥에서는 목표 섞기와 어긋난다(데칼이 바닥 색을 못 읽음). 판도 블렌드 상태를 안 바꾸고 같은 근사를 쓴다.
+- 물들임은 외곽선·안쪽 선(가장자리)만 — 원판 **안쪽 채움**과 예고 채움에는 걸지 않는다(채움 배율만). `TelegraphQuad` 는 알파로 가장자리를 구분해 섞는다.
+- 조준 표시(URP Lit)는 물들임 없음(채움 배율만).
+
+### 확인
+- 확인 씬 `Assets/0.Scenes/Debug/DebugDecalFloorBlendLab.unity`(빌드 목록 아님) — 저작 메뉴 `Tools/Debug/221 바닥 블렌딩 확인 씬 만들기`. 씬을 열고 ▶ → 밝은·어두운·무늬(`Generic_01_A`) 바닥 3장 위에 플레이어 인디케이터·예고를 나란히 만든다. **B 를 누르는 동안 블렌딩 끔**(221 이전 화면과 비교).
+- 테스트: `Tools/Tests/전투 EditMode 테스트 실행` 의 `DecalFloorBlendTests`(식·1.0 = 그대로·값 없음 = 그대로·설정 → 전역 값 4개·물들임 0 = 그대로·완전 물들임 = 바닥 절반·밝기 보존은 색조 유지·곱하기는 기준 바닥에서 F×C·양쪽 소프트·예고 에셋 하한·셰이더가 공용 hlsl 사용·셰이더 컴파일). 값이 없을 때 EnemyC3 픽셀 비교가 그대로 통과 = 기본 화면 동일.

@@ -48,6 +48,7 @@ Shader "Monster/EnemyC3Plate"
 
             #include "EnemyC3Sdf.hlsl"
             #include "DecalDistanceFade.hlsl"
+            #include "DecalFloorBlend.hlsl"
 
             struct Attributes
             {
@@ -80,18 +81,28 @@ Shader "Monster/EnemyC3Plate"
                 float coreHalf = _C3Size.x;
                 float d = square ? EnemyC3Box(p, float2(coreHalf, coreHalf)) : EnemyC3CircleSdf(p, coreHalf);
 
+                // 할 일 221 — 바닥 블렌딩(예고 전역 값). 안쪽(채움·띠·쐐기)만 채움 배율 × 판 추가 배율, 외곽선·안쪽 선은 그대로 + 바깥 끝 소프트.
+                float3 floorBlend = DecalFloorBlendResolve(_DecalFloorBlendTelegraph);
+                float innerScale = floorBlend.x * floorBlend.z;
+                float4 fillColor = float4(_C3Fill.rgb, _C3Fill.a * innerScale);
+
                 float4 c;
-                if (_C3Mode.y > 0.5) c = EnemyC3Fill(d, aa, _C3Fill);
+                if (_C3Mode.y > 0.5) c = EnemyC3Fill(d, aa, fillColor);
                 else
                 {
                     EnemyC3Palette pal;
                     pal.outline = _C3Outline; pal.innerLine = _C3InnerLine; pal.band = _C3Band;
-                    pal.fill = _C3Fill; pal.markers = _C3Markers;
+                    pal.fill = fillColor; pal.markers = _C3Markers;
+                    pal.band.a *= innerScale; pal.markers.a *= innerScale;
+                    // 221 후속 — 외곽선·안쪽 선 물들임(데칼과 같은 근사, 감마 기준 바닥).
+                    float3 edgeBlend = DecalFloorBlendResolveEdge(_DecalFloorBlendTelegraphEdge);
+                    pal.outline = DecalFloorBlendStain(pal.outline, edgeBlend, DFB_REF_FLOOR_GAMMA);
+                    pal.innerLine = DecalFloorBlendStain(pal.innerLine, edgeBlend, DFB_REF_FLOOR_GAMMA);
                     // 판은 unit = 1(디자인 단위 그대로).
                     float band = square ? EnemyC3BandLinear(d, 1.0, _C3Geom.w) : EnemyC3BandCircle(p, coreHalf, _C3Geom.w);
                     float marker = _C3Mode.w > 0.5 ? EnemyC3CircleFins(p, coreHalf, _C3Size.z, aa) : 0.0;
-                    c = EnemyC3Boundary(d, aa, 1.0, band, marker, _C3Mode.z > 0.5,
-                                        _C3Geom.x, _C3Geom.y, _C3Geom.z, pal);
+                    c = EnemyC3BoundarySoft(d, aa, 1.0, band, marker, _C3Mode.z > 0.5,
+                                            _C3Geom.x, _C3Geom.y, _C3Geom.z, floorBlend.y, pal);
                 }
 
                 float3 rgb = EnemyC3ToOutput(c.rgb) * _Color.rgb;

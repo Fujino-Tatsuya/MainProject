@@ -48,6 +48,7 @@ Shader "Monster/TelegraphQuad"
 
             #define _BaseColor _Color
             #include "TelegraphMask.hlsl"
+            #include "DecalFloorBlend.hlsl"
 
             // 예전 BossPatternVisuals.BuildSquare(64)·BuildDisc(128)·BuildCrosshair(128) 의 한 텍셀 알파(8비트).
             float CodeShapeSize() { return _CodeShape.x < 1.5 ? 64.0 : 128.0; }
@@ -129,9 +130,33 @@ Shader "Monster/TelegraphQuad"
                 float4 shape = _CodeShape.x < 0.5
                     ? SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv) * i.color
                     : float4(1.0, 1.0, 1.0, CodeShapeAlpha(i.uv)) * i.color;
+                // 할 일 221 — 바닥 블렌딩(예고 전역 값). 진한 알파(테두리 1)는 가장자리, 옅은 알파(채움 0.55)는 채움 배율 × 판 추가 배율.
+                //   소프트는 코드 사각·원판만(테두리 폭 = _CodeShape.y) — 바깥 끝 전체 + 테두리 띠 안쪽 끝(가장자리 픽셀만). 텍스처 모양·조준은 소프트 없음.
+                //   221 후속 — 가장자리 픽셀은 외곽선 알파 배율·물들임(데칼과 같은 근사, 선형 기준 바닥).
+                float3 floorBlend = DecalFloorBlendResolve(_DecalFloorBlendTelegraph);
+                float edge = DecalFloorBlendEdgeFromAlpha(shape.a / max(i.color.a, 1.0e-4), 0.6, 0.95);
+                float outerSoft = 1.0;
+                float rimW = max(_CodeShape.y, 1.0e-3);
+                float rimT = 2.0;   // 테두리 띠 안 위치(0 = 바깥 끝, 1 = 안쪽 끝), 띠 밖 = 2
+                if (_CodeShape.x > 0.5 && _CodeShape.x < 1.5)
+                {
+                    float2 e = min(i.uv, 1.0 - i.uv);
+                    rimT = min(e.x, e.y) / rimW;
+                }
+                else if (_CodeShape.x > 1.5 && _CodeShape.x < 2.5)
+                    rimT = (1.0 - length(i.uv - 0.5) * 2.0) / rimW;
+                if (rimT < 2.0)
+                {
+                    outerSoft = DecalFloorBlendOuterSoft(rimT, floorBlend.y);
+                    if (rimT > 0.0 && rimT < 1.0) outerSoft *= lerp(1.0, DecalFloorBlendOuterSoft(1.0 - rimT, floorBlend.y), edge);
+                }
+                shape.a *= DecalFloorBlendFill(edge, floorBlend.x * floorBlend.z) * outerSoft;
+
                 float3 rgb; float a;
                 TelegraphShade_float(shape, i.positionWS, rgb, a);
-                return half4(rgb * a, a);   // 프리멀티(Sprites/Default 와 같은 블렌드)
+                float4 stained = DecalFloorBlendStain(float4(rgb, a), DecalFloorBlendResolveEdge(_DecalFloorBlendTelegraphEdge), DFB_REF_FLOOR_LINEAR);
+                float4 pm = lerp(float4(rgb * a, a), float4(stained.rgb * stained.a, stained.a), edge);
+                return half4(pm);   // 프리멀티(Sprites/Default 와 같은 블렌드)
             }
             ENDHLSL
         }

@@ -450,8 +450,9 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
 
     // ─── 스매시 바닥 원 = 인터럽트 색(파랑) ─────────────────────────────
     // 🔴 스매시는 간파 창을 여는 공격이라 바닥 예고 원을 **파랑**으로(팀장 10-12 — 23호 돌진·스피너 돌진과 같은 규약).
-    //    원은 SVN VFX(`FX_Mob_Smah_Warning` 의 `L_circle` 스프라이트, 저작 색 빨강-주황)라 에셋은 건드리지 않고,
-    //    재생된 인스턴스의 **RGB 만** 칠한다. 알파는 `FadeInHoldEffect` 가 맡고 RGB 는 보존하므로 페이드와 안 싸운다.
+    //    원은 SVN VFX(`FX_Mob_Smah_Warning` 의 `L_circle` 스프라이트)라 에셋은 건드리지 않고, 재생된 인스턴스에
+    //    C3 판(EnemyC3Plate, 09)을 붙여 그리고 스프라이트는 숨긴다(할 일 221 — 바닥 블렌딩 적용, EnemyC3SmashPlate).
+    //    알파는 그대로 `FadeInHoldEffect` 가 맡고 판으로 넘겨 받는다.
     //    이 이펙트는 건틀렛만 쓰고 스매시는 항상 간파 공격이라 풀에 파랑이 남아도 다른 데로 번지지 않는다.
     //    재생 시작은 클립 이벤트(전 피어)라 서버가 알려 줄 필요가 없다 — 각 피어가 자기 인스턴스를 칠한다.
     readonly List<GameObject> _smashTelegraphInstances = new List<GameObject>();
@@ -470,7 +471,7 @@ public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWi
         if (smashTelegraph.GetInstances(_smashTelegraphInstances) == 0) return;
 
         // 인터럽트 색 = 이 몬스터 스타일의 인터럽트 **채움** RGB(알파는 VFX 스프라이트 것을 유지 — 모양·페이드는 아트 VFX 담당).
-        // C3 sprite contains the selected colors; keep the VFX-driven alpha.
+        // C3 plate (09) holds the selected colors; the VFX-driven alpha is forwarded to it.
         _smashTintVersion = TelegraphStyleSO.Version;
         for (int i = 0; i < _smashTelegraphInstances.Count; i++)
         {

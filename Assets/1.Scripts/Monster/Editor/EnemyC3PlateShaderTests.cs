@@ -21,7 +21,7 @@ public sealed class EnemyC3PlateShaderTests
 
     static IEnumerable<TestCaseData> Cases()
     {
-        var plates = new (string id, bool square)[] { ("12", false), ("14", false), ("15", true), ("16", true), ("06", false), ("07", false) };
+        var plates = new (string id, bool square)[] { ("12", false), ("14", false), ("15", true), ("16", true), ("06", false), ("07", false), ("09", false) };   // 09 = 건틀렛 스매시(221 — 구운 sprite 대체)
         foreach (var (id, square) in plates)
             foreach (bool fill in new[] { false, true })
                 foreach (float size in Sizes)

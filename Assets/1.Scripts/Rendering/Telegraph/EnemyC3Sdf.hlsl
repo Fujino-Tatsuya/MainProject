@@ -152,8 +152,10 @@ struct EnemyC3Palette
 // Bake 의 테두리 층 합성: (채움) → 띠 → 쐐기 → 안쪽 선 → 바깥 외곽선.
 // d = 모양 SDF, band = 띠 덮임, marker = 쐐기 덮임, fillUnder = 09·16 처럼 채움을 테두리 층에 깔지.
 // outerWidth·innerWidth·gap 은 디자인 단위 — unit 을 곱해 p 단위로 바꾼다.
-float4 EnemyC3Boundary(float d, float aa, float unit, float band, float marker, bool fillUnder,
-                       float outerWidth, float innerWidth, float gap, EnemyC3Palette c)
+// outerSoft(할 일 221) = 바깥 외곽선 소프트(0~1, 외곽선 폭에 대한 비율) — 후속부터 외곽선 안·밖 가장자리 둘 다.
+//   0 이면 곱하지 않는다 — Bake 와 같은 결과(아래 EnemyC3Boundary 가 0 으로 부른다).
+float4 EnemyC3BoundarySoft(float d, float aa, float unit, float band, float marker, bool fillUnder,
+                           float outerWidth, float innerWidth, float gap, float outerSoft, EnemyC3Palette c)
 {
     float inside = saturate(0.5 - d / aa);
     float4 col = float4(0, 0, 0, 0);
@@ -164,7 +166,19 @@ float4 EnemyC3Boundary(float d, float aa, float unit, float band, float marker, 
     float inner = saturate(0.5 + (-d - innerStart) / aa) * saturate(0.5 + (d + innerEnd) / aa);
     col = EnemyC3Over(col, c.innerLine, inner * inside);
     float rim = saturate(0.5 + d / aa) * saturate(0.5 + (outerWidth * unit - d) / aa);
+    // 221 후속 — 외곽선 안·밖 가장자리 둘 다(t = 0 모양 경계 ~ 1 바깥 끝). DecalFloorBlendLineSoft 와 같은 식.
+    if (outerSoft > 1.0e-4 && outerWidth > 0.0)
+    {
+        float t = d / (outerWidth * unit);
+        rim *= smoothstep(0.0, outerSoft, t) * smoothstep(0.0, outerSoft, 1.0 - t);
+    }
     return EnemyC3Over(col, c.outline, rim);
+}
+
+float4 EnemyC3Boundary(float d, float aa, float unit, float band, float marker, bool fillUnder,
+                       float outerWidth, float innerWidth, float gap, EnemyC3Palette c)
+{
+    return EnemyC3BoundarySoft(d, aa, unit, band, marker, fillUnder, outerWidth, innerWidth, gap, 0.0, c);
 }
 
 // Bake 의 채움 층(fill=true): 모양 안을 채움 색으로만.

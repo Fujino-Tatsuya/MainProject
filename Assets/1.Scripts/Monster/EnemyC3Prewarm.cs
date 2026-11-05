@@ -11,7 +11,7 @@ using Object = UnityEngine.Object;
 /// 진입점은 <see cref="EnemyC3Visuals.Prewarm"/> 하나(1회 플래그, Play 마다 ResetForPlay 로 초기화)이고,
 /// 호출 위치는 <c>NetworkLoadingFlowController.HandleLoadStarted</c>(타깃 씬 로드 시작 — 호스트·클라 모두) 한 줄이다.
 /// 세 단계:
-///   (a) 데이터 — JSON(Get), 판·데칼 재질(Resources), 판 층별 MaterialPropertyBlock, 스매시 09 sprite.
+///   (a) 데이터 — JSON(Get), 판·데칼 재질(Resources), 판 층별 MaterialPropertyBlock(스매시 09 판 포함 — 할 일 221).
 ///   (b) 셰이더 — EnemyC3Plate·SG_EnemyC3Decal·TelegraphQuad 의 변형을 코드로 만든 ShaderVariantCollection 으로 WarmUp.
 ///       에셋이 아니라 코드 SVC 다 — 세 셰이더는 이미 Resources 재질(MA_EnemyC3Plate·MA_EnemyC3Decal·MA_TelegraphQuad)로 빌드에
 ///       들어가고, 그래픽 설정(Preloaded Shaders)·새 에셋을 건드리지 않는다. 데칼 키워드 = PC_Renderer 데칼 설정이 켜는 조합
@@ -19,7 +19,7 @@ using Object = UnityEngine.Object;
 ///       🔴 에디터는 처음 쓰는 변형을 여기서 동기 컴파일한다(셰이더 캐시가 빌 때 1회 ~10 s) — 빌드는 미리 컴파일돼 있다.
 ///       🔴 DX12·Vulkan·Metal 에서 WarmUp 은 셰이더 프로그램까지만 준비한다 — 파이프라인 상태(PSO)는 첫 그리기에서 만든다(남는 비용).
 ///   (c) JIT — 화면 밖 더미에서 C3 칠하기 경로(NewDecalInstance·SetDecalProperties·채움 Set*·PaintPlate/PaintLayer/PaintActive·
-///       CreateJump/Begin·BossPatternVisuals.Paint(CodeShape)·ApplySmash)를 한 번씩 돌리고 즉시 지운다(재질 인스턴스 포함).
+///       CreateJump/Begin·BossPatternVisuals.Paint(CodeShape)·스매시 09 판)를 한 번씩 돌리고 즉시 지운다(재질 인스턴스 포함).
 ///       할 일 57.1/57.3 — 보스 예고 컴포넌트도 임시 오브젝트에 붙여 실제 경로를 한 번씩 돌린다(WarmBossComponents):
 ///       BossAttackConeTelegraph.Show(합집합·부채꼴·잡기·띠·간파)·Hide(EnsureBuilt 포함) · WellsDroneAttack.ClientMark·ClientLock·ClientCancel
 ///       (57.3: Resources 인덱스가 가리키는 실제 데이터 — 모델 풀 대출·카메라 없는 분기·낙하 Tick·재사용 PlayableGraph·전용 RT 첫 그리기 포함).
@@ -40,6 +40,7 @@ static class EnemyC3Prewarm
         ("12", false, false), ("12", false, true), ("14", false, false), ("14", false, true),
         ("15", true, false), ("15", true, true), ("16", true, false),
         ("06", false, false), ("06", false, true), ("07", false, true),
+        ("09", false, false),   // 스매시(221 — 판)
     };
 
     // SG_EnemyC3Decal 키워드 조합(PassType.ScriptableRenderPipeline — DBufferProjector 등 LightMode 패스 전부가 이 종류다).
@@ -84,7 +85,6 @@ static class EnemyC3Prewarm
         EnemyC3Visuals.Get("01");                       // JSON 전부 로드
         _ = EnemyC3Visuals.PlateMaterial;
         _ = EnemyC3Visuals.DecalMaterial;
-        _ = EnemyC3Visuals.SmashSprite;
         var probe = new MaterialPropertyBlock();
         foreach (var (id, square, fill) in PlateLayers) EnemyC3Visuals.SetPlateProperties(probe, id, square, fill);
     }
@@ -174,12 +174,9 @@ static class EnemyC3Prewarm
             jump = EnemyC3Visuals.CreateJump(root.transform.position, 1f, 1f);
             jump.hideFlags = HideFlags.HideAndDontSave;
 
-            // 스매시 09 — sprite 교체(이미 같은 sprite 면 그대로).
-            var smash = new GameObject("Smash") { hideFlags = HideFlags.HideAndDontSave };
-            smash.transform.SetParent(root.transform, false);
-            var sr = smash.AddComponent<SpriteRenderer>();
-            sr.sprite = EnemyC3Visuals.SmashSprite;
-            if (sr.sprite != null) EnemyC3Visuals.ApplySmash(smash);
+            // 스매시 09 — 할 일 221 부터 C3 판(EnemyC3SmashPlate)이라 같은 판 칠하기 경로다(원본 sprite 가 없어 붙이기는 생략).
+            EnemyC3Visuals.PaintLayer(outer, EnemyC3Visuals.SmashId, false, false, 0.5f);
+            _ = EnemyC3Visuals.OuterScale(EnemyC3Visuals.SmashId);
 
             var bossSw = Stopwatch.StartNew();
             WarmBossComponents(root.transform, ref drone);

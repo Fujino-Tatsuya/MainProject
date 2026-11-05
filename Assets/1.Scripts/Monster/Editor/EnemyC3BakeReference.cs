@@ -7,7 +7,7 @@ using static EnemyC3Visuals;
 /// <summary>
 /// Editor-only CPU reference for the enemy C3 art (moved out of the runtime EnemyC3Visuals in 할 일 57 S4b).
 /// The runtime draws with EnemyC3Plate / SG_EnemyC3Decal and never builds textures; this 384² bake is kept only as
-/// the pixel comparison baseline (EnemyC3*ShaderTests, EnemyC3Validation) and for the smash 09 sprite bake.
+/// the pixel comparison baseline (EnemyC3*ShaderTests, EnemyC3Validation).
 /// </summary>
 public static class EnemyC3BakeReference
 {
