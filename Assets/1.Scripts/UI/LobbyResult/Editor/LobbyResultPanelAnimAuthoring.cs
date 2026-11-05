@@ -14,6 +14,8 @@ public static class LobbyResultPanelAnimAuthoring
     const string Tag = "[LobbyResultPanelAnim]";
     /// <summary>왕관 반짝임 기본 스프라이트 — 기존 VFX 에셋 재활용(4갈래 별빛, Sprite 로 임포트돼 있음). 교체는 인스펙터 sparkleSprite 칸.</summary>
     public const string DefaultSparkleSpritePath = "Assets/50.Art/VFX/Textures/Flare06.png";
+    /// <summary>펀치 배경 광륜 기본 텍스처(할 일 220) — 기존 VFX 에셋 재활용(부드러운 원형 빛, Default 텍스처 임포트 → RawImage). 교체는 인스펙터 backdropFlashTexture 칸.</summary>
+    public const string DefaultBackdropFlashTexturePath = "Assets/50.Art/VFX/Textures/GlowFree1.png";
 
     [MenuItem("Tools/UI/로비 결과창 애니 연결")]
     public static void Connect()
@@ -80,7 +82,8 @@ public static class LobbyResultPanelAnimAuthoring
         var so = new SerializedObject(animator);
         changed |= SetReference(so, "scaleTarget", panel);
         changed |= SetReference(so, "statsView", stats);
-        changed |= SetDefaultSparkle(so);
+        changed |= SetDefaultAsset<Sprite>(so, "sparkleSprite", DefaultSparkleSpritePath, "반짝임");
+        changed |= SetDefaultAsset<Texture2D>(so, "backdropFlashTexture", DefaultBackdropFlashTexturePath, "펀치 배경 광륜");
         if (content.GetComponentInParent<LobbyResultPanel>(true) == null)
             Debug.LogWarning($"{Tag} 부모에 LobbyResultPanel 이 없다 — 소요 시간 카운트업 없음.", content);
         so.ApplyModifiedPropertiesWithoutUndo();
@@ -88,20 +91,20 @@ public static class LobbyResultPanelAnimAuthoring
     }
 
     /// <summary>
-    /// 왕관 반짝임 스프라이트가 비어 있을 때만 기본(기존 에셋 <c>Flare06</c>)을 넣는다 — 사용자가 바꾼 스프라이트는 그대로 둔다.
+    /// 칸이 비어 있을 때만 기본 에셋(기존 아트 재활용)을 넣는다 — 사용자가 바꾼 값은 그대로 둔다.
     /// </summary>
-    static bool SetDefaultSparkle(SerializedObject so)
+    static bool SetDefaultAsset<T>(SerializedObject so, string property, string path, string label) where T : Object
     {
-        SerializedProperty prop = so.FindProperty("sparkleSprite");
+        SerializedProperty prop = so.FindProperty(property);
         if (prop.objectReferenceValue != null)
             return false;
-        Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(DefaultSparkleSpritePath);
-        if (sprite == null)
+        T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+        if (asset == null)
         {
-            Debug.LogWarning($"{Tag} 기본 반짝임 스프라이트가 없다(SVN 아트 확인): {DefaultSparkleSpritePath} — 반짝임 없음.");
+            Debug.LogWarning($"{Tag} 기본 {label} 에셋이 없다(SVN 아트 확인): {path} — {label} 없음.");
             return false;
         }
-        prop.objectReferenceValue = sprite;
+        prop.objectReferenceValue = asset;
         return true;
     }
 

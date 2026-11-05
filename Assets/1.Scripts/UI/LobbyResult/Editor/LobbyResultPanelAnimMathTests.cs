@@ -207,4 +207,81 @@ public sealed class LobbyResultPanelAnimMathTests
         // 지속 0 = 펀치 없음
         Assert.AreEqual(1f, LobbyResultPanelAnimMath.PanelPunchScale(0.1f, 0f, 1.06f, Ease.OutQuad), 1e-6f);
     }
+
+    [Test]
+    public void CountUpCurveWeight_SmallLinear_LargeCurve_LogBlend()
+    {
+        // 기본 기준 10 ~ 1000: 10 이하 선형, 1000 이상 곡선 그대로, 100 = 반반(자릿수 보간)
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(1, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(3, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(10, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.CountUpCurveWeight(100, 10f, 1000f), 1e-5f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CountUpCurveWeight(1000, 10f, 1000f), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CountUpCurveWeight(1234567, 10f, 1000f), 1e-6f);
+        // 기준이 뒤집히면 선형 기준 하나로 자른다
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.CountUpCurveWeight(50, 100f, 10f), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.CountUpCurveWeight(500, 100f, 10f), 1e-6f);
+    }
+
+    [Test]
+    public void CountUpFrame_AllValuesArriveTogether_SmallEven_LargeDramatic()
+    {
+        AnimationCurve curve = LobbyResultPanelAnimator.DefaultCountUpCurve();
+        LobbyResultCountUpFrame At(float p) => new LobbyResultCountUpFrame(p, p >= 1f ? 1f : Mathf.Clamp01(curve.Evaluate(p)), 10f, 1000f);
+
+        int[] finals = { 1, 3, 12, 100, 754, 48210, 1234567 };
+        // 같은 끝: 끝 직전엔 모두 최종값 전, 끝(1)에서 모두 최종값. 도중 어느 값도 최종값을 넘지 않는다.
+        foreach (int final in finals)
+        {
+            Assert.Less(At(0.99f).Value(final), final, $"final={final}");
+            Assert.AreEqual(final, At(1f).Value(final), $"final={final}");
+            int previous = 0;
+            for (float p = 0f; p < 1f; p += 0.005f)
+            {
+                int v = At(p).Value(final);
+                Assert.LessOrEqual(v, final, $"final={final} p={p}");
+                Assert.GreaterOrEqual(v, previous, $"final={final} p={p}"); // 되돌아가지 않음
+                previous = v;
+            }
+        }
+        Assert.AreEqual(754.4f, At(1f).Seconds(754.4f), 1e-4f);
+        Assert.Less(At(0.99f).Seconds(754.4f), 754f); // 표기 12:34 는 끝에만
+        Assert.AreEqual(1f, LobbyResultCountUpFrame.Final.ProgressFor(3), 1e-6f);
+
+        // 작은 값(3) = 선형 — 1/3·2/3 지점에서 고르게 한 칸씩
+        Assert.AreEqual(0, At(0.33f).Value(3));
+        Assert.AreEqual(1, At(0.34f).Value(3));
+        Assert.AreEqual(1, At(0.66f).Value(3));
+        Assert.AreEqual(2, At(0.67f).Value(3));
+        // 큰 값 = 곡선 그대로(30% 시간에 82%)
+        Assert.AreEqual(curve.Evaluate(0.3f), At(0.3f).ProgressFor(48210), 1e-5f);
+        Assert.Greater(At(0.3f).Value(48210), 48210 * 0.8f);
+        // 중간 값(100) = 반반 — 선형보다 빠르고 곡선보다 느리다
+        float mid = At(0.3f).ProgressFor(100);
+        Assert.Greater(mid, 0.3f);
+        Assert.Less(mid, curve.Evaluate(0.3f));
+    }
+
+    [Test]
+    public void PunchFlash_QuickOnThenFades()
+    {
+        const float duration = 0.45f, rise = 0.1f;
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.FlashAlpha(-0.01f, duration, rise, Ease.OutCubic), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.FlashAlpha(0f, duration, rise, Ease.OutCubic), 1e-6f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.FlashAlpha(duration * 0.05f, duration, rise, Ease.OutCubic), 1e-4f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.FlashAlpha(duration * rise, duration, rise, Ease.OutCubic), 1e-4f);
+        float fading = LobbyResultPanelAnimMath.FlashAlpha(duration * 0.5f, duration, rise, Ease.OutCubic);
+        Assert.Greater(fading, 0f);
+        Assert.Less(fading, 1f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.FlashAlpha(duration, duration, rise, Ease.OutCubic), 1e-6f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.FlashAlpha(0.1f, 0f, rise, Ease.OutCubic), 1e-6f);
+        // 켜지는 비율 0 = 첫 순간 최대
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.FlashAlpha(0f, duration, 0f, Ease.OutCubic), 1e-6f);
+
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.FlashSpread(0f, duration, Ease.OutCubic), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.FlashSpread(duration, duration, Ease.OutCubic), 1e-6f);
+        float spreading = LobbyResultPanelAnimMath.FlashSpread(duration * 0.5f, duration, Ease.OutCubic);
+        Assert.Greater(spreading, 0.5f); // OutCubic = 앞에서 빨리 퍼짐
+        Assert.Less(spreading, 1f);
+    }
 }

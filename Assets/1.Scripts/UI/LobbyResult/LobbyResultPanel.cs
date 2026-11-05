@@ -171,15 +171,15 @@ public sealed class LobbyResultPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// 소요 시간 값을 최종값 × <paramref name="progress"/>(0~1)로 쓴다(표기는 <see cref="Refresh"/> 와 같은 mm:ss) — 1 = 최종값.
+    /// 소요 시간 값을 카운트업 프레임 <paramref name="frame"/> 으로 쓴다(값 크기에 맞는 감속 — 할 일 220, 표기는 <see cref="Refresh"/> 와 같은 mm:ss) — 1 = 최종값.
     /// 로비 결과창 카운트업(할 일 215, <see cref="LobbyResultPanelAnimator"/>)만 부른다. 결과가 없으면 아무것도 안 한다.
     /// </summary>
-    public void SetPlayTimeCountUp(float progress)
+    public void SetPlayTimeCountUp(LobbyResultCountUpFrame frame)
     {
         if (playTimeText == null || !SessionResult.HasValue)
             return;
         playTimeText.text = SessionResult.FormatTime(
-            LobbyResultPanelAnimMath.CountUpSeconds(SessionResult.SurvivalSeconds, progress));
+            frame.Seconds(SessionResult.SurvivalSeconds));
     }
 
     /// <summary>인스펙터 순위 계수.</summary>

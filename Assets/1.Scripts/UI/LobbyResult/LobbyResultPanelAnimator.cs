@@ -10,7 +10,9 @@ using UnityEngine.UI;
 /// (c) 숫자 카운트업: 열 때 플레이어 행 숫자(<see cref="ResultStatsView.SetCountUpProgress"/>)와 소요 시간
 ///     (<see cref="LobbyResultPanel.SetPlayTimeCountUp"/>)이 같은 진행도로 0 에서 최종값까지 올라간다.
 ///     기본 곡선은 강한 감속 — 82% 까지 빠르게, 남은 자리는 시간의 70% 동안 천천히(할 일 220).
-/// (c2) 카운트업이 끝나는 순간(최종값 도달) 창 본체가 살짝 커졌다 돌아오는 펀치(EuniTween <c>Easing.Punch</c>, 할 일 220).
+///     값이 작을수록 선형 쪽으로 섞어(<c>linearMaxSteps</c>~<c>curveFullSteps</c>) 정수가 고르게 오르고, 모든 값이 같은 순간 최종값.
+/// (c2) 카운트업이 끝나는 순간(최종값 도달) 창 본체가 살짝 커졌다 돌아오는 펀치(EuniTween <c>Easing.Punch</c>, 할 일 220)
+///      + 같은 순간 패널 뒤 번쩍임(<c>punchFlashMode</c> — 테두리 빛 테 / 배경 광륜).
 /// (d) 1위 왕관: 카운트업 끝 펀치가 끝난 직후부터 <c>crownRepeatInterval</c>(3초)마다 점프하며 한 바퀴(기본 Y축) 돌고,
 ///     착지마다 반짝임이 크게 터진 뒤 다음 점프 전까지 은은하게 반복한다(EuniTween 이징). 행 밖으로 튀어나가도 자르지 않는다.
 ///
@@ -52,6 +54,10 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     [SerializeField] private float countUpDuration = 1.5f;
     [Tooltip("카운트업 곡선(가로 = 진행 0~1, 세로 = 최종값 대비 0~1). 0~1 밖은 자른다. 기본 = 강한 감속(30% 시간에 82%, 남은 70% 시간 동안 마지막 자리가 천천히 — 할 일 220). 숫자는 소수 버림이라 최종값은 끝(펀치 순간)에만 나온다.")]
     [SerializeField] private AnimationCurve countUpCurve = DefaultCountUpCurve();
+    [Tooltip("값 크기별 감속 세기(할 일 220) — 최종값(소요 시간은 초 수)이 이 이하면 곡선 없이 선형(정수가 끝까지 고르게). 감속 꼬리 동안 정수가 안 바뀌어 멈춰 보이는 걸 막는다.")]
+    [SerializeField] private float linearMaxSteps = 10f;
+    [Tooltip("최종값이 이 이상이면 countUpCurve 그대로(극적 감속). 선형 기준과 사이는 자릿수(log10)로 섞는다 — 기본 10~1000 이면 100 = 반반. 모든 값은 같은 순간(펀치)에 최종값.")]
+    [SerializeField] private float curveFullSteps = 1000f;
 
     [Header("카운트업 끝 패널 펀치 (EuniTween)")]
     [Tooltip("카운트업이 끝나는 순간(최종값 도달) 창 본체(scaleTarget)가 커졌다 돌아오는 시간(초, unscaled). 0 이하면 펀치 없음. 왕관 첫 점프는 펀치가 끝난 뒤.")]
@@ -60,6 +66,30 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     [SerializeField] private float punchScale = 1.06f;
     [Tooltip("펀치 이징 — 커지는 절반에 적용, 줄어드는 절반은 거울(EuniTween Easing.Punch). OutQuad = 빠르게 커졌다 꼭대기에서 멈칫.")]
     [SerializeField] private Ease punchEase = Ease.OutQuad;
+
+    [Header("펀치 번쩍임 (EuniTween)")]
+    [Tooltip("펀치 순간 번쩍임(할 일 220). Border = 패널 테두리 바깥으로 빛 테가 번쩍 퍼지며 사라짐(추천) · Backdrop = 패널 뒤 둥근 광륜이 커지며 사라짐 · Both = 둘 다 · None = 끔.")]
+    [SerializeField] private PunchFlashMode punchFlashMode = PunchFlashMode.Border;
+    [Tooltip("테두리 번쩍임 모양 스프라이트 — 비우면 창 본체(scaleTarget) Image 의 스프라이트(panel_battle_results)를 그대로 써서 패널 윤곽을 딴다. 교체는 이 칸만.")]
+    [SerializeField] private Sprite borderFlashSprite;
+    [Tooltip("배경 광륜 텍스처(RawImage) — 기본 = 기존 에셋 GlowFree1(부드러운 원형 빛, 50.Art/VFX/Textures). 교체는 이 칸만. 비우면 Backdrop 없음.")]
+    [SerializeField] private Texture backdropFlashTexture;
+    [Tooltip("번쩍임 색(흰 텍스처에 곱한다). 알파 = 최대 세기에 곱한다.")]
+    [SerializeField] private Color flashColor = new Color(1f, 0.93f, 0.7f, 1f);
+    [Tooltip("번쩍임 최대 세기(0~1, 투명도).")]
+    [Range(0f, 1f)]
+    [SerializeField] private float flashIntensity = 0.85f;
+    [Tooltip("번쩍임 시간(초, unscaled) — 펀치와 같은 순간 시작. 0 이하면 번쩍임 없음.")]
+    [SerializeField] private float flashDuration = 0.45f;
+    [Tooltip("켜지는 구간 비율(시간 대비). 짧을수록 '번쩍'. 나머지 동안 flashEase 로 사라진다.")]
+    [Range(0f, 0.9f)]
+    [SerializeField] private float flashRise = 0.1f;
+    [Tooltip("사라짐·퍼짐 이징(EuniTween). OutCubic = 금방 빠지고 꼬리가 길다.")]
+    [SerializeField] private Ease flashEase = Ease.OutCubic;
+    [Tooltip("테두리 빛 테 두께(UI px) — 패널 바깥으로 이만큼까지 퍼진다. 시작은 이 값의 40%.")]
+    [SerializeField] private float borderFlashThickness = 22f;
+    [Tooltip("배경 광륜 크기 — 패널 크기 대비, 시작 → 끝.")]
+    [SerializeField] private Vector2 backdropFlashScale = new Vector2(0.95f, 1.35f);
 
     [Header("1위 왕관 점프·회전 (EuniTween)")]
     [Tooltip("카운트업 끝 패널 펀치가 끝나고(펀치 없으면 카운트업 끝) 왕관이 뛰기 시작할 때까지(초, unscaled).")]
@@ -117,6 +147,9 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     private bool _punching;
     private float _countUpElapsed; // 열기부터(초, unscaled) — 카운트업·펀치 공용
     private float _punchMultiplier = 1f;
+    private bool _flashing;
+    private Image _borderFlash;      // 런타임에 Content 아래(Panel 바로 뒤) 한 번 만들어 재사용
+    private RawImage _backdropFlash;
 
     private RectTransform _crown;  // 이번 열기의 1위 왕관(행이 다시 그려지면 파괴된다 — Unity null 로 확인)
     private Vector2 _crownBasePosition;
@@ -147,6 +180,8 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
         _countUpElapsed = 0f;
         _countingUp = countUpDuration > 0f && (statsView != null || _panel != null);
         _punching = _countingUp && PunchEnabled; // 카운트업이 없으면 "끝나는 순간"도 없다
+        _flashing = _countingUp && FlashEnabled;
+        HideFlash();
         _punchMultiplier = 1f;
         ApplyCountUp();
         ApplyPunch();
@@ -168,6 +203,7 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
         _canvasGroup.interactable = false;
         _canvasGroup.blocksRaycasts = false;
         StopPunch(); // 닫힘 크기 연출이 바로 이어받는다
+        StopFlash();
 
         if (!isActiveAndEnabled || closeDuration <= 0f)
         {
@@ -184,13 +220,15 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     {
         float dt = Time.unscaledDeltaTime;
 
-        if (_countingUp || _punching)
+        if (_countingUp || _punching || _flashing)
         {
             _countUpElapsed += dt;
             if (_countingUp)
                 ApplyCountUp();
             if (_punching)
                 ApplyPunch();
+            if (_flashing)
+                ApplyFlash(); // 펀치 뒤에 — 펀치 크기를 따라간다
         }
 
         if (_crownPlaying)
@@ -255,6 +293,7 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
         _countingUp = false;
         _onHidden = null;
         StopPunch();
+        StopFlash();
         StopCrown();
         SetVisibility(0f);
     }
@@ -263,11 +302,12 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
     {
         float progress = LobbyResultPanelAnimMath.CountUpProgress(_countUpElapsed, countUpDelay, countUpDuration);
         float curved = progress >= 1f ? 1f : (countUpCurve != null ? countUpCurve.Evaluate(progress) : progress);
-        curved = Mathf.Clamp01(curved);
+        // 값마다 크기에 맞춰 선형↔곡선을 섞는다(작은 값 = 고르게, 큰 값 = 극적 감속). 진행도 1 에서 모두 동시에 최종값.
+        var frame = new LobbyResultCountUpFrame(progress, Mathf.Clamp01(curved), linearMaxSteps, curveFullSteps);
         if (statsView != null)
-            statsView.SetCountUpProgress(curved);
+            statsView.SetCountUpProgress(frame);
         if (_panel != null)
-            _panel.SetPlayTimeCountUp(curved);
+            _panel.SetPlayTimeCountUp(frame);
 
         if (progress >= 1f)
             _countingUp = false;
@@ -420,6 +460,114 @@ public sealed class LobbyResultPanelAnimator : MonoBehaviour
             _punchMultiplier = 1f;
         }
         ApplyScale();
+    }
+
+    // ── 펀치 번쩍임(할 일 220) ─────────────────────────────────
+
+    public enum PunchFlashMode { None, Border, Backdrop, Both }
+
+    private bool WantsBorderFlash => punchFlashMode == PunchFlashMode.Border || punchFlashMode == PunchFlashMode.Both;
+    private bool WantsBackdropFlash => (punchFlashMode == PunchFlashMode.Backdrop || punchFlashMode == PunchFlashMode.Both) && backdropFlashTexture != null;
+    private bool FlashEnabled => flashDuration > 0f && flashIntensity > 0f && scaleTarget != null && (WantsBorderFlash || WantsBackdropFlash);
+
+    private void ApplyFlash()
+    {
+        float since = _countUpElapsed - LobbyResultPanelAnimMath.CountUpEnd(countUpDelay, countUpDuration);
+        if (since < 0f)
+            return;
+        if (since >= flashDuration)
+        {
+            StopFlash();
+            return;
+        }
+
+        EnsureFlashImages();
+        float alpha = flashIntensity * LobbyResultPanelAnimMath.FlashAlpha(since, flashDuration, flashRise, flashEase);
+        float spread = LobbyResultPanelAnimMath.FlashSpread(since, flashDuration, flashEase);
+        Color color = flashColor;
+        color.a *= alpha;
+        Vector2 panelSize = scaleTarget.rect.size;
+
+        if (_borderFlash != null)
+        {
+            float thickness = Mathf.Max(0f, borderFlashThickness) * Mathf.Lerp(0.4f, 1f, spread);
+            FollowPanel(_borderFlash.rectTransform, panelSize + new Vector2(thickness, thickness) * 2f);
+            _borderFlash.color = color;
+            _borderFlash.enabled = true;
+        }
+        if (_backdropFlash != null)
+        {
+            FollowPanel(_backdropFlash.rectTransform, panelSize * Mathf.Lerp(backdropFlashScale.x, backdropFlashScale.y, spread));
+            _backdropFlash.color = color;
+            _backdropFlash.enabled = true;
+        }
+    }
+
+    // 패널과 같은 자리·같은 크기 배율(펀치 포함)로 — 크기만 다르게.
+    private void FollowPanel(RectTransform rect, Vector2 size)
+    {
+        rect.anchorMin = scaleTarget.anchorMin;
+        rect.anchorMax = scaleTarget.anchorMax;
+        rect.pivot = scaleTarget.pivot;
+        rect.anchoredPosition = scaleTarget.anchoredPosition;
+        rect.sizeDelta = size - (scaleTarget.rect.size - scaleTarget.sizeDelta); // 늘림 앵커여도 rect 크기가 size 가 되게
+        rect.localScale = scaleTarget.localScale;
+    }
+
+    private void EnsureFlashImages()
+    {
+        // 패널 바로 뒤(같은 부모, 앞 형제) — 패널이 가운데를 덮어 테두리 바깥·패널 둘레만 보인다. Dim 보다는 앞.
+        if (WantsBackdropFlash && _backdropFlash == null)
+        {
+            _backdropFlash = CreateFlashObject<RawImage>("PunchFlash_Backdrop");
+            _backdropFlash.texture = backdropFlashTexture;
+        }
+        if (WantsBorderFlash && _borderFlash == null)
+        {
+            Sprite sprite = borderFlashSprite;
+            if (sprite == null)
+            {
+                Image panelImage = scaleTarget.GetComponent<Image>();
+                sprite = panelImage != null ? panelImage.sprite : null;
+            }
+            if (sprite != null)
+            {
+                _borderFlash = CreateFlashObject<Image>("PunchFlash_Border");
+                _borderFlash.sprite = sprite;
+            }
+        }
+        // 순서: 광륜(가장 뒤) → 테두리 → 패널
+        int index = scaleTarget.GetSiblingIndex();
+        if (_backdropFlash != null)
+            _backdropFlash.transform.SetSiblingIndex(index);
+        index = scaleTarget.GetSiblingIndex();
+        if (_borderFlash != null)
+            _borderFlash.transform.SetSiblingIndex(index);
+    }
+
+    private T CreateFlashObject<T>(string objectName) where T : MaskableGraphic
+    {
+        var go = new GameObject(objectName, typeof(RectTransform), typeof(T));
+        go.layer = scaleTarget.gameObject.layer;
+        go.transform.SetParent(scaleTarget.parent, false);
+        T graphic = go.GetComponent<T>();
+        graphic.raycastTarget = false;
+        graphic.enabled = false;
+        return graphic;
+    }
+
+    private void HideFlash()
+    {
+        if (_borderFlash != null)
+            _borderFlash.enabled = false;
+        if (_backdropFlash != null)
+            _backdropFlash.enabled = false;
+    }
+
+    private void StopFlash()
+    {
+        _flashing = false;
+        HideFlash();
     }
 
     private void StopPunch()

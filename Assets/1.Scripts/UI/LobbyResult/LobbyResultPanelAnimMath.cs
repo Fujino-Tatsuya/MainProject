@@ -8,6 +8,36 @@ using UnityEngine;
 /// </summary>
 public static class LobbyResultPanelAnimMath
 {
+    /// <summary>
+    /// 감속 곡선 가중치(할 일 220 후속) — 최종값의 정수 단계 수(<paramref name="steps"/>)가
+    /// <paramref name="linearMaxSteps"/> 이하면 0(선형), <paramref name="curveFullSteps"/> 이상이면 1(곡선 그대로), 사이는 log10 으로 보간.
+    /// 작은 값은 감속 꼬리 동안 정수가 안 바뀌어 멈춰 보이므로 선형 쪽으로, 큰 값은 꼬리에도 자리가 넉넉해 곡선 그대로.
+    /// 기준이 뒤집히거나 같으면(곡선 ≤ 선형) 기준 하나로 자른다(그 이하 선형, 넘으면 곡선).
+    /// </summary>
+    public static float CountUpCurveWeight(double steps, float linearMaxSteps, float curveFullSteps)
+    {
+        double lo = Mathf.Max(1f, linearMaxSteps);
+        double hi = Mathf.Max(1f, curveFullSteps);
+        if (steps <= lo)
+            return 0f;
+        if (steps >= hi || hi <= lo)
+            return 1f;
+        return Mathf.Clamp01((float)((System.Math.Log10(steps) - System.Math.Log10(lo)) / (System.Math.Log10(hi) - System.Math.Log10(lo))));
+    }
+
+    /// <summary>
+    /// 값 하나의 진행도 = 선형과 곡선 진행도를 <paramref name="curveWeight"/> 로 섞은 것. 선형 진행도 1 이면 정확히 1
+    /// — 모든 값이 같은 순간(카운트업 끝)에 최종값에 닿는다. 둘 다 0~1 로 잘라 섞어 넘침 없음, 가중치가 고정이라 되돌아가지 않음.
+    /// </summary>
+    public static float BlendedCountUpProgress(float linear, float curved, float curveWeight)
+    {
+        if (linear >= 1f)
+            return 1f;
+        if (linear <= 0f)
+            return 0f;
+        return Mathf.Lerp(Mathf.Clamp01(linear), Mathf.Clamp01(curved), Mathf.Clamp01(curveWeight));
+    }
+
     /// <summary>경과 시간 → 진행도 0~1. 지속시간 0 이하면 바로 1(즉시 끝).</summary>
     public static float Progress(float elapsed, float duration)
     {
@@ -76,6 +106,32 @@ public static class LobbyResultPanelAnimMath
         if (duration <= 0f || sinceCountUpEnd <= 0f || sinceCountUpEnd >= duration)
             return 1f;
         return 1f + (peakScale - 1f) * Easing.Punch(ease, sinceCountUpEnd / duration);
+    }
+
+    /// <summary>
+    /// 펀치 번쩍임 세기 0~1(할 일 220) — 지속의 <paramref name="riseFraction"/> 동안 0→1 로 빠르게 켜지고,
+    /// 남은 시간 동안 1→0 으로 사라진다(<paramref name="ease"/> = 사라지는 쪽 이징, OutCubic 이면 금방 빠지고 꼬리가 길다).
+    /// 시작 전·끝난 뒤·지속 0 이하 = 0. 켜지는 비율 0 이하 = 첫 순간부터 최대.
+    /// </summary>
+    public static float FlashAlpha(float sinceStart, float duration, float riseFraction, Ease ease)
+    {
+        if (duration <= 0f || sinceStart < 0f || sinceStart >= duration)
+            return 0f;
+        float t = sinceStart / duration;
+        float rise = Mathf.Clamp(riseFraction, 0f, 0.99f);
+        if (t < rise)
+            return t / rise;
+        return 1f - Easing.Evaluate(ease, (t - rise) / (1f - rise));
+    }
+
+    /// <summary>번쩍임 퍼짐 0~1(할 일 220) — EuniTween <see cref="Easing.Evaluate"/>. 시작 전 0, 끝·지속 0 이하 = 1.</summary>
+    public static float FlashSpread(float sinceStart, float duration, Ease ease)
+    {
+        if (sinceStart <= 0f)
+            return 0f;
+        if (duration <= 0f || sinceStart >= duration)
+            return 1f;
+        return Easing.Evaluate(ease, sinceStart / duration);
     }
 
     /// <summary>
@@ -182,4 +238,40 @@ public static class LobbyResultPanelAnimMath
             return 0f;
         return Easing.Punch(ease, progress);
     }
+}
+
+/// <summary>
+/// 카운트업 한 프레임(할 일 220 후속) — 선형 진행도·곡선 진행도·값 크기 기준을 함께 넘겨, 받는 쪽(행 숫자·소요 시간)이
+/// 값마다 감속 세기를 고른다(<see cref="LobbyResultPanelAnimMath.CountUpCurveWeight"/>). 모두 선형 진행도 1 에서 동시에 최종값.
+/// </summary>
+public readonly struct LobbyResultCountUpFrame
+{
+    public readonly float Linear;
+    public readonly float Curved;
+    public readonly float LinearMaxSteps;
+    public readonly float CurveFullSteps;
+
+    public LobbyResultCountUpFrame(float linear, float curved, float linearMaxSteps, float curveFullSteps)
+    {
+        Linear = linear;
+        Curved = curved;
+        LinearMaxSteps = linearMaxSteps;
+        CurveFullSteps = curveFullSteps;
+    }
+
+    /// <summary>최종값 그대로(5.ResultScene·카운트업 없음).</summary>
+    public static LobbyResultCountUpFrame Final => new LobbyResultCountUpFrame(1f, 1f, 0f, 0f);
+
+    /// <summary>정수 단계 수가 <paramref name="steps"/> 인 값의 진행도.</summary>
+    public float ProgressFor(double steps) =>
+        LobbyResultPanelAnimMath.BlendedCountUpProgress(Linear, Curved,
+            LobbyResultPanelAnimMath.CountUpCurveWeight(steps, LinearMaxSteps, CurveFullSteps));
+
+    /// <summary>정수 칸 — 단계 수 = 최종값.</summary>
+    public int Value(int finalValue) =>
+        LobbyResultPanelAnimMath.CountUpValue(finalValue, ProgressFor(System.Math.Abs((double)finalValue)));
+
+    /// <summary>소요 시간(초) — 단계 수 = 표시되는 초 수(mm:ss 는 초 아래 버림).</summary>
+    public float Seconds(float finalSeconds) =>
+        LobbyResultPanelAnimMath.CountUpSeconds(finalSeconds, ProgressFor(System.Math.Floor(Mathf.Max(0f, finalSeconds))));
 }

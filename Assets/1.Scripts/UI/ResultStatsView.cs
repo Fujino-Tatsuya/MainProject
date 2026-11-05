@@ -99,15 +99,15 @@ public sealed class ResultStatsView : MonoBehaviour
         UiStrings.ResultSurvival.FormatOr((prefix ?? string.Empty) + "{time}", new Dictionary<string, string> { ["time"] = time });
 
     /// <summary>
-    /// 플레이어 행 숫자를 최종값 × <paramref name="progress"/>(0~1)로 — 로비 결과창 카운트업(할 일 215)만 부른다.
+    /// 플레이어 행 숫자를 카운트업 프레임 <paramref name="frame"/> 으로 — 로비 결과창 카운트업(할 일 215·220)만 부른다.
     /// 5.ResultScene 은 부르지 않아 Apply 한 최종값 그대로다.
     /// </summary>
-    public void SetCountUpProgress(float progress)
+    public void SetCountUpProgress(LobbyResultCountUpFrame frame)
     {
         for (int i = 0; i < _rows.Count; i++)
         {
             if (_rows[i] != null)
-                _rows[i].SetCountUpProgress(progress);
+                _rows[i].SetCountUpProgress(frame);
         }
     }
 
