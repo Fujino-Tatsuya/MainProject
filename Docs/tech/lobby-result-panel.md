@@ -41,10 +41,15 @@
   - 예전 = `result_row_backing`(회색 88) 위에 금색을 곱해 어두운 갈색 테가 됐다 — 안 보이던 원인. 검토한 후보: ① 내장 UISprite(채택) ② `50.Art/UI/HUD/Tooltip/Skill_Tooltip_Tag_Outline.png`(또렷한 흰 외곽선이지만 Sprite 임포트·9-slice 가 아니라 SVN `.meta` 수정 필요) ③ `50.Art/UI/char_select/card_selected_ring.png`(흰 링, 9-slice 없음 → 가로로 긴 행에 늘리면 테 두께가 찌그러짐). 프로젝트 UI 아트의 9-slice 스프라이트는 모두 어두운 색(28~116)이라 곱하면 금색이 죽는다.
   - 맥동 = `LobbyResultLocalMarkerPulse`(같은 오브젝트): `period` 1.6초마다 투명도 1 ↔ `minAlpha` 0.55, 테 여백 +`outsetBreath` 3px ↔ 0, `ease` InOutSine(EuniTween `PingPongPulse`), unscaled. 켜질 때 가장 밝게 시작. `pulse` 끄면 저작 값 그대로. 자기 Image 알파·자기 여백만 바꿔 카운트업·패널 펀치(부모 크기)와 안 겹친다.
   - 행 프리팹 재생성(`Tools/UI/Authoring/Lobby Result Panel (재생성)`)도 같은 값(`LocalMarkerColor`·`LocalMarkerOutset`·`LocalMarkerCornerScale`, 맥동 컴포넌트)을 붙인다.
+  - 크기 `localScale` = **(0.99, 0.9, 1)**(222 후속, 사용자 조정 — 저작 메뉴 `LocalMarkerScale` 도 같은 값). 맥동은 여백(offset)·알파만 바꾸고 `localScale` 은 건드리지 않는다.
 
 ## 닫기·모달
 - 닫기 버튼, ESC, **열린 뒤 180초**(`autoCloseSeconds`, `Time.unscaledTime` — 슬로모션 영향 없음, 0 이하면 끔) 중 먼저 오는 것. 피어마다 각자(로컬) 닫는다.
 - 열려 있는 동안 `Content` 의 `UiModalBlocker` 가 로컬 플레이어 입력을 막고, 반투명 Dim 이 뒤 클릭을 막는다.
+- **닫기 버튼 hover 흰 테두리(할 일 224)** = `Button_Close` 의 `UiHoverBorder`(범용 컴포넌트, `Assets/1.Scripts/UI/UiHoverBorder.cs` — 셰브론용 기존 `UiHoverOutline`(할 일 109)과 별개). 마우스를 올리거나 키보드·패드로 선택하면 버튼 둘레에 흰 테두리가 `fadeTime` 0.1초(unscaled, EuniTween `ease` OutQuad)에 켜지고, 벗어나면 같은 시간에 꺼진다.
+  - 버튼 Image·Button Transition(ColorTint)은 그대로 — 테두리는 버튼 바로 뒤 형제 Image(처음 켜질 때 하나 만들어 재사용, `Button_Close_HoverBorder`)가 버튼 자리·크기를 매 프레임 따라가며 `outset` 5px 크게 그려 둘레만 보인다. 버튼 스프라이트(`button_pill_neutral`)는 어두운 색이라 흰색을 곱할 수 없어 따로 그린다.
+  - 스프라이트 `outlineSprite` = Unity 내장 `UI/Skin/UISprite.psd`(흰 9-slice), 색 흰색 알파 0.95, `cornerScale`(pixelsPerUnitMultiplier) 0.12 — 알약 모양 끝을 둥글게. 비활성 버튼·패널 닫힘(Content 꺼짐) 때 즉시 숨김. 계산 `UiHoverBorder.Step`(테스트 `Editor/UiHoverBorderTests.cs`).
+  - 재생성 메뉴도 같은 컴포넌트·스프라이트를 붙인다.
 
 ## ESC
 - 패널은 열려 있을 때만 ESC 를 쓴다. 지금 로비(`LobbySceneManager`)에는 ESC 처리가 없어 충돌은 없다.

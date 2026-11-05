@@ -94,6 +94,7 @@ public static class LobbyResultPanelAuthoring
     const string LocalMarkerSpritePath = "UI/Skin/UISprite.psd"; // AssetDatabase.GetBuiltinExtraResource
     const float LocalMarkerOutset = 14f;           // 행 배경(Backing) 밖으로 나오는 테 두께(px) — 예전 9
     const float LocalMarkerCornerScale = 0.18f;    // pixelsPerUnitMultiplier — 내장 스프라이트 모서리를 키워 행 배경 둥근 모서리에 맞춤
+    static readonly Vector3 LocalMarkerScale = new Vector3(0.99f, 0.9f, 1f); // 사용자 조정(222 후속)
     static readonly Color DimColor = new Color(0f, 0f, 0f, 0.6f);
 
     // ── 메뉴 ────────────────────────────────────────────────
@@ -197,6 +198,7 @@ public static class LobbyResultPanelAuthoring
             Image markerImage = AddImage(marker.gameObject, AssetDatabase.GetBuiltinExtraResource<Sprite>(LocalMarkerSpritePath), true, LocalMarkerColor);
             markerImage.pixelsPerUnitMultiplier = LocalMarkerCornerScale;
             marker.gameObject.AddComponent<LobbyResultLocalMarkerPulse>(); // 맥동 값은 컴포넌트 기본값
+            marker.localScale = LocalMarkerScale; // 맥동은 여백·알파만 바꿔 크기를 덮어쓰지 않는다
             marker.gameObject.SetActive(false);
 
             RectTransform backing = NewRect("Backing", root.transform);
@@ -380,6 +382,10 @@ public static class LobbyResultPanelAuthoring
             closeImage.raycastTarget = true;
             Button closeButton = close.gameObject.AddComponent<Button>();
             closeButton.targetGraphic = closeImage;
+            // hover·선택 시 흰 테두리(할 일 224) — 버튼 Transition 은 그대로, 테두리는 버튼 뒤 형제 Image 를 런타임에 만든다.
+            var closeOutline = new SerializedObject(close.gameObject.AddComponent<UiHoverBorder>());
+            closeOutline.FindProperty("outlineSprite").objectReferenceValue = AssetDatabase.GetBuiltinExtraResource<Sprite>(LocalMarkerSpritePath);
+            closeOutline.ApplyModifiedPropertiesWithoutUndo();
             RectTransform closeLabel = NewRect("Label", close);
             StretchWithOffset(closeLabel, -Padding);
             AddText(closeLabel, font, LobbyResultUiStrings.Close, 54f, TextAlignmentOptions.Center, TextLight);
