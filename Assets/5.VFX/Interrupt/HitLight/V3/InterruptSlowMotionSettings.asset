@@ -49,7 +49,7 @@ MonoBehaviour:
   interruptSuccessProfile:
     scale: 0.1
     hitStopDuration: 1.25
-    hitStopScale: 1
+    hitStopScale: 0.01
     enterDuration: 0
     holdDuration: 0
     exitDuration: 0
