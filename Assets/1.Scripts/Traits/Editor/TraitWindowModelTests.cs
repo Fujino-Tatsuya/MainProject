@@ -244,6 +244,9 @@ public sealed class TraitWindowModelTests
     public void TextTable_DefaultsMatchConstants_AndFallsBackWithoutAssetOrRow()
     {
         var table = UnityEngine.ScriptableObject.CreateInstance<TraitTextTable>();
+        // Strings 시트 행이 에셋 값보다 먼저다(11-04 현지화 A) — 빈 표를 걸어 시트 내용과 무관하게 에셋·상수 규칙만 본다.
+        var emptyStrings = UnityEngine.ScriptableObject.CreateInstance<StringTable>();
+        Loc.SetTable(emptyStrings);
         try
         {
             Assert.That(table.Entries.Count, Is.EqualTo(TraitTexts.AllIds.Length), "새 에셋 = 모든 ID 행");
@@ -266,6 +269,8 @@ public sealed class TraitWindowModelTests
         }
         finally
         {
+            Loc.SetTable(null);
+            UnityEngine.Object.DestroyImmediate(emptyStrings);
             UnityEngine.Object.DestroyImmediate(table);
         }
     }

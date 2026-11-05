@@ -321,7 +321,7 @@ public sealed class InterruptCameraCenterTrackerTests
         OwnerJudged(s.Director, s.Target, true);
         Assert.AreEqual(InterruptCameraCenterState.Centering, s.Director.CameraCenterState);
         s.Step(0f);
-        Near(new Vector3(3f, 0f, 0f), s.Step(0.5f));
+        Near(new Vector3(3f, 0f, 0f), s.Step(0.3f)); // 이동 0.08s 끝 · 제압 성공 기본 복귀 대기(0.45s, 219) 전
         Assert.AreEqual(Vector3.zero, s.Step(0.5f, true));
         Assert.AreEqual(InterruptCameraCenterState.Idle, s.Director.CameraCenterState, "연출 뒤 평소 중심 그대로");
     }
@@ -387,7 +387,7 @@ public sealed class InterruptCameraCenterTrackerTests
         s.Director.CameraCenterServerSucceeded(InterruptPresentationTier.Suppress, false, 7, point, Time.unscaledTime);
         Assert.AreEqual(InterruptCameraCenterState.Centering, s.Director.CameraCenterState);
         s.Step(0f);
-        Near(new Vector3(-2f, 0f, 4f), s.Step(0.5f), "수평만");
+        Near(new Vector3(-2f, 0f, 4f), s.Step(0.3f), "수평만"); // 제압 성공 기본 복귀 대기(0.45s, 219) 전
     }
 
     [Test]
