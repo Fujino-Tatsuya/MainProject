@@ -24,14 +24,14 @@ MonoBehaviour:
       time: 0
       value: 1
       inSlope: 0
-      outSlope: -1.8
+      outSlope: 0
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 0.4
-      value: 0.35
+      time: 0.68334043
+      value: 0.3461853
       inSlope: -0.9
       outSlope: -0.9
       tangentMode: 0
@@ -42,7 +42,7 @@ MonoBehaviour:
       time: 1
       value: 0
       inSlope: -0.15
-      outSlope: 0
+      outSlope: -0.15
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -194,11 +194,11 @@ MonoBehaviour:
     m_RotationOrder: 4
   whiteoutFrames: 0
   gapRaySpread: 20
-  gapRayCount: 8
+  gapRayCount: 4
   gapSparkSpread: 30
   gapStreakAxis: 0
   raySpace: 1
-  rayScreenSize: 0.05
+  rayScreenSize: 0.07
   rayScreenLength: 1
   rayScreenBrightness: 1.5
   rayScreenMaterial: {fileID: 2100000, guid: d04c16b45e7636a4fbad39483f445774, type: 2}

@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9061f5b72ee46340a901305563bd2b9, type: 3}
   m_Name: InterruptHitLightLook_V3_Suppress
   m_EditorClassIdentifier: Assembly-CSharp::InterruptHitLightLook
-  lightColor: {r: 1, g: 0.6, b: 0.3, a: 1}
-  lightIntensity: 25
+  lightColor: {r: 0.81960785, g: 0.9713135, b: 1, a: 1}
+  lightIntensity: 60
   lightRange: 100
-  lightShadows: 2
+  lightShadows: 1
   lightDuration: 0.9
   lightCurve:
     serializedVersion: 2
@@ -193,12 +193,12 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   whiteoutFrames: 3
-  gapRaySpread: 20
-  gapRayCount: 13
-  gapSparkSpread: 30
+  gapRaySpread: 11.5
+  gapRayCount: 16
+  gapSparkSpread: 90
   gapStreakAxis: 0
   raySpace: 1
-  rayScreenSize: 0.05
+  rayScreenSize: 0.1
   rayScreenLength: 1
-  rayScreenBrightness: 2.5
+  rayScreenBrightness: 0.1
   rayScreenMaterial: {fileID: 2100000, guid: d04c16b45e7636a4fbad39483f445774, type: 2}
