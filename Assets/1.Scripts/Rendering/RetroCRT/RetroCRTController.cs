@@ -1,7 +1,4 @@
 ﻿using UnityEngine;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-using UnityEngine.InputSystem;
-#endif
 
 // PC Renderer를 공유하는 다른 씬까지 CRT가 켜지지 않도록 맵에서 수명을 관리한다.
 [ExecuteAlways]
@@ -9,7 +6,7 @@ using UnityEngine.InputSystem;
 public sealed class RetroCRTController : MonoBehaviour
 {
     [Header("Cyanilux CRT")]
-    [Tooltip("Cyanilux CRT만 켜고 끈다. F7도 이 항목만 전환한다. 아래 두 효과는 독립적으로 동작한다.")]
+    [Tooltip("Cyanilux CRT만 켜고 끈다. 아래 두 효과는 독립적으로 동작한다.")]
     [SerializeField] private bool _effectEnabled = true;
 
     [Tooltip("검은 CRT 베젤 크기. 0=없음, 1=기존 크기, 클수록 테두리가 넓어진다. 화면 곡률과 별도로 조절한다.")]
@@ -40,9 +37,6 @@ public sealed class RetroCRTController : MonoBehaviour
     [SerializeField] private Material _materialOverride;
 
     private static RetroCRTController s_active;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-    private InputAction _toggleAction;
-#endif
 
     // 런타임 오버라이드. 공유 머티리얼의 저작값은 건드리지 않고, 활성화된 것만 MPB 로 덮는다.
     // 비어 있으면 아무것도 밀지 않으므로 맵 씬의 기존 룩이 그대로 유지된다.
@@ -129,36 +123,16 @@ public sealed class RetroCRTController : MonoBehaviour
             Debug.LogWarning("[RetroCRT] 컨트롤러가 둘 이상이다. 맵 씬에 하나만 둘 것.", this);
 
         s_active = this;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-        if (Application.isPlaying)
-        {
-            _toggleAction = new InputAction("Toggle CRT", InputActionType.Button, "<Keyboard>/f7");
-            _toggleAction.performed += OnTogglePerformed;
-            _toggleAction.Enable();
-        }
-#endif
     }
 
     private void OnDisable()
     {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-        _toggleAction?.Dispose();
-        _toggleAction = null;
-#endif
         // 연출 도중 씬이 바뀌어도 오버라이드가 남지 않게 한다.
         ClearAllOverrides();
 
         if (s_active == this)
             s_active = null;
     }
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-    private void OnTogglePerformed(InputAction.CallbackContext context)
-    {
-        if (Application.isPlaying && s_active == this)
-            ToggleEffect();
-    }
-#endif
 
     [ContextMenu("Toggle CRT")]
     public void ToggleEffect()

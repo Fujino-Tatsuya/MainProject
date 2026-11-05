@@ -9,7 +9,7 @@
 //   Home   = CSV 저장 + 콘솔 요약          (F1~F12 는 전부 다른 디버그 키가 쓰고 있다)
 //   End    = 프레임 상한 해제 ↔ 원래 상한 (바꾸면 누적 초기화 — 섞이면 비교가 안 된다)
 //   Insert = 누적 초기화
-//   F8     = 화면 한 줄 표시 토글(ProfilerHUD 와 같은 키)
+//   (F8 화면 한 줄 표시 토글은 11-05 삭제 — 표시는 showOverlay 칸으로만)
 //
 // 숫자의 의미
 //   Frame  = Time.unscaledDeltaTime — 실제 프레임 간격(벽시계). 예산 초과 판정은 이 값으로 한다.
@@ -455,12 +455,10 @@ public sealed class ZonePerfRecorder : MonoBehaviour
         if (kb.homeKey.wasPressedThisFrame) SaveCsv("Home 키");
         if (kb.endKey.wasPressedThisFrame) { SetUncapped(!_uncapped); ResetAll(); }
         if (kb.insertKey.wasPressedThisFrame) ResetAll();
-        if (kb.f8Key.wasPressedThisFrame) showOverlay = !showOverlay;
 #else
         if (Input.GetKeyDown(KeyCode.Home)) SaveCsv("Home 키");
         if (Input.GetKeyDown(KeyCode.End)) { SetUncapped(!_uncapped); ResetAll(); }
         if (Input.GetKeyDown(KeyCode.Insert)) ResetAll();
-        if (Input.GetKeyDown(KeyCode.F8)) showOverlay = !showOverlay;
 #endif
     }
 

@@ -60,7 +60,7 @@ public static class MaskBlurAuthoring
 
         Debug.Log(
             $"[MaskBlur] ProfilerHUD 마커를 마스크 블러 4패스로 교체했다(씬 '{scene.name}'). " +
-            "F8 로 확인할 것 — 0.00 ms 로만 찍히면 패스 이름이 어긋난 것이다.");
+            "ProfilerHUD 로 확인할 것 — 0.00 ms 로만 찍히면 패스 이름이 어긋난 것이다.");
     }
 
     private static void AddMarker(ProfilerHUD hud, string label, string markerName)

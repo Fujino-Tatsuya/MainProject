@@ -6,7 +6,7 @@
 // 사용법:
 //   1) 빈 GameObject 에 ProfilerHUD 컴포넌트 추가 (Reset 시 FullScreenFog 마커 자동 채움).
 //   2) Custom Markers 에 RenderGraph 패스 이름을 넣으면 패스별 ms 가 표시됨.
-//   3) 플레이 → F8 토글.
+//   3) 플레이 → startVisible 이 켜져 있으면 표시(F8 토글은 11-05 삭제).
 //
 // GPU ms 가 0/N/A 면 Project Settings > Player > Other Settings > "Frame Timing Stats" 활성화.
 // 패스 ms 는 AddRasterRenderPass<T>("이름", ...) 의 "이름" 과 Marker Name 이 정확히 같아야 잡힌다.
@@ -19,22 +19,13 @@ using System.Collections.Generic;
 using System.Text;
 using Unity.Profiling;
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;   // 신 Input System (이 프로젝트: Active Input Handling = New)
-#endif
 
 [DisallowMultipleComponent]
 public sealed class ProfilerHUD : MonoBehaviour
 {
     // ───────── 인스펙터 설정 ─────────
     [Header("표시")]
-#if ENABLE_INPUT_SYSTEM
-    [Tooltip("HUD on/off 토글 키 (신 Input System)")]
-    public Key toggleKey = Key.F8;
-#else
-    [Tooltip("HUD on/off 토글 키 (구 Input Manager)")]
-    public KeyCode toggleKey = KeyCode.F8;
-#endif
+    // F8 토글 키는 뺐다(11-05 사용자) — 표시는 startVisible 로만 정한다.
     [Tooltip("시작 시 켜진 상태로 둘지")]
     public bool startVisible = true;
     [Tooltip("화면 모서리 위치")]
@@ -180,12 +171,6 @@ public sealed class ProfilerHUD : MonoBehaviour
 
     void Update()
     {
-#if ENABLE_INPUT_SYSTEM
-        var kb = Keyboard.current;
-        if (kb != null && kb[toggleKey].wasPressedThisFrame) _visible = !_visible;
-#else
-        if (Input.GetKeyDown(toggleKey)) _visible = !_visible;
-#endif
         // 인스펙터에서 targetFps 를 런타임에 바꾸면 예산도 따라간다.
         // (OnEnable 에서만 계산하면 실행 중 목표 변경이 색·그래프에 반영되지 않는다.)
         int wantFps = Mathf.Max(1, targetFps);
