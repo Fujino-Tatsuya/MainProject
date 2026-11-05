@@ -27,6 +27,12 @@ public sealed class DebugLobbyResultPanelLab : MonoBehaviour
     private string _lastClose = "-";
     private bool _slowMotion;
 
+    // 등급 도장(할 일 223) 확인용 소요 시간(초) — 음수 = 값 세트 기본(12:34 + 세트마다 61초).
+    private static readonly float[] GradeSampleSeconds = { 230f, 360f, 361f, 540f, 720f, 721f };
+    private static readonly string[] GradeSampleLabels = { "S 03:50", "S 06:00", "A 06:01", "A 09:00", "B 12:00", "C 12:01" };
+    private float _playTimeOverride = -1f;
+    private int _gradeSample = -1;
+
     private void Start()
     {
         if (panel == null)
@@ -72,6 +78,7 @@ public sealed class DebugLobbyResultPanelLab : MonoBehaviour
         if (kb.rKey.wasPressedThisFrame) StartCoroutine(CloseThenReopen());
         if (kb.vKey.wasPressedThisFrame) OpenWithNewResult(_playerCount, _variant + 1);
         if (kb.tKey.wasPressedThisFrame) ToggleSlowMotion();
+        if (kb.gKey.wasPressedThisFrame) OpenWithGradeSample(_gradeSample + 1);
     }
 
     private void OpenWithNewResult(int playerCount, int variant)
@@ -79,8 +86,16 @@ public sealed class DebugLobbyResultPanelLab : MonoBehaviour
         _playerCount = Mathf.Clamp(playerCount, 1, 3);
         _variant = variant;
         SessionResult.Capture(variant % 3 == 2 ? SessionOutcome.Wiped : SessionOutcome.Cleared,
-            754.4f + variant * 61f, BuildPlayers(_playerCount, variant));
+            _playTimeOverride >= 0f ? _playTimeOverride : 754.4f + variant * 61f, BuildPlayers(_playerCount, variant));
         panel.Show(); // 열려 있으면 다시 채우고 카운트업을 처음부터
+    }
+
+    /// <summary>등급 도장 확인 — 소요 시간 예시(S/A/B/C 경계 앞뒤)로 다시 연다. 다른 값 세트(V·1~3)도 이 시간을 유지한다.</summary>
+    private void OpenWithGradeSample(int index)
+    {
+        _gradeSample = ((index % GradeSampleSeconds.Length) + GradeSampleSeconds.Length) % GradeSampleSeconds.Length;
+        _playTimeOverride = GradeSampleSeconds[_gradeSample];
+        OpenWithNewResult(_playerCount, _variant);
     }
 
     private IEnumerator CloseThenReopen()
@@ -134,11 +149,12 @@ public sealed class DebugLobbyResultPanelLab : MonoBehaviour
 
     private void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(10f, 10f, 460f, 300f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(10f, 10f, 520f, 340f), GUI.skin.box);
         GUILayout.Label("215 로비 결과창 애니 테스트");
         GUILayout.Label("1/2/3 = 플레이어 수 바꿔 열기 · O = 열기 · C = 닫기 · ESC = 패널 닫기");
         GUILayout.Label("R = 닫는 도중 다시 열기 · V = 값 바꿔 다시 열기(카운트업 끝 감속·값 크기별 세기·패널 펀치·1위 왕관 점프·반짝임 재확인)");
         GUILayout.Label("T = 슬로모션 0.1 토글(패널 연출은 unscaled 라 그대로여야 함)");
+        GUILayout.Label("G = 등급 도장 소요 시간 예시 순환(S 03:50 → S 06:00 → A 06:01 → A 09:00 → B 12:00 → C 12:01) · 아래 버튼으로 바로");
         if (panel == null)
         {
             GUILayout.Label("⚠ 씬에 LobbyResultPanel 이 없다");
@@ -160,8 +176,17 @@ public sealed class DebugLobbyResultPanelLab : MonoBehaviour
         }
         if (GUILayout.Button(_slowMotion ? "슬로모션 끄기" : "슬로모션 0.1")) ToggleSlowMotion();
         GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        for (int i = 0; i < GradeSampleLabels.Length; i++)
+        {
+            if (GUILayout.Button(GradeSampleLabels[i]))
+                OpenWithGradeSample(i);
+        }
+        GUILayout.EndHorizontal();
 
         GUILayout.Label($"열림 {panel.IsOpen} · 플레이어 {_playerCount}명 · 값 세트 {_variant} · 마지막 닫힘 {_lastClose} · timeScale {Time.timeScale:0.##}");
+        if (SessionResult.HasValue)
+            GUILayout.Label($"소요 시간 {SessionResult.FormatSurvival()} → 등급 {LobbyResultGrade.Letter(panel.EvaluateGrade(SessionResult.SurvivalSeconds))}");
         GUILayout.EndArea();
     }
 

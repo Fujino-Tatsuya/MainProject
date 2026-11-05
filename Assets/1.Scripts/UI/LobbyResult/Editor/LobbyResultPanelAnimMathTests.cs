@@ -284,4 +284,58 @@ public sealed class LobbyResultPanelAnimMathTests
         // 주기 0 이하 = 맥동 없음
         Assert.AreEqual(0f, LobbyResultPanelAnimMath.PingPongPulse(0.4f, 0f, Ease.InOutSine), 1e-6f);
     }
+
+    // ── 등급 도장(할 일 223) ──
+
+    [Test]
+    public void StampDropPose_HiddenBeforeStart_SlamsToFinalWithInQuad()
+    {
+        LobbyResultStampPose before = LobbyResultPanelAnimMath.StampDropPose(-0.01f, 0.12f, 2.5f, -12f, -8f, Ease.InQuad);
+        Assert.AreEqual(0f, before.Alpha, 1e-6f);
+        Assert.AreEqual(2.5f, before.Scale, 1e-6f);
+        Assert.AreEqual(-12f, before.Angle, 1e-6f);
+
+        // 절반 시간 = InQuad 0.25 — 아직 크게 남아 있다가 끝에서 빨라진다
+        LobbyResultStampPose half = LobbyResultPanelAnimMath.StampDropPose(0.06f, 0.12f, 2.5f, -12f, -8f, Ease.InQuad);
+        Assert.AreEqual(2.5f - 1.5f * 0.25f, half.Scale, 1e-4f);
+        Assert.AreEqual(0.25f, half.Alpha, 1e-4f);
+        Assert.AreEqual(-11f, half.Angle, 1e-4f);
+
+        LobbyResultStampPose landed = LobbyResultPanelAnimMath.StampDropPose(0.12f, 0.12f, 2.5f, -12f, -8f, Ease.InQuad);
+        Assert.AreEqual(1f, landed.Scale, 1e-6f);
+        Assert.AreEqual(1f, landed.Alpha, 1e-6f);
+        Assert.AreEqual(-8f, landed.Angle, 1e-6f);
+
+        // 지속 0 = 시작하자마자 최종
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampDropPose(0f, 0f, 2.5f, -12f, -8f, Ease.InQuad).Alpha, 1e-6f);
+    }
+
+    [Test]
+    public void StampBounceAndShake_OnlyAfterLanding_SettleExactly()
+    {
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampBounceScale(0f, 0.16f, 1.08f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1.08f, LobbyResultPanelAnimMath.StampBounceScale(0.08f, 0.16f, 1.08f, Ease.OutQuad), 1e-4f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampBounceScale(0.16f, 0.16f, 1.08f, Ease.OutQuad), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.StampBounceScale(0.05f, 0f, 1.08f, Ease.OutQuad), 1e-6f);
+
+        Assert.AreEqual(Vector2.zero, LobbyResultPanelAnimMath.StampShakeOffset(-0.01f, 0.12f, 8f, 3f));
+        Assert.AreEqual(Vector2.zero, LobbyResultPanelAnimMath.StampShakeOffset(0.12f, 0.12f, 8f, 3f));
+        Vector2 mid = LobbyResultPanelAnimMath.StampShakeOffset(0.01f, 0.12f, 8f, 3f);
+        Assert.Greater(mid.magnitude, 0f);
+        Assert.LessOrEqual(Mathf.Abs(mid.x), 8f);
+    }
+
+    [Test]
+    public void StampTiming_AfterPunch_CrownWaitsUntilStampSettles()
+    {
+        // 카운트업 0.15 + 1.5 = 1.65 끝 → 펀치 0.28 → 도장 1.93 시작
+        Assert.AreEqual(1.93f, LobbyResultPanelAnimMath.StampStart(0.15f, 1.5f, 0.28f, 0f), 1e-5f);
+        // 음수 지연은 펀치와 겹치되 카운트업 끝보다 앞으로는 안 간다
+        Assert.AreEqual(1.65f, LobbyResultPanelAnimMath.StampStart(0.15f, 1.5f, 0.28f, -1f), 1e-5f);
+        // 내려찍기 0.12 + max(흔들림 0.12, 반동 0.16) = 0.28
+        Assert.AreEqual(0.28f, LobbyResultPanelAnimMath.StampTotal(0.12f, 0.12f, 0.16f), 1e-6f);
+        // 왕관 첫 점프 = 카운트업 끝 + (펀치 + 도장) + 왕관 지연 — 도장이 자리 잡은 뒤
+        float crown = LobbyResultPanelAnimMath.CrownFirstStart(0.15f, 1.5f, 0.28f + 0.28f, 0.05f);
+        Assert.GreaterOrEqual(crown, 1.93f + 0.28f);
+    }
 }

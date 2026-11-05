@@ -218,6 +218,64 @@ public static class LobbyResultPanelAnimMath
         return Easing.Evaluate(ease, Mathf.Clamp01(tri));
     }
 
+    // ── 등급 도장(할 일 223) ─────────────────────────────────
+
+    /// <summary>
+    /// 도장 내려찍기 시작 시각(열기부터, 초) = 카운트업 끝 + 패널 펀치 + <paramref name="stampDelay"/>.
+    /// 지연이 음수면 펀치와 겹치게 당기되, 카운트업 끝보다 앞으로는 안 간다.
+    /// </summary>
+    public static float StampStart(float countUpDelay, float countUpDuration, float punchDuration, float stampDelay)
+    {
+        float end = CountUpEnd(countUpDelay, countUpDuration);
+        return Mathf.Max(end, end + Mathf.Max(0f, punchDuration) + stampDelay);
+    }
+
+    /// <summary>도장 내려찍기 시작부터 자리 잡을 때까지(초) = 내려찍기 + max(흔들림, 반동).</summary>
+    public static float StampTotal(float dropDuration, float shakeDuration, float bounceDuration) =>
+        Mathf.Max(0f, dropDuration) + Mathf.Max(0f, Mathf.Max(shakeDuration, bounceDuration));
+
+    /// <summary>
+    /// 내려찍기 모습 — 시작 전(경과 0 미만) = 투명, 크기 <paramref name="startScale"/>, 기울기 <paramref name="startAngle"/>.
+    /// 그 뒤 <paramref name="dropDuration"/> 에 걸쳐 크기 1·투명도 1·기울기 <paramref name="endAngle"/> 로(EuniTween <paramref name="ease"/>, 기본 InQuad = 끝에서 빨라져 "쾅").
+    /// 지속 0 이하면 시작하자마자 최종 모습.
+    /// </summary>
+    public static LobbyResultStampPose StampDropPose(float sinceStart, float dropDuration, float startScale,
+        float startAngle, float endAngle, Ease ease)
+    {
+        if (sinceStart < 0f)
+            return new LobbyResultStampPose(startScale, 0f, startAngle);
+        float t = dropDuration <= 0f ? 1f : Mathf.Clamp01(sinceStart / dropDuration);
+        if (t >= 1f)
+            return new LobbyResultStampPose(1f, 1f, endAngle);
+        float e = Easing.Evaluate(ease, t);
+        return new LobbyResultStampPose(Mathf.LerpUnclamped(startScale, 1f, e), Mathf.Clamp01(e), Mathf.LerpUnclamped(startAngle, endAngle, e));
+    }
+
+    /// <summary>
+    /// 착지 반동 크기 배율 — 1 → <paramref name="peakScale"/> → 1(EuniTween <see cref="Easing.Punch"/>).
+    /// 착지 전·반동 끝·지속 0 이하는 정확히 1.
+    /// </summary>
+    public static float StampBounceScale(float sinceLand, float duration, float peakScale, Ease ease)
+    {
+        if (duration <= 0f || sinceLand <= 0f || sinceLand >= duration)
+            return 1f;
+        return Mathf.LerpUnclamped(1f, peakScale, Easing.Punch(ease, sinceLand / duration));
+    }
+
+    /// <summary>
+    /// 착지 흔들림 위치 오프셋(UI px) — <paramref name="duration"/> 동안 <paramref name="cycles"/> 번 좌우로(세로는 절반·반 박자 어긋나게),
+    /// 세기는 선형으로 줄어든다. 착지 전·끝·지속 0 이하는 0. 무작위 없음(모든 피어·매번 같은 모습).
+    /// </summary>
+    public static Vector2 StampShakeOffset(float sinceLand, float duration, float amplitude, float cycles)
+    {
+        if (duration <= 0f || sinceLand <= 0f || sinceLand >= duration)
+            return Vector2.zero;
+        float t = sinceLand / duration;
+        float strength = amplitude * (1f - t);
+        float phase = 2f * Mathf.PI * Mathf.Max(0f, cycles) * t;
+        return new Vector2(Mathf.Sin(phase) * strength, Mathf.Sin(phase * 1.5f) * strength * 0.5f);
+    }
+
     /// <summary>반짝임 크기·투명도 0 → 1 → 0(EuniTween <see cref="Easing.Punch"/>). 진행도 0 미만(안 보임)·1 이상이면 0.</summary>
     public static float SparklePulse(float progress, Ease ease)
     {
@@ -261,4 +319,19 @@ public readonly struct LobbyResultCountUpFrame
     /// <summary>소요 시간(초) — 단계 수 = 표시되는 초 수(mm:ss 는 초 아래 버림).</summary>
     public float Seconds(float finalSeconds) =>
         LobbyResultPanelAnimMath.CountUpSeconds(finalSeconds, ProgressFor(System.Math.Floor(Mathf.Max(0f, finalSeconds))));
+}
+
+/// <summary>등급 도장 한 순간의 모습(할 일 223) — 크기 배율·투명도·기울기(도, 화면 안 Z).</summary>
+public readonly struct LobbyResultStampPose
+{
+    public readonly float Scale;
+    public readonly float Alpha;
+    public readonly float Angle;
+
+    public LobbyResultStampPose(float scale, float alpha, float angle)
+    {
+        Scale = scale;
+        Alpha = alpha;
+        Angle = angle;
+    }
 }
