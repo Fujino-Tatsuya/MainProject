@@ -163,8 +163,12 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 float3 floorBlend=DecalFloorBlendResolve(_DecalFloorBlendSkill);
                 half face=_MarkerColor.a*lerp(0.55h,1.0h,saturate(uv.y))*(half)(floorBlend.x*floorBlend.z);
                 half4 result=half4(_MarkerColor.rgb*face,face);
-                Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
-                Over(result,_InnerColor.rgb,inner*_InnerColor.a);
+                // 221 follow-up: outline/inner line stained into the floor (alpha scale + stain), outline inner edge soft (outer edge = baseA below).
+                float3 edgeBlend=DecalFloorBlendResolveEdge(_DecalFloorBlendSkillEdge);
+                half4 outlineC=(half4)DecalFloorBlendStain(_OutlineColor,edgeBlend,DFB_REF_FLOOR_LINEAR);
+                half4 innerC=(half4)DecalFloorBlendStain(_InnerColor,edgeBlend,DFB_REF_FLOOR_LINEAR);
+                Over(result,outlineC.rgb,outer*outlineC.a*(half)DecalFloorBlendOuterSoft(1.0-sd/max(outerWidth,0.0001),floorBlend.y));
+                Over(result,innerC.rgb,inner*innerC.a);
                 half visibility=saturate(_Alpha/max(_ArrowReferenceAlpha,0.01h));
                 half3 baseRgb=result.rgb/max(result.a,0.0001h);
                 half baseA=result.a*shape*visibility*_Color.a*(half)DecalFloorBlendOuterSoft(sd/max(outerWidth,0.0001),floorBlend.y);
@@ -175,9 +179,11 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                     half edgeMask=edgeWidth>0.0?(1.0h-smoothstep(edgeWidth-aa,edgeWidth+aa,sd))*shape:0.0h;
                     float2 edgeUv=float2(saturate(sd/max(edgeWidth,0.0001)),uv.y)*_EdgeTex_ST.xy+_EdgeTex_ST.zw;
                     half4 edgeTex=SAMPLE_TEXTURE2D_LOD(_EdgeTex,sampler_EdgeTex,edgeUv,0);
-                    half edgeA=edgeMask*edgeTex.a*_EdgeLineColor.a*(half)DecalFloorBlendOuterSoft(sd/max(edgeWidth,0.0001),floorBlend.y);
+                    half4 edgeC=(half4)DecalFloorBlendStain(float4(edgeTex.rgb*_EdgeLineColor.rgb,edgeMask*edgeTex.a*_EdgeLineColor.a
+                              *DecalFloorBlendLineSoft(sd/max(edgeWidth,0.0001),floorBlend.y)),edgeBlend,DFB_REF_FLOOR_LINEAR);
+                    half edgeA=edgeC.a;
                     half outA=edgeA+baseA*(1.0h-edgeA);
-                    half3 outRgb=(edgeTex.rgb*_EdgeLineColor.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
+                    half3 outRgb=(edgeC.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
                     return half4(outRgb,outA);
                 }
                 return half4(baseRgb,baseA);
@@ -214,8 +220,12 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                 half innerScale=(half)(floorBlend.x*floorBlend.z);
                 half face=_FillOpacity*lerp(lerp(0.04h/0.145h,1.0h,saturate(input.uv.y)),1.0h,lengthFadeOn)*innerScale;
                 half4 result=half4(_Color.rgb*face,face);
-                Over(result,_OutlineColor.rgb,outer*_OutlineColor.a);
-                Over(result,_InnerColor.rgb,inner*_InnerColor.a);
+                // 221 follow-up: outline/inner line stained into the floor, outline inner edge soft (outer edge = baseA below).
+                float3 edgeBlend=DecalFloorBlendResolveEdge(_DecalFloorBlendSkillEdge);
+                half4 outlineC=(half4)DecalFloorBlendStain(_OutlineColor,edgeBlend,DFB_REF_FLOOR_LINEAR);
+                half4 innerC=(half4)DecalFloorBlendStain(_InnerColor,edgeBlend,DFB_REF_FLOOR_LINEAR);
+                Over(result,outlineC.rgb,outer*outlineC.a*(half)DecalFloorBlendOuterSoft(1.0-nearest/max(outerWidth,0.0001),floorBlend.y));
+                Over(result,innerC.rgb,inner*innerC.a);
                 result*=rangeVisibility;
                 half fins=0.0h;
                 // Repeat in segment-local world distance, anchored to the caster.
@@ -256,10 +266,12 @@ Shader "VeyTrace/Player/Skill Line Indicator"
                     half edgeMask=edgeWidth>0.0?1.0h-smoothstep(edgeWidth-aa,edgeWidth+aa,fromSide):0.0h;
                     float2 edgeUv=float2(saturate(fromSide/max(edgeWidth,0.0001)),input.uv.y)*_EdgeTex_ST.xy+_EdgeTex_ST.zw;
                     half4 edgeTex=SAMPLE_TEXTURE2D_LOD(_EdgeTex,sampler_EdgeTex,edgeUv,0);
-                    half edgeA=edgeMask*inside*edgeTex.a*_EdgeLineColor.a*(half)saturate(EdgeLineFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y))*distanceFade
-                              *(half)DecalFloorBlendOuterSoft(fromSide/max(edgeWidth,0.0001),floorBlend.y);
+                    half4 edgeC=(half4)DecalFloorBlendStain(float4(edgeTex.rgb*_EdgeLineColor.rgb,edgeMask*inside*edgeTex.a*_EdgeLineColor.a
+                              *saturate(EdgeLineFade(_LineFadeSpan.x+input.uv.y*_LineFadeSpan.y))*distanceFade
+                              *DecalFloorBlendLineSoft(fromSide/max(edgeWidth,0.0001),floorBlend.y)),edgeBlend,DFB_REF_FLOOR_LINEAR);
+                    half edgeA=edgeC.a;
                     half outA=edgeA+baseA*(1.0h-edgeA);
-                    half3 outRgb=(edgeTex.rgb*_EdgeLineColor.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
+                    half3 outRgb=(edgeC.rgb*edgeA+baseRgb*baseA*(1.0h-edgeA))/max(outA,0.0001h);
                     return half4(outRgb,outA);
                 }
                 return half4(baseRgb,baseA);

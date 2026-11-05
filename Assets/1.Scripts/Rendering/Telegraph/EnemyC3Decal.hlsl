@@ -59,6 +59,10 @@ float4 EnemyC3DecalGamma(float2 uv)
     pal.outline = _C3Outline; pal.innerLine = _C3InnerLine; pal.band = _C3Band;
     pal.fill = float4(0, 0, 0, 0); pal.markers = _C3Markers;
     pal.band.a *= floorBlend.x; pal.markers.a *= floorBlend.x;
+    // 221 후속 — 외곽선·안쪽 선도 바닥에 물들게(알파 배율 + 물들임, 감마 색이라 감마 기준 바닥).
+    float3 edgeBlend = DecalFloorBlendResolveEdge(_DecalFloorBlendTelegraphEdge);
+    pal.outline = DecalFloorBlendStain(pal.outline, edgeBlend, DFB_REF_FLOOR_GAMMA);
+    pal.innerLine = DecalFloorBlendStain(pal.innerLine, edgeBlend, DFB_REF_FLOOR_GAMMA);
     return EnemyC3BoundarySoft(d, aa, unit, bandCover, marker, false, _C3Geom.x, _C3Geom.y, _C3Geom.z, floorBlend.y, pal);
 }
 

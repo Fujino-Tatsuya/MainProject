@@ -82,6 +82,8 @@ public sealed class DecalFloorBlendTests
         {
             Assert.AreEqual(DecalFloorBlend.Identity, s.SkillGlobal());
             Assert.AreEqual(DecalFloorBlend.Identity, s.TelegraphGlobal());
+            Assert.AreEqual(DecalFloorBlend.EdgeIdentity, s.SkillEdgeGlobal(), "외곽선 코드 기본 = 지금 화면");
+            Assert.AreEqual(DecalFloorBlend.EdgeIdentity, s.TelegraphEdgeGlobal());
         }
         finally { Object.DestroyImmediate(s); }
     }
@@ -91,24 +93,34 @@ public sealed class DecalFloorBlendTests
     {
         Vector4 skillBefore = Shader.GetGlobalVector(DecalFloorBlend.SkillGlobalId);
         Vector4 telegraphBefore = Shader.GetGlobalVector(DecalFloorBlend.TelegraphGlobalId);
+        Vector4 skillEdgeBefore = Shader.GetGlobalVector(DecalFloorBlend.SkillEdgeGlobalId);
+        Vector4 telegraphEdgeBefore = Shader.GetGlobalVector(DecalFloorBlend.TelegraphEdgeGlobalId);
         var s = ScriptableObject.CreateInstance<DecalFloorBlendSettings>();
         try
         {
             s.skillFillAlphaScale = 0.5f; s.skillEdgeSoftness = 0.2f; s.skillPlateFillAlphaScale = 0.9f;
             s.telegraphFillAlphaScale = 0.7f; s.telegraphEdgeSoftness = 0.1f; s.telegraphPlateFillAlphaScale = 0.8f;
+            s.skillOutlineAlphaScale = 0.6f; s.skillOutlineStain = 0.4f; s.skillStainMode = DecalFloorStainMode.Multiply;
+            s.telegraphOutlineAlphaScale = 0.9f; s.telegraphOutlineStain = 0.3f;
             DecalFloorBlendDriver.Apply(s);
+            Assert.AreEqual(new Vector4(0.6f, 0.4f, 1f, 1f), Shader.GetGlobalVector(DecalFloorBlend.SkillEdgeGlobalId));
+            Assert.AreEqual(new Vector4(0.9f, 0.3f, 0f, 1f), Shader.GetGlobalVector(DecalFloorBlend.TelegraphEdgeGlobalId));
             Assert.AreEqual(new Vector4(0.5f, 0.2f, 0.9f, 1f), Shader.GetGlobalVector(DecalFloorBlend.SkillGlobalId));
             Assert.AreEqual(new Vector4(0.7f, 0.1f, 0.8f, 1f), Shader.GetGlobalVector(DecalFloorBlend.TelegraphGlobalId));
 
             DecalFloorBlendDriver.Apply(null);
             Assert.AreEqual(new Vector3(1f, 0f, 1f), DecalFloorBlend.Resolve(Shader.GetGlobalVector(DecalFloorBlend.SkillGlobalId)));
             Assert.AreEqual(new Vector3(1f, 0f, 1f), DecalFloorBlend.Resolve(Shader.GetGlobalVector(DecalFloorBlend.TelegraphGlobalId)));
+            Assert.AreEqual(new Vector3(1f, 0f, 0f), DecalFloorBlend.ResolveEdge(Shader.GetGlobalVector(DecalFloorBlend.SkillEdgeGlobalId)));
+            Assert.AreEqual(new Vector3(1f, 0f, 0f), DecalFloorBlend.ResolveEdge(Shader.GetGlobalVector(DecalFloorBlend.TelegraphEdgeGlobalId)));
         }
         finally
         {
             Object.DestroyImmediate(s);
             Shader.SetGlobalVector(DecalFloorBlend.SkillGlobalId, skillBefore);
             Shader.SetGlobalVector(DecalFloorBlend.TelegraphGlobalId, telegraphBefore);
+            Shader.SetGlobalVector(DecalFloorBlend.SkillEdgeGlobalId, skillEdgeBefore);
+            Shader.SetGlobalVector(DecalFloorBlend.TelegraphEdgeGlobalId, telegraphEdgeBefore);
         }
     }
 
@@ -129,6 +141,72 @@ public sealed class DecalFloorBlendTests
         Assert.IsNotNull(s, "Resources/" + DecalFloorBlendSettings.ResourcePath);
         Assert.Greater(s.telegraphFillAlphaScale, 0.3f, "예고는 회피 신호 — 너무 옅게 하지 말 것");
         Assert.Greater(s.skillFillAlphaScale, 0f);
+        Assert.GreaterOrEqual(s.telegraphOutlineAlphaScale, 0.7f, "예고 외곽선은 회피 신호 — 너무 낮추지 말 것");
+        Assert.LessOrEqual(s.telegraphOutlineStain, 0.8f, "완전 물들임이면 어두운 바닥에서 외곽선이 묻힌다");
+    }
+
+    // ── 221 후속 — 외곽선 물들임·양쪽 소프트 ─────────────────────────────
+
+    static readonly Color White = new Color(1f, 1f, 1f, 0.95f);
+
+    [Test]
+    public void Stain_Identity_IsNoChange()
+    {
+        foreach (Color c in new[] { White, new Color(0.74f, 0.5f, 0.47f, 1f), new Color(0f, 0f, 0f, 0.3f) })
+        {
+            Color o = DecalFloorBlend.Stain(c, DecalFloorBlend.ResolveEdge(DecalFloorBlend.EdgeIdentity), DecalFloorBlend.RefFloorGamma);
+            Assert.AreEqual(c.r, o.r, Eps); Assert.AreEqual(c.g, o.g, Eps); Assert.AreEqual(c.b, o.b, Eps); Assert.AreEqual(c.a, o.a, Eps);
+            Color u = DecalFloorBlend.Stain(c, DecalFloorBlend.ResolveEdge(Vector4.zero), DecalFloorBlend.RefFloorGamma);
+            Assert.AreEqual(c.a, u.a, Eps, "값 없음 = 그대로");
+        }
+    }
+
+    [Test]
+    public void Stain_AlphaScale_OnlyScalesAlpha()
+    {
+        Color o = DecalFloorBlend.Stain(White, new Vector3(0.5f, 0f, 0f), DecalFloorBlend.RefFloorGamma);
+        Assert.AreEqual(0.475f, o.a, Eps);
+        Assert.AreEqual(1f, o.r, Eps);
+    }
+
+    [TestCase(DecalFloorStainMode.LuminanceKeep)]
+    [TestCase(DecalFloorStainMode.Multiply)]
+    public void Stain_Full_KeepsHalfTheFloor(DecalFloorStainMode mode)
+    {
+        Color o = DecalFloorBlend.Stain(White, new Vector3(1f, 1f, (float)mode), DecalFloorBlend.RefFloorGamma);
+        Assert.AreEqual(White.a * (1f - DecalFloorBlend.StainKeep), o.a, Eps, "완전 물들임 = 알파 × (1 − 남김)");
+    }
+
+    [Test]
+    public void Stain_Luminance_PullsBrightnessTowardFloor_KeepsHue()
+    {
+        Color o = DecalFloorBlend.Stain(White, new Vector3(1f, 1f, 0f), DecalFloorBlend.RefFloorGamma);
+        float expected = Mathf.Lerp(1f, DecalFloorBlend.RefFloorGamma, 0.5f);
+        Assert.AreEqual(expected, o.r, Eps, "흰 선 → 기준 바닥과 흰색의 중간 밝기");
+        Assert.Greater(o.r, DecalFloorBlend.RefFloorGamma + 0.2f, "어두운 바닥보다 충분히 밝게 남는다(회피 신호)");
+        Color red = DecalFloorBlend.Stain(new Color(0.8f, 0.2f, 0.2f, 1f), new Vector3(1f, 1f, 0f), DecalFloorBlend.RefFloorGamma);
+        Assert.Greater(red.r, red.g * 2f, "색조 유지");
+    }
+
+    [Test]
+    public void Stain_Multiply_MatchesFloorTimesColor_AtReferenceFloor()
+    {
+        var c = new Color(0.74f, 0.5f, 0.47f, 1f);
+        Color o = DecalFloorBlend.Stain(c, new Vector3(1f, 1f, 1f), DecalFloorBlend.RefFloorGamma);
+        float f = DecalFloorBlend.RefFloorGamma;
+        // 기준 바닥 위 DBuffer lerp 결과 = F·(1 − a) + D·a 가 F·c 와 같다(자름이 안 걸리는 채널).
+        Assert.AreEqual(f * c.r, f * (1f - o.a) + o.r * o.a, 1e-4f);
+        Assert.AreEqual(f * c.g, f * (1f - o.a) + o.g * o.a, 1e-4f);
+    }
+
+    [Test]
+    public void LineSoft_SoftensBothEdges()
+    {
+        Assert.AreEqual(1f, DecalFloorBlend.LineSoft(0f, 0f), Eps, "소프트 0 = 그대로");
+        Assert.AreEqual(0f, DecalFloorBlend.LineSoft(0f, 0.5f), Eps, "안쪽 끝");
+        Assert.AreEqual(0f, DecalFloorBlend.LineSoft(1f, 0.5f), Eps, "바깥 끝");
+        Assert.AreEqual(1f, DecalFloorBlend.LineSoft(0.5f, 0.5f), Eps, "가운데는 그대로");
+        Assert.AreEqual(DecalFloorBlend.LineSoft(0.2f, 0.5f), DecalFloorBlend.LineSoft(0.8f, 0.5f), Eps, "대칭");
     }
 
     [Test]
@@ -141,6 +219,7 @@ public sealed class DecalFloorBlendTests
         }
         string range = File.ReadAllText("Assets/3.Materials/Player/SkillRangeIndicator/SkillRangeIndicator.shadergraph");
         StringAssert.Contains("\"m_FunctionName\": \"SkillRangeDecalFade\"", range);
+        StringAssert.Contains("\"m_ShaderOutputName\": \"ColorIn\"", range, "221 후속 — 색도 함수를 거친다(외곽선 물들임)");
         string guid = AssetDatabase.AssetPathToGUID("Assets/1.Scripts/Rendering/Telegraph/SkillRangeDecalAlpha.hlsl");
         Assert.IsNotEmpty(guid);
         StringAssert.Contains("\"m_FunctionSource\": \"" + guid + "\"", range);

@@ -94,6 +94,10 @@ Shader "Monster/EnemyC3Plate"
                     pal.outline = _C3Outline; pal.innerLine = _C3InnerLine; pal.band = _C3Band;
                     pal.fill = fillColor; pal.markers = _C3Markers;
                     pal.band.a *= innerScale; pal.markers.a *= innerScale;
+                    // 221 후속 — 외곽선·안쪽 선 물들임(데칼과 같은 근사, 감마 기준 바닥).
+                    float3 edgeBlend = DecalFloorBlendResolveEdge(_DecalFloorBlendTelegraphEdge);
+                    pal.outline = DecalFloorBlendStain(pal.outline, edgeBlend, DFB_REF_FLOOR_GAMMA);
+                    pal.innerLine = DecalFloorBlendStain(pal.innerLine, edgeBlend, DFB_REF_FLOOR_GAMMA);
                     // 판은 unit = 1(디자인 단위 그대로).
                     float band = square ? EnemyC3BandLinear(d, 1.0, _C3Geom.w) : EnemyC3BandCircle(p, coreHalf, _C3Geom.w);
                     float marker = _C3Mode.w > 0.5 ? EnemyC3CircleFins(p, coreHalf, _C3Size.z, aa) : 0.0;

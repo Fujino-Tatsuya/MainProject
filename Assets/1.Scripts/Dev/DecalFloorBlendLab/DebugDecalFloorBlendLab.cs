@@ -42,7 +42,10 @@ public sealed class DebugDecalFloorBlendLab : MonoBehaviour
     readonly List<Material> _aimMaterials = new List<Material>();
     Color _aimBase = Color.white;
 
-    void Start()
+    void Start() => Build();
+
+    /// <summary>바닥 3장과 인디케이터·예고를 만든다. Play 밖에서도 부를 수 있다(비교 이미지 캡처 — DecalFloorBlendLabCapture).</summary>
+    public void Build()
     {
         string[] names = { "밝은 바닥", "어두운 바닥", "무늬 바닥" };
         Material[] floors = { FloorOr(brightFloor, new Color(0.85f, 0.85f, 0.82f)), FloorOr(darkFloor, new Color(0.12f, 0.12f, 0.14f)), FloorOr(patternFloor, new Color(0.5f, 0.45f, 0.4f)) };
@@ -144,7 +147,7 @@ public sealed class DebugDecalFloorBlendLab : MonoBehaviour
         if (mat == null) return;
         GameObject q = GameObject.CreatePrimitive(PrimitiveType.Quad);
         q.name = name;
-        Destroy(q.GetComponent<Collider>());
+        Kill(q.GetComponent<Collider>());
         q.transform.SetParent(parent, false);
         // 쿼드 uv.y 0 = 시전자 쪽 — 중심을 길이 절반만큼 앞으로
         q.transform.localPosition = localPos + Vector3.forward * (length * 0.5f);
@@ -162,7 +165,7 @@ public sealed class DebugDecalFloorBlendLab : MonoBehaviour
         if (aimQuad == null) return;
         GameObject q = GameObject.CreatePrimitive(PrimitiveType.Quad);
         q.name = "AimIndicator";
-        Destroy(q.GetComponent<Collider>());
+        Kill(q.GetComponent<Collider>());
         q.transform.SetParent(parent, false);
         q.transform.localPosition = localPos;
         q.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
@@ -204,17 +207,25 @@ public sealed class DebugDecalFloorBlendLab : MonoBehaviour
     {
         Vector4 s = Shader.GetGlobalVector(DecalFloorBlend.SkillGlobalId);
         Vector4 t = Shader.GetGlobalVector(DecalFloorBlend.TelegraphGlobalId);
-        GUI.Label(new Rect(12f, 12f, 900f, 80f),
+        Vector4 se = Shader.GetGlobalVector(DecalFloorBlend.SkillEdgeGlobalId);
+        Vector4 te = Shader.GetGlobalVector(DecalFloorBlend.TelegraphEdgeGlobalId);
+        GUI.Label(new Rect(12f, 12f, 1100f, 100f),
             "221 바닥 블렌딩 — B 누르는 동안 끔(221 이전)\n" +
             $"스킬 채움 {s.x:0.00} · 소프트 {s.y:0.00} · 판 {s.z:0.00} (유효 {s.w:0})   예고 채움 {t.x:0.00} · 소프트 {t.y:0.00} · 판 {t.z:0.00} (유효 {t.w:0})\n" +
+            $"스킬 외곽선 알파 {se.x:0.00} · 물들임 {se.y:0.00} · 모드 {(DecalFloorStainMode)(int)se.z}   예고 외곽선 알파 {te.x:0.00} · 물들임 {te.y:0.00} · 모드 {(DecalFloorStainMode)(int)te.z}\n" +
             "값: Resources/Rendering/DecalFloorBlendSettings — Play 중 바로 반영");
+    }
+
+    static void Kill(Object o)
+    {
+        if (o == null) return;
+        if (Application.isPlaying) Destroy(o); else DestroyImmediate(o);
     }
 
     void OnDestroy()
     {
         DecalFloorBlendDriver.Bypass = false;
-        foreach (Object o in _owned)
-            if (o != null) Destroy(o);
+        foreach (Object o in _owned) Kill(o);
         _owned.Clear();
     }
 }

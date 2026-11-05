@@ -13,8 +13,14 @@ MonoBehaviour:
   m_Name: DecalFloorBlendSettings
   m_EditorClassIdentifier: Assembly-CSharp::DecalFloorBlendSettings
   skillFillAlphaScale: 0.6
-  skillEdgeSoftness: 0.15
+  skillEdgeSoftness: 0.5
+  skillOutlineAlphaScale: 0.9
+  skillOutlineStain: 0.7
+  skillStainMode: 0
   skillPlateFillAlphaScale: 1
   telegraphFillAlphaScale: 0.6
-  telegraphEdgeSoftness: 0.15
+  telegraphEdgeSoftness: 0.5
+  telegraphOutlineAlphaScale: 0.9
+  telegraphOutlineStain: 0.6
+  telegraphStainMode: 0
   telegraphPlateFillAlphaScale: 1

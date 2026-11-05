@@ -175,10 +175,12 @@ Q 충전 중 바닥에 뜨는 직사각형(`SkillLineIndicator` 의 Fill 쿼드,
 - 커브 칸(Length Fade Curve·Edge Line Curve)은 거너 Q 사각형 전용 그대로(§8-1). `Player_Assassin.prefab` 에는 커브 오버라이드를 두지 않는다.
 - 화살표 폭 = `SkillLineIndicator.arrowWidth`(0.9). 거리 감쇠(`_DecalFade`)는 화살표에 걸지 않는다.
 
-## 9. 바닥 블렌딩 — 채움 알파 배율·바깥 끝 소프트 (할 일 221, 2026-11-05)
+## 9. 바닥 블렌딩 — 채움 배율·외곽선 물들임·안밖 소프트 (할 일 221, 2026-11-05)
 
-- 모든 예고(C3 데칼 외곽선·채움, C3 바닥 판, `TelegraphQuad` 판, 23호 차징 오라 원판)의 **안쪽(채움·띠 그라데이션·쐐기) 알파**에 공용 배율을 곱해 바닥이 비치게 한다. **외곽선·안쪽 선은 그대로**, 바깥 외곽선의 바깥 끝만 소프트.
-- 칸: `Assets/Resources/Rendering/DecalFloorBlendSettings.asset` 의 `telegraphFillAlphaScale`·`telegraphEdgeSoftness`·`telegraphPlateFillAlphaScale`(스킬 인디케이터 칸과 별도). 코드 기본 1·0·1 = 이전 화면, 에셋 시작값 0.6·0.15·1.
+- 모든 예고(C3 데칼 외곽선·채움, C3 바닥 판, `TelegraphQuad` 판, 23호 차징 오라 원판)의 **안쪽(채움·띠 그라데이션·쐐기) 알파**에 공용 배율을 곱해 바닥이 비치게 한다.
+- 후속: **외곽선·안쪽 선도 바닥에 물들게** — 외곽선 알파 배율 + 물들임(0 = 일반, 1 = 완전) + 모드(밝기 보존 기본 / 곱하기). 소프트는 외곽선 **안·밖 가장자리 둘 다**. 데칼·판 모두 같은 근사(기준 바닥 감마 0.3) — 상세 [decal.md](decal.md) "물들임 근사".
+- 칸: `Assets/Resources/Rendering/DecalFloorBlendSettings.asset` 의 `telegraphFillAlphaScale`·`telegraphEdgeSoftness`·`telegraphPlateFillAlphaScale`·`telegraphOutlineAlphaScale`·`telegraphOutlineStain`·`telegraphStainMode`(스킬 칸과 별도). 코드 기본 1·0·1·1·0·밝기 보존 = 이전 화면, 에셋 시작값 0.6·0.5·1·0.9·0.6·밝기 보존(스킬 물들임 0.7 보다 약하게).
+- 어두운 바닥 확인: 밝기 보존·곱하기 둘 다 외곽선이 묻히지 않음(비교 이미지 `_lane-artifacts/Work2/221/compare/sheet_dark_telegraph.png`). 밝기 보존 쪽이 더 밝게 남아 기본. 테스트가 예고 외곽선 알파 ≥ 0.7·물들임 ≤ 0.8 을 지킨다.
 - **§3 의 "최종 불투명도 = 색 알파 × 모양 × 마스크" 에 바닥 블렌딩 배율이 한 번 더 곱해진다**(채움 층만). 거리 감쇠(§8)와도 곱.
 - 🔴 회피 신호 — 빨강/파랑 구분(§2)과 함께 채움이 너무 옅어지지 않게. 경계는 외곽선이 지킨다.
 - 미적용: 건틀렛 스매시 원(미리 구운 sprite), `shapeTexture` 를 쓰는 `AoeTelegraph`(SG_TelegraphDecal), 보스 방향 표식 전/후방 재질 색(모양 호는 C3 채움이라 적용).

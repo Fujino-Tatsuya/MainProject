@@ -15,8 +15,17 @@ public sealed class DecalFloorBlendSettings : ScriptableObject
     [Tooltip("안쪽 채움 알파 배율. 1 = 그대로, 낮출수록 바닥 무늬·명암이 비친다. 외곽선·안쪽 선은 그대로.")]
     [Range(0f, 1f)] public float skillFillAlphaScale = 1f;
 
-    [Tooltip("가장자리 소프트 — 바깥 외곽선 폭 중 바깥 끝에서 이 비율만큼을 부드럽게 흐린다. 0 = 그대로(또렷), 1 = 외곽선 전체가 그라데이션.")]
+    [Tooltip("가장자리 소프트 — 바깥 외곽선 폭 중 안·밖 가장자리에서 각각 이 비율만큼을 부드럽게 흐린다. 0 = 그대로(또렷), 0.5 = 외곽선이 가운데만 진한 그라데이션.")]
     [Range(0f, 1f)] public float skillEdgeSoftness;
+
+    [Tooltip("외곽선(바깥 외곽선·안쪽 선) 알파 배율. 1 = 그대로.")]
+    [Range(0f, 1f)] public float skillOutlineAlphaScale = 1f;
+
+    [Tooltip("외곽선 물들임 — 0 = 지금(일반 섞기, 스티커처럼 덮음) ~ 1 = 완전 물들임(바닥 무늬·명암이 절반 남고 색만 외곽선 쪽으로).")]
+    [Range(0f, 1f)] public float skillOutlineStain;
+
+    [Tooltip("물들임 근사 방식. 밝기 보존 = 색조 유지·밝기를 바닥 쪽으로(흰 선도 읽힘) · 곱하기 = 바닥 × 색(흰 선은 거의 사라짐).")]
+    public DecalFloorStainMode skillStainMode = DecalFloorStainMode.LuminanceKeep;
 
     [Tooltip("판(투명 쿼드 — 거너 Q 직선·대시 화살표·조준 표시) 전용 채움 추가 배율. 투영 데칼과 진하기를 맞출 때. 1 = 채움 배율만.")]
     [Range(0f, 1f)] public float skillPlateFillAlphaScale = 1f;
@@ -25,12 +34,23 @@ public sealed class DecalFloorBlendSettings : ScriptableObject
     [Tooltip("안쪽 채움(채움·띠 그라데이션·쐐기) 알파 배율. 1 = 그대로. 외곽선·안쪽 선은 그대로라 범위 경계는 남는다.")]
     [Range(0f, 1f)] public float telegraphFillAlphaScale = 1f;
 
-    [Tooltip("가장자리 소프트 — 바깥 외곽선 폭 중 바깥 끝에서 이 비율만큼을 부드럽게 흐린다. 0 = 그대로.")]
+    [Tooltip("가장자리 소프트 — 바깥 외곽선 폭 중 안·밖 가장자리에서 각각 이 비율만큼을 부드럽게 흐린다. 0 = 그대로.")]
     [Range(0f, 1f)] public float telegraphEdgeSoftness;
+
+    [Tooltip("외곽선(바깥 외곽선·안쪽 선) 알파 배율. 1 = 그대로. 🔴 회피 신호 — 너무 낮추지 말 것.")]
+    [Range(0f, 1f)] public float telegraphOutlineAlphaScale = 1f;
+
+    [Tooltip("외곽선 물들임 — 0 = 지금(일반 섞기) ~ 1 = 완전 물들임.")]
+    [Range(0f, 1f)] public float telegraphOutlineStain;
+
+    [Tooltip("물들임 근사 방식(스킬 칸과 같은 뜻).")]
+    public DecalFloorStainMode telegraphStainMode = DecalFloorStainMode.LuminanceKeep;
 
     [Tooltip("판(C3 바닥 판 — 드론·박격포·전기 장판·점프 착지, TelegraphQuad) 전용 채움 추가 배율. 1 = 채움 배율만.")]
     [Range(0f, 1f)] public float telegraphPlateFillAlphaScale = 1f;
 
     public Vector4 SkillGlobal() => DecalFloorBlend.ToGlobal(skillFillAlphaScale, skillEdgeSoftness, skillPlateFillAlphaScale);
     public Vector4 TelegraphGlobal() => DecalFloorBlend.ToGlobal(telegraphFillAlphaScale, telegraphEdgeSoftness, telegraphPlateFillAlphaScale);
+    public Vector4 SkillEdgeGlobal() => DecalFloorBlend.ToEdgeGlobal(skillOutlineAlphaScale, skillOutlineStain, skillStainMode);
+    public Vector4 TelegraphEdgeGlobal() => DecalFloorBlend.ToEdgeGlobal(telegraphOutlineAlphaScale, telegraphOutlineStain, telegraphStainMode);
 }

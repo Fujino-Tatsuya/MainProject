@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 바닥 블렌딩(할 일 221)의 적용 지점 한 곳 — 매 프레임 <see cref="DecalFloorBlendSettings"/> 를 전역 셰이더 값 2개
+/// 바닥 블렌딩(할 일 221)의 적용 지점 한 곳 — 매 프레임 <see cref="DecalFloorBlendSettings"/> 를 전역 셰이더 값 4개(채움·외곽선 × 스킬·예고)
 /// (<see cref="DecalFloorBlend.SkillGlobal"/>·<see cref="DecalFloorBlend.TelegraphGlobal"/>)로 넣는다. Play 중 에셋 값을 바꾸면 바로 보인다.
 ///
 /// <see cref="DecalDistanceFadeDriver"/> 와 같은 방식 — 씬 배치 없이 스스로 생긴다. DecalProjector 는 MaterialPropertyBlock 을
@@ -43,11 +43,15 @@ public sealed class DecalFloorBlendDriver : MonoBehaviour
         if (settings == null) { Clear(); return; }
         Shader.SetGlobalVector(DecalFloorBlend.SkillGlobalId, settings.SkillGlobal());
         Shader.SetGlobalVector(DecalFloorBlend.TelegraphGlobalId, settings.TelegraphGlobal());
+        Shader.SetGlobalVector(DecalFloorBlend.SkillEdgeGlobalId, settings.SkillEdgeGlobal());
+        Shader.SetGlobalVector(DecalFloorBlend.TelegraphEdgeGlobalId, settings.TelegraphEdgeGlobal());
     }
 
     public static void Clear()
     {
         Shader.SetGlobalVector(DecalFloorBlend.SkillGlobalId, Vector4.zero);
         Shader.SetGlobalVector(DecalFloorBlend.TelegraphGlobalId, Vector4.zero);
+        Shader.SetGlobalVector(DecalFloorBlend.SkillEdgeGlobalId, Vector4.zero);
+        Shader.SetGlobalVector(DecalFloorBlend.TelegraphEdgeGlobalId, Vector4.zero);
     }
 }
