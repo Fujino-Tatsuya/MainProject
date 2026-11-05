@@ -435,7 +435,8 @@ public static class LobbyResultPanelAuthoring
     static readonly Color GradeStampColor = new Color(205f / 255f, 32f / 255f, 36f / 255f, 1f); // 예전 도장 PNG 의 빨강
     const float GradeStampCenterX = 1150f;
     const float GradeStampCenterY = 903f;
-    const float GradeStampSize = 175f;
+    const float GradeStampSize = 120f;      // 사용자 조정(223 — 175 → 120)
+    const float GradeLetterSize = 77f;      // 원 크기 비율(예전 175px 에 112)
     const float GradeStampAngle = -8f; // 최종 기울기 — 연출(LobbyResultPanelAnimator.stampEndAngle)과 같은 값
     static readonly Color GradeLetterColor = new Color(1f, 0.95f, 0.84f, 1f); // 크림색
     // 글자 폰트 = 결과창 다른 글자(프리팹)가 실제로 쓰는 서울알림 Medium. 위 FontPath(NotoSansKR)는 처음 저작 때 값이라 도장에는 쓰지 않는다.
@@ -535,7 +536,7 @@ public static class LobbyResultPanelAuthoring
 
         RectTransform letter = NewRect("Text_Grade", root);
         StretchWithOffset(letter, 0f);
-        TMP_Text text = AddText(letter, font, "S", 112f, TextAlignmentOptions.Center, GradeLetterColor);
+        TMP_Text text = AddText(letter, font, "S", GradeLetterSize, TextAlignmentOptions.Center, GradeLetterColor);
 
         if (view == null)
             return;
