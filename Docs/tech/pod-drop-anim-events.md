@@ -24,7 +24,12 @@
 
 ## 2. 로비 발사 — 끝 페이드 (할 일 198)
 
-`발사 클립(DP_LaunchCycle) 시작 → … → 하강 시작 이벤트(종류 3) → launchEndWaitSeconds(기본 0.5) → 끝 페이드 아웃 launchEndFadeSeconds(1) → 다 검어진 순간 서버가 로딩`
+`발사 클립(DP_LaunchCycle) 시작 → … → 하강 시작 이벤트(종류 3) → launchEndWaitSeconds(기본 0.5) → 끝 페이드 아웃 launchEndFadeSeconds(1) → 다 검어짐(EndBlackAt) → 암전 유지 launchEndBlackHoldSeconds(1, 할 일 230) → 서버가 로딩`
+
+- **암전 유지(230)**: 사용자 요청 "화면이 완전히 암전된 뒤 1초 뒤 로딩 씬". `LoadAt = EndBlackAt + launchEndBlackHoldSeconds`(xlsx Lobby 행 `lobby.launchEndBlackHoldSeconds`). 0 = 예전처럼 다 검어진 순간 로딩.
+  - 모든 피어가 같은 시간표(서버 시간 + 복제 시각)로 페이드를 그리므로, 서버가 로딩을 거는 순간 클라는 이미 유지 시간만큼 검은 채다 — 클라 서버시간 추정 오차·복제 지연이 유지 시간(1초)보다 작으면 깜빡임 없음.
+    하강 이벤트가 없는 클립의 예비 기준(`_launchEndedAt` 복제)은 클라가 복제 지연만큼 늦게 검어지는데, 그것도 유지 시간 안에 흡수된다.
+  - 로딩을 건 뒤에도 검은 화면(500)은 로비 씬이 내려갈 때까지(디스폰 → `Clear`) 그대로고, 로딩 화면(1000)이 그 위에 뜬다. HUD 숨김 규칙 그대로.
 
 - 예전(121)엔 **발사 클립 끝** + 대기 1초였다. 이제는 하강 시작 기준이라 발사 클립이 끝나기 전에 로딩으로 넘어갈 수 있다.
 - `launchEndWaitSeconds` 는 이름 그대로 두고 뜻만 "하강 시작 이벤트 → 페이드 시작"으로 바꿨다(xlsx 행 그대로, 값 1 → 0.5).

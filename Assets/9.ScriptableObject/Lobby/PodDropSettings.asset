@@ -37,6 +37,7 @@ MonoBehaviour:
     launchFastSpeed2: 1
     launchEndWaitSeconds: 0.5
     launchEndFadeSeconds: 1
+    launchEndBlackHoldSeconds: 1
     hudRescanSeconds: 0.5
   map:
     holdSeconds: 0.3

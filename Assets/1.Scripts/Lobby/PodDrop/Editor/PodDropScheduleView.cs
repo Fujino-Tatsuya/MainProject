@@ -108,16 +108,18 @@ public static class PodDropScheduleView
     private static string EndLines(PodDropLobbyTimeline t, double? descentAt, double? launchAt, string source = null)
     {
         if (descentAt == null)
-            return $"\n  끝 대기·페이드     하강 시작 +0 ~ {t.LaunchEndWaitSeconds:0.##}s 대기 · ~ {t.LoadAfterLaunchEndSeconds:0.##}s 검게 → 로딩";
+            return $"\n  끝 대기·페이드     하강 시작 +0 ~ {t.LaunchEndWaitSeconds:0.##}s 대기 · ~ {t.LaunchEndWaitSeconds + t.LaunchEndFadeSeconds:0.##}s 검게 · " +
+                   $"~ {t.LoadAfterLaunchEndSeconds:0.##}s 암전 유지 → 로딩";
 
         double end = descentAt.Value;
         string fromLaunch = launchAt != null ? $", 발사 시작 기준 +{end - launchAt.Value:0.##}s" : "";
         return $"\n  포드 하강 시작    ≈{end:0.##}s ({source}{fromLaunch})" +
                $"\n  끝 대기           ≈{end:0.##} ~ {t.EndFadeAt(end):0.##}s ({t.LaunchEndWaitSeconds:0.##}s, 발사 클립은 계속 돈다)" +
                (t.LaunchEndFadeSeconds > 0f
-                   ? $"\n  끝 페이드 아웃    ≈{t.EndFadeAt(end):0.##} ~ {t.LoadAt(end):0.##}s (검게, 선형 — 시작 암전과 같은 검은 화면)"
-                   : "\n  끝 페이드 아웃    없음 (대기 끝에 곧바로 로딩)") +
-               $"\n  로딩 시작         ≈{t.LoadAt(end):0.##}s (다 검어진 순간 서버가 건다 — 로딩 화면이 검은 화면 위에 뜬다)";
+                   ? $"\n  끝 페이드 아웃    ≈{t.EndFadeAt(end):0.##} ~ {t.EndBlackAt(end):0.##}s (검게, 선형 — 시작 암전과 같은 검은 화면)"
+                   : "\n  끝 페이드 아웃    없음 (대기 끝에 곧바로 검다)") +
+               $"\n  암전 유지         ≈{t.EndBlackAt(end):0.##} ~ {t.LoadAt(end):0.##}s ({t.LaunchEndBlackHoldSeconds:0.##}s, 완전히 검은 채)" +
+               $"\n  로딩 시작         ≈{t.LoadAt(end):0.##}s (서버가 건다 — 로딩 화면이 검은 화면 위에 뜬다)";
     }
 
     /// <summary>발사 클립 시점(클립 초, 1배속) — 가속 1단계 · 2단계 · 끝 이벤트. 이벤트가 없는 가속 단계는 클립 끝(그 단계 없음).</summary>

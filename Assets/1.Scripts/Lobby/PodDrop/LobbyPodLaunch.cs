@@ -318,7 +318,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             Debug.Log($"[SceneFlow] {Tag} 발사 클립 끝 +{elapsed:0.##}s");
         }
 
-        // 4) 포드 하강 시작(클립 이벤트 위치 + 복제 시각, 할 일 198) + 대기 → 끝 페이드가 다 검어진 순간 로딩 — 로딩 화면(정렬 1000)이 검은 화면(500) 위에 뜬다.
+        // 4) 포드 하강 시작(클립 이벤트 위치 + 복제 시각, 할 일 198) + 대기 → 끝 페이드가 다 검어진 순간 + 암전 유지(launchEndBlackHoldSeconds, 할 일 230) 뒤 로딩 — 클라도 같은 시간표라 그 동안 검은 채다. 로딩 화면(정렬 1000)이 검은 화면(500) 위에 뜬다.
         double descentAt = DescentElapsed(timeline, run.Start, board);
         double loadAt = timeline.LoadAt(descentAt);
         if (elapsed < loadAt)
@@ -326,7 +326,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
 
         _run = null;
         _loadIssued = true;
-        Debug.Log($"[SceneFlow] {Tag} 끝 페이드 완료 +{elapsed:0.##}s(하강 시작 +{descentAt:0.##}s) — 맵 로딩 시작");
+        Debug.Log($"[SceneFlow] {Tag} 끝 페이드 완료 +{timeline.EndBlackAt(descentAt):0.##}s → 암전 유지 뒤 +{elapsed:0.##}s(하강 시작 +{descentAt:0.##}s) — 맵 로딩 시작");
         run.OnDone?.Invoke();
     }
 

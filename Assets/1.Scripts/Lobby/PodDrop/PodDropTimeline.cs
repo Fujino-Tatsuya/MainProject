@@ -58,9 +58,12 @@ public struct PodDropLobbyTimings
     [Tooltip("포드 하강 시작 이벤트(발사 클립 PodClipEvent 정수 인자 3 — 포드가 아래로 내려가기 시작하는 프레임) → 끝 페이드 아웃 시작(초, 실시간). " +
              "0 = 하강 시작 순간 곧바로 페이드. 하강 이벤트 위치는 FBX 임포트 창 Animation 탭에서 옮긴다. 클립에 하강 이벤트가 없으면 발사 클립 끝(끝 이벤트)부터 잰다(경고)")]
     [Min(0f)] public float launchEndWaitSeconds;
-    [Tooltip("끝 페이드 아웃 — 화면이 다 검어지기까지(초, 선형 — 시작 암전과 같은 검은 화면). 다 검어진 순간 서버가 로딩을 건다(로딩 화면이 검은 화면 위에 뜬다 — 발사 클립이 아직 돌고 있어도). " +
-             "대기·페이드 둘 다 0 = 하강 시작 순간 곧바로 로딩(페이드 없음)")]
+    [Tooltip("끝 페이드 아웃 — 화면이 다 검어지기까지(초, 선형 — 시작 암전과 같은 검은 화면). 다 검어진 뒤 아래 암전 유지 시간이 지나면 서버가 로딩을 건다(발사 클립이 아직 돌고 있어도). " +
+             "대기·페이드·유지 모두 0 = 하강 시작 순간 곧바로 로딩(페이드 없음)")]
     [Min(0f)] public float launchEndFadeSeconds;
+    [Tooltip("끝 페이드가 완전히 검어진 순간 → 로딩 씬 전환(초, 실시간, 할 일 230). 이 동안 모든 피어 화면은 검은 채다 — 클라 시계·복제 지연 여유도 된다. " +
+             "0 = 다 검어진 순간 곧바로 로딩. 로딩 화면(정렬 1000)이 검은 화면(500) 위에 뜬다")]
+    [Min(0f)] public float launchEndBlackHoldSeconds;
 
     [Header("화면 UI")]
     [Tooltip("연출 도중 새로 뜬 화면 UI 를 다시 찾아 숨기는 간격(초). 0 = 매 프레임")]
@@ -87,6 +90,7 @@ public struct PodDropLobbyTimings
         launchFastSpeed2 = 1f,
         launchEndWaitSeconds = 0.5f, // 할 일 198 — 하강 시작 이벤트 뒤 0.5초
         launchEndFadeSeconds = 1f,
+        launchEndBlackHoldSeconds = 1f, // 할 일 230 — 다 검어진 뒤 1초
         hudRescanSeconds = 0.5f,
     };
 }
@@ -263,8 +267,10 @@ public sealed class PodDropLobbyTimeline
     public float LaunchEndWaitSeconds { get; }
     /// <summary>끝 페이드 아웃 — 다 검어지기까지(초).</summary>
     public float LaunchEndFadeSeconds { get; }
-    /// <summary>포드 하강 시작 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드.</summary>
-    public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds;
+    /// <summary>끝 페이드가 다 검어진 순간 → 로딩 시작(초, 할 일 230).</summary>
+    public float LaunchEndBlackHoldSeconds { get; }
+    /// <summary>포드 하강 시작 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드 + 암전 유지.</summary>
+    public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds + LaunchEndBlackHoldSeconds;
 
     // 슬롯별 보행 시간(초, 걷기 시작 지점 → 좌석) — 수평 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
     private readonly float[] _walkSeconds;
@@ -295,6 +301,7 @@ public sealed class PodDropLobbyTimeline
         WalkInterval = Mathf.Max(0f, timings.walkInterval);
         LaunchEndWaitSeconds = Mathf.Max(0f, timings.launchEndWaitSeconds);
         LaunchEndFadeSeconds = Mathf.Max(0f, timings.launchEndFadeSeconds);
+        LaunchEndBlackHoldSeconds = Mathf.Max(0f, timings.launchEndBlackHoldSeconds);
         _walkSeconds = new float[walkSeconds != null ? walkSeconds.Count : 0];
         for (int i = 0; i < _walkSeconds.Length; i++)
             _walkSeconds[i] = walkSeconds[i] > 0f ? walkSeconds[i] : 0f; // NaN 도 0
@@ -316,8 +323,11 @@ public sealed class PodDropLobbyTimeline
     /// <summary>끝 페이드 아웃 시작 = 포드 하강 시작 + 끝 대기. 하강 시각을 아직 모르면 +∞.</summary>
     public double EndFadeAt(double descentAt) => descentAt + LaunchEndWaitSeconds;
 
-    /// <summary>로딩 시작 = 끝 페이드가 다 검어진 순간(하강 시작 + 대기 + 페이드). 서버가 이 시각에 로딩을 건다(발사 클립이 아직 돌아도). 하강 시각을 아직 모르면 +∞.</summary>
-    public double LoadAt(double descentAt) => descentAt + LoadAfterLaunchEndSeconds;
+    /// <summary>끝 페이드가 다 검어진 순간 = 하강 시작 + 대기 + 페이드. 하강 시각을 아직 모르면 +∞.</summary>
+    public double EndBlackAt(double descentAt) => EndFadeAt(descentAt) + LaunchEndFadeSeconds;
+
+    /// <summary>로딩 시작 = 다 검어진 순간 + 암전 유지(할 일 230). 서버가 이 시각에 로딩을 건다(발사 클립이 아직 돌아도). 하강 시각을 아직 모르면 +∞.</summary>
+    public double LoadAt(double descentAt) => EndBlackAt(descentAt) + LaunchEndBlackHoldSeconds;
 
     /// <summary>슬롯(0 = P1)이 걷기 시작하는 경과 시각(초).</summary>
     public double WalkStartAt(int slot, double boardAt) => boardAt + Mathf.Max(0, slot) * WalkInterval;
