@@ -2573,7 +2573,6 @@ GameObject:
   - component: {fileID: 3045470295606529221}
   - component: {fileID: 6683383704205377552}
   - component: {fileID: 1533343968998975998}
-  - component: {fileID: 7301089643129533440}
   m_Layer: 5
   m_Name: Button_Close
   m_TagString: Untagged
@@ -2683,25 +2682,6 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
---- !u!114 &7301089643129533440
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7346276137353425357}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 34f6d7c6f98f432f913dbd29a3e5a623, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UiHoverBorder
-  outlineSprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
-  outlineColor: {r: 1, g: 1, b: 1, a: 0.95}
-  outset: 5
-  cornerScale: 0.12
-  fadeTime: 0.1
-  ease: 5
-  showOnSelect: 1
 --- !u!1 &7444974420835609874
 GameObject:
   m_ObjectHideFlags: 0

@@ -17,7 +17,6 @@ internal static class ResultStatsEditModeTestRunner
         "^LobbyResultPanelRulesTests",  // 로비 결과 패널 열고 닫기(할 일 48)
         "^LobbyResultRankingTests",     // 로비 결과 패널 순위 점수·왕관(할 일 48)
         "^LobbyResultPanelAnimMathTests", // 로비 결과창 열고 닫기·카운트업 계산(할 일 215)
-        "^UiHoverBorderTests",          // 결과창 닫기 버튼 hover 흰 테두리(할 일 224)
         "^LobbyResultGradeTests"        // 결과창 등급 도장 규칙(할 일 223)
     };
 

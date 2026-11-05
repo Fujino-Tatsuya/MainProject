@@ -382,10 +382,6 @@ public static class LobbyResultPanelAuthoring
             closeImage.raycastTarget = true;
             Button closeButton = close.gameObject.AddComponent<Button>();
             closeButton.targetGraphic = closeImage;
-            // hover·선택 시 흰 테두리(할 일 224) — 버튼 Transition 은 그대로, 테두리는 버튼 뒤 형제 Image 를 런타임에 만든다.
-            var closeOutline = new SerializedObject(close.gameObject.AddComponent<UiHoverBorder>());
-            closeOutline.FindProperty("outlineSprite").objectReferenceValue = AssetDatabase.GetBuiltinExtraResource<Sprite>(LocalMarkerSpritePath);
-            closeOutline.ApplyModifiedPropertiesWithoutUndo();
             RectTransform closeLabel = NewRect("Label", close);
             StretchWithOffset(closeLabel, -Padding);
             AddText(closeLabel, font, LobbyResultUiStrings.Close, 54f, TextAlignmentOptions.Center, TextLight);
