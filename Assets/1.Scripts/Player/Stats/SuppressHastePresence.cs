@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 
 /// <summary>
-/// 제압 가속이 켜져 있는가 — 연출 쪽(피해 숫자 합산·3타 줌인·보스 체력바 흰 칸 멈춤, 할 일 174)이 읽는 한 곳.
+/// 제압 가속이 켜져 있는가 — 연출 쪽(피해 숫자 합산·N타 줌인·보스 체력바 흰 칸 멈춤, 할 일 174)이 읽는 한 곳.
 /// 기준 = 대표 상태이상(<see cref="SuppressHasteRules.HudRepresentative"/>) 보유 — 비네팅(<c>SuppressHasteVignetteHUD</c>)과 같다.
 /// 상태이상 목록은 NetworkList 라 전 피어에서 같은 답이 나온다(새 RPC·NetworkVariable 없음). 판정에는 쓰지 않는다.
 /// </summary>

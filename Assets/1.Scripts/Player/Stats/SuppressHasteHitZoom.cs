@@ -1,6 +1,6 @@
 using System;
 
-/// <summary>3타 줌인 수치(xlsx <c>SuppressHaste</c> 시트 → <see cref="SuppressHasteData"/>).</summary>
+/// <summary>N타 줌인 수치(기본 4타)(xlsx <c>SuppressHaste</c> 시트 → <see cref="SuppressHasteData"/>).</summary>
 public readonly struct SuppressHasteHitZoomValues
 {
     public readonly int EveryHits;
@@ -18,14 +18,14 @@ public readonly struct SuppressHasteHitZoomValues
         ReturnSeconds = returnSeconds;
     }
 
-    /// <summary>SO 가 없을 때 — 시트 기본값과 같다(3타 · 0.9배 · 들어감 0.04 · 유지 0.11 · 복귀 0.12초).</summary>
-    public static SuppressHasteHitZoomValues Default => new SuppressHasteHitZoomValues(3, 0.9f, 0.04f, 0.11f, 0.12f);
+    /// <summary>SO 가 없을 때 — 시트 기본값과 같다(4타 · 0.9배 · 들어감 0.04 · 유지 0.11 · 복귀 0.12초).</summary>
+    public static SuppressHasteHitZoomValues Default => new SuppressHasteHitZoomValues(4, 0.9f, 0.04f, 0.11f, 0.12f);
 
     public float TotalSeconds => Math.Max(0f, InSeconds) + Math.Max(0f, HoldSeconds) + Math.Max(0f, ReturnSeconds);
 }
 
 /// <summary>
-/// 제압 가속 3타 줌인(할 일 174) — 로컬 오너가 보스에게 맞힌 타격 N번마다 내 화면만 짧게 당긴다.
+/// 제압 가속 N타 줌인(기본 4타, 할 일 174·233) — 로컬 오너가 보스에게 맞힌 타격 N번마다 내 화면만 짧게 당긴다.
 ///   · 셈 = 서버가 확정한 내 보스 피해 RPC 1회 = 1타(빗나감·0 피해는 RPC 가 없어 안 센다). 가속 중이 아니면 안 세고 0 으로 리셋.
 ///   · 슬로우 줌과 겹치면 **건너뛴다** — 슬로우 줌(내 간파 0.7~0.85배)이 도는 동안은 펄스를 버리고 1. 곱하지 않는다(suppress-haste.md §2.2).
 ///   · 가속이 끝나도 진행 중인 펄스는 끝까지 돈다(복귀 도중 튀지 않게). 셈만 리셋.

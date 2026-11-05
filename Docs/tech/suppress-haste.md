@@ -14,7 +14,7 @@
 | 상태이상 | `CooldownRateModifier`(대표) · `MoveSpeedFinalMultiplier` · `AttackSpeedFinalMultiplier` — 출처 = 보스 `NetworkObjectId`, 스택 1 | player-stats.md §3 |
 | HUD 아이콘 | 대표(`CooldownRateModifier`) 1개만, 나머지 둘 숨김(`SuppressHasteRules.IsHudHidden`) | — |
 | 데이터 | xlsx `SuppressHaste` 시트 → `Assets/Resources/Player/SuppressHasteData.asset` | [data-table.md](data-table.md) 시트 표 |
-| 연출 | 비네팅(§2) · 피해 숫자 합산 · 3타 줌인 · 보스 체력바 흰 칸 멈춤(§2.A, 할 일 174) | — |
+| 연출 | 비네팅(§2) · 피해 숫자 합산 · N타 줌인(기본 4타) · 보스 체력바 흰 칸 멈춤(§2.A, 할 일 174) | — |
 | 다른 출처 | `SuppressHaste.GrantServer(sourceId, suppressDuration)` — 보스 종류 무관 서버 API | handoff §2 |
 
 - 쿨 속도 배율은 쿨 시계(§1.1)가 소비한다 — 스킬(우클릭·Q·E·궁극기)·대시 충전·가붕이 패시브 내부 쿨.
@@ -73,10 +73,10 @@
 | # | 무엇 | 누가 보나 | 기준 | 코드 |
 |---|---|---|---|---|
 | 1 | 피해 숫자 합산 | 전 피어 | **공격자**에게 가속이 있으면 그 공격자 → 대상 피해를 숫자 하나로(공격 종류·Multi 무관) | [floating-damage-design.md §3.1](floating-damage-design.md#31-제압-가속-합산-할-일-174) |
-| 2 | 3타 줌인 | 내 화면만 | **로컬 플레이어**에게 가속이 있을 때 내가 보스에게 맞힌 타격 N번마다 | §2.2 |
+| 2 | N타 줌인(기본 4타) | 내 화면만 | **로컬 플레이어**에게 가속이 있을 때 내가 보스에게 맞힌 타격 N번마다 | §2.2 |
 | 3 | 보스 체력바 흰 칸 멈춤 | 전 피어 | 그 **보스가 건**(출처 = 보스 NetworkObjectId) 가속이 플레이어 누구에게라도 남아 있는 동안 | §2.3 |
 
-### 2.2 3타 줌인
+### 2.2 N타 줌인
 - 셈: 보스 `Unit` 의 피해 RPC(`ClientDamageDealtClientRpc`) 1회 = 1타. `Unit.ClientHitAttributed`(RPC 당 1회 — 보호막+체력을 함께 깎아도 1타) →
   `UnitCameraFeedbackReporter`(대상 `Rank == Boss` · 공격자 = 나) → `CameraTargetSwitcher.ReportLocalBossHit`.
   빗나감·0 피해(무적 잠김 등)는 RPC 가 없어 안 센다. 가속이 아니면 안 세고 0 으로 리셋, 낙하 뷰·관전 중엔 안 센다.
@@ -84,12 +84,12 @@
   가속이 끝나도 진행 중인 펄스는 끝까지(튀지 않게), 셈만 리셋.
 - 🟨 **슬로우 줌과 겹치면 건너뛴다(곱하지 않는다).** 이 프레임 슬로우 줌 배율이 1 이 아니면 펄스를 버리고 1 — 끝난 뒤 다시 나오지 않는다.
   이유: 제압 가속은 간파 성공으로 시작하므로 첫 타들이 내 간파 슬로우 줌(0.7~0.85배)과 바로 겹친다. 곱하면 0.63배까지 들어가 슬로우 줌의 의도된 깊이를 넘고,
-  슬로우 중 미세한 앞뒤 흔들림은 연출이 아니라 잡음으로 보인다. 간파 연출이 우선이라 그동안은 3타 줌을 쉰다. 셈은 계속한다.
+  슬로우 중 미세한 앞뒤 흔들림은 연출이 아니라 잡음으로 보인다. 간파 연출이 우선이라 그동안은 N타 줌을 쉰다. 셈은 계속한다.
 - 순수 로직 `SuppressHasteHitZoom`(`Assets/1.Scripts/Player/Stats/SuppressHasteHitZoom.cs`). 수치는 시트 칸(아래 표).
 
 | 칸(xlsx `SuppressHaste`) | 기본 | 뜻 |
 |---|---|---|
-| `hitZoomEveryHits` | 3 | 몇 타마다 |
+| `hitZoomEveryHits` | 4 | 몇 타마다(할 일 233 — 3 → 4, xlsx SVN r607) |
 | `hitZoomFactor` | 0.9 | 카메라 거리 배율(1 = 줌 없음, 하한 0.1) |
 | `hitZoomInSeconds` | 0.02 | 1 → 배율 (실시간 초) |
 | `hitZoomHoldSeconds` | 0.11 | 배율 유지 — 들어감 + 유지 = 0.13초 뒤 복귀 시작 |
@@ -105,7 +105,7 @@
   제압 가속은 모든 제압 진입(칸·기믹 보상)에서 같은 길이(`durationOverride` 0)로 걸리고 이미 전 피어에 복제된다.
 - **한계**: 시트 `durationOverride` > 0 이면 흰 칸 멈춤 길이 = 그 초(제압 길이와 달라진다). 살아 있는 플레이어가 아무도 없으면(전원 쓰러짐) 버프가 빠져 멈춤도 풀린다.
 - 규칙 `DelayedHealthFreezeRule`(같은 파일). 플레이어·머리 위 바는 `SetFrozen` 을 안 불러 그대로다.
-- 테스트: EditMode `SuppressHastePresentationTests`(3타 셈·리셋·펄스·슬로우 줌 건너뜀·잔상 멈춤/해제/회복) · `FloatingDamageAccumulationPolicyTests`(합산 키).
+- 테스트: EditMode `SuppressHastePresentationTests`(N타 셈·리셋·펄스·슬로우 줌 건너뜀·잔상 멈춤/해제/회복) · `FloatingDamageAccumulationPolicyTests`(합산 키).
 
 ## 3. 팔라딘 E — 공속 적용 범위 (할 일 91 A5, 2026-10-22 사용자 결정)
 
