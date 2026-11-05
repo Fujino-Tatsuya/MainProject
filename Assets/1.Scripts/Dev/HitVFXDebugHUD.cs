@@ -29,7 +29,7 @@ using UnityEngine.InputSystem;   // 신 Input System (이 프로젝트: Active I
 [DisallowMultipleComponent]
 public sealed class HitVFXDebugHUD : MonoBehaviour
 {
-    // 사용 중인 키를 피해서 배정했다: F8=ProfilerHUD · F10=디버그 부활 · M=맵 오버뷰 ·
+    // 사용 중인 키를 피해서 배정했다: F10=디버그 부활 · M=맵 오버뷰 ·
     // F=다리 상호작용 · [ ]=카메라 전환/미니맵 줌 · ESC=씬 전환.
 #if ENABLE_INPUT_SYSTEM
     private const Key CycleEffectKey = Key.F1;

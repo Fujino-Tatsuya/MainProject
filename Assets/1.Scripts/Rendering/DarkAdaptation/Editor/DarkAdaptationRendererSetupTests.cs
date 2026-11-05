@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
 /// <summary>
-/// 암순응 렌더러 기능이 PC·Mobile 렌더러에 들어 있고, 셰이더 참조가 비어 있지 않으며 목록 맨 끝인지(할 일 87 C3).
+/// 암순응 렌더러 기능이 PC·Mobile 렌더러에 들어 있고, 셰이더 참조가 비어 있지 않으며 목록 맨 끝(패널 배경 블러 201 제외)인지(할 일 87 C3).
 /// </summary>
 public sealed class DarkAdaptationRendererSetupTests
 {
@@ -18,8 +18,13 @@ public sealed class DarkAdaptationRendererSetupTests
         int count = data.rendererFeatures.Count;
         Assert.Greater(count, 0, "기능 없음");
 
-        var feature = data.rendererFeatures[count - 1] as DarkAdaptationFeature;
-        Assert.IsNotNull(feature, "DarkAdaptationFeature 가 목록 맨 끝에 없다");
+        // 맨 끝 = 화면 전체 후처리 중 마지막. 패널 배경 블러(201)는 패널 열린 동안만 그 뒤에 붙는 UI 패스라 제외한다.
+        int last = count - 1;
+        while (last > 0 && data.rendererFeatures[last] is PanelBackdropBlurFeature)
+            last--;
+
+        var feature = data.rendererFeatures[last] as DarkAdaptationFeature;
+        Assert.IsNotNull(feature, "DarkAdaptationFeature 가 목록 맨 끝(패널 배경 블러 제외)에 없다");
 
         var shader = new SerializedObject(feature).FindProperty("_shader").objectReferenceValue as Shader;
         Assert.IsNotNull(shader, "셰이더 참조가 비었다");

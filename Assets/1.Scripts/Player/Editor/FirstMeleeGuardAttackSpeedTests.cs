@@ -231,6 +231,8 @@ public sealed class FirstMeleeGuardAttackSpeedTests
             Animator animator = go.AddComponent<Animator>();
             // 클립 이벤트 수신자 — 없으면 "AnimationEvent has no receiver" 에러 로그로 테스트가 실패한다.
             go.AddComponent<EnumAnimationEventProbe>();
+            // 이펙트 이벤트(PlayEffect·StartEffect·StopEffect, VFX 10-26) 수신자 — 이 테스트는 재생 속도만 보므로 빈 몸체.
+            go.AddComponent<GuardVfxEventSink>();
             animator.runtimeAnimatorController = controller;
             animator.Rebind();
             animator.SetFloat(PlayerAttackSpeedAnimator.RateParameter, rate);
@@ -269,4 +271,12 @@ public sealed class FirstMeleeGuardAttackSpeedTests
         Assert.That(close, Is.LessThan(end), "창 닫힘 → 종료 순서 — 같은 시각 두 이벤트의 발화 순서에 기대지 않는다");
         Assert.That(end, Is.LessThan(clip.length), "End 는 클립 안 — 끝 이후면 Idle 전환과 겹쳐 안 올 수 있다");
     }
+}
+
+// 팔라딘 E 클립의 이펙트 이벤트를 받기만 한다 — 없으면 "AnimationEvent has no receiver" 에러 로그로 재생 테스트가 실패한다.
+public sealed class GuardVfxEventSink : MonoBehaviour
+{
+    public void PlayEffect(string _) { }
+    public void StartEffect(string _) { }
+    public void StopEffect(string _) { }
 }

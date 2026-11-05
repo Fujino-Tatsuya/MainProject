@@ -102,12 +102,23 @@ public class TraitPickConfirmTests
     [Test]
     public void Message_UsesRegisteredText_ThenDefault()
     {
-        string registered = TraitPickConfirmModel.FormatMessage(Restraint, new[] { "광란 강화" }, RegistryWithRestraint());
-        Assert.AreEqual("변신 불가 ‘광란 강화’ 선택?", registered);
+        // Strings 시트 행이 등록 문구보다 먼저다(11-04 현지화 A) — 빈 표를 걸어 시트 내용과 무관하게 등록·기본 규칙만 본다.
+        var emptyTable = UnityEngine.ScriptableObject.CreateInstance<StringTable>();
+        Loc.SetTable(emptyTable);
+        try
+        {
+            string registered = TraitPickConfirmModel.FormatMessage(Restraint, new[] { "광란 강화" }, RegistryWithRestraint());
+            Assert.AreEqual("변신 불가 ‘광란 강화’ 선택?", registered);
 
-        string fallback = TraitPickConfirmModel.FormatMessage("ASN_2_RETURN", new[] { "가", "나" }, new TraitContentRegistry());
-        StringAssert.Contains("가" + TraitUiStrings.NameSeparator.Text + "나", fallback);
-        StringAssert.DoesNotContain("{traits}", fallback);
+            string fallback = TraitPickConfirmModel.FormatMessage("ASN_2_RETURN", new[] { "가", "나" }, new TraitContentRegistry());
+            StringAssert.Contains("가" + TraitUiStrings.NameSeparator.Text + "나", fallback);
+            StringAssert.DoesNotContain("{traits}", fallback);
+        }
+        finally
+        {
+            Loc.SetTable(null);
+            UnityEngine.Object.DestroyImmediate(emptyTable);
+        }
     }
 
     // ── 등록부 규칙 ──────────────────────────────────────────────────

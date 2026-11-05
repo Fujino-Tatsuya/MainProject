@@ -32,13 +32,6 @@
 | F4 | 살아 있는 보스(23호·웰즈) 체력 최대치의 10% 깎기(호스트) — 정상 피해 경로라 페이즈 전환이 실제처럼 난다 | `Dev/DevBossHpCut.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F5 | 보스방 진입 패드로 파티 워프 | `Dev/DevBossEntranceWarp.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F6 | 보스 전투 중(Phase = Combat) 누른 사람만 보스방 지정 지점으로 이동(호스트·클라, 오너 권한) — 지점 = `bossroom.prefab` 의 빈 오브젝트 `[Dev] BossWarpPoint`(옮기면 위치·y축 회전이 바뀜). 연출·낙하 복구 중엔 안 함 | `Dev/DevBossPointWarp.cs` (자동 생성) | DEV_HOTKEYS | — (신규) | |
-| F7 | RetroCRT(Cyanilux CRT) 토글 | `Rendering/RetroCRT/RetroCRTController.cs` (맵 씬) | DEV_HOTKEYS | ✗ | ⚠️ F7 — RenderCostAB |
-| F7 | 실루엣 ON/OFF 수동 토글(측정기) | `Dev/LookAB/RenderCostAB.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F7 — RetroCRTController |
-| F8 | 프로파일러 HUD 토글 | `Dev/Profiler/ProfilerHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | ⚠️ F8 — ZonePerfRecorder |
-| F8 | 존별 성능 한 줄 오버레이 토글 | `Dev/Profiler/ZonePerfRecorder.cs` (씬 배치형) | DEV_HOTKEYS (본문) | ✗ | ⚠️ F8 — ProfilerHUD |
-| Home | 존별 성능 CSV 저장 + 콘솔 요약 | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
-| End | 프레임 상한 해제 ↔ 원래 상한(누적 초기화) | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
-| Insert | 존별 성능 누적 초기화 | `Dev/Profiler/ZonePerfRecorder.cs` | DEV_HOTKEYS (본문) | ✗ | |
 | F9 / Shift+F9 | 가장 가까운 몬스터 / 전부 즉사 (호스트) | `Utility/DevMonsterKill.cs` (자동 생성) | DEV_HOTKEYS | ✗ |  |
 | F10 | 디버그 부활(로컬 오너, 소울 상태일 때) | `Player/Life/PlayerReviveController.cs` (Player 프리팹) | 없음 | ✓ | |
 | F11 | 보스 막타 직전까지 자동 진행(호스트) — 어디서든: 튜토리얼 중이면 게이트 G10 까지 강제 개방 + 단계 보스 진입(디버그 메뉴 경로, 한 프레임 — 순서 규칙에 막힐 때만 Alt+8 경로) → 엘리베이터 스킵(정상 엘리베이터 경로에 시작 시각만 마지막 페이드 직전으로 당김 — 카메라 복귀도 정상 경로) → 등장 연출 스킵(전원 동의 스킵 경로) → 전투 시작 뒤 23호 남은 HP 페이즈 기믹·0줄 자폭을 끝난 것으로 두고 HP 1. 다음 한 대가 실제 처치(보스 B 승리 연출 테스트). 진행 중인 엘리베이터·기믹은 끝나길 기다림, 60초 제한 | `Dev/DevBossFinalBlow.cs` (자동 생성) + `TwentyThreeBoss.DevPrepareFinalBlowServer` · `BossTeleportManager.DevStartElevatorSkippedServer` · `Map/BossEncounterDirector.Dev.cs` | DEV_HOTKEYS | — (신규, 10-27) | |
@@ -56,14 +49,17 @@
 
 - 23호 예약(F3)은 `TwentyThreeBoss.cs` 의 `DevReserveJumpCombo`·`ConsumeDevReservation` 블록(같은 게이트)을 쓴다. 단타 예약 5종(F3 훅·Shift+F3·F4·F6·F9·F11)은 2026-10-20 경석 요청으로 걷어 냈다 — F11 은 10-27 23호 막타 준비로 다시 씀(F4 는 10-22 보스 체력 10% 깎기, F6 은 10-26 보스방 지정 위치 이동(할 일 102)으로 씀).
 - **겹침은 표시만 했다** — 코드는 고치지 않았다.
-  F8·F7 은 둘 다 씬에 붙어 있을 때만 겹친다. `[ ]` 는 관전 모드이고 미니맵이 슬롯 밖일 때만 겹친다.
+  `[ ]` 는 관전 모드이고 미니맵이 슬롯 밖일 때만 겹친다.
 - 일반 조작 키(ESC·이동·스킬·F 상호작용·Alt+Enter 창 모드 등)는 디버그 단축키가 아니라 제외했다.
-- `LookToggle` 은 게이트 대상이지만 단축키가 없다(F9 룩 토글은 09-29 에 뺐다 — 시작 룩 적용만 한다).
+- F7(RetroCRT 토글)·F8(ProfilerHUD 토글·ZonePerfRecorder 한 줄 표시 토글) 단축키는 11-05 사용자 요청으로 뺐다(안 씀). CRT 는 `_effectEnabled` 칸(또는 컴포넌트 메뉴 Toggle CRT)으로 정한다.
+- 프로파일러 HUD(`ProfilerHUD`)·존별 성능 기록(`ZonePerfRecorder` — 한 줄 표시·CSV Home·End·Insert)은 11-05 에 모든 씬에서 뺐다. 스크립트는 `Dev/Profiler/Legacy/`, 프리팹은 `2.Prefabs/ProfillingHUD/Legacy/ProfilerHUD.prefab` 에 guid 그대로 보관(컴파일 유지). 다시 쓰려면 보관 프리팹을 씬에 놓는다.
+- 룩 A/B 토글(`LookToggle`)과 실루엣 비용 측정기(`RenderCostAB`, F7)는 할 일 226(11-05)에 `Dev/LookAB/` 폴더째 삭제했다.
+  맵 씬 화면은 그대로다 — `FogManager.prefab` 의 디밍·시야 차폐 값이 원래 룩 B 와 같다. 기록: [history/look-ab-tuning.md](../history/look-ab-tuning.md).
 
 ## 4. 게이트를 바꾼 파일 (할 일 41)
 
-`Dev/DevBossAttackHotkeys.cs` · `Dev/DevBossEntranceWarp.cs` · `Dev/HitVFXDebugHUD.cs` · `Dev/LookAB/LookToggle.cs` ·
-`Dev/LookAB/RenderCostAB.cs` · `Dev/Profiler/ProfilerHUD.cs` · `Dev/Profiler/ZonePerfRecorder.cs` · `Utility/DevMonsterKill.cs` ·
+`Dev/DevBossAttackHotkeys.cs` · `Dev/DevBossEntranceWarp.cs` · `Dev/HitVFXDebugHUD.cs` · ~~`Dev/LookAB/LookToggle.cs`~~ ·
+~~`Dev/LookAB/RenderCostAB.cs`~~(둘 다 226 삭제) · `Dev/Profiler/Legacy/ProfilerHUD.cs` · `Dev/Profiler/Legacy/ZonePerfRecorder.cs`(11-05 Legacy) · `Utility/DevMonsterKill.cs` ·
 `Map/MapScene/MapSceneSkipController.cs` · `Map/MapScene/MapSceneDebugActions.cs` · `Map/MapScene/MapSceneDirector.Skip.cs` ·
 `Map/MapScene/Flow/MapSceneTraitCorridorFlow.cs` · `Monster/Boss/TwentyThreeBoss.cs` · `Rendering/RetroCRT/RetroCRTController.cs`
 

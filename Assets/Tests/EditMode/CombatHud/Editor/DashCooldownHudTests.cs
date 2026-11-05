@@ -139,7 +139,7 @@ public sealed class DashCooldownHudTests
 
         Assert.That(Vector3.Distance(copy.lossyScale, icon.lossyScale), Is.LessThan(0.0001f), $"{slot.name}: 사본 크기·반전");
         Assert.That(Quaternion.Angle(copy.rotation, icon.rotation), Is.LessThan(0.01f), $"{slot.name}: 사본 회전");
-        Assert.That(((RectTransform)copy).sizeDelta, Is.EqualTo(((RectTransform)icon).sizeDelta), slot.name);
+        // 사본 sizeDelta 는 비교하지 않는다 — 배치·크기는 사용자가 CombatHUD 에서 조정한다(11-05 사용자 결정).
         return fill;
     }
 }

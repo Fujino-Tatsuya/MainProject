@@ -8,7 +8,7 @@
 //     대상이므로 건너뛰지 않는다. 걸어가는 구간만 없앤다.
 //
 //  ⚠️ 이 컴포넌트는 결과물이 아니라 도구다. `#if` 로 감싸 DEV_HOTKEYS 없는 릴리스 빌드에서는 클래스가 아예 없다
-//     (ProfilerHUD·LookToggle 과 같은 부류). 다만 **씬에 배치하지 않는다** — 런타임에 스스로
+//     (옛 ProfilerHUD 와 같은 부류). 다만 **씬에 배치하지 않는다** — 런타임에 스스로
 //     생기므로 씬에 missing script 가 남을 일도 없고, 어떤 씬에서 Play 해도 붙는다.
 //
 //  ⚠️ 빌드에서는 Standalone 스크립팅 심볼 **DEV_HOTKEYS** 가 있을 때만 들어간다(Development Build 도 됨).
@@ -28,7 +28,7 @@ using UnityEngine.InputSystem;   // 신 Input System (이 프로젝트: Active I
 [DisallowMultipleComponent]
 public sealed class DevBossEntranceWarp : MonoBehaviour
 {
-    // 이미 쓰이는 키 — F1·F2(HitVFXDebugHUD) · F8(ProfilerHUD) · F10(디버그 부활) · F3·F4·F6·F9·F11(23호 공격 예약 — DevBossAttackHotkeys)
+    // 이미 쓰이는 키 — F1·F2(HitVFXDebugHUD) · F10(디버그 부활) · F3·F4·F6·F9·F11(23호 공격 예약 — DevBossAttackHotkeys)
     //                M(맵 오버뷰) · [ ](카메라 타겟 전환). F5 가 비어 있어 쓴다.
 #if ENABLE_INPUT_SYSTEM
     const Key WarpKey = Key.F5;

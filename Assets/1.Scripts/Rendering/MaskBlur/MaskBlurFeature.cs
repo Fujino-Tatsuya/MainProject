@@ -16,7 +16,7 @@ using UnityEngine.Rendering.Universal;
 
 public sealed class MaskBlurFeature : ScriptableRendererFeature
 {
-    // RenderGraph 패스 이름. ProfilerHUD 의 customMarkers 가 이 문자열로 패스를 찾는다.
+    // RenderGraph 패스 이름. Unity Profiler·프로파일러 창이 이 문자열로 패스를 찾는다(ProfilerHUD 는 11-05 Legacy).
     //
     // 왜 상수로 묶는가: 마커 이름이 실제 패스 이름과 어긋나면 HUD 는 에러 없이 0.00 ms 를
     // 찍는다. "이 패스는 공짜"로 읽히는 거짓 신호이고, 성능을 판단하는 자리라 특히 위험하다.

@@ -1,4 +1,5 @@
 // ZonePerfRecorder.cs
+// 🗄️ Legacy(2026-11-05, 226 후속) — 어느 씬·프리팹에도 배치하지 않는다. 보관 프리팹 2.Prefabs/ProfillingHUD/Legacy/ProfilerHUD.prefab 이 Missing Script 가 되지 않게 컴파일만 유지한다.
 // 존별 실시간 성능 기록기 — 로컬 플레이어가 서 있는 존마다 프레임 비용을 쌓아 CSV 로 남긴다(PLAN-cleanup-optimization §S6).
 //
 // 왜 존별인가: 존은 맵 시작 때 전부 생성되고 계속 켜져 있다(MapContentSpawner). 그래서 위치마다 비용이 다른 이유는
@@ -9,7 +10,7 @@
 //   Home   = CSV 저장 + 콘솔 요약          (F1~F12 는 전부 다른 디버그 키가 쓰고 있다)
 //   End    = 프레임 상한 해제 ↔ 원래 상한 (바꾸면 누적 초기화 — 섞이면 비교가 안 된다)
 //   Insert = 누적 초기화
-//   F8     = 화면 한 줄 표시 토글(ProfilerHUD 와 같은 키)
+//   (F8 화면 한 줄 표시 토글은 11-05 삭제 — 표시는 showOverlay 칸으로만)
 //
 // 숫자의 의미
 //   Frame  = Time.unscaledDeltaTime — 실제 프레임 간격(벽시계). 예산 초과 판정은 이 값으로 한다.
@@ -455,12 +456,10 @@ public sealed class ZonePerfRecorder : MonoBehaviour
         if (kb.homeKey.wasPressedThisFrame) SaveCsv("Home 키");
         if (kb.endKey.wasPressedThisFrame) { SetUncapped(!_uncapped); ResetAll(); }
         if (kb.insertKey.wasPressedThisFrame) ResetAll();
-        if (kb.f8Key.wasPressedThisFrame) showOverlay = !showOverlay;
 #else
         if (Input.GetKeyDown(KeyCode.Home)) SaveCsv("Home 키");
         if (Input.GetKeyDown(KeyCode.End)) { SetUncapped(!_uncapped); ResetAll(); }
         if (Input.GetKeyDown(KeyCode.Insert)) ResetAll();
-        if (Input.GetKeyDown(KeyCode.F8)) showOverlay = !showOverlay;
 #endif
     }
 

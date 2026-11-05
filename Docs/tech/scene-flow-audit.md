@@ -336,9 +336,9 @@ YAML 기준 MapScene에는 총 10개의 씬 배치 `NetworkObject`가 존재한�
 
 | 타입 | 클래스 조건부 컴파일 | MapScene 증거 | 클라이언트 로그 |
 |---|---|---|---|
-| LookToggle | `LookToggle.cs:27` | `4.MapScene.unity:3236` | `Instance-Run_UxbA1cuR.log:425-426` |
+| LookToggle (226 삭제) | `LookToggle.cs:27` | `4.MapScene.unity:3236` | `Instance-Run_UxbA1cuR.log:425-426` |
 | ProfilerHUD | `ProfilerHUD.cs:17-419` | `4.MapScene.unity:3255-3272` | `:427-429` |
-| RenderCostAB | `RenderCostAB.cs:27` | `4.MapScene.unity:4650` | `:430-432` |
+| RenderCostAB (226 삭제) | `RenderCostAB.cs:27` | `4.MapScene.unity:4650` | `:430-432` |
 | HitVFXDebugHUD | `HitVFXDebugHUD.cs:22` | prefab/scene instance `4.MapScene.unity:6278` | `:423-424`, `:433-435` |
 
 두 번째 빌드도 동일 경고를 낸다(`Instance(1)-Run_TsFItBju.log:1053-1065`). `FogManager`에도 missing Behaviour가 하나 있다(`Instance-Run_UxbA1cuR.log:424`).

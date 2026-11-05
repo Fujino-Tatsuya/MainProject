@@ -10,7 +10,6 @@ GameObject:
   m_Component:
   - component: {fileID: 5183559392053023593}
   - component: {fileID: 3790732302556278461}
-  - component: {fileID: 6250038768474514944}
   m_Layer: 0
   m_Name: FogManager
   m_TagString: Untagged
@@ -69,20 +68,3 @@ MonoBehaviour:
   maskSize: {x: 15, y: 15}
   maskTintStrength: 0.201
   maxVolumes: 16
---- !u!114 &6250038768474514944
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6420106822572668577}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: efe621b073730fc45b0c6e85df2e7505, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LookToggle
-  startLook: 1
-  fogManager: {fileID: 3790732302556278461}
-  globalVolume: {fileID: 0}
-  profileB: {fileID: 0}
-  toastSeconds: 2.5

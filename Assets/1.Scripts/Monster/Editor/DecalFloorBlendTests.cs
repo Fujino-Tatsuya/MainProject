@@ -141,7 +141,8 @@ public sealed class DecalFloorBlendTests
         Assert.IsNotNull(s, "Resources/" + DecalFloorBlendSettings.ResourcePath);
         Assert.Greater(s.telegraphFillAlphaScale, 0.3f, "예고는 회피 신호 — 너무 옅게 하지 말 것");
         Assert.Greater(s.skillFillAlphaScale, 0f);
-        Assert.GreaterOrEqual(s.telegraphOutlineAlphaScale, 0.7f, "예고 외곽선은 회피 신호 — 너무 낮추지 말 것");
+        // 하한 = 사용자 튜닝값 0.4(44de033e, 11-05). 그 아래는 회피 신호가 약해진다.
+        Assert.GreaterOrEqual(s.telegraphOutlineAlphaScale, 0.4f, "예고 외곽선은 회피 신호 — 너무 낮추지 말 것");
         Assert.LessOrEqual(s.telegraphOutlineStain, 0.8f, "완전 물들임이면 어두운 바닥에서 외곽선이 묻힌다");
     }
 

@@ -9,7 +9,7 @@
 //         // BT/AI 관련 per-frame 코드 (블랙보드 갱신, 의사결정 등)
 //     }
 //
-// 그러면 Unity Profiler 창(검색 "BT")과 ProfilerHUD 의 "게임플레이 마커 > BT" 에 따로 표시된다.
+// 그러면 Unity Profiler 창(검색 "BT")에 따로 표시된다.
 // ProfilerMarker는 릴리스 빌드에서도 비용이 거의 없으므로(프로파일러 비활성 시) 그대로 둬도 된다.
 
 using Unity.Profiling;

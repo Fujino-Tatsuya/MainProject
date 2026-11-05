@@ -3377,10 +3377,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6250038768474514944, guid: a8c34a8fb0da1f240ad0e177964dbef5, type: 3}
-      propertyPath: globalVolume
-      value: 
-      objectReference: {fileID: 973540931}
     - target: {fileID: 6420106822572668577, guid: a8c34a8fb0da1f240ad0e177964dbef5, type: 3}
       propertyPath: m_Name
       value: FogManager
