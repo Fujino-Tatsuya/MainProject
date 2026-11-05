@@ -89,7 +89,11 @@ public static class LobbyResultPanelAuthoring
     }
 
     static readonly Color TextLight = new Color(0.86f, 0.86f, 0.84f, 1f);
-    static readonly Color LocalMarkerColor = new Color(1f, 0.78f, 0.2f, 1f);
+    // "나" 강조(할 일 222) — 흰 기본 UI 스프라이트(Unity 내장 UISprite, 9-slice)에 밝은 금색. 예전 RowBacking(회색 88)에 금색을 곱하면 어두운 갈색이 돼 안 보였다.
+    static readonly Color LocalMarkerColor = new Color(1f, 0.84f, 0.3f, 1f);
+    const string LocalMarkerSpritePath = "UI/Skin/UISprite.psd"; // AssetDatabase.GetBuiltinExtraResource
+    const float LocalMarkerOutset = 14f;           // 행 배경(Backing) 밖으로 나오는 테 두께(px) — 예전 9
+    const float LocalMarkerCornerScale = 0.18f;    // pixelsPerUnitMultiplier — 내장 스프라이트 모서리를 키워 행 배경 둥근 모서리에 맞춤
     static readonly Color DimColor = new Color(0f, 0f, 0f, 0.6f);
 
     // ── 메뉴 ────────────────────────────────────────────────
@@ -187,10 +191,12 @@ public static class LobbyResultPanelAuthoring
             element.minWidth = element.preferredWidth = RowWidth;
             element.minHeight = element.preferredHeight = RowH;
 
-            // "나" 강조 — 행 배경을 금색으로 조금 크게 깐다(배경 뒤). Bind 가 로컬 행만 켠다.
+            // "나" 강조 — 밝은 금색 테를 행 배경 뒤에 크게 깐다(테만 보임) + 은은한 맥동(할 일 222). Bind 가 로컬 행만 켠다.
             RectTransform marker = NewRect("Marker_Local", root.transform);
-            StretchWithOffset(marker, Padding + 9f);
-            AddImage(marker.gameObject, sprites.RowBacking, true, LocalMarkerColor);
+            StretchWithOffset(marker, Padding + LocalMarkerOutset);
+            Image markerImage = AddImage(marker.gameObject, AssetDatabase.GetBuiltinExtraResource<Sprite>(LocalMarkerSpritePath), true, LocalMarkerColor);
+            markerImage.pixelsPerUnitMultiplier = LocalMarkerCornerScale;
+            marker.gameObject.AddComponent<LobbyResultLocalMarkerPulse>(); // 맥동 값은 컴포넌트 기본값
             marker.gameObject.SetActive(false);
 
             RectTransform backing = NewRect("Backing", root.transform);

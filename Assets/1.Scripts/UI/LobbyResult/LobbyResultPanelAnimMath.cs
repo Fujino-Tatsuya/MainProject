@@ -205,6 +205,19 @@ public static class LobbyResultPanelAnimMath
         return t < 1f ? t : -1f;
     }
 
+    /// <summary>
+    /// "나" 행 강조 맥동(할 일 222) — 경과 시간 → 0 → 1 → 0 을 <paramref name="period"/> 마다 반복.
+    /// 앞 절반에 <paramref name="ease"/>(EuniTween <see cref="Easing.Evaluate"/>), 뒤 절반은 거울. 0 초 = 0, 주기 0 이하 = 늘 0.
+    /// </summary>
+    public static float PingPongPulse(float elapsed, float period, Ease ease)
+    {
+        if (period <= 0f || elapsed <= 0f)
+            return 0f;
+        float phase = Repeat(elapsed, period) / period;
+        float tri = phase < 0.5f ? phase * 2f : (1f - phase) * 2f;
+        return Easing.Evaluate(ease, Mathf.Clamp01(tri));
+    }
+
     /// <summary>반짝임 크기·투명도 0 → 1 → 0(EuniTween <see cref="Easing.Punch"/>). 진행도 0 미만(안 보임)·1 이상이면 0.</summary>
     public static float SparklePulse(float progress, Ease ease)
     {

@@ -261,4 +261,27 @@ public sealed class LobbyResultPanelAnimMathTests
         Assert.Greater(mid, 0.3f);
         Assert.Less(mid, curve.Evaluate(0.3f));
     }
+
+    [Test]
+    public void LocalMarkerPulse_PingPongsEveryPeriod()
+    {
+        // 222: 0 초 = 0(가장 밝음), 반 주기 = 1(가장 어두움), 한 주기 = 다시 0, 반복
+        const float period = 1.6f;
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.PingPongPulse(0f, period, Ease.InOutSine), 1e-6f);
+        Assert.AreEqual(1f, LobbyResultPanelAnimMath.PingPongPulse(0.8f, period, Ease.InOutSine), 1e-4f);
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.PingPongPulse(1.6f, period, Ease.InOutSine), 1e-4f);
+        Assert.AreEqual(0.5f, LobbyResultPanelAnimMath.PingPongPulse(0.4f, period, Ease.InOutSine), 1e-4f);
+        Assert.AreEqual(LobbyResultPanelAnimMath.PingPongPulse(0.4f, period, Ease.InOutSine),
+            LobbyResultPanelAnimMath.PingPongPulse(1.2f, period, Ease.InOutSine), 1e-4f); // 거울
+        Assert.AreEqual(LobbyResultPanelAnimMath.PingPongPulse(0.3f, period, Ease.InOutSine),
+            LobbyResultPanelAnimMath.PingPongPulse(0.3f + 5f * period, period, Ease.InOutSine), 1e-3f); // 반복
+        for (float t = 0f; t < 5f; t += 0.01f)
+        {
+            float v = LobbyResultPanelAnimMath.PingPongPulse(t, period, Ease.InOutSine);
+            Assert.GreaterOrEqual(v, 0f);
+            Assert.LessOrEqual(v, 1f);
+        }
+        // 주기 0 이하 = 맥동 없음
+        Assert.AreEqual(0f, LobbyResultPanelAnimMath.PingPongPulse(0.4f, 0f, Ease.InOutSine), 1e-6f);
+    }
 }

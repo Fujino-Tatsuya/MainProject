@@ -33,9 +33,14 @@
 | `event Action<LobbyResultCloseReason> Closed` | 닫힐 때 한 번(`Api`·`Button`·`Escape`·`AutoClose`) |
 | `static bool IsEscapeClaimed` | 패널이 열려 있거나 이 프레임 ESC 로 닫혔다 — 아래 ESC 참고 |
 
-- 표시 내용: 판 결과 라벨(CLEAR/FAILED/ABORTED, `UI.Result.*` 키) · 소요 시간 mm:ss · 플레이어 행(아래 "열·순위") · "나" 행 금색 테두리.
+- 표시 내용: 판 결과 라벨(CLEAR/FAILED/ABORTED, `UI.Result.*` 키) · 소요 시간 mm:ss · 플레이어 행(아래 "열·순위") · "나" 행 금색 테두리(맥동, 아래).
 - **Show 시점에 값을 글자로 복사한다.** Show 직후 `SessionResult.Clear()` 해도 보이는 내용은 그대로다(단 그 뒤엔 다시 Show 할 수 없다).
 - "나" 강조 기준 = `NetworkManager.LocalClientId`(세션 유지 중이어야 한다).
+- **"나" 강조 모양(할 일 222)** = 행 프리팹 `Marker_Local`(행 배경 `Backing` 뒤, Bind 가 로컬 행만 켬).
+  - 스프라이트 = Unity 내장 `UI/Skin/UISprite.psd`(흰 9-slice 둥근 사각, 프로젝트 다른 저작 메뉴도 씀 — 새 아트·SVN 변경 없음), 색 밝은 금색 `(1, 0.84, 0.3, 1)`, `pixelsPerUnitMultiplier` 0.18(모서리를 키워 행 배경 둥근 모서리에 맞춤), 행 배경 밖으로 **14px**(예전 9).
+  - 예전 = `result_row_backing`(회색 88) 위에 금색을 곱해 어두운 갈색 테가 됐다 — 안 보이던 원인. 검토한 후보: ① 내장 UISprite(채택) ② `50.Art/UI/HUD/Tooltip/Skill_Tooltip_Tag_Outline.png`(또렷한 흰 외곽선이지만 Sprite 임포트·9-slice 가 아니라 SVN `.meta` 수정 필요) ③ `50.Art/UI/char_select/card_selected_ring.png`(흰 링, 9-slice 없음 → 가로로 긴 행에 늘리면 테 두께가 찌그러짐). 프로젝트 UI 아트의 9-slice 스프라이트는 모두 어두운 색(28~116)이라 곱하면 금색이 죽는다.
+  - 맥동 = `LobbyResultLocalMarkerPulse`(같은 오브젝트): `period` 1.6초마다 투명도 1 ↔ `minAlpha` 0.55, 테 여백 +`outsetBreath` 3px ↔ 0, `ease` InOutSine(EuniTween `PingPongPulse`), unscaled. 켜질 때 가장 밝게 시작. `pulse` 끄면 저작 값 그대로. 자기 Image 알파·자기 여백만 바꿔 카운트업·패널 펀치(부모 크기)와 안 겹친다.
+  - 행 프리팹 재생성(`Tools/UI/Authoring/Lobby Result Panel (재생성)`)도 같은 값(`LocalMarkerColor`·`LocalMarkerOutset`·`LocalMarkerCornerScale`, 맥동 컴포넌트)을 붙인다.
 
 ## 닫기·모달
 - 닫기 버튼, ESC, **열린 뒤 180초**(`autoCloseSeconds`, `Time.unscaledTime` — 슬로모션 영향 없음, 0 이하면 끔) 중 먼저 오는 것. 피어마다 각자(로컬) 닫는다.
