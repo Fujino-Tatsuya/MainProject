@@ -20,7 +20,6 @@ public sealed class BossIntroPresentation : MonoBehaviour
     // 스킵 위젯 모양은 타이틀 ESC 건너뛰기(TitleSkipHint)도 같이 쓴다 — internal(경석 10-26). 정본은 CinematicOverlay.
     internal const float SkipPillWidth = CinematicOverlay.SkipPillWidth;
     internal const float SkipPillHeight = CinematicOverlay.SkipPillHeight;
-    internal static readonly Color SkipIdleColor = CinematicOverlay.SkipIdleColor;
     internal static readonly Color SkipTextColor = CinematicOverlay.SkipTextColor;
     internal static readonly Color KeycapTextColor = CinematicOverlay.KeycapTextColor;
     internal const float SkipKeycapWidth = CinematicOverlay.SkipKeycapWidth;
@@ -360,9 +359,7 @@ public sealed class BossIntroPresentation : MonoBehaviour
         if (_monologueText != null && _monologueText.font != font) _monologueText.font = font;
     }
 
-    // 타이틀 ESC 건너뛰기(TitleSkipHint)가 쓰는 이름 — 정본은 CinematicOverlay.
+    // 타이틀 ESC 건너뛰기(TitleSkipHint)가 쓰는 이름(키캡) — 정본은 CinematicOverlay.
     internal static Sprite KeycapSprite(int width, int height) => CinematicOverlay.KeycapSprite(width, height);
 
-    internal static Sprite RoundedOutlineSprite(int width, int height, float radius, float thickness) =>
-        CinematicOverlay.RoundedOutlineSprite(width, height, radius, thickness);
 }
