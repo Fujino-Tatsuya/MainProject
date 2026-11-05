@@ -429,8 +429,10 @@ public static class LobbyResultPanelAuthoring
 
     // ── 등급 도장(할 일 223) ──────────────────────────────────
 
-    // 소요시간 캡슐(x 137~962) 과 닫기 버튼(x 1313~) 사이 빗금 칸 가운데. 빨간 도장 하나 + 위에 등급 글자(TMP).
-    const string GradeStampSpritePath = "Assets/50.Art/UI/Result/UI_Result_GradeStamp_Red.png";
+    // 소요시간 캡슐(x 137~962) 과 닫기 버튼(x 1313~) 사이 빗금 칸 가운데. 빨간 원 하나 + 가운데 등급 글자(TMP).
+    // 원 = git 의 작은 흰 원 PNG(512px, 가장자리 안티에일리어싱)에 Image 색으로 빨강 — 기본 Knob 은 확대하면 흐려서 안 쓴다.
+    const string GradeStampSpritePath = "Assets/2.Prefabs/UI/Textures/ResultGradeCircle.png";
+    static readonly Color GradeStampColor = new Color(205f / 255f, 32f / 255f, 36f / 255f, 1f); // 예전 도장 PNG 의 빨강
     const float GradeStampCenterX = 1150f;
     const float GradeStampCenterY = 903f;
     const float GradeStampSize = 175f;
@@ -441,8 +443,8 @@ public static class LobbyResultPanelAuthoring
 
     static TMP_FontAsset LoadGradeFont() => AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(GradeFontPath);
 
-    /// <summary>기존 패널 프리팹에 도장만 붙인다(멱등 — 이미 있으면 손대지 않는다). 다시 만들려면 프리팹의 GradeStamp 를 지우고 다시.</summary>
-    [MenuItem("Tools/UI/Authoring/Lobby Result Panel 등급 도장 추가 (223)")]
+    /// <summary>기존 패널 프리팹에 도장을 붙인다. 이미 있으면 원 스프라이트·색만 다시 맞춘다(위치·글자는 그대로 — 손으로 맞춘 값 보호).</summary>
+    [MenuItem("Tools/UI/Authoring/Lobby Result Panel 등급 도장 추가·갱신 (223)")]
     public static void AddGradeStampToPrefab()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -468,9 +470,19 @@ public static class LobbyResultPanelAuthoring
                 Debug.LogError($"{Tag} Content/Panel 이 없다: {PanelPath}");
                 return;
             }
-            if (panel.Find("GradeStamp") != null)
+            Transform existing = panel.Find("GradeStamp");
+            if (existing != null)
             {
-                Debug.Log($"{Tag} 등급 도장이 이미 있다 — 손대지 않음.");
+                Image image = existing.GetComponent<Image>();
+                if (image == null || (image.sprite == stamp && image.color == GradeStampColor))
+                {
+                    Debug.Log($"{Tag} 등급 도장이 이미 최신 — 손대지 않음.");
+                    return;
+                }
+                image.sprite = stamp;
+                image.color = GradeStampColor;
+                PrefabUtility.SaveAsPrefabAsset(root, PanelPath, out bool updated);
+                Debug.Log($"{Tag} 등급 도장 원·색 갱신 {(updated ? "성공" : "실패")}: {PanelPath}");
                 return;
             }
 
@@ -484,14 +496,14 @@ public static class LobbyResultPanelAuthoring
         }
     }
 
-    /// <summary>batchmode 용(-executeMethod) — 새 PNG 임포트 후 도장 추가.</summary>
+    /// <summary>batchmode 용(-executeMethod) — 새 PNG 임포트 후 도장 추가·갱신.</summary>
     public static void AddGradeStampBatch()
     {
         AssetDatabase.Refresh();
         AddGradeStampToPrefab();
     }
 
-    /// <summary>도장 PNG 를 Sprite(Single·밉맵 없음)로 맞춰 읽는다. 아트 .meta(SVN)는 이 설정만 바꾼다.</summary>
+    /// <summary>원 PNG 를 Sprite(Single·밉맵 없음)로 맞춰 읽는다.</summary>
     static Sprite LoadGradeStampSprite()
     {
         if (AssetImporter.GetAtPath(GradeStampSpritePath) is TextureImporter importer &&
@@ -516,7 +528,7 @@ public static class LobbyResultPanelAuthoring
         root.SetAsLastSibling(); // 내려찍을 때 2.5배로 커져도 다른 칸 위에
         PlaceDesign(root, GradeStampCenterX - GradeStampSize * 0.5f, GradeStampCenterY - GradeStampSize * 0.5f, GradeStampSize, GradeStampSize);
         root.localRotation = Quaternion.Euler(0f, 0f, GradeStampAngle);
-        AddImage(root.gameObject, stamp, false, Color.white).preserveAspect = true;
+        AddImage(root.gameObject, stamp, false, GradeStampColor).preserveAspect = true;
         CanvasGroup group = root.gameObject.AddComponent<CanvasGroup>(); // 연출이 투명도를 바꾼다
         group.interactable = false;
         group.blocksRaycasts = false;

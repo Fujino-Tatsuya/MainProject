@@ -1,4 +1,8 @@
 using NUnit.Framework;
+using TMPro;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>로비 결과창 등급 도장 규칙(할 일 223) — 6분 이하 S, 9분 이하 A, 12분 이하 B, 그 위 C(경계 포함·정수 초), 클리어 판에만 도장.</summary>
 public sealed class LobbyResultGradeTests
@@ -38,5 +42,26 @@ public sealed class LobbyResultGradeTests
         Assert.IsTrue(LobbyResultGrade.ShowsStamp(SessionOutcome.Cleared));
         Assert.IsFalse(LobbyResultGrade.ShowsStamp(SessionOutcome.Wiped));   // 전멸(패배)
         Assert.IsFalse(LobbyResultGrade.ShowsStamp(SessionOutcome.Aborted)); // 중단
+    }
+
+    [Test]
+    public void Prefab_GradeStamp_IsCleanRedCircle_WithSeoulAlrimLetter()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(LobbyResultPanelAuthoring.PanelPath);
+        Assert.IsNotNull(prefab);
+        Transform stamp = prefab.transform.Find("Content/Panel/GradeStamp");
+        Assert.IsNotNull(stamp, "GradeStamp 없음");
+
+        Image image = stamp.GetComponent<Image>();
+        Assert.IsNotNull(image.sprite);
+        Assert.AreEqual("Assets/2.Prefabs/UI/Textures/ResultGradeCircle.png", AssetDatabase.GetAssetPath(image.sprite)); // git 흰 원(도장 스프라이트·Knob 아님)
+        Assert.AreEqual(205f / 255f, image.color.r, 0.01f);
+        Assert.AreEqual(32f / 255f, image.color.g, 0.01f);
+        Assert.AreEqual(36f / 255f, image.color.b, 0.01f);
+        Assert.AreEqual(-8f, Mathf.DeltaAngle(0f, stamp.localEulerAngles.z), 0.01f);
+
+        TMP_Text letter = stamp.GetComponentInChildren<TMP_Text>(true);
+        Assert.IsNotNull(letter);
+        StringAssert.Contains("SeoulAlrimTTF-Medium", letter.font.name);
     }
 }
