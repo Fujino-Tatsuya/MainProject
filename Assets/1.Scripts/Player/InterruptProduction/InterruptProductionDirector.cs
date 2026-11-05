@@ -776,8 +776,6 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             return;
 
         Instance._ownerPresentation?.LocalEnded(Time.unscaledTime);
-        // 카메라 대상 중심(할 일 196) — cue 없는 종료(시전 거부 등)도 복귀. 성공 슬로우 복귀를 기다리는 중이면 그대로 둔다.
-        Instance._cameraCenter.ReturnUnlessSucceeded(Time.unscaledTime);
     }
 
     /// <summary>
@@ -836,6 +834,11 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
         LastSuccessTier = tier;
         if (viewerIsCaster)
             LastOwnerTier = tier;
+
+        // 카메라 대상 중심(196 → 11-05 제압 간파 전용, 모든 화면) — 오너가 판정 순간 이미 제압으로 옮겼으면 한 번만(서버 단계가 다르면 보정).
+        // 아래 219 보정이 _ownerPlayedTier 를 서버 단계로 바꾸기 전에 읽는다.
+        CameraCenterServerSucceeded(tier, ownerCueHandled && _ownerPlayedTier == InterruptPresentationTier.Suppress, casterClientId,
+            targetPosition, Time.unscaledTime);
 
         // 오너 판정 cue(191)가 판정 순간 이미 섬광을 틀었다 — 예측 단계의 섬광(적중 라이트 / ②~⑥, OwnerJudgeCues.cs).
         // 제압 간파도 같은 길(11-04 할 일 211 — 단계 설정이 V3, 섬광 시퀀스·오너 암전 없음).

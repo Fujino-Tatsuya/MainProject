@@ -53,8 +53,34 @@ public readonly struct InterruptCameraCenterDecision
 /// </list>
 /// 문서: Docs/tech/interrupt-presentation.md(단계 4에서 카메라 절 추가 예정).
 /// </summary>
+/// <summary>서버 성공 사건을 받은 화면의 카메라 대상 중심 처리(11-05 제압 간파 전용).</summary>
+public enum InterruptCameraCenterSuccessAction : byte
+{
+    /// <summary>그대로 — 일반·대쉬 성공, 또는 오너가 판정 순간 이미 제압으로 옮겼다(중복 1회).</summary>
+    None = 0,
+    /// <summary>지금 대상 쪽으로 옮긴다 — 팀원 화면, 또는 오너 예측이 제압을 놓쳤다(서버 보정).</summary>
+    Begin = 1,
+    /// <summary>지금 복귀 — 오너가 제압으로 옮겼는데 서버 단계는 제압이 아니다(서버 보정).</summary>
+    Return = 2,
+}
+
 public static class InterruptCameraCenterRules
 {
+    /// <summary>이 성공 단계에 대상 중심을 적용하는가(11-05) — 스위치 켬 ∧ 제압 간파. 일반·대쉬는 안 움직인다.</summary>
+    public static bool AppliesOnSuccess(InterruptPresentationTier tier, bool switchOn) =>
+        switchOn && tier == InterruptPresentationTier.Suppress;
+
+    /// <summary>
+    /// 서버 성공 사건(전 피어, 제압 표식 bit0) 처리(11-05). <paramref name="ownerAlreadyCentered"/> = 이 화면이 발동자이고 판정 순간 제압으로 이미 옮겼다
+    /// (오너 판정 cue 가 이 성공을 처리 ∧ 판정 단계 제압). 그러면 서버 단계가 제압이면 그대로(한 번만), 아니면 복귀. 아니면 제압일 때만 옮긴다.
+    /// </summary>
+    public static InterruptCameraCenterSuccessAction OnServerSuccess(InterruptPresentationTier serverTier, bool switchOn, bool ownerAlreadyCentered)
+    {
+        if (ownerAlreadyCentered)
+            return serverTier == InterruptPresentationTier.Suppress ? InterruptCameraCenterSuccessAction.None : InterruptCameraCenterSuccessAction.Return;
+        return AppliesOnSuccess(serverTier, switchOn) ? InterruptCameraCenterSuccessAction.Begin : InterruptCameraCenterSuccessAction.None;
+    }
+
     /// <summary>
     /// 이 단계의 목표 중심·복귀 시점. <paramref name="baseCenter"/> = 평소 중심(옮기기 전 카메라가 따르는 지점),
     /// <paramref name="targetPosition"/> = 예측이 고른 간파 대상 위치, <paramref name="ratio"/> = 대상 쪽 이동 비율([0, 1]로 자른다 — 1 = 대상이 정중앙).

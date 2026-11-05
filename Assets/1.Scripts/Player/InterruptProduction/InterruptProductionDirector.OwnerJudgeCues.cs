@@ -30,7 +30,6 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
     bool IInterruptOwnerCueSink.OwnerAttempt(in InterruptOwnerCue cue)
     {
         OwnerJudgeCues.Attempted();
-        BeginCameraCenter(cue.Forecast, cue.Target, Time.unscaledTime); // 196 — 받아들임과 무관하게 이 시전이 카메라 상태를 대체
         return LocalOwnerAttempt(cue.Skill, cue.Forecast, cue.Owner, cue.Target, cue.AttackDirection, cue.ViaDash);
     }
 
@@ -46,7 +45,8 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
         uint triggerId = OwnerJudgeCues.JudgeSucceeded(viewer, FlashPoint(cue.FlashPosition), cue.FlashPosition,
             Time.unscaledTime, InterruptEffectTime.Now(HitFlash.Clock), Time.frameCount, look, variant);
         LastOwnerTier = tier;
-        CameraCenterSucceeded(Time.unscaledTime, tier == InterruptPresentationTier.Suppress);
+        // 196 → 11-05 — 카메라 대상 중심은 제압 간파 성공 순간에만(클릭 순간 이동 없음). 팀원 화면은 서버 성공 사건으로(HandleStarted).
+        CameraCenterOwnerJudged(tier, viewer, cue.Target, cue.FlashPosition, Time.unscaledTime);
         // 제압 칸 = 판정 순간 단계(오너 제압 예측 또는 랩 '제압 간파' 재현) — 그 단계 설정의 발생 위치·암순응·단계별 V3 에셋을 쓰게.
         if (InterruptPresentationTierRules.UsesHitLight(look))
             BeginHitLight(InterruptProductionEvent.LocalSuccess(triggerId, viewer, cue.FlashPosition,
@@ -61,7 +61,9 @@ public sealed partial class InterruptProductionDirector : IInterruptOwnerCueSink
             InterruptPresentationTierRules.UsesHitLight(_ownerJudgeCues.LocalSuccessLook))
             _hitLight?.Stop();
         OwnerJudgeCues.Ended(reason, Time.unscaledTime);
-        CameraCenterReturn(Time.unscaledTime); // 196 — 판정 실패·서버 거부·끊김·판정 버림 = 그 순간 복귀
+        // 196 — 서버 거부면 내 제압 간파로 옮긴 카메라를 그 순간 복귀. 판정 실패·끊김·판정 버림은 성공 전이라 옮긴 것이 없다(11-05 클릭 이동 없음).
+        if (reason == InterruptOwnerEndReason.ServerRejected)
+            CameraCenterOwnerRejected(_networkManager != null ? _networkManager.LocalClientId : 0, Time.unscaledTime);
         LastOwnerTier = InterruptPresentationTier.Fail;
     }
 

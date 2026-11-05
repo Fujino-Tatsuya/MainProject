@@ -532,7 +532,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 |---|---|---|---|
 | 시도(강·약)·성공 슬로우 · 히트스톱 | — · A1 | 서버 타임라인(전 피어 공용) | 채널을 거치지 않는다. `Time.timeScale` 은 피어 전역이라 개인 슬로우는 불가 |
 | 오너 줌 | A3 | 개인 | 카메라가 매 프레임 `Director.OwnerZoomFactor(목적, 성공 배율)`·`Director.OwnerAwaitsStrongResult` 질의 → `SlowMotionOwnerZoom`(시도~성공 줌 한 번). 내 슬로우인지는 카메라가 본다 |
-| 카메라 대상 중심(196) | `cameraCenter` | 개인 | 카메라가 매 프레임 `Director.OwnerCameraCenterShift(추적 대상, cameraBusy)` 질의 — 오너 cue 로만 시작하므로 늘 내 간파([§10](#10-카메라-대상-중심-할-일-196)) |
+| 카메라 대상 중심(196 → 11-05) | `cameraCenter` | **공용(각 화면 자기 카메라)** | 카메라가 매 프레임 `Director.OwnerCameraCenterShift(추적 대상, cameraBusy)` 질의 — **제압 간파 성공 순간에만, 모든 화면**(오너 = 판정 cue, 팀원·보정 = 서버 성공 사건 제압 표식 bit0, [§10](#10-카메라-대상-중심-할-일-196)) |
 | 오너 암전 · 섬광 오버레이 | 효과 칸 `show*`(§0.6) | 개인(오너 상태 기계) | §0.3 |
 | 빛 모임 · 월드 섬광 · 적중 지점 라이트 | 효과 칸 `show*`(§0.6) | 오너 = 입력 순간 예측 / 팀원·모두 = 슬로우 이벤트 | §0.3 |
 | 암순응 self 강도 | A2 | 개인 | 발동자 == `LocalClientId` ∧ 섬광 오버레이 안 돎(약 시도 성공), 섬광 순간 |
@@ -562,7 +562,7 @@ A4 칸은 켜져 있다 — 성공 순간(Started 즉시) 원샷이라 섬광(6 
 | E1 | `targetFlash` | 꺼짐 | 맞은 쪽 섬광 `Interrupt_Flash` | 23호·건틀릿봇·스피너봇·월봇·허수아비·스파링 봇 `PlayInterruptFlashRpc` → `Director.PlayCue(TargetFlash, …, this)` |
 | A5 | `hideCombatUi`(옛 `hideDamageNumbers` — `FormerlySerializedAs`, 프리팹 줄 그대로) | **켬** | 전투 표시 숨김(154 → 179 후속 2·4) — 내 강 시도 암전 시작 ~ 성공 섬광 ⑥ 가라앉음 끝(실패·판정 전 종료·예측 빗나감이면 오너 암전 걷기 끝) 이 화면의 **피해 숫자 캔버스(보스 포함)·머리 위 체력바(플레이어·몬스터·보스 모두 — 179 후속 4. 화면 고정 보스 HP 바 `BossHealthHUD` 는 그대로)·오너 조준 표시 쿼드(렌더러만 끔)** 를 숨긴다. 생성·수명·게이지 값은 그대로. 숨긴 조준 쿼드는 그려지지 않아 암전 마스크(비트 4)에도 안 남는다(전에는 플레이어 루트 태깅으로 비트를 받아 흰 사각형 실루엣). 일반 간파의 팀원 화면은 그대로(암전·②~⑥ 없음) | 상태에서 바로 읽는 값(pull) — `FloatingDamageSpawner`·`UnitOverheadHealthBar`·`PlayerAimIndicator` 의 `LateUpdate` → `Director.CombatUiHidden` = `InterruptProductionRules.ShouldHideCombatUi(칸, State == AttemptStrong ∨ DimIntensity > 0 ∨ 섬광 진행기 OverlayActive)` (제압 섬광 시퀀스 항은 11-04 할 일 211 로 삭제). 따로 복원할 상태가 없어 끝·실패·강제 리셋·디렉터 꺼짐이면 다음 프레임에 보인다(조준 쿼드는 컴포넌트 OnDisable 에도 켬). cue(`InterruptProductionCue`) 아님 — 런타임 값은 `director.HideCombatUi` |
 | A6·A7 | (삭제 — 옛 `suppressFlash`·`suppressFlashTargetOnly`) | — | **11-04 할 일 211 로 삭제** — 제압 간파 = 일반·대쉬와 같은 적중 라이트 V3(`suppressTier`, §8.3). 섬광 시퀀스·섬광 범위는 Legacy([§7](#7-제압-간파-애니메이션-섬광-할-일-179) 기록용), 프리팹 줄도 지웠다 | — |
-| — | `cameraCenter`("성공 — 개인") | **켬**(코드 기본값) | 카메라 대상 중심(196, [§10](#10-카메라-대상-중심-할-일-196)) — 내 간파 클릭 즉시 카메라 중심을 간파 대상 쪽으로. 줌(A3)과 독립. 끄면 기존과 같음 | 시도 cue 순간 읽음(진행 중 이동은 끝까지) → `CameraTargetSwitcher` 가 `Director.OwnerCameraCenterShift` 로 이동량을 묻는다. cue 아님 — 런타임 값은 `director.CameraCenterEnabled` |
+| — | `cameraCenter`("성공 — 개인") | **켬**(코드 기본값) | 카메라 대상 중심(196 → 11-05, [§10](#10-카메라-대상-중심-할-일-196)) — **제압 간파 성공 순간** 모든 플레이어 카메라 중심을 간파 대상 쪽으로(일반·대쉬 간파·클릭 순간은 안 움직임). 줌(A3)과 독립. 끄면 그 화면은 안 움직임 |
 
 - **B1·B2·C1 과 빛 모임의 겹침**: 셋 다 '시도 순간 무기에서 기를 모으는' 연출이라 강 시도의 빛 모임(같은 소켓 — 방패·단검)과 뜻이 겹친다. 132 이전부터 꺼져 있던 값을 그대로 두었다 — 켜면 강 시도에서 둘이 같은 자리에 겹쳐 나온다.
 
@@ -938,23 +938,24 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 
 > 계획서: `_lane-artifacts/MainProject-WorkTree/196/PLAN.md`(레포 밖). 코드: `InterruptCameraCenterRules`(순수 규칙)·`InterruptCameraCenterTracker`(상태 기계, 실제 시간)·`InterruptProductionDirector.CameraCenter.cs`·`CameraTargetSwitcher`.
 
-내 간파(근접·대쉬) 클릭 즉시 카메라 중심을 **간파 대상 쪽으로** 짧게 옮긴다. 줌(A3)은 그대로 — 중심만 옮긴다. **오너 화면만**(팀원 화면 그대로).
+**11-05 사용자 확정 — 제압 간파 성공 순간에만, 모든 플레이어 카메라**(호스트·클라이언트, 간파한 사람·팀원 전부)를 **간파 대상 쪽으로** 짧게 옮긴다. 일반·대쉬 간파는 안 움직이고, 예전 **클릭 즉시 이동은 없앴다**. 줌(A3)은 그대로 — 중심만 옮긴다. 각 화면은 자기 카메라만, 자기 플레이어를 따르는 지점 기준으로 같은 칸 값으로 옮긴다. 새 RPC 없음.
 
 | 칸 | 위치 | 기본값 | 뜻 |
 |---|---|---|---|
-| `cameraCenter` | 디렉터 "성공 — 개인" | 켬 | 켜기/끄기(bool, 테이블 밖). 시도 cue 순간 읽는다 |
+| `cameraCenter` | 디렉터 "성공 — 개인" | 켬 | 켜기/끄기(bool, 테이블 밖, 각 화면 자기 값). 성공 순간 읽는다 |
 | `cameraCenterMoveDuration` | 슬로우 SO ④ | 0.08 | 대상 쪽으로 옮기는 시간(초, 실제 시간) |
 | `cameraCenterRatio` | 슬로우 SO ④ | 1 | 옮기는 비율(0~1, 1 = 대상이 화면 중심) |
 | `cameraCenterReturnDuration` | 슬로우 SO ④ | 0.25 | 평소 중심으로 돌아오는 시간(초, 실제 시간) |
 
-- **시작**: 매니저 오너 시도 cue — 근접 = 누른 순간, 대쉬 = 대시에 실린 순간(`ArmDashAttach`). 강·약 예측 모두, 대상 없음 = 그대로. 대상 = 예측이 고른 캐시 대상 — 움직이면 따라가고 사라지면(파괴·비활성) 복귀. 새 시도는 지금 이동량에서 이전 상태를 대체한다.
-- **복귀**: 판정 실패·서버 거부·CC 끊김(`CrowdControl`)·판정 버림(`JudgeDropped`)·강제 리셋·cue 없는 종료(시전 거부 등) = **그 순간**. 판정 성공 = **내 성공 슬로우가 복귀(Exit) 구간에 들어가는 순간**까지 유지 — 이 화면에 내 성공 슬로우가 안 보이면(거부·잠금) 성공 프로필 시간표 `SuccessReturnDelay`(히트스톱 + 진입 + 유지) 뒤.
+- **시작(11-05)**: ① **간파한 오너** = 오너 판정 성공 cue 순간, 판정 단계가 제압(219 오너 제압 예측 = 대상 제압 칸 마지막 칸)이면 바로(`CameraCenterOwnerJudged`, 대상 = cue 대상, 없으면 적중 지점). ② **팀원·호스트 구경 화면** = 서버 성공 슬로우 Started 의 제압 표식(bit0)으로(`CameraCenterServerSucceeded`, 대상 = 발동자 간파 스킬이 이 피어 복제 위치로 다시 찾은 대상 `FindPeerSuccessTargetId`, 못 찾으면 적중 지점 고정). ③ **오너 화면 보정** = 판정 cue 가 이 성공을 처리했고 판정 단계가 제압이면 서버 사건은 **그대로(한 번만)**, 서버 단계가 제압이 아니면 **복귀**, 판정은 일반·대쉬였는데 서버가 제압이면 **그때 옮긴다** — 순수 규칙 `InterruptCameraCenterRules.AppliesOnSuccess`·`OnServerSuccess`. 대상이 움직이면 따라가고 사라지면(파괴·비활성) 복귀. 새 제압 간파는 지금 이동량에서 이어 대체.
+- **복귀**: 시작하자마자 **발동자의 성공 슬로우(제압 전용 ③-2 프로필)가 복귀(Exit) 구간에 들어가는 순간**까지 유지 — 이 화면에 그 슬로우가 끝내 안 보이면 ③-2 시간표(히트스톱+진입+유지)로. 서버 거부(내 제압으로 옮긴 것만)·서버 단계 보정·강제 리셋 = **그 순간**. 판정 실패·CC·판정 버림은 성공 전이라 옮긴 것이 없어 무관(팀원 제압으로 옮긴 중이면 그대로).
 - **오프셋 방식**: 오너 줌과 같은 경로 — `FollowOffset`(World Space) = 기본 오프셋 × 줌 배율 + 이동량. 이동량은 수평(XZ)만, 복귀가 끝나면 정확히 0 → 원래 오프셋.
 - **기준점(196 후속)**: 이동량 = (대상 − **카메라가 실제로 따라간 지점**) × 비율. 따라간 지점 = 플레이어 vcam `State.RawPosition` − 직전에 넣은 오프셋(기본 × 줌 배율 + 이동량) — `InterruptCameraCenterRules.FollowedPoint`. 플레이어 실제 위치를 쓰면 팔로우 감쇠(PositionDamping 1, 슬로우 때 감쇠도 느려짐)로 뒤처진 만큼 이동·대쉬 간파 때 대상에서 빗나가고 슬로우가 풀릴 때 중심이 쓸려 갔다.
 - **다른 카메라 연출과 충돌**: `cameraBusy` = 연출 vcam(`IsInCinematic`) ∨ 낙하 뷰 ∨ 관전 ∨ 임시 추적(`HasTemporaryFollow`)이면 진행 중인 이동을 **즉시 버리고 0**(그 연출이 끝나도 되살리지 않는다). 추적 대상이 없을 때도 같다.
 - **데이터 테이블**: SO ④ 칸 3개는 `SlowMotion` 시트(대상 열 `InterruptSlowMotionSettings`) 행 — ✅ SVN r583 병합 Export 로 생김(0.08·0.75·0.25, 버려진 값 0).
 - 랩: 튜닝 패널 효과 줄 밑 **"카메라 대상 중심 (196)"** 토글 — 이 피어 런타임 값만, 다음 간파부터. '전부 켬'·'암전만' 은 건드리지 않는다.
-- 테스트: `InterruptCameraCenterTests`(복귀 시점표·비율·기준점·스위치·오너·SO 기본값) · `InterruptCameraCenterTrackerTests`(이동·유지·복귀·대체·소실) · 랩 토글 `DebugInterruptLabTests`.
+- 테스트: `InterruptCameraCenterTests`(순수 시점표·비율·기준점·SO 기본값) · `InterruptCameraCenterTrackerTests`(이동·유지·복귀·대체·소실 · 11-05 제압만·서버 사건 처리 규칙 · 디렉터: 시도 cue·일반·대쉬 안 움직임 / 제압 오너·팀원 / 판정+서버 사건 한 번 / 예측 보정 / 서버 거부는 내 것만) · 랩 토글 `DebugInterruptLabTests`. 랩 '제압 간파' 재현 버튼도 판정 cue 경로라 이 화면 카메라가 적중 지점 쪽으로 움직인다.
+- **알려진 차이(11-05)**: 원격 클라이언트 오너는 판정 순간 바로 움직이지만, 팀원 화면은 서버 사건이 닿는 만큼(편도 지연) 늦게 시작한다. 복귀는 각 화면이 받은 그 슬로우 구간을 따르므로 대략 맞는다.
 
 **알려진 한계**
 - 시네마틱 블렌드로 들어가는 첫 프레임에 이동량이 0 으로 꺼지면서 화면이 한 번 튈 수 있다.
