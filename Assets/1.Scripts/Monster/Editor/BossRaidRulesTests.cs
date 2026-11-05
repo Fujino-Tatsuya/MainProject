@@ -149,4 +149,21 @@ public sealed class BossRaidRulesTests
         Assert.That(BossRaidRules.CapHitDamage(45, 220, 0.9f), Is.EqualTo(45));
         Assert.That(BossRaidRules.CapHitDamage(9999, 220, 0f), Is.EqualTo(9999));
     }
+
+    /// 할 일 232 — 북진 압박 3번째 성공 간파만 제압 간파 연출(데이터 칸 기본 3, 0 = 끔).
+    [Test]
+    public void PushNorthSuppressFx_OnlyConfiguredCounter()
+    {
+        Assert.IsFalse(BossRaidRules.IsPushNorthSuppressFxCounter(1, 3));
+        Assert.IsFalse(BossRaidRules.IsPushNorthSuppressFxCounter(2, 3));
+        Assert.IsTrue(BossRaidRules.IsPushNorthSuppressFxCounter(3, 3));
+        Assert.IsFalse(BossRaidRules.IsPushNorthSuppressFxCounter(4, 3), "3번째 뒤(칸 설정이 길 때)는 일반");
+    }
+
+    [Test]
+    public void PushNorthSuppressFx_ZeroDisables()
+    {
+        for (int n = 0; n <= 4; n++)
+            Assert.IsFalse(BossRaidRules.IsPushNorthSuppressFxCounter(n, 0));
+    }
 }

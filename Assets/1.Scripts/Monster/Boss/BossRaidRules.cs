@@ -64,6 +64,13 @@ public static class BossRaidRules
     public static BossAttackId RescueAttackFor(int alivePlayers) =>
         alivePlayers >= 2 ? BossAttackId.Grab : BossAttackId.Jump;
 
+    /// <summary>
+    /// 북진 압박 — 이번 기믹의 <paramref name="counterNumber"/>번째 성공 간파(1부터)가 '제압 간파 연출' 간파인가(할 일 232 — 기본 3번째만).
+    /// <paramref name="configuredNumber"/> ≤ 0 = 끔. 서버 표식과 오너 예측 복제값이 같은 계산을 쓴다.
+    /// </summary>
+    public static bool IsPushNorthSuppressFxCounter(int counterNumber, int configuredNumber) =>
+        configuredNumber > 0 && counterNumber == configuredNumber;
+
     /// <summary>한 번에 받는 피해 상한. ratio ≤ 0 이면 상한 없음.</summary>
     public static int CapHitDamage(int damage, int receiverMaxHp, float ratio)
     {

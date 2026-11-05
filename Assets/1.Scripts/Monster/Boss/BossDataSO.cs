@@ -434,6 +434,9 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("파훼 보상 — 그로기(초) · 받는 플레이어 피해 배율(제압 경로, 이 기믹 끝에서만).")]
     [DataTableIgnore] [Min(0.5f)] public float pushNorthRewardDuration = 8f;
     [DataTableIgnore] [Min(1f)] public float pushNorthRewardDamageMultiplier = 1.3f;
+    [Tooltip("이 기믹의 몇 번째 성공 간파를 '제압 간파 연출'로 낼지(할 일 232 — 기본 3번째만). 0 = 끔.\n" +
+             "제압 V3 적중 라이트·제압 성공 슬로우·화이트아웃·카메라 대상 중심 — 제압 칸과 무관. 연출만이고 밀림·파훼 제압은 그대로.")]
+    [DataTableIgnore] [Min(0)] public int pushNorthSuppressFxCounterNumber = 3;
     [Tooltip("차징 실패 즉사 방전을 무적으로 못 피하게(할 일 105). 1=켜기, 0=끔.\n" +
              "1 이면 전체 범위 회차(2회차~)는 전멸기 — 발동 순간 살아 있는 참가자 전원 사망 처리(칸·벽 끼임·무적 무관).\n" +
              "안전 구역이 있는 1회차는 칸 판정 그대로 + 칸 위 플레이어는 무적(대시 등 전부)을 뚫는 즉사 피해. 0 이면 예전처럼 무적으로 피할 수 있다.\n" +
