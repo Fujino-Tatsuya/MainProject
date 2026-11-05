@@ -65,7 +65,7 @@ public static class GameMenuAuthoring
             root.AddComponent<GraphicRaycaster>();
             var controller = root.AddComponent<GameMenuController>();
 
-            var content = new GameObject("Content", typeof(RectTransform), typeof(Image), typeof(UiModalBlocker));
+            var content = new GameObject("Content", typeof(RectTransform), typeof(Image), typeof(UiModalBlocker), typeof(PanelBackdropBlurTarget)); // 201 배경 블러
             content.layer = uiLayer;
             var contentRt = (RectTransform)content.transform;
             contentRt.SetParent(root.transform, false);

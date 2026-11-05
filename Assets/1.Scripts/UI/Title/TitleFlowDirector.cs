@@ -6,12 +6,13 @@ using UnityEngine.InputSystem;
 public enum TitleFlowState
 {
     Idle,
+    Restoring,
     Approaching,
     Starting,
 }
 
 /// <summary>
-/// 타이틀 연출의 단일 진입점. Press 캡슐 → 아무 키 → 카메라가 모니터로 다가감 → 모니터 CRT 꺼짐 → 검정 페이드 → 로비.
+/// 타이틀 연출의 단일 진입점. Press 문구(화면은 블러·흑백 + TV 글리치) → 아무 키 → 블러·흑백 원복(1초, 218) → 카메라가 모니터로 다가감 → 모니터 CRT 꺼짐 → 검정 페이드 → 로비.
 /// 다가가는 중 ESC = 꺼짐 없이 바로 검정 페이드 → 로비.
 /// </summary>
 /// <remarks>
@@ -56,8 +57,41 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [SerializeField] private Vector2 _startBurst = new(0.35f, 0.1f);
 
     [Header("UI 루트")]
-    [Tooltip("Press 캡슐 — 화면 앞 오버레이(모니터 안이 아니다).")]
+    [Tooltip("Press Any Button 문구 — 화면 앞 오버레이(모니터 안이 아니다). 이 문구가 있는 캔버스는 대기 블러에서 빠져 선명하다.")]
     [SerializeField] private GameObject _pressAnyKeyRoot;
+
+    // 218 — Press 대기 동안 문구 캔버스 밖(월드)을 블러·흑백으로, 키 입력 뒤 선형으로 원복한 다음 카메라 진입.
+    // 블러는 201 공용 경로(PanelBackdropBlur.Drive → PC_Renderer PanelBackdropBlurFeature). 렌더러에 피처가 없으면 원복 시간만 기다린다.
+    [Header("Press 대기 블러·흑백 (218)")]
+    [Tooltip("끄면 블러·흑백 없이 예전처럼 키 입력 즉시 카메라 진입.")]
+    [SerializeField] private bool _idleBlurEnabled = true;
+
+    [Tooltip("대기 중 화면 모양. 채도 0 = 완전 흑백. 원복 동안 셋 다 원본 쪽으로 선형으로 줄어든다.")]
+    [SerializeField] private PanelBackdropBlurLook _idleBlurLook = new(1.42f, 0f, 0f, true);
+
+    [Tooltip("키 입력 뒤 블러 0·색 원복까지 걸리는 시간(초, unscaled, 선형). 끝나면 카메라 진입 연출.")]
+    [SerializeField, Min(0f)] private float _restoreDuration = 1f;
+
+    // 218 후속 — 블러·흑백 위에 아날로그 TV 글리치(가로 찢김·RGB 어긋남·주사선·잡음). 블러 합성 패스 안에서 그린다(새 패스·텍스처 없음).
+    // 세기 = max(상시, 버스트) — 버스트는 TitleCrtFx 와 같은 모양(즉시 피크 → 빠른 감쇠). 원복 동안 블러 세기와 같이 0 으로. Press 문구에는 안 걸린다.
+    [Header("Press 대기 TV 글리치 (218 후속, unscaled) — 범위 = (최소, 최대) 무작위")]
+    [Tooltip("끄면 블러·흑백만(글리치 없음).")]
+    [SerializeField] private bool _idleGlitchEnabled = true;
+
+    [Tooltip("상시 글리치 세기(0~1). 아래 모양 값에 곱해진다 — 은은한 주사선·잡음·가끔 작은 찢김.")]
+    [SerializeField, Range(0f, 1f)] private float _idleGlitchAmbient = 0.3f;
+
+    [Tooltip("버스트(강한 지직) 세기(0~1).")]
+    [SerializeField] private Vector2 _idleGlitchBurstStrength = new(0.75f, 1f);
+
+    [Tooltip("버스트 사이 간격(초).")]
+    [SerializeField] private Vector2 _idleGlitchBurstInterval = new(1.5f, 4f);
+
+    [Tooltip("버스트 한 번 길이(초).")]
+    [SerializeField] private Vector2 _idleGlitchBurstDuration = new(0.12f, 0.3f);
+
+    [Tooltip("글리치 세기 1 일 때의 모양. 상시·버스트 모두 이 값 × 세기.")]
+    [SerializeField] private PanelBackdropGlitchLook _idleGlitchLook = new(0.45f, 3f, 0.008f, 0.06f, 0.35f, 0.18f);
 
     [Header("오버레이 (전체화면)")]
     [Tooltip("우측 하단 'Esc 건너뛰기' 안내(TitleSkipHint — 보스 스킵 위젯 모양, 누르면 바로). 접근 구간에만 켠다.")]
@@ -80,6 +114,15 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
     private TitleFlowState _state = TitleFlowState.Idle;
     private float _approachElapsed;
+    private float _restoreElapsed;
+    private bool _blurHeld;
+
+    // Press 대기 글리치 버스트 예약(unscaled 시각).
+    private float _glitchClock;
+    private float _nextGlitchBurst;
+    private float _glitchBurstStart;
+    private float _glitchBurstEnd;
+    private float _glitchBurstPeak;
 
     public TitleFlowState State => _state;
 
@@ -114,7 +157,13 @@ public sealed class TitleFlowDirector : MonoBehaviour
         {
             case TitleFlowState.Idle:
                 if (AnyStartInput())
-                    EnterApproaching();
+                    EnterRestoring();
+                else
+                    DriveIdleBlur(1f);
+                break;
+
+            case TitleFlowState.Restoring:
+                TickRestoring();
                 break;
 
             case TitleFlowState.Approaching:
@@ -138,7 +187,39 @@ public sealed class TitleFlowDirector : MonoBehaviour
         if (_crtFx != null)
             _crtFx.AmbientBursts = true; // 로고·Press 캡슐이 지직거린다
 
+        HoldIdleBlur();
+
         Debug.Log("[TitleFlow] Idle");
+    }
+
+    // 키 입력 → Press 문구는 바로 끄고(예전 키 입력 순간과 같음), 블러·흑백을 _restoreDuration 동안 선형으로 0 까지 → 카메라 진입.
+    private void EnterRestoring()
+    {
+        SetActive(_pressAnyKeyRoot, false);
+
+        if (!_blurHeld || _restoreDuration <= 0f)
+        {
+            ReleaseIdleBlur();
+            EnterApproaching();
+            return;
+        }
+
+        _state = TitleFlowState.Restoring;
+        _restoreElapsed = 0f;
+        Debug.Log("[TitleFlow] Restoring");
+    }
+
+    private void TickRestoring()
+    {
+        _restoreElapsed += Time.unscaledDeltaTime;
+        float t = Mathf.Clamp01(_restoreElapsed / _restoreDuration);
+        DriveIdleBlur(1f - t); // 글리치도 같은 진행도로 0 까지(피처가 블러 세기를 곱한다)
+
+        if (t >= 1f)
+        {
+            ReleaseIdleBlur();
+            EnterApproaching();
+        }
     }
 
     private void EnterApproaching()
@@ -216,6 +297,85 @@ public sealed class TitleFlowDirector : MonoBehaviour
     {
         yield return _monitorDisplay.PowerOff(_powerOffDuration);
         _sceneManager.StartGame();
+    }
+
+    // ── Press 대기 블러(218) ──────────────────────────────────────────────
+
+    // 문구가 있는 캔버스를 "패널"로 잡는다 → 그 캔버스(Overlay)는 후처리 뒤에 그려져 선명, 월드만 흐림·흑백.
+    private void HoldIdleBlur()
+    {
+        if (!_idleBlurEnabled || _blurHeld)
+            return;
+
+        Canvas sharpCanvas = _pressAnyKeyRoot != null ? _pressAnyKeyRoot.GetComponentInParent<Canvas>(true) : null;
+        if (sharpCanvas == null)
+        {
+            // 캔버스 없이 잡으면 모든 Overlay 캔버스가 흐림 대상이 된다 — 문구까지 흐려지니 블러를 건너뛴다.
+            Debug.LogWarning("[TitleFlow] Press 문구(_pressAnyKeyRoot)·캔버스가 없다 — 대기 블러 없이 진행.", this);
+            return;
+        }
+
+        PanelBackdropBlur.Acquire(this, sharpCanvas);
+        _blurHeld = true;
+
+        _glitchClock = 0f;
+        _glitchBurstEnd = 0f;
+        _nextGlitchBurst = RandomRange(_idleGlitchBurstInterval);
+        DriveIdleBlur(1f);
+    }
+
+    // 블러 세기 + 이번 프레임 글리치 세기를 공용 경로에 넘긴다. 잡지 않았으면 아무것도 안 한다.
+    private void DriveIdleBlur(float amount)
+    {
+        if (!_blurHeld)
+            return;
+
+        if (!_idleGlitchEnabled)
+        {
+            PanelBackdropBlur.Drive(this, amount, _idleBlurLook);
+            return;
+        }
+
+        PanelBackdropBlur.Drive(this, amount, _idleBlurLook, TickIdleGlitch(), _idleGlitchLook);
+    }
+
+    // 상시 + 불규칙 버스트. 버스트 = 즉시 피크 → (1-k)² 감쇠(TitleCrtFx.CurrentBurst 와 같은 모양).
+    private float TickIdleGlitch()
+    {
+        _glitchClock += Time.unscaledDeltaTime;
+
+        if (_glitchClock >= _nextGlitchBurst)
+        {
+            _glitchBurstStart = _glitchClock;
+            _glitchBurstEnd = _glitchClock + Mathf.Max(0.01f, RandomRange(_idleGlitchBurstDuration));
+            _glitchBurstPeak = Mathf.Clamp01(RandomRange(_idleGlitchBurstStrength));
+            _nextGlitchBurst = _glitchBurstEnd + Mathf.Max(0.05f, RandomRange(_idleGlitchBurstInterval));
+        }
+
+        float burst = 0f;
+        if (_glitchClock < _glitchBurstEnd)
+        {
+            float k = Mathf.InverseLerp(_glitchBurstStart, _glitchBurstEnd, _glitchClock);
+            burst = _glitchBurstPeak * (1f - k) * (1f - k);
+        }
+
+        return Mathf.Max(_idleGlitchAmbient, burst);
+    }
+
+    private static float RandomRange(Vector2 range) => Random.Range(range.x, range.y);
+
+    private void ReleaseIdleBlur()
+    {
+        if (!_blurHeld)
+            return;
+
+        PanelBackdropBlur.Release(this);
+        _blurHeld = false;
+    }
+
+    private void OnDisable()
+    {
+        ReleaseIdleBlur();
     }
 
     // x = 세기, y = 길이(초) — 인스펙터 「전환 지직거림」.

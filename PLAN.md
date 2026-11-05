@@ -1,4 +1,169 @@
-# ▶▶▶ 계획 = **잔류 포격(GUN_4_ECHO_Q) VFX — 몸에 붙는 에너지 폭탄 구체 + 전용 폭발** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 확인 · ✅ MainProject 연결 · ⏳ 민경 Play)
+# ▶▶▶ 계획 = **추격의 궤적(ASN_4_Q_TRAIL) VFX — 경로 잔상 일섬(b) vs 그림자 자국 + 베기 줄(c) 비교** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 비교 → **C안** 선택(경로·끝점 섬광 뺌) · ✅ 연결(컴파일 0 · 랩 로그 확인) · ✅ 재제작 4 — 민경 수정본(공중 줄 z 0.5·바닥 자국 늘이기) MainProject 교체·연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · ⏳ SVN · 핸드오프 [handoff-pursuit-trail-vfx.md](Docs/tech/handoff-pursuit-trail-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04). 판정·수치·네트워크 무변경, 새 RPC 없음.
+
+## 사실 — 기획 vs 구현(코드 확인)
+- 기획: Q 가 지나간 경로에 0.15초 뒤 원래 Q 피해 25% 추가 피해, 그림자 회귀 왕복 각각. 추가 이동·CC 없음.
+- 구현: 판정 있음(`AssassinDashStrikeSkill` 궤적 예약, 지연 ÷ 공격속도). **연출 사건이 이미 전 피어로 온다** — `TraitSkillFx` `AssassinPursuitTrail`
+  `Activated`(판정 순간, 빗나가도 · Pos = 선분 시작 · End = 선분 끝 · Shape = 경로 도형) · `Hit`(대상마다). 구독하는 VFX 없음.
+- 일반·변신 Q 모두 적용. 원래 연출: 일반 = 일섬 `PierceLine`(+Z 1m, Z 배율 = 길이) + `PierceBurst` / 변신 = `StormSlash` 루프.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방식(Q1) | **두 벌 만들어 MyProject 테스트 씬에서 비교** — (b) 원래 일섬을 색 지정 재생한 잔상 / (c) 새 VFX |
+| (c) 모양(Q6) | 경로 바닥 **어두운 보라 그림자 자국** + 시작→끝 아주 빠르게(≈0.08초) 그어지는 **얇고 밝은 베기 줄** + 경로를 따라 작은 그림자 파편 |
+| 시점(Q7) | **판정 순간(`Activated`) 하나에 전부** — 3차(11-04 민경): 2차에 나눴던 바닥 자국도 다시 판정 순간으로. 한 프리팹 `FX_PursuitTrail`(자국 + 팡) |
+| 톤(2차) | 보라 살짝 더 어둡게 · 베기 줄은 그어지지 않고 한 번에 터짐(굵게 번쩍 → 가늘어짐) + 경로 섬광·끝점 섬광·파편 |
+| 변신 Q(Q2) | 일반 Q 와 같은 연출(통일) |
+| 적중(Q3) | 대상별 연출 없음(피격 반응·피해 숫자) |
+| 톤(Q4) | 어둡고 탁한 보라 그림자(그림자 회귀 표식 계열) — 인스펙터 칸으로 조절 |
+| 미리보기 | 실제 어쌔신 모델·애니메이터·원본 Q 연출을 MainProject 최신본으로 다시 가져옴(guid 유지) |
+
+### 재제작(11-04 민경 — "원래 Q 와 따로 놀고 다시 베는 느낌·임팩트가 없다")
+| 항목 | 결정 |
+|---|---|
+| 색 | **원래 Q 일섬과 같은 핏빛 빨강 + 검붉은 잔흔**, 베는 순간 섬광만 흰빛에 가까운 뜨거운 심 |
+| 움직임 | 밝은 칼끝이 **시작 → 끝으로 ≈0.06초에 다시 훑으며** 베인 선을 남김(원래 잔흔이 남은 자리를 같은 방향으로) |
+| 임팩트 | 훑기가 끝나는 순간 **궤적 전체 길이의 긴 섬광 하나**(굵게 번쩍 → 0.1초 안에 꺼짐) + 경로 양옆으로 짧은 붉은 베임 불꽃 |
+| 바닥 | 검붉은 잔흔을 아주 약하게 한 번 더(베인 자국이 깊어짐, 원래 잔흔 색) |
+| 대상별 | `Hit` 마다 대상 몸에 작은 붉은 베임 섬광 `FX_PursuitTrail_Hit`(≈0.15초) |
+| 교체 | 같은 이름 `FX_PursuitTrail`(guid 유지) — MainProject SVN 교체 때 Unity 끄고 |
+
+### 재제작 2(11-04 민경 — 1차 재제작도 별로 · `Shader_IntegratedEffect` 금지)
+- 원본 = Piloto **`BM Sword of the Gods`**(어디에도 안 쓰임 — 그대로 가져와도 됨). 좌클릭 적중 `SlashImpact` 는 이미 쓰이므로 그대로 쓰지 않는다.
+- 높이 = **바닥**. 경로 = 지면 베기 자국 `ARPG_GroundSlams_Slash_Trail` 검정 + 빨강(나타날 때 폭 1.6배 번쩍 = 긴 섬광) + 같은 자국 가늘고 밝은 칼날 심 · 불티 `Flecks_Shiny_Additive` · 바닥 균열 `Clair_Groundcrack`(선택, 기본 끔).
+- 대상별 = 초승달 베기 `BM_SlashWave_1` edge·base(0.6배). 원본 재질·텍스처·곡선 그대로 복제 — 자국은 빌보드 → 같은 재질의 사각형 메시 입자로 바꿔 Z 로 늘린다.
+- `Shader_IntegratedEffect` 는 이번 VFX 에 쓰지 않는다(알파 제곱 — 투명·파랗게 보임).
+
+### 재제작 4(11-04 민경)
+- 대상별 `FX_PursuitTrail_Hit` **뺌**. 섬광 줄(FullRainbowFlare) 뺌 — 민경이 프리팹에서 지우고 바닥 자국 `Ground_decal1/5` 두 레이어만 남김.
+- 바닥 자국 = Q 이동 거리만큼 **경로를 따라 고르게 이어 붙임**(선 모양 + BurstSpread, 자국 모양 유지).
+- 공중(y ≈ 1) = 좌클릭 `SlashImpact` 의 Core·Glow·Scar·Flash 구성을 참고해 경로 길이로, **더 가늘고 짧게(날카롭게)** — 그대로 쓰지 않고 변형.
+- **고강도 섬광** 추가 — Cut_Flash 보다 빠르게(0.05초) 경로 전체가 번쩍. URP 파티클 가산 + HDR 세기 ×8(블룸), 섬광 줄 텍스처.
+- 미리보기: Q 종료 후 0.3초에 재생(임의 값). 본편은 서버 판정 순간(0.15초 ÷ 공격속도).
+
+## 작업 순서
+1. MyProject: MainProject 에서 어쌔신 모델·애니메이션·원본 Q VFX 재동기화 · 빌더 `Tools/VFX/Assassin Pursuit Trail (어쌔신 추격의 궤적) 빌드` — (c) `FX_PursuitTrail`(+Z 1m 저작) · 미리보기 씬(Q → 0.15초 뒤 궤적, 키로 b/c 전환, 왕복 보기).
+2. ⏸ 민경 비교·선택 → **승인**.
+3. MainProject: (c) 고르면 SVN `Player3/PursuitTrail/` import · `AssassinSkillView` 가 `TraitSkillFx.Raised`(추격의 궤적 Activated) 구독 → 선분 길이에 맞춰 재생((b)면 원래 일섬 색 지정) · 랩 확인.
+4. 문서: handoff · `trait-effect-events.md` · `CONTEXT.md`.
+
+## 완료 조건
+- 미리보기: (b)/(c) 비교 → 민경 선택·승인.
+- MainProject: 보유 시 궤적 판정 순간 경로 연출 · 그림자 회귀 왕복 각각 · 일반·변신 Q · 호스트·클라 같은 화면 · 컴파일 0.
+
+---
+
+# 계획(이전) = **칼날의 영역(ASN_3_E_AREA) VFX — 기존 E 베기를 판정 배율만큼 키움** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ 구현(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04). 판정·수치·네트워크 무변경, 새 아트 없음.
+
+## 사실
+- 기획: 일반 E 강타 범위(길이·폭)·변신 E 반경 ×1.25 — "표시는 실제 판정과 맞추며 기존 베기 VFX 스케일 재사용".
+- 구현: 판정·미리보기는 ×1.25 적용돼 있었으나 **VFX 는 그대로**(강타 = 소켓 고정 배율, 변신 E 원 베기 = 데이터 반경) → 판정이 연출보다 25% 넓었다.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 방식(Q1) | **크기만 맞춤** — 추가 레이어 없음(밋밋하면 그때 재검토) |
+| 강타(Q2) | 소켓 배율 × 사거리 배율, **균일**(사거리·각도 배율이 같은 1.25) |
+| 변신 E(Q3) | 원 베기 배율 × 반경 배율 |
+| 작업(Q4) | MainProject 코드만(`AssassinSkillView`·`EffectSocketPlayer.Scale` 읽기) + 랩 확인 |
+
+## 완료 조건
+- 보유 시 강타·변신 E VFX ×1.25, 미보유 ×1 · 전 피어 같은 크기 · 컴파일 0.
+
+---
+
+# 계획(이전) = **그림자 회귀(ASN_2_RETURN) VFX — 출발점에 꽂힌 반투명 단검 표식** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인(**그림자 실루엣** 선택, 단검 크기·위치 민경 수정본 그대로) · ✅ 연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · 핸드오프 [handoff-shadow-return-vfx.md](Docs/tech/handoff-shadow-return-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04). 판정·수치·네트워크 무변경, 새 RPC 없음.
+
+## 사실 — 기획 vs 구현(코드 확인)
+- 기획: Q 후 3초 안에 다시 누르면 처음 위치로 복귀 돌진(원래 Q 피해 60%), Q 쿨 +20%. 일반·변신 Q 모두. 출발점 = 첫 돌진 시작, 창 = 첫 돌진 끝부터 3초, R 전환·사망·씬 이동이면 폐기. 저장점 도착 보장 없음.
+- 구현 일치(`AssassinShadowReturnSkill`, 공용 후속 시전 장치). **각 피어가 출발점을 저장**(`AssassinDashStrikeSkill.LocalReturnOrigin`, 돌진 시작 위치) · 칸 열림은 복제(`PlayerSkillController.IsFollowUpOpen(Q)` — 만료·복귀 사용·R·사망에 닫힘) → 연출에 새 네트워크 불필요. 남은 시간은 복제 안 됨(각 피어가 창 길이로 근사).
+- 전용 연출 없음(복귀 돌진은 원래 Q 연출 그대로).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 모양(Q1) | 출발점 바닥에 **단검 하나를 꽂아 둠**(기존 `Dagger_Weapon_R` 모델, 칼끝 아래·살짝 기울임) |
+| 질감(Q2) | **원래 단검 텍스처 + 알파 ≈0.5**. 미리보기에서 그림자 실루엣안(어두운 보라 단색 + 옅은 테두리)도 키로 비교 |
+| 레이어(Q3) | 단검 + **바닥 그림자 웅덩이/링** + **남은 시간 — 마지막 1초 깜빡/흐려짐**. 나타날 때 연기는 뺌 |
+| 나타남(Q4) | 복귀 칸이 열린 게 보이는 순간(첫 Q 직후, 전 피어 같은 값), 저장된 출발점에 |
+| 사라짐(Q5) | 복귀 사용 = 복귀 돌진 시작 때 0.2초 페이드 · 만료·R·사망(칸 닫힘) = 0.4초 페이드 |
+| 누가(Q6) | 전 피어 |
+| 작업(Q7) | MyProject 빌더 + 미리보기(실제 어쌔신 Q → 표식 → 다시 Q 복귀) → 승인 → SVN `Player3/ShadowReturn/` + MainProject 연결 |
+
+## 작업 순서
+1. MyProject: 빌더 `Tools/VFX/Assassin Shadow Return (어쌔신 그림자 회귀) 빌드` — `FX_ShadowReturn_Marker`(단검 + 바닥 그림자) · 재질 2벌(원래 텍스처 반투명 / 그림자 실루엣) · 미리보기 씬.
+2. ⏸ 민경 확인·선택 → **승인**.
+3. MainProject: import · 연출 컴포넌트 `AssassinShadowReturnView`(Q 칸 후속 열림 + 원래 Q 의 출발점을 보고 표식 생성·페이드·마지막 1초 깜빡) · `Player_Assassin` 배선 · 랩 확인.
+4. 문서: handoff · `trait-effect-events.md` §3.1 · `CONTEXT.md`.
+
+## 완료 조건
+- 미리보기: 탑다운에서 출발점 단검이 읽힘 · 질감 선택(민경 승인).
+- MainProject: 그림자 회귀 보유 시 Q 후 출발점 표식 · 복귀 시작/만료에 사라짐 · 일반·변신 Q 모두 · 호스트·클라 같은 화면 · 컴파일 0.
+
+---
+
+# 계획(이전) = **절제된 분노(ASN_2_RESTRAINT) VFX — 강화된 일반 Q·E 레이어 + 봉인 순간 + 단검 봉인 띠** (2026-11-04 · grill 확정 · ✅ 승인 · ✅ MyProject 제작·민경 확인(Crimson 선택) · ✅ 3차(MainProject 연결 — 봉인·단검 띠만) 승인 · ✅ 연결(컴파일 0 · 랩 로그 확인) · ⏳ 민경 Play·MPPM · ⏳ SVN · 핸드오프 [handoff-restraint-vfx.md](Docs/tech/handoff-restraint-vfx.md))
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-04).
+> **1단계 = MyProject 제작(색 2벌) + 미리보기 씬 → 민경 비교·선택·승인. 2단계 = 고른 한 벌만 MainProject 연결.** 판정·수치 무변경, 새 RPC 없음.
+
+## 사실 — 기획 vs 구현(코드 확인)
+- 기획: R·변신·분노 없음 → 일반 Q·E 피해 +35%·재사용 −25%, 백어택 유지, 변신 중 고르면 안전 종료 뒤 적용. 구현 일치(`AssassinState.IsRestrained` = 모드 스위치, 전 피어 같은 획득 행 · 서버 종료 요청·분노 0 · HUD R 칸·머리 위 분노 게이지 숨김).
+- 연출: **전용 VFX·사건 없음**(trait-effect-events §3.1 "모드 변경").
+- 연결 지점: 일반 Q = `AssassinSkillView.EndPierce`(PierceLine 축별 배율 Z = 길이 · PierceBurst 끝점) · E 강타 = 클립 이벤트 `EffectAnimEvents.Played(id)`(강타 베기 id) · 단검 소켓 `Dagger_Weapon_R/L/VFX_EnhanceAura`(E 오라와 같은 곳).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 무엇을(Q1) | (a) 강화된 일반 Q·E 레이어 + (c) 봉인 순간 원샷 + (b) 상시 표시(몸 오라 아님) |
+| 레이어 지점(Q4) | Q 관통 선 + 관통 폭발 · E 강타 베기. E 차지·오라는 그대로(준비 표시 — 강타와 대비) |
+| 방식(Q5) | **기존 그대로 + 레이어 추가**(같은 자리·같은 크기 규칙으로 동시 재생) |
+| 봉인 순간(Q6) | `IsRestrained` false → true 순간, 변신 중이면 변신 끝나는 순간 · 늦은 합류·재접속은 안 냄(상시 표시만) · **전 피어**, 새 RPC 없음 |
+| 상시 표시(Q7) | **단검 봉인 띠** — 양손 단검 손잡이 근처 은빛 띠·사슬 고리, 은은하게 + 가끔 반짝, 무기를 따라감. 작아서 안 보이면 머리 위 봉인 표식 보조 검토 |
+| 색(Q2·Q8) | 두 벌 제작·비교: **`_Crimson`** = 억눌린 분노(검붉은 심 + 은백 테두리·잔상) / **`_Violet`** = 차가운 봉인(청보라 + 은색). MyProject 미리보기에서 키로 전환 → **고른 한 벌만** MainProject |
+| 작업(Q3) | 이전과 같음 — MyProject 빌더 → 미리보기 → 승인 → SVN `Player3/Restraint/` |
+
+### 2차 결정(11-04 민경 피드백)
+- 관통 선 레이어 삭제 → **원본 일반 Q 를 색만 바꿔**(색상 교체 + 채도 배율 — 은빛) 낸다. 관통 폭발 레이어는 유지.
+- 사슬 = **블렌더로 만든 서로 꿰인 사슬 한 바퀴 메시**(`SM_Restraint_ChainRing.fbx`)를 메시 입자로, **은색** — 봉인·관통 폭발 같은 사슬.
+- 봉인: 바닥 문양 삭제 · **R 소용돌이를 같이 켜고 사슬이 다 조인 순간 끊고 `_End`**(R 이 갇히는 연출) · 사슬 3줄 엇갈려 얽힘.
+- E 강타 레이어: 기하 호 삭제 → **원본 강타를 은색으로 복제**해 1.1배로 겹침.
+- 미리보기: **실제 어쌔신 모델·애니메이터·원본 Q/E/R 연출**(MainProject 에서 MyProject 로 복사, guid 유지 — 원본 VFX 프리팹은 MainProject 최신본으로 동기화, MyProject 옛 파일은 scratchpad 백업).
+
+### 3차 결정(11-04 민경 — MainProject 연결 범위, ✅ 승인)
+- **가져오는 것 = Crimson 의 `FX_Restraint_Seal` · `FX_Restraint_DaggerBand_R/_L` 만.** Q·E 레이어(관통 폭발·강타 은색 복제·원본 Q 색 바꾸기)는 이번에 연결하지 않는다.
+  SVN `Assets/50.Art/VFX/Common/Players/Player3/Restraint/`(색 하위 폴더 없음) — 프리팹 + 쓰는 재질·텍스처·메시(사슬 고리 FBX, 나선 R/L). 새 파일 추가만(교체 없음).
+- **단검 띠 = MeshRenderer**(파티클 아님 — 남은 건 사슬 메시 하나, 민경이 Core·Glow 끄고 Twinkle 지움). 단검 소켓 `Dagger_Weapon_R/L/VFX_EnhanceAura` 의 **자식**으로 붙여 단검 배율(1.25)을 그대로 받는다 → 나선 메시는 배율 없는 소켓 공간으로 다시 굽는다(MyProject 미리보기도 자식으로).
+- **페이드 = 알파**(URP Unlit 반투명, 알파 1 이면 지금처럼 불투명하게 보임) — 나타남 0.4초 · 사라짐 0.4초(인스펙터 칸).
+- **띠가 나타나는 시점 = 봉인 오라가 터지는 순간(0.58초, `SealBurstTime`)부터 페이드 인** — 몸을 조이던 사슬이 터지며 단검으로 옮겨 감기는 느낌(인스펙터 칸).
+- 봉인 = `IsRestrained` false → true 를 본 순간(변신 중이면 변신 끝나는 순간) · 플레이어 발밑 · **R 소용돌이(`Assassin_R_BladeVortex`)를 같이 켜고 0.42초(`SealLockTime`)에 해제 → outro(_End)**. 전 피어 각자 판단, 새 RPC 없음.
+- 늦은 합류·재접속·Armature 재활성 = 봉인 없이 띠만 바로(페이드 없이) 표시. 특성 해제 → 페이드 아웃. 디스폰 → 즉시 제거. 사망·다운은 그대로 둔다(특성 유지).
+
+## 작업 순서(3차 — MainProject 연결)
+1. MyProject 빌더: 띠 = MeshRenderer + URP Unlit 반투명 재질 · 나선 메시 배율 없는 소켓 공간 · 미리보기 테스터가 띠를 소켓 자식으로·봉인 0.58초 뒤 페이드 인(민경 확인).
+2. MainProject: SVN 폴더로 복사(.meta 포함, guid 유지) · 엔트리 `FX_Restraint_Seal_Entry` + `EffectCatalog.Assassin_Restraint_Seal` · 컴포넌트 `AssassinRestraintView`(봉인·R 소용돌이·띠 R/L 생성과 알파 페이드) · `Player_Assassin` 배선.
+3. 확인: 컴파일 0 · DebugTraitLab 에서 특성 부여 → 봉인 → 띠 페이드 인 · 해제 → 페이드 아웃(로그) · ⏳ 민경 Play·MPPM.
+4. 문서: `handoff-restraint-vfx.md` · `trait-effect-events.md` §3.1 · `CONTEXT.md`.
+
+## 작업 순서(1·2차)
+1. MyProject: 빌더 `Tools/VFX/Assassin Restraint (어쌔신 절제된 분노) 빌드` — 색 세트 2개 × (`FX_Restraint_PierceLine` · `_PierceBurst` · `_ESlash` · `_Seal` · `_DaggerBand`) · 미리보기 씬(일반 Q 돌진·E 강타·봉인 순간·단검 띠, 키로 색 전환).
+2. ⏸ 민경 비교·선택 → 수정 → **승인**.
+3. MainProject: 고른 벌 import · 엔트리·`EffectCatalog` · 연출 컴포넌트(`AssassinRestraintView` — `IsRestrained` 를 보고 Q/E 레이어·봉인·띠를 켬) · `Player_Assassin` 배선.
+4. 문서: handoff · `trait-effect-events.md` §3.1 · `CONTEXT.md`.
+
+## 완료 조건
+- 미리보기: 두 색 비교 · Q/E 레이어가 기존 연출 위에 겹쳐 강해 보임 · 봉인 순간 · 띠가 탑다운에서 읽힘(민경 선택·승인).
+- MainProject: 절제된 분노일 때만 레이어·띠 · 봉인 순간 1회 · 호스트·클라 같은 화면 · 컴파일 0.
+
+---
+
+# 계획(이전) = **잔류 포격(GUN_4_ECHO_Q) VFX — 몸에 붙는 에너지 폭탄 구체 + 전용 폭발** (2026-11-03 · grill 확정 · ✅ 승인 · ✅ MyProject 확인 · ✅ MainProject 연결 · ⏳ 민경 Play)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-03, 전부 추천안).
 > **1단계 = MyProject 제작 + 미리보기 씬 → 민경 확인·승인. 2단계 = MainProject import·연결.** 판정·피해 무변경.

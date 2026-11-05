@@ -89,8 +89,40 @@ public class AssassinStrikeBoxTests
         Assert.AreEqual(4, data.NormalSteps.Length);
         for (int i = 0; i < 4; i++)
             AssertSector(data.NormalSteps[i], ranges[i], angles[i], $"일반 {i + 1}타");
-        AssertSector(data.EnhancedStep, 1.8f, 120f, "강타");
         AssertSector(data.TransformedStep, 1.8f, 120f, "변신 묶음");
+
+        // 강타 = 원(할 일 216 — 강타 VFX 고리: 중심 발밑 앞 0.6m, 반경 1.4m, 높이 ±1.8m).
+        AssassinBasicAttackStepData enhanced = data.EnhancedStep;
+        Assert.IsNotNull(enhanced?.HitArea, "강타");
+        Assert.AreEqual(AttackShapeOrigin.CasterAim, enhanced.HitArea.Origin, "강타");
+        Assert.AreEqual(1, enhanced.HitArea.Shapes.Count, "강타");
+        var circle = enhanced.HitArea.Shapes[0] as AttackCircleShape;
+        Assert.IsNotNull(circle, "강타 원");
+        Assert.AreEqual(AssassinBasicAttackStepData.EnhancedStrikeRadius, circle.Radius, Eps, "강타 반경");
+        Assert.AreEqual(0f, circle.MinRadius, Eps, "강타 도넛 아님");
+        Assert.AreEqual(AssassinBasicAttackStepData.EnhancedStrikeForwardOffset, circle.ForwardOffset, Eps, "강타 중심 앞 오프셋");
+        Assert.AreEqual(0f, circle.SideOffset, Eps, "강타");
+        Assert.AreEqual(-AssassinBasicAttackStepData.EnhancedStrikeHeight, circle.MinHeight, Eps, "강타");
+        Assert.AreEqual(AssassinBasicAttackStepData.EnhancedStrikeHeight, circle.MaxHeight, Eps, "강타");
+    }
+
+    // 강타 원(할 일 216) — 중심이 조준 방향 앞으로 옮겨지고, 등 뒤도 반경 안이면 맞는다(부채꼴과 다른 점).
+    [Test]
+    public void 강타_원은_조준_방향_앞_중심이다()
+    {
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, AssassinBasicAttackStepData.EnhancedStrikeCircle());
+        var origin = new Vector3(2f, 0f, -3f);
+        AttackShapePose right = area.ResolvePose(origin, Vector3.right, Vector3.zero, Vector3.zero);
+        float r = AssassinBasicAttackStepData.EnhancedStrikeRadius;
+        float f = AssassinBasicAttackStepData.EnhancedStrikeForwardOffset;
+
+        Assert.IsTrue(area.Contains(right, origin + Vector3.right * (f + r - 0.02f)), "앞 끝 안");
+        Assert.IsFalse(area.Contains(right, origin + Vector3.right * (f + r + 0.02f)), "앞 끝 밖");
+        Assert.IsTrue(area.Contains(right, origin - Vector3.right * (r - f - 0.02f)), "등 뒤 끝 안");
+        Assert.IsFalse(area.Contains(right, origin - Vector3.right * (r - f + 0.02f)), "등 뒤 끝 밖");
+        Vector3 center = origin + Vector3.right * f;
+        Assert.IsTrue(area.Contains(right, center + Vector3.forward * (r - 0.02f)), "옆(왼쪽) 끝 안");
+        Assert.IsFalse(area.Contains(right, center + Vector3.forward * (r + 0.02f)), "옆(왼쪽) 끝 밖");
     }
 
     [Test]

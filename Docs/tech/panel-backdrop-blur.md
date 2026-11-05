@@ -1,0 +1,62 @@
+# 패널 배경 블러 (할 일 201)
+
+패널(모달)이 열려 있는 동안 **패널만 선명하고 그 뒤는 HUD 까지 전부 실시간으로 흐려진다.**
+
+## 1. 구조
+
+| 조각 | 파일 | 하는 일 |
+|---|---|---|
+| 공용 진입점 | `Assets/1.Scripts/Rendering/PanelBackdropBlur/PanelBackdropBlur.cs` | `Acquire(owner, panelCanvas)` / `Release(owner)`. 참조 카운트라 패널이 겹쳐도 안전. 세기 `Amount` 0↔1 을 `fadeSeconds`(0.15초, unscaled) 동안 보간. HUD 캔버스 전환(§2). |
+| 순수 규칙 | 같은 파일 `PanelBackdropBlurState` | 참조 카운트·가장 위 패널 순서·보간·캔버스 전환 판정. EditMode `PanelBackdropBlurTests`. |
+| 패널 컴포넌트 | `Assets/1.Scripts/UI/PanelBackdropBlurTarget.cs` | 패널 콘텐츠 루트에 하나. OnEnable 잡기 / OnDisable 놓기(`UiModalBlocker` 와 같은 수명). |
+| 렌더 피처 | `PanelBackdropBlurFeature.cs` + `Shaders/PanelBackdropBlur.shader` | `PC_Renderer` 에만. BeforeRenderingPostProcessing 에서 카메라 컬러 전체를 축소·가로·세로 블러(반복) → 원본과 `Amount` 로 섞고 채도·어둡게도 같은 세기로. `Amount` 0 이면 패스를 넣지 않음(비용 0). Game 카메라만. |
+| 설정 SO | `Assets/9.ScriptableObject/UI/PanelBackdropBlurSettings.asset` | 세기 1.42 · 축소 1/4 · 반복 3 · 채도 0.6 · 어둡게 0.25 · 보간 0.15초(옛 특성 창 값 그대로). 피처 칸 `_settings` 로 물려 있다. 데이터 테이블 시트 없음(연출 기술 값). |
+
+붙은 패널: `GameMenu.prefab` `Content`(일시정지·설정·종료 확인) · `LobbyResultPanel.prefab` `Content` · `TraitUI.prefab` `Window`(특성 선택 — 2차 확인창·초기화 팝업은 같은 캔버스라 함께 선명).
+저작 메뉴(`GameMenuAuthoring`·`LobbyResultPanelAuthoring`·`TraitUiAuthoring` 전체 생성)도 같이 붙인다.
+**제외**: 캐릭터 선택 패널, 데모 연결 대기 화면, 로딩, 튜토리얼 안내·로비 대사, 스킬 툴팁, 디버그 맵 개요(M).
+
+MaskBlur(할 일 203, 맵 비네팅)와 피처·셰이더·설정·정적 상태가 모두 따로다 — 같은 프레임에 함께 돌아도 서로 덮지 않는다.
+
+## 2. HUD 까지 흐리는 방법
+
+Screen Space Overlay UI 는 후처리 뒤에 그려져 렌더 피처가 못 건드린다. 그래서 **블러가 0 보다 큰 동안만**:
+
+- 열린 패널 중 가장 위 패널의 루트 캔버스 `sortingOrder` 보다 **작은** Overlay 루트 캔버스(HUD 0·머리 위 체력바 -10·미니맵 40·피해 숫자 50·튜토리얼 안내 50·컷신 자막 440 등)를
+  Screen Space Camera(메인 카메라, 평면 거리 = near clip + 0.05)로 바꾼다 → 투명 패스에서 월드와 같이 그려져 함께 흐려진다.
+- 패널 자신과 그보다 위 캔버스(간파 암전 HUD 덮개·섬광 `short.MaxValue` 근처, 데모 연결 30000, 성능 표시 등)는 Overlay 그대로 → 선명.
+- 위 패널이 닫히면(예: 결과창 200 위 ESC 메뉴 900 → 닫힘) 다시 판정해 아래 패널 캔버스를 되돌린다.
+- 열린 동안 0.5초마다 새 캔버스를 다시 찾는다(피해 숫자 등). 닫히는 보간이 0 이 되면 원래 값(모드·카메라·평면 거리)으로 한 번에 되돌린다.
+- HUD 배치 코드(체력바·피해 숫자·상호작용 표시)는 `anchoredPosition = 화면 좌표 / scaleFactor` 방식이라 카메라 모드에서도 같은 자리.
+
+## 3. 알려진 위험·대응
+
+1. **HUD 색 튐** — 카메라 모드인 동안 HUD 에도 후처리(톤매핑 Neutral·블룸·CRT)가 걸린다. 블러·어둡게가 같이 올라가서 대부분 가려지지만, 여는 첫 순간 HUD 색이 살짝 바뀔 수 있다. 크면 `fadeSeconds` 를 줄이거나 어둡게를 올려 가린다.
+2. **가까운 물체 가림** — 카메라 모드 UI 는 깊이 판정을 받는다. 평면을 near clip 바로 앞(+0.05)에 둬 탑다운 카메라에선 가릴 물체가 없다.
+3. **간파 암전 HUD 덮개** — 덮개·섬광 캔버스는 패널보다 위(최상위)라 전환 대상이 아니다(기존 그대로). 패널이 열린 중 간파 연출이 겹치면 카메라 모드 HUD 는 월드와 같이 DarkAdaptation 패스를 받는다(흐린 배경 일부라 의도와 같음).
+4. 렌더러에 피처가 없으면(`Mobile_Renderer`) `PanelBackdropBlur.IsAvailable` = false → 블러·캔버스 전환 없이 패널만 열린다(특성 창은 어둡게 막 0.55 로).
+
+## 4. 비용
+
+열린 동안 매 프레임 1/4 해상도 가로·세로 블러 × 반복 3 + 풀 해상도 합성·복사 1회(추정 0.2~0.5ms, 미실측). 캔버스 전환 순간 캔버스 다시 그리기 1회. 닫혀 있으면 0.
+
+## 5. 직접 구동 — 타이틀 Press 대기 (할 일 218)
+
+`PanelBackdropBlur.Drive(owner, amount, look)` — `Acquire` 한 owner 가 세기를 0~1 로 **직접** 정한다(fadeSeconds 보간 무시, 바로 반영).
+구동 중엔 피처가 SO 의 세기·채도·어둡게 대신 `PanelBackdropBlurLook`(같은 뜻의 칸 + `scaleRadiusWithAmount` = 블러 반경도 세기에 비례)을 쓴다.
+`Release` 하면 구동이 풀리고 남은 세기는 평소처럼 fadeSeconds 로 0 이 된다. 셰이더·RT 는 그대로(새 텍스처 없음).
+
+- 쓰는 곳: `TitleFlowDirector` — Press 문구(`_pressAnyKeyRoot`)의 캔버스를 패널로 잡아 그 캔버스(문구·스킵 안내·페이드)는 선명, 월드만 블러 + 흑백(기본 세기 1.42·채도 0·어둡게 0·반경 비례).
+  아무 키 → 문구 끔 → `_restoreDuration`(1초, unscaled) 동안 세기 1→0 선형(블러·흑백 같이 원복) → 놓고 기존 카메라 진입(`EnterApproaching`). 원복 중 ESC 스킵 없음.
+- 문구 참조가 비면 블러를 건너뛴다(캔버스 없이 잡으면 모든 Overlay 가 흐려져 문구까지 흐려짐).
+
+### 5.1 TV 글리치 (218 후속, 11-05)
+
+`PanelBackdropBlur.Drive(owner, amount, look, glitch, glitchLook)` — 구동에 아날로그 TV 글리치를 얹는다. **블러 합성 패스(`PanelBlurComp`) 안에서** 절차적으로 그린다 — 새 패스·RT·텍스처 없음.
+화면 세기 = `glitch`(호출자가 매 프레임 계산, 0~1) × 블러 세기 → 원복 동안 블러와 같은 진행도로 0. 글리치 없는 `Drive`·패널 블러(201)는 세기 0 → 셰이더가 분기로 건너뛴다(비용 그대로).
+
+- 모양 `PanelBackdropGlitchLook`(값 = 글리치 세기 1 기준): 주사선 어둡기·주기(px)·RGB 어긋남(UV)·찢김 최대 폭(UV)·찢김 띠 비율(세기³ 비례 — 상시엔 드묾)·잡음.
+- 셰이더: 가로 띠 찢김(띠 수·위치는 초당 15번 바뀜)·줄 단위 미세 떨림 → RGB 어긋남(흑백 처리 **뒤** 채널을 따로 뽑아 흑백 위에 빨강·파랑 테두리)·주사선·흑백 잡음(초당 30번). 시간 = `Time.unscaledTime`.
+- 비용: 글리치 중 합성이 원본·블러 샘플 2 → 6(풀 해상도 1패스), 해시 몇 번. 그 외 동일.
+- 쓰는 곳: `TitleFlowDirector` 「Press 대기 TV 글리치 (218 후속)」 칸 — 상시 세기 0.3 + 불규칙 버스트(세기 0.75~1, 간격 1.5~4초, 길이 0.12~0.3초, 즉시 피크 → (1-k)² 감쇠 = `TitleCrtFx` 버스트와 같은 모양), 모양 기본 (0.45, 3px, 0.008, 0.06, 0.35, 0.18). Press 문구 캔버스는 블러와 같은 규칙으로 글리치에서도 빠진다.
+- 기존 타이틀 CRT 를 안 쓴 이유: `TitleCrtFx` 는 모니터 화면 머티리얼(`Title/CRTScreen`) 전용이고, 전체화면 `RetroCRTController`(Cyanilux)는 타이틀에서 꺼져 있으며(`_effectEnabled 0`) 베젤·곡률까지 바뀌어 룩이 달라진다. 카메라 진입 때의 지직거림(`_approachBurst`·`_burstFx`)은 그대로.

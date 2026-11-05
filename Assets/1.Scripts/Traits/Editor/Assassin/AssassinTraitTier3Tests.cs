@@ -215,7 +215,7 @@ public sealed class AssassinTraitTier3Tests
         Assert.AreEqual(1.25f, length, Eps, "길이 ×1.25");
         Assert.AreEqual(1.25f, width, Eps, "폭 ×1.25");
 
-        // 강타 기본 부채꼴(할 일 153) r1.8·120° → 길이 배율 = range 2.25, 폭 배율 = angle 150°. 꼭짓점(발밑)·높이는 그대로.
+        // 부채꼴 배율 규칙(할 일 153 — 강타는 216 부터 원, 아래 원 테스트) r1.8·120° → 길이 배율 = range 2.25, 폭 배율 = angle 150°. 꼭짓점(발밑)·높이는 그대로.
         var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, AssassinBasicAttackStepData.StrikeSector(1.8f, 120f));
         var scaled = (AttackSectorShape)area.Scaled(length, width).Shapes[0];
         Assert.AreEqual(2.25f, scaled.Range, Eps);
@@ -250,6 +250,23 @@ public sealed class AssassinTraitTier3Tests
     {
         var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, new AttackSectorShape(1.8f, 120f));
         Assert.AreSame(area, AssassinTraitAreaRules.ScaleArea(null, AssassinTraitAreaRules.EnhancedStrike, area), "특성 출처 없음 = 원본 그대로");
+    }
+
+    // 할 일 216 — 강타 도형이 원이 된 뒤 칼날의 영역: 반경 × 길이 배율(1.25), 중심 앞 오프셋·높이는 그대로.
+    [Test]
+    public void Area_EnhancedStrikeCircle_RadiusTimes1_25_CenterKept()
+    {
+        TraitModifierSet set = SetOf(Area);
+        float length = set.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Length);
+        float width = set.AreaMultiplier(AssassinTraitAreaRules.EnhancedStrike, TraitAreaAxis.Width);
+
+        var area = new AttackShapeSet(AttackShapeOrigin.CasterAim, AssassinBasicAttackStepData.EnhancedStrikeCircle());
+        var scaled = (AttackCircleShape)area.Scaled(length, width).Shapes[0];
+        var original = (AttackCircleShape)area.Shapes[0];
+        Assert.AreEqual(original.Radius * 1.25f, scaled.Radius, Eps, "반경 ×1.25");
+        Assert.AreEqual(original.ForwardOffset, scaled.ForwardOffset, Eps, "중심 오프셋은 배율 없음");
+        Assert.AreEqual(original.MaxHeight, scaled.MaxHeight, Eps, "높이는 배율 없음");
+        Assert.AreEqual(AssassinBasicAttackStepData.EnhancedStrikeRadius, original.Radius, Eps, "원본 그대로(복사본)");
     }
 
     [Test]
