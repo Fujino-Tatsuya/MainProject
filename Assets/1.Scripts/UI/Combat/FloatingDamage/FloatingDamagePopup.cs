@@ -123,7 +123,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _alpha = _baseColor.a * _displayAlphaMultiplier;
 
         // 누적 구간 판정용 — 대상이 도중에 사라져도 같은 기준으로 판정하도록 생성 때 저장한다.
-        _baseMaxHp = request.target != null ? request.target.MaxHp : 0;
+        _baseMaxHp = request.BaseMaxHp;
         _rank = request.target != null ? request.target.Rank : MonsterRank.Normal;
 
         SetTier(tier);

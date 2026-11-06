@@ -19,6 +19,11 @@ public sealed class FloatingDamageAnchor : MonoBehaviour
     public Vector3 WorldPosition =>
         (anchorTransform != null ? anchorTransform.position : transform.TransformPoint(localOffset)) + worldOffset;
 
+    // 242 디버그 씬(DebugFloatingDamage)이 Play 중 값을 바꾸고 프리팹에 저장할 때 읽고 쓴다.
+    public Transform AnchorTransform => anchorTransform;
+    public Vector3 LocalOffset { get => localOffset; set => localOffset = value; }
+    public Vector3 WorldOffset { get => worldOffset; set => worldOffset = value; }
+
     void OnDrawGizmosSelected()
     {
         Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.9f);
