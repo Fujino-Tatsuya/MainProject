@@ -82,13 +82,17 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewS
 
     protected override bool CompleteBeforeAttackLanded => true;
 
-    // 충격파 = 간파 성공(카운터 창 소비) 때만(2026-10-26 민경). 예전엔 적중 1건 이상이면 터졌다.
+    // 충격파 = 제압 간파 성공 때만(할 일 241, 11-06). 그 전엔 모든 간파 성공(카운터 창 소비, 2026-10-26 민경), 더 전엔 적중 1건 이상이면 터졌다.
     // 성공은 디렉터 성공 단계가 판정 1회에 한 번(여러 대상이 성공해도) 시전자의 relay 를 부른다 — 서버에서만 난다(할 일 118).
     // 전송로(PaladinSkillView.InterruptWaveRpc)는 그대로, B3 칸은 받는 피어에서 디렉터가 본다.
     void IInterruptSuccessRelay.ServerRelaySuccess(in InterruptProductionEvent e)
     {
         // 🔴 시전자 아래 relay 를 다 부르므로 자기 시전만(대체 슬롯 포함). 꺼진 컴포넌트는 옛 OnEnable 구독처럼 빠진다.
         if (e.Skill != this || !isActiveAndEnabled)
+            return;
+
+        // 241(11-06 사용자 지시) — 제압 간파 성공만. 일반·대쉬 성공은 충격파 없음. 단계 = 서버 성공 사건(제압 표식 소비 후)이라 RPC 를 보낼지 여기서 한 번 정한다.
+        if (!InterruptPresentationTierRules.PlaysPaladinWave(e.Tier))
             return;
 
         skillView?.ServerInterruptWave();

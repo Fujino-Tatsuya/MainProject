@@ -125,6 +125,12 @@ public static class InterruptPresentationTierRules
     public static InterruptVariant VariantOf(bool dash) => dash ? InterruptVariant.Dash : InterruptVariant.Normal;
 
     /// <summary>
+    /// 팔라딘 간파 성공 충격파(B3 <c>PaladinWave</c>)를 이 단계에서 터뜨리는가 — 제압 간파 성공만(할 일 241, 11-06 사용자 지시). 일반·대쉬 성공은 안 터진다.
+    /// 서버가 성공 사건의 단계(<see cref="Select"/> — 제압 표식 소비 후)로 한 번 정하고 전 피어 RPC 를 보낼지 말지 고른다 → 모든 피어 같은 결과, 새 RPC 없음.
+    /// </summary>
+    public static bool PlaysPaladinWave(InterruptPresentationTier tier) => tier == InterruptPresentationTier.Suppress;
+
+    /// <summary>
     /// [오너] 입력 순간 시도 암전(+빛 모임)을 켜는가(Q1) — 강 예측이고 예측된 성공 단계의 설정이 암전 켬일 때만.
     /// 약 예측은 아무것도 안 켠다(Q3 — 약한 줌만, 줌은 서버 약 시도 슬로우가 처리). 대상 없음은 시도로 치지 않는다.
     /// </summary>
