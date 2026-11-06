@@ -48,8 +48,8 @@ MonoBehaviour:
   interruptWeakZoomFactor: 1
   interruptSuccessProfile:
     scale: 0.1
-    hitStopDuration: 1.25
-    hitStopScale: 0.01
+    hitStopDuration: 0.5
+    hitStopScale: 0.7
     enterDuration: 0
     holdDuration: 0
     exitDuration: 0
@@ -58,11 +58,11 @@ MonoBehaviour:
   interruptSuppressSuccessProfile:
     scale: 0.3
     hitStopDuration: 0.08
-    hitStopScale: 0.02
-    enterDuration: 0.2
+    hitStopScale: 0.04
+    enterDuration: 1.2
     holdDuration: 0.35
     exitDuration: 0.25
-    failExitDuration: 0.1
+    failExitDuration: 0
   cameraCenterMoveDuration: 0.08
   cameraCenterRatio: 0.75
-  cameraCenterReturnDuration: 0.25
+  cameraCenterReturnDuration: 0.5

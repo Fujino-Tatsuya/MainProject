@@ -166,6 +166,17 @@ public sealed class InterruptPresentationTierTests
         CollectionAssert.AreEqual(new[] { false, false }, port.SuppressFlags);
     }
 
+    // ---- 1-b. 팔라딘 성공 충격파 = 제압 간파 성공만(할 일 241) ----
+
+    [TestCase(false, InterruptVariant.Normal, false, ExpectedResult = false)]
+    [TestCase(false, InterruptVariant.Dash, true, ExpectedResult = false)]
+    [TestCase(true, InterruptVariant.Normal, false, ExpectedResult = false)] // 일반 간파 성공
+    [TestCase(true, InterruptVariant.Dash, false, ExpectedResult = false)]   // 대쉬 간파 성공
+    [TestCase(true, InterruptVariant.Normal, true, ExpectedResult = true)]   // 제압 간파 성공
+    [TestCase(true, InterruptVariant.Dash, true, ExpectedResult = true)]     // 대쉬로 제압해도 제압
+    public bool 팔라딘_성공_충격파는_제압_간파_성공만(bool succeeded, InterruptVariant variant, bool suppress) =>
+        InterruptPresentationTierRules.PlaysPaladinWave(InterruptPresentationTierRules.Select(succeeded, variant, suppress));
+
     // ---- 2. 오너 암전 = 단계 설정이 켬일 때만(Q1, 기본 전부 끔) · 실패 = 약한 줌만(Q3) ----
 
     private sealed class Timing : IInterruptOwnerPresentationSettings

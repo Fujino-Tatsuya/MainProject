@@ -8,9 +8,9 @@
 
 ## 1. 목록
 
-- **언제**: 일반·대쉬·제압 간파 모두 같은 VFX 가 나온다. 대쉬 간파는 대시 중 상체 레이어(`DashInterruptUpper`)에서 같은 클립을 재생하므로
+- **언제**: 일반·대쉬·제압 간파 모두 같은 VFX 가 나온다 — 단 팔라딘 성공 충격파(`PaladinShieldWave`)는 제압 간파 성공만(할 일 241). 대쉬 간파는 대시 중 상체 레이어(`DashInterruptUpper`)에서 같은 클립을 재생하므로
   클립 이벤트 VFX 가 그 레이어에서 나고, 대시 끝에 0층으로 넘겨받을 때 상체 레이어를 즉시 비워 두 번 나지 않는다(`PlayerDashController.HandOffDashInterruptToBase`).
-  제압 간파 전용 캐릭터 VFX 는 없다.
+  제압 간파 전용 캐릭터 VFX = 팔라딘 성공 충격파 하나(241).
 - **누가 보나**: 아래 VFX 는 전부 **전 피어**(각 피어가 자기 화면에 재생). 오너 전용은 없다.
 - **사건**: 시도 = 시전 시작(`OnClientPlay`), 판정 = 클립 Hit 이벤트(서버), 성공 = 디렉터 성공 단계가 시전자 relay 를 부름(서버) → RPC, 실패 전용 VFX 는 없다.
 
@@ -21,7 +21,7 @@
 | `PaladinShieldMaterialGlow` | 방패 문양 발광(머티리얼 페이드) | 방패 메쉬 `SM_Wep_Shield_01` 의 `MaterialFadeEffect` (E 수호자의 의지와 공용) | 시도 — 시전 시작 ~ 스킬 끝(FadeOut) | `PaladinSkillView.BeginInterruptGlow` ← `FirstMeleeInterruptSkill.PlayCue`(디렉터 시도 cue) | B1 |
 | `PaladinShieldGlowLoop` | 방패 발광 루프 | 소켓 `VFX/ShieldInterrupt/ShieldGlow` · `50.Art/VFX/Common/Players/Player1/RightClickSkill/FX_ShieldGlow(_Entry)` | 시도 — 시전 시작 ~ 스킬 끝(Stop) | 같은 곳 | B1 |
 | `PaladinShieldCharge` | 방패 기 모으기 | 소켓 `VFX/ShieldInterrupt/ShieldCharge`(id `ShieldCharge`) · `…/RightClickSkill/FX_ShieldCharge(_Entry)` | 클립 0초 `StartEffect` ~ Hit(0.333초) `StopEffect`, 판정 전에 끊기면 `EndInterruptVfx` 가 회수 | `EffectAnimEvents.StartEffect` | B2 |
-| `PaladinShieldWave` | 성공 충격파 | 소켓 `ShieldWave` · `…/RightClickSkill/FX_ShieldWave(_Entry)` | 성공 — 판정 1회에 한 번(서버 relay → `InterruptWaveRpc` 전 피어) | `PaladinSkillView.PlayCue`(PaladinWave) | B3 |
+| `PaladinShieldWave` | 성공 충격파 | 소켓 `ShieldWave` · `…/RightClickSkill/FX_ShieldWave(_Entry)` | **제압 간파 성공만**(할 일 241, 11-06 — 일반·대쉬 성공은 안 남) — 판정 1회에 한 번. 서버 relay 가 성공 사건 단계(`InterruptPresentationTierRules.PlaysPaladinWave(e.Tier)`, 제압 표식 소비 후)를 보고 제압일 때만 `InterruptWaveRpc` 전 피어(새 RPC 없음) | `PaladinSkillView.PlayCue`(PaladinWave) | B3 |
 
 ### 거너 — 근접 간파 (`Player_Gunner.prefab`, 클립 `gunner.fbx` 의 `gunner_skill_RMB_interrupt` — 이펙트 이벤트 없음)
 
