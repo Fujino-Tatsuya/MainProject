@@ -62,8 +62,8 @@ public static class AssassinRestraintRules
     /// <summary>분노 획득(적중 충전·훈련 보정) 가능 — 절제된 분노면 불가.</summary>
     public static bool CanGainRage(bool restrained) => !restrained;
 
-    /// <summary>공용 스킬 HUD 에서 이 슬롯을 숨길까 — 절제된 분노면 R 칸만(할 일 133).</summary>
-    public static bool HidesHudSlot(bool restrained, PlayerSkillSlot slot) => restrained && slot == PlayerSkillSlot.Ultimate;
+    /// <summary>공용 스킬 HUD 에서 이 슬롯 아이콘을 회색조로 할까 — 절제된 분노면 R 칸만. 칸은 숨기지 않는다(할 일 133 숨김 → 237 회색).</summary>
+    public static bool GraysHudSlot(bool restrained, PlayerSkillSlot slot) => restrained && slot == PlayerSkillSlot.Ultimate;
 
     /// <summary>머리 위 분노 게이지 줄을 보일까 — 절제된 분노면 숨긴다(<see cref="IOverheadTraitGauge.Visible"/>).</summary>
     public static bool ShowsRageGauge(bool restrained) => !restrained;

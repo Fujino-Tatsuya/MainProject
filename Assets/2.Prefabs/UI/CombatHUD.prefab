@@ -250,6 +250,7 @@ MonoBehaviour:
     keyBackground: {fileID: 8998427736566006272}
     keyText: {fileID: 613}
   blockedColor: {r: 0.35, g: 0.35, b: 0.35, a: 0.75}
+  grayscaleIconMaterial: {fileID: 2100000, guid: 4f655adaf5084bf2bad923d09e523697, type: 2}
 --- !u!114 &373025847395609761
 MonoBehaviour:
   m_ObjectHideFlags: 0

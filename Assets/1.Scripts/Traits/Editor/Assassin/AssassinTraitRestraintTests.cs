@@ -98,15 +98,15 @@ public sealed class AssassinTraitRestraintTests
         transformEndTime = start + Rules.DurationFor(fuel),
     };
 
-    // ── HUD 표시(할 일 133) ─────────────────────────────────────────────
+    // ── HUD 표시(할 일 133 · 237 숨김 → 회색) ─────────────────────────────────────────────
 
     [Test]
-    public void Hud_Restrained_HidesOnlyUltimateSlot_AndRageGauge()
+    public void Hud_Restrained_GraysOnlyUltimateSlot_AndHidesRageGauge()
     {
-        Assert.IsTrue(AssassinRestraintRules.HidesHudSlot(true, PlayerSkillSlot.Ultimate), "R 칸 숨김");
+        Assert.IsTrue(AssassinRestraintRules.GraysHudSlot(true, PlayerSkillSlot.Ultimate), "R 칸 아이콘 회색");
         foreach (PlayerSkillSlot slot in new[] { PlayerSkillSlot.Main, PlayerSkillSlot.Sub, PlayerSkillSlot.Interrupt })
-            Assert.IsFalse(AssassinRestraintRules.HidesHudSlot(true, slot), $"{slot} 는 그대로");
-        Assert.IsFalse(AssassinRestraintRules.HidesHudSlot(false, PlayerSkillSlot.Ultimate), "미선택 = R 보임");
+            Assert.IsFalse(AssassinRestraintRules.GraysHudSlot(true, slot), $"{slot} 는 그대로");
+        Assert.IsFalse(AssassinRestraintRules.GraysHudSlot(false, PlayerSkillSlot.Ultimate), "미선택 = R 원래 색");
 
         Assert.IsFalse(AssassinRestraintRules.ShowsRageGauge(true), "머리 위 분노 줄 숨김");
         Assert.IsTrue(AssassinRestraintRules.ShowsRageGauge(false));

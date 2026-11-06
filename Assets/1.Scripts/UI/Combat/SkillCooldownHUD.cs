@@ -30,11 +30,15 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         [System.NonSerialized] public bool iconBaseColorCached;
         [System.NonSerialized] public bool iconTinted;     // 후속 시전 중 아이콘 색 곱하기(할 일 128 5a)
         [System.NonSerialized] public Color iconTint;
-        [System.NonSerialized] public bool hiddenByTrait;  // 특성이 슬롯을 없앴다(절제된 분노 = R, 할 일 133) — 슬롯 루트를 끈다
+        [System.NonSerialized] public bool grayedByTrait;  // 특성이 슬롯을 못 쓰게 했다(절제된 분노 = R) — 칸은 두고 아이콘만 회색조(할 일 133 숨김 → 237)
+        [System.NonSerialized] public Material iconMaterial;          // 회색조 전 원래 재질(프리팹 값, 보통 null = UI 기본)
+        [System.NonSerialized] public Material cooldownIconMaterial;
     }
 
     [SerializeField] private SlotWidget[] slots;
     [SerializeField] private Color blockedColor = new Color(0.35f, 0.35f, 0.35f, 0.75f);
+    [Tooltip("특성으로 못 쓰게 된 칸(절제된 분노 = R) 아이콘에 끼울 회색조 재질 — MA_UIGrayscale(셰이더 UI/Grayscale). 비면 색을 빼지 않는다.")]
+    [SerializeField] private Material grayscaleIconMaterial;
 
     private PlayerSkillController skillController;
     private AssassinState assassinState;
@@ -228,7 +232,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             if (widget == null)
                 continue;
 
-            ApplyTraitHidden(widget);
+            ApplyTraitGrayscale(widget);
 
             float remaining = 0f;
             float total = 0f;
@@ -255,18 +259,33 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         }
     }
 
-    // 절제된 분노(할 일 133) — R 슬롯 루트(CooldownFill 의 부모, CacheSlotColors 와 같은 기준)를 런타임에 끈다. 프리팹은 그대로.
-    // 바뀔 때만 SetActive — 특성 초기화로 풀리면 다시 켠다.
-    private void ApplyTraitHidden(SlotWidget widget)
+    // 절제된 분노 — R 칸은 그대로 두고 아이콘(과 쿨타임 마스크 안 사본)만 회색조 재질로 바꾼다(할 일 237, 133 의 슬롯 숨김 대체).
+    // 프레임·키 글자·툴팁은 그대로. 바뀔 때만 재질을 갈고, 특성 초기화로 풀리면 원래 재질로 돌린다. 색(차단 색·후속 tint)은 재질과 별개라 그대로 곱해진다.
+    private void ApplyTraitGrayscale(SlotWidget widget)
     {
-        bool hidden = assassinState != null && AssassinRestraintRules.HidesHudSlot(assassinState.IsRestrained, widget.slot);
-        if (hidden == widget.hiddenByTrait)
+        bool grayed = assassinState != null && AssassinRestraintRules.GraysHudSlot(assassinState.IsRestrained, widget.slot);
+        if (grayed == widget.grayedByTrait)
             return;
 
-        widget.hiddenByTrait = hidden;
-        Transform slotRoot = widget.cooldownFill != null ? widget.cooldownFill.transform.parent : null;
-        if (slotRoot != null)
-            slotRoot.gameObject.SetActive(!hidden);
+        widget.grayedByTrait = grayed;
+        SwapGrayscale(widget.icon, grayed, ref widget.iconMaterial);
+        SwapGrayscale(widget.cooldownIcon, grayed, ref widget.cooldownIconMaterial);
+    }
+
+    private void SwapGrayscale(Image image, bool grayed, ref Material original)
+    {
+        if (image == null || grayscaleIconMaterial == null)
+            return;
+
+        if (grayed)
+        {
+            original = image.material == image.defaultMaterial ? null : image.material;
+            image.material = grayscaleIconMaterial;
+        }
+        else
+        {
+            image.material = original;
+        }
     }
 
     private void CacheSlotColors()
