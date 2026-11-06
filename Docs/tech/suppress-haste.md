@@ -55,10 +55,14 @@
 |---|---|---|
 | `vignetteSprite` | 임시 흰색 PNG | **이미지 교체 = 이것만 바꾼다** |
 | `vignetteColor` | 흰색 | 스프라이트에 곱하는 색. 컬러 이미지로 바꾸면 흰색 그대로 둔다 |
-| `maxAlpha` | 0.6 | 버프 중 최대 알파 |
+| `fillAlpha`(옛 `maxAlpha`) | 0.25 | 버프 중 가장자리 채움 알파(0 = 스피드 라인만) |
+| 스피드 라인(249) | `MA_SpeedLines`(셰이더 `UI/SpeedLines`) | `speedLineMaterial`·`lineColor`·`lineAlpha` 0.55·`lineCount` 90·`lineDensity` 0.5·`lineThickness` 0.35·`lineInnerMin/Max` 0.75/1.05·`lineFps` 24·`centerClearRadius` 0.6 — 런타임 자식 RawImage `SpeedLines` 에 절차 생성(텍스처 없음) |
+| 켜짐 버스트(249) | 0.2초 × 1.8 | `burstDuration`·`burstMultiplier` — 켜지는 순간 선 밀도·알파를 배율만큼 올렸다 버스트 시간 동안 1 로. 시트 대상 아님(HUD 인스펙터) |
+| 에디터 미리보기 | 꺼짐 | Play 없이 Prefab Mode 에서 강도·버스트 시점·선 배치 번호로 보기(저장 안 되는 자식, Play·빌드 무시) |
 | `data` | `SuppressHasteData.asset` | 페이드 인/아웃 시간(`vignetteFadeIn` 0.2 / `vignetteFadeOut` 0.3)을 읽는 시트 에셋. 비우면 Resources 에서 찾는다 |
 
 - 페이드 시간은 프리팹이 아니라 **시트**(xlsx `SuppressHaste`)에서 고친다 — 빌드는 항상 xlsx 값([data-table.md](data-table.md)).
+- 주의(249 되살리기, 11-09): `CombatHUD.prefab` 인스턴스에 옛 이름 오버라이드 `maxAlpha` 0.981·`visibleAlphaThreshold` 0 이 있다. `fillAlpha` 로 이어지면 채움이 거의 불투명해 선이 묻힐 수 있으니 Play 에서 확인하고 값은 사용자가 정한다.
 
 ### 2.2 이미지로 바꾸는 법
 1. 가장자리만 불투명한 스프라이트(Texture Type = Sprite, Clamp 권장)를 `Assets/2.Prefabs/UI/Textures/` 또는 아트 경로에 둔다.

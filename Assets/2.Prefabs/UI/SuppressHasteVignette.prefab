@@ -91,6 +91,7 @@ MonoBehaviour:
   image: {fileID: 939202592348726317}
   vignetteSprite: {fileID: 21300000, guid: 8d869fcaf07d6b94b914ceb3f8210f9d, type: 3}
   vignetteColor: {r: 1, g: 1, b: 1, a: 1}
-  maxAlpha: 0.6
+  fillAlpha: 0.25
+  speedLineMaterial: {fileID: 2100000, guid: db498cf68d7e324bb4676f52c5e1edca, type: 2}
   data: {fileID: 11400000, guid: 0bec9e944bea55d438d77ac51510cfea, type: 2}
   visibleAlphaThreshold: 0.001
