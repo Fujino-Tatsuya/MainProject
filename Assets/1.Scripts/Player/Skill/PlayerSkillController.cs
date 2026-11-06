@@ -381,6 +381,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             if (IsSkillActive || isRequestingSkill || !IsCooldownReady(slot))
                 return false;
 
+            // 특성 고른 뒤 파티 대기 중이면 겨눔 자체를 시작하지 않는다(할 일 236 오너 1차) — 피드백 없음, 입력은 '그 밖' 행대로 버림.
+            if (IsBlockedByTraitWait(skill))
+                return false;
+
             return targeting.Begin(slot);
         }
 
@@ -426,6 +430,13 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     {
         return Cast(slot, target, aimPoint, hasAimPoint);
     }
+
+    /// <summary>
+    /// 증강(특성)을 고른 뒤 파티 대기 중이라 이 스킬을 막는가(할 일 236) — 타겟팅 모드 스킬만, 맵씬 디렉터 복제 상태로 판정.
+    /// 오너 1차(조준 진입·조준 중 취소)와 서버 2차(<see cref="CanApproveSkill"/>)가 같은 규칙(<see cref="TraitWaitTargetingRules"/>)을 쓴다.
+    /// </summary>
+    public bool IsBlockedByTraitWait(PlayerSkillBase skill) =>
+        skill != null && IsNetworkActive && TraitWaitTargeting.Blocks(skill.Data, OwnerClientId);
 
     // 조준 모드는 로컬 조작자(오너/오프라인)에서만, 타겟팅 컴포넌트가 있을 때만 시작할 수 있다.
     private bool CanBeginTargeting()
@@ -1077,6 +1088,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                 stateController != null && stateController.CanUseSkill);
         }
 
+        // 특성 고른 뒤 파티 대기 중 타겟팅 스킬 금지(할 일 236) — 서버 2차·원격 오너 1차 공용. 대쉬 간파는 간파 슬롯이라 타겟팅 스킬이 아니다.
+        if (approval == PlayerSkillApproval.Approved && !dashInterrupt && IsBlockedByTraitWait(skill))
+            approval = PlayerSkillApproval.TraitWait;
+
         if (approval == PlayerSkillApproval.Approved)
         {
             // 지점 기반 CanUse(거너 R 지점 지정 등)가 이번 요청의 지점을 보도록 CanUse 직전에 넣는다.
@@ -1115,6 +1130,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
                 break;
             case PlayerSkillApproval.DashWindow:
                 Edit.Log($"[DashInterrupt] 거부 — 대시 경과 {dashElapsed:F3}s 가 창(+서버 허용오차) 밖", this);
+                break;
+            case PlayerSkillApproval.TraitWait:
+                Edit.Log($"[Skill] {slot} 거부 — 특성 고른 뒤 파티 대기 중 타겟팅 스킬 금지(할 일 236)", this);
                 break;
         }
 
@@ -1932,7 +1950,8 @@ public enum PlayerSkillApproval
     Dead,           // 사망 중 + 사망 중 허용 스킬 아님
     StateOrEffect,  // Idle/Move 아님 또는 스킬 차단 효과
     CanUseFailed,   // 스킬 자체 조건(CanUse)
-    DashWindow      // 대쉬 간파 — 대시 경과가 창(+서버 허용오차) 밖 (할 일 115)
+    DashWindow,     // 대쉬 간파 — 대시 경과가 창(+서버 허용오차) 밖 (할 일 115)
+    TraitWait       // 특성 고른 뒤 파티 대기 중 타겟팅 스킬 금지 (할 일 236, TraitWaitTargetingRules)
 }
 
 /// <summary>
