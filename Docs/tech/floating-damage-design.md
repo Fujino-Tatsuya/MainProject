@@ -227,9 +227,14 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 - **구간 기준 최대 체력**: 네트워크 없이는 Unit 최대 체력이 0 이라 구동기 칸 `groups[i].baseMaxHp` 를 쓴다(요청 `baseMaxHpOverride` — 게임 경로는 안 씀). 기본 = 데이터 값 23호 레이드 2880(1인) · 팔라딘 220 · 휴머노이드 90.
 - **숫자 크기 고치기** = 설정 SO `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset` — `popupStyles[kind].height`(HP 36·보호막 34)·`tierLooks[*].holdScale`·`spawnOffset` 등.
   패널의 `-4 -1 +1 +4` 버튼이 HP·보호막 높이를 SO 에 바로 쓰고 저장한다(Play 중이어도 남음). 인스펙터에서 고쳐도 같다 — **다음 숫자부터 반영**. 이 SO 는 **xlsx 미연결**(§10) — 확정 값은 에셋 커밋만.
+  **어느 칸이 크기를 바꾸나** (숫자마다 생성 때 읽음, 캐시 없음): 화면 높이(px) = `popupStyles[kind].height` × `tierLooks[구간].holdScale` × 팀원 배율(`teammateScaleMultiplier`, 내 공격이면 1) × (화면 높이 ÷ 1080),
+  그 값이 `minScreenPixelHeight`(16) 보다 작으면 16 으로 올림. `tierLooks` 는 **그 숫자가 들어간 구간 줄만** 쓰인다 — 패널 기본 구간은 **중간**(X)이라 `[0]` 낮음 줄을 고치면 안 보인다(Z 로 바꿀 것).
+  `spawnScale`(등장 확대)·`shake`(흔들림)는 그 줄의 `spawnSettleDuration > 0` **이고** `spawnScale > holdScale` 일 때만 돈다(`HasSpawnPop`) — 아니면 둘 다 무시.
+  패널이 방금 숫자의 구간(▶)·읽은 높이·유지 크기·화면 px·하한 걸림과, 등장 확대가 꺼진 줄을 보여 준다.
 - **보스 위치 고치기** = 대상 프리팹 루트 `FloatingDamageAnchor`(23호 = `TwentyThree.prefab` 루트, 본 `anchorTransform` + `worldOffset`). 패널 `Y ±0.1/±0.5` 또는 인스펙터에서 Play 중 조정 → 떠 있는 누적 숫자도 바로 따라온다.
   Play 중 값은 끝나면 날아가므로 **'현재 앵커 값을 프리팹에 저장'** 버튼 — 컴포넌트가 정의된 원본 프리팹(`TwentyThree.prefab`, 레이드 변형이 물려받음)에 `localOffset`·`worldOffset` 을 쓴다(본 지정은 그대로). 중간 변형이 같은 칸을 덮어쓰면 패널·콘솔에 경고.
 - **기즈모**: 노란 구 = 앵커 점, 초록 구 = 앵커 없음(콜라이더 중심), 선 = 대상 발 → 생성점. 에디트 모드 씬 뷰에서도 보이고, Game 뷰는 Gizmos 켬일 때.
+- 🔴 Dev Boot(호스트)로 열지 말 것 — 씬에 놓인 `Player_Paladin` 이 호스트 소유로 스폰되면 "내 플레이어"로 걸러져 숫자가 안 뜰 수 있고, 호스트 플레이어·카메라가 따로 생긴다(11-06 로그 — 오디오 리스너 3개). 씬을 열고 그냥 ▶.
 - 알려진 한계: 꺼진 스크립트도 `Awake` 는 돈다(네트워크 없는 경고가 콘솔에 날 수 있음 — 숫자와 무관) · 플레이어·몬스터에는 앵커가 없어 콜라이더 중심 · 앵커 '저장'은 에디터에서만.
 - 테스트: `Assets/Tests/EditMode/FloatingDamage/Editor/FloatingDamageDebugLabTests.cs`(메뉴 `Tools/Tests/데미지 숫자 EditMode 테스트 실행`).
 

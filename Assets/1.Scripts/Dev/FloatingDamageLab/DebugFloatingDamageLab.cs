@@ -67,6 +67,8 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
     float _nextAutoAt;
     bool _panelVisible = true;
     string _status = string.Empty;
+    string _lastShot = string.Empty;
+    FloatingDamageTier? _lastTier;
     Vector2 _scroll;
 
     void Awake()
@@ -243,6 +245,24 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
             baseMaxHpOverride = entry.baseMaxHp,
         };
         spawner.Submit(request);
+        _lastShot = DescribeShot(spawner.Settings, request, kind);
+    }
+
+    // 방금 띄운 숫자가 설정 SO 의 어느 칸을 읽었는지 — 스포너·팝업과 같은 계산(구간 판정·높이·유지 크기·팀원 배율·해상도 하한).
+    string DescribeShot(FloatingDamageSettings settings, FloatingPopupRequest request, PopupKind kind)
+    {
+        settings.TryGetStyle(kind, out FloatingPopupStyle style);
+        FloatingDamageTier tier = settings.ClassifyTier(request.amount, request.BaseMaxHp, request.target.Rank);
+        _lastTier = tier;
+        FloatingDamageTierLook look = settings.GetLook(tier);
+        float display = FloatingDamageDisplayPolicy.Evaluate(settings.DisplayFilter, request.fromLocalPlayer,
+            settings.TeammateScaleMultiplier, settings.TeammateAlpha).scaleMultiplier;
+        float canvasScale = Screen.height / Mathf.Max(1f, settings.ReferenceResolution.y);
+        float steady = style.height * look.holdScale * display;
+        float floor = FloatingDamageMinPixelPolicy.Multiplier(settings.MinScreenPixelHeight, steady, canvasScale);
+        string floorNote = floor > 1f ? $" — [!] 해상도 하한 {settings.MinScreenPixelHeight:0}px 에 걸려 높이를 바꿔도 안 변함" : string.Empty;
+        return $"방금: {kind} {request.amount} → 구간 {tier}\n" +
+               $"  높이 {style.height:0.#} × 유지 {look.holdScale:0.##} × 팀원 {display:0.##} = {steady:0.#} (화면 {steady * canvasScale * floor:0}px){floorNote}";
     }
 
     // ---- 화면 ----
@@ -309,11 +329,17 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
 
         StyleRow(settings, PopupKind.Damage, "HP 숫자 높이");
         StyleRow(settings, PopupKind.ShieldDamage, "보호막 숫자 높이");
+        GUILayout.Label("  tierLooks (▶ = 방금 숫자가 쓴 줄 — 다른 줄을 고치면 안 보인다)");
         for (int t = 0; t < 3; t++)
         {
             FloatingDamageTierLook look = settings.GetLook((FloatingDamageTier)t);
-            GUILayout.Label($"  구간 {(FloatingDamageTier)t}: 유지 ×{look.holdScale:0.##} · 등장 ×{look.spawnScale:0.##}");
+            string mark = _lastTier == (FloatingDamageTier)t ? "▶" : "  ";
+            // 등장 확대·흔들림은 spawnSettleDuration > 0 이고 등장 > 유지일 때만 돈다(FloatingDamageTierLook.HasSpawnPop).
+            string pop = look.HasSpawnPop ? $"등장 ×{look.spawnScale:0.##}" : "[!] 등장 확대·흔들림 꺼짐(settle 0 또는 등장≤유지)";
+            GUILayout.Label($"  {mark} [{t}] {(FloatingDamageTier)t}: 유지 ×{look.holdScale:0.##} · {pop}");
         }
+        if (!string.IsNullOrEmpty(_lastShot))
+            GUILayout.Label(_lastShot);
         GUILayout.Label($"  몸 중심 위 spawnOffset {settings.SpawnOffset:0.#}px");
 #if UNITY_EDITOR
         if (GUILayout.Button("설정 SO 인스펙터에서 열기"))
