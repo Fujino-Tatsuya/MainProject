@@ -89,10 +89,19 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     [SerializeField, Min(160f)] float width = 240f;
 
     DebugTimeScale _timeScale;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+    DebugCharacterCycle _characterCycle; // 같은 오브젝트 — F1 순환·캐릭터 변경 버튼 공용(할 일 238)
+#endif
     readonly DebugSuppressInterruptRepro _suppressRepro = new DebugSuppressInterruptRepro();
     readonly DebugInterruptTierPreview _tierPreview = new DebugInterruptTierPreview();
 
-    void Awake() => TryGetComponent(out _timeScale);
+    void Awake()
+    {
+        TryGetComponent(out _timeScale);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        TryGetComponent(out _characterCycle);
+#endif
+    }
 
     void Update()
     {
@@ -109,6 +118,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     public enum Section
     {
         Replay,        // 간파 재생 — 지금 단계 표시·단계 재현
+        Character,     // 캐릭터 변경 — 팔라딘/거너/어쌔신(할 일 238, F1 순환과 같은 길)
         Versions,      // 단계·버전 선택 — 일반·대쉬·제압 V0~V3·암순응·위치
         Whiteout,      // 화이트아웃·제압 — 3단계 화이트아웃 스위치·단계 에셋
         Effects,       // 화면 효과 — 효과 칸 켜기/끄기
@@ -122,6 +132,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     public static string SectionTitle(Section section) => section switch
     {
         Section.Replay => "간파 재생",
+        Section.Character => "캐릭터 변경",
         Section.Versions => "단계·버전 선택",
         Section.Whiteout => "화이트아웃·제압 (219)",
         Section.Effects => "화면 효과",
@@ -135,7 +146,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     public const string FoldPrefsPrefix = "DebugInterruptLab.Fold.";
 
     // 처음(키 없음)엔 자주 쓰는 재생·버전·배속만 펼친다.
-    static bool DefaultOpen(Section section) => section == Section.Replay || section == Section.Versions || section == Section.Speed;
+    static bool DefaultOpen(Section section) => section == Section.Replay || section == Section.Character || section == Section.Versions || section == Section.Speed;
 
     const float Gap = 4f;          // 버튼 사이 간격
     const float RowHeight = 22f;   // 버튼·토글 높이
@@ -163,6 +174,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             else
             {
                 DrawSection(Section.Replay, () => DrawReplay(director));
+                DrawSection(Section.Character, DrawCharacter);
                 DrawSection(Section.Versions, () => DrawTierVersions(director));
                 DrawSection(Section.Whiteout, () => DrawWhiteout(director));
                 DrawSection(Section.Effects, () => DrawEffects(director));
@@ -378,6 +390,59 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             GUILayout.Label("※ 호스트 화면에서만 효과(표식은 서버)");
         else if (_suppressRepro.Enabled)
             GUILayout.Label($"허수아비 {_suppressRepro.DummyCount} · 제압 간파 {_suppressRepro.MarkedCount}회");
+    }
+
+    /// <summary>캐릭터 변경 버튼 순서(할 일 238).</summary>
+    public static readonly TutorialCharacter[] CharacterButtons =
+        { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin };
+
+    /// <summary>캐릭터 변경 버튼 글자.</summary>
+    public static string CharacterButtonLabel(TutorialCharacter character) => character switch
+    {
+        TutorialCharacter.Gunner => "거너",
+        TutorialCharacter.Assassin => "어쌔신",
+        _ => "팔라딘",
+    };
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+    string _characterStatus;
+#endif
+
+    // 캐릭터 변경(할 일 238) — 같은 오브젝트의 DebugCharacterCycle.TrySwapToServer(F1 순환·특성 랩 버튼과 같은 길: 디스폰 → 같은 자리 새 Variant).
+    // 호스트 화면만 된다(새 RPC 없음). 바꾸면 HP·쿨·상태가 새로 시작된다.
+    void DrawCharacter()
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        if (_characterCycle == null)
+        {
+            GUILayout.Label("DebugCharacterCycle 없음");
+            return;
+        }
+
+        var labels = new string[CharacterButtons.Length];
+        for (int i = 0; i < labels.Length; i++)
+            labels[i] = CharacterButtonLabel(CharacterButtons[i]);
+        int clicked = ButtonRow(labels);
+        if (clicked >= 0)
+        {
+            TutorialCharacter character = CharacterButtons[clicked];
+            int id = DebugCharacterCycle.FindCharacterId(_characterCycle.Roster, character);
+            if (id < 0)
+                _characterStatus = $"로스터에 {CharacterButtonLabel(character)} 없음";
+            else
+                _characterStatus = _characterCycle.TrySwapToServer(id)
+                    ? $"{CharacterButtonLabel(character)}(으)로 변경"
+                    : "변경 안 됨(이미 그 캐릭터·연타 간격·클라 창 — 콘솔)";
+        }
+
+        Unity.Netcode.NetworkManager networkManager = Unity.Netcode.NetworkManager.Singleton;
+        if (networkManager != null && networkManager.IsListening && !networkManager.IsServer)
+            GUILayout.Label("※ 호스트 화면에서만 바뀐다");
+        if (!string.IsNullOrEmpty(_characterStatus))
+            GUILayout.Label(_characterStatus);
+#else
+        GUILayout.Label("이 빌드에선 캐릭터 변경 없음");
+#endif
     }
 
     // 간파 스킬 캐릭터 VFX 개별 켜고 끄기(할 일 238) — InterruptVfxToggles(정적·이 피어만·저장 안 함, Play 시작마다 전부 켬).

@@ -55,3 +55,9 @@
   - 루프(방패 발광·기 모으기)를 재생 중에 꺼도 이번 재생은 끝까지 간다 — 다음 시전부터.
 - 새 간파 VFX 를 추가할 때: `InterruptVfx` 에 키 + `Label`·`CharacterOf`(클립 이벤트면 `TryGetAnimEffect`) → 스폰 지점에 `IsOn` 한 줄 → 이 문서 표.
 - 테스트: `Assets/1.Scripts/Dev/InterruptLab/Editor/InterruptVfxTogglesTests.cs`(메뉴 `Tools/Tests/간파 랩 EditMode 테스트 실행` 에 포함).
+
+## 3. 랩 캐릭터 변경 버튼
+
+- 튜닝 패널 섹션 **'캐릭터 변경'** — 팔라딘/거너/어쌔신 버튼. 같은 오브젝트의 `DebugCharacterCycle.TrySwapToServer` 를 부른다
+  (F1 순환·특성 랩 버튼과 같은 길: 서버가 지금 PlayerObject 를 디스폰하고 같은 자리에 새 Variant 를 `PlayerSpawnService.SpawnCharacter` 로 세움).
+- **호스트 화면에서만** 된다(새 RPC 없음 — 클라 창은 '호스트 화면에서만' 안내). 바꾸면 HP·쿨·상태가 새로 시작된다. VFX 토글 값은 정적이라 그대로 남는다.
