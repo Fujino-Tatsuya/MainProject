@@ -79,7 +79,7 @@ public class PlayerDashVfx : BaseNetworkBehaviour
 
         // 내 화면은 즉시 — 아래 RPC 는 나를 뺀 전원에게만 간다.
         // 오프라인(VFXScene·싱글 테스트)에서는 스폰되지 않아 RPC 가 예외라 여기서 끝난다.
-        if (active) _dashAfterimage.Play();
+        if (active) { _dashAfterimage.Play(); PlayDashSound(); }
         else _dashAfterimage.Stop();
 
         if (!IsNetworkActive) return;
@@ -98,7 +98,20 @@ public class PlayerDashVfx : BaseNetworkBehaviour
     }
 
     /// <summary>[전 피어] 각자 자기 화면에 잔상을 켠다. 속도선은 DashAfterimage 가 같이 끈다.</summary>
-    private void PlayDashAfterimageLocal() => _dashAfterimage?.Play();
+    private void PlayDashAfterimageLocal()
+    {
+        _dashAfterimage?.Play();
+        PlayDashSound();
+    }
+
+    // 대시 소리(11-06) — 잔상과 같은 길(오너 즉시 · 남은 RPC)로 대시 시작마다 1번. 키 = Sound 시트.
+    private const string DashSoundKey = "S1_Dash";
+
+    private void PlayDashSound()
+    {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.Play(DashSoundKey, transform.position);
+    }
 
     /// <summary>[전 피어] 잔상 생성을 멈춘다. 이미 떠 있는 조각은 제 수명대로 사라진다.</summary>
     private void StopDashAfterimageLocal() => _dashAfterimage?.Stop();

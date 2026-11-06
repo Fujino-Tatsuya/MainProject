@@ -271,6 +271,9 @@ public class Player : Unit
         // 특성 수치 출처(할 일 125 2/5) — Player.prefab 에 붙어 있다. 없으면(테스트·옛 프리팹) 붙인다.
         traitModifiers = PlayerTraitModifiers.For(this);
         stats.Register(traitModifiers);
+        // 발소리(11-06) — 프리팹에 없으면 붙인다(전 캐릭터 공용, 걷기 애니 재생 위치 기준).
+        if (!TryGetComponent<PlayerFootstepSound>(out _))
+            gameObject.AddComponent<PlayerFootstepSound>();
 
         // StatusEffectController는 NetworkBehaviour라 런타임 추가가 불가 — 프리팹에 미리 부착돼 있어야 한다
         if (GetComponent<StatusEffectController>() == null)

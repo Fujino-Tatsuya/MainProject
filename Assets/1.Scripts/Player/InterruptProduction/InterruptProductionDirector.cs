@@ -802,6 +802,8 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
     // ---- 피어 사건 (GlobalTimeScale 이벤트 → 단계) ----
 
+    private const string InterruptSuccessSoundKey = "S1_Interrupt_Success";
+
     private void HandleStarted(uint triggerId, ulong casterClientId, SlowMotionPurpose purpose, Vector3 targetPosition)
     {
         // 보는 사람을 못 정하면(NetworkManager 없음) 암순응은 건너뛴다 — 옛 InterruptDarkAdaptation 과 같다.
@@ -831,6 +833,10 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
 
         if (purpose != SlowMotionPurpose.Success)
             return;
+
+        // 간파 성공 소리(11-06) — 서버 성공 확정마다 모든 화면에서 1번, 대상 위치. 키 = Sound 시트.
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.Play(InterruptSuccessSoundKey, targetPosition);
 
         // 제압 간파(할 일 179)·대쉬 간파(192) — 서버가 슬로우 Start 이벤트 표식 바이트에 실어 보낸 칸(이 Started 호출 안에서 읽는다) → 연출 단계.
         bool suppressInterrupt = _timeScale != null && _timeScale.CurrentSuppressInterrupt;

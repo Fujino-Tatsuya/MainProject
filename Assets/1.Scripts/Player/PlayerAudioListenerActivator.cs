@@ -28,6 +28,14 @@ public class PlayerAudioListenerActivator : NetworkBehaviour
             return; // 원격 플레이어 인스턴스: 리스너 영구 비활성
         }
 
+        // 로비(11-06): 로비 씬에는 리스너가 없어 3D 소리(평타·스킬 VFX 소리)가 내 위치에서 안 들렸다 → 로비 플레이어는 스폰 즉시 켠다.
+        // 로비 플레이어는 로비를 떠날 때 디스폰되므로 로딩씬 리스너와 겹치지 않는다.
+        if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameManager.GameState.Lobby)
+        {
+            EnableListener();
+            return;
+        }
+
         // 내 플레이어: 본게임 준비 완료 시점에 활성화 (이미 준비됐으면 즉시 1회)
         GameManager.SubscribeMainGameStart(EnableListener);
     }

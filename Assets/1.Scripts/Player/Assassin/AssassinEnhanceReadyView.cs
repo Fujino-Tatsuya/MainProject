@@ -69,8 +69,12 @@ public sealed class AssassinEnhanceReadyView : MonoBehaviour
             if (bladeGlow != null)
                 bladeGlow.FadeIn();
             if (playCharge)
+            {
                 ForEach(charges, c => c.PlayOnce());
+                PlaySound(ChargeSoundKey);
+            }
             ForEach(auras, a => { if (!a.IsPlaying) a.Play(); });
+            PlaySound(AuraSoundKey);
             return;
         }
 
@@ -78,6 +82,16 @@ public sealed class AssassinEnhanceReadyView : MonoBehaviour
             bladeGlow.FadeOut();
         // 엔트리 outroDuration 동안 방출을 멈추고 남은 입자를 흩어지게 한 뒤 반납한다.
         ForEach(auras, a => { if (a.IsPlaying) a.Stop(); });
+    }
+
+    // 소리는 양손 소켓 수와 무관하게 1번(11-06 경석) — 엔트리(E_Charge·E_Aura)에는 소리를 달지 않는다. 키 = Sound 시트.
+    private const string ChargeSoundKey = "S1_Assassin_E_Start";
+    private const string AuraSoundKey = "S1_Assassin_E_Buff";
+
+    private void PlaySound(string key)
+    {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.Play(key, transform.position);
     }
 
     private static void ForEach(EffectSocketPlayer[] players, System.Action<EffectSocketPlayer> action)

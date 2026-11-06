@@ -24,6 +24,9 @@ public class BossElectricFloorVfx : MonoBehaviour
     [SerializeField, Min(0f)] float height = 0.09f;
 
     [Header("③ 피격")]
+    /// <summary>장판 발동 소리 키(Sound 시트). 발동마다 1번.</summary>
+    const string ElectricFloorSoundKey = "S1_23_Electric";
+
     [Tooltip("FX_ElectricFloorHit 엔트리 — 맞은 플레이어 몸 가운데를 따라다닌다")]
     [SerializeField] EffectEntry hitEffect;
     [SerializeField, Min(0.05f)] float hitTime = 0.5f;
@@ -111,6 +114,10 @@ public class BossElectricFloorVfx : MonoBehaviour
     {
         if (!EnsurePool()) return;
         _pool.Fire(tilePrefab, mask, time, lethal);
+
+        // 소리 = 장판 발동 1회(맞은 플레이어 수와 무관 — 11-06 경석). 피격 VFX(FX_ElectricFloorHit)에는 소리를 달지 않는다.
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.Play(ElectricFloorSoundKey, transform.position);
 
         // ③ 후보 = 지금 발이 터진 칸 안인 플레이어. 피해 신호가 이미 와 있으면 바로, 아니면 hitWindow 동안 기다린다.
         WatchPlayers();

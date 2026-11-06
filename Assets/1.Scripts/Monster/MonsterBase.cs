@@ -82,7 +82,7 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
-    float _vulnerableUntil = -1f;   // 서버 전용 종료 시각. -1 = 취약 아님
+    float _monsterVulnerableUntil = -1f;   // 서버 전용 종료 시각. -1 = 취약 아님
 
     // 지금 쫓거나 때리는 대상의 NetworkObjectId **표시용 복제**(할 일 58 — 나를 노리는 몬스터 주황 외곽선).
     // 서버만 쓴다(Update). Chase·Attack 이고 서버 로직이 돌 때만 대상 id, 그 밖 0 — 규칙은 MonsterAggroTargetRule.
@@ -310,7 +310,7 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
         float duration = counter != null ? counter.VulnerableDuration : 8f;
         if (duration <= 0f) return;
 
-        _vulnerableUntil = Time.time + duration;
+        _monsterVulnerableUntil = Time.time + duration;
         _vulnerable.Value = true;
         Edit.Log($"[Monster] {name} 취약 시작 — {duration:0.##}s", this);
     }
@@ -320,7 +320,7 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     {
         if (!IsServer) return;
         bool was = _vulnerable.Value;
-        _vulnerableUntil = -1f;
+        _monsterVulnerableUntil = -1f;
         _vulnerable.Value = false;
         if (was) Edit.Log($"[Monster] {name} 취약 끝", this);
     }
@@ -436,7 +436,7 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     void TickServer(float dt)
     {
         // 취약 만료 — 상태와 무관하게 시간으로만 끝난다(그로기·밀림·공격 중이어도). PreTick 앞이라 파생이 틱을 가로채도 돈다.
-        if (_vulnerableUntil >= 0f && Time.time >= _vulnerableUntil)
+        if (_monsterVulnerableUntil >= 0f && Time.time >= _monsterVulnerableUntil)
             ServerEndVulnerable();
 
         if (OnServerPreTick(dt)) return;
