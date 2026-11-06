@@ -75,3 +75,12 @@
   - Play 중: `letterboxHeight` 는 매 프레임 읽어서 인스펙터에서 바꾸면 바로 반영된다(테이블 모드면 Play 가 끝날 때 xlsx 값으로 되돌아간다 — 확정은 xlsx). 프리팹 에셋 수정은 **이미 만든 복제본에는 안 들어간다** — 다음 연출(다음 Play·다음 씬의 첫 연출)부터. Play 중 모양은 Hierarchy 의 `LobbyPodLaunch`/`MapPodArrival` 오브젝트 아래 `PodDropOverlay` 복제본을 고쳐 보고(Play 끝나면 사라짐) 프리팹에 옮긴다.
   - 출격·착륙 연출만 다시 트는 디버그 단축키·메뉴는 없다 — 로비 출격 집결 → 맵 착륙 정상 흐름으로 본다.
 - 테스트: `PodDropScreenOverlayTests`(프리팹 값 보존·대체·커밋된 프리팹 계약).
+
+## 6. 연출 중 플레이어 실루엣 끔 (할 일 230)
+
+사용자 요청 "연출 상태에서는 캐릭터 실루엣 비활성화".
+
+- 로비 출격: 출격 확정(시작 시각 복제)부터 로딩으로 로비 씬이 사라질 때까지(`ClearLocal`) 모든 플레이어의 벽 뒤 실루엣을 끈다 — 발사대 벽 뒤로 걸어 들어갈 때 윤곽선이 컷을 깨던 것.
+- 맵 착륙: 진입(로딩 화면 아래)부터 **연출 끝**(`EndAt` — UI·튜토리얼이 돌아오는 순간, `ClearLocal`)까지. 예전엔 디졸브 끝(조작 복귀)에 되켰다 — 조작은 그대로 디졸브 끝에 돌아오고, 실루엣만 UI 와 같이 돌아온다.
+- 방식: `PlayerSilhouetteSuppression`(`Rendering/Silhouette/`) — 스폰된 `PlayerSilhouetteTag` 마다 `SetSuppressed(true)`, 태그 수가 바뀌면 다시 찾아 늦게 스폰된 플레이어도 잡는다. 로컬 시각 값(복제 없음, 피어마다 자기 화면). 두 연출이 같은 묶음 클래스를 쓴다.
+- 보스 승리 연출의 `PlayerSilhouetteFeature.SuppressedByCinematic`(피처 전체 끔, 정적 bool 하나)은 쓰지 않는다 — 여러 연출이 한 bool 을 쓰면 먼저 끝난 쪽이 다른 연출의 끔을 풀 수 있다. 보스 엘리베이터(`BossTeleportManager`)도 태그별 경로다.

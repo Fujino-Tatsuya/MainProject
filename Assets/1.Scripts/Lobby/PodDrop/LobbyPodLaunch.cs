@@ -19,7 +19,7 @@ using UnityEngine.Serialization;
 /// <item>오너: 시작 직후 짧은 암전의 유지 구간 한가운데(<see cref="PodDropLobbyTimeline.TeleportAt"/>) 자기 걷기 시작 지점(WalkStart, 슬롯 순서)으로
 /// 순간이동한다(보스 엘리베이터 TeleportOwnerClientRpc 의 오너 처리와 같은 순서). 해치가 열리면(복제) 자기 슬롯 보행 구간 동안 그 자리 → 개인 경로점(슬롯 entryPath) → 공용 경로점(walkPath, 슬롯 합류 번호부터 리스트 순서)을
 /// 평소 걷기 변위(Walk 애니)로 걷고 → 문턱까지 같은 속도로, 문턱 → 좌석은 미끄러짐 시간 동안 충돌 없이 보간한다(포드 실내 1.42m &lt; 캡슐 1.79m). 도착 뒤 좌석에 붙잡아 둔다.</item>
-/// <item>전 피어(로컬 표시): 레터박스·UI 숨김·시작 암전·끝 페이드 아웃(<see cref="PodDropScreenOverlay"/> 검은 화면 한 장), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
+/// <item>전 피어(로컬 표시): 레터박스·UI 숨김·시작 암전·끝 페이드 아웃(<see cref="PodDropScreenOverlay"/> 검은 화면 한 장), 연출 내내 플레이어 실루엣 끔(<see cref="PlayerSilhouetteSuppression"/>, 할 일 230), 카메라 임시 추적(포드 카메라 지점) + 거리 배율 줌인,
 /// 발사대 Animator 1배속 재생(<see cref="PodAnimatorDriver"/>) — 순간이동 순간 해치 클립, 해치 이벤트 프레임에서 멈춤, 가장 늦게 앉는 순간 발사 클립(해치 닫힘·갱도 문·포드 하강) 처음부터 끝까지.
 /// 클라 Animator 는 재생만 한다 — 자기 이벤트로는 해치 자세를 멈출 뿐 단계를 넘기지 않는다.</item>
 /// </list>
@@ -130,6 +130,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private PodDropLobbyTimeline _timeline;
     private PodDropScreenOverlay _overlay;
     private CameraTargetSwitcher _heldCamera;
+    // 연출 동안 꺼 둔 플레이어 실루엣(할 일 230) — ClearLocal(로비 씬과 함께 사라질 때 포함)에서 되켠다.
+    private readonly PlayerSilhouetteSuppression _silhouettes = new PlayerSilhouetteSuppression();
     private PodAnimatorDriver _launcherDriver;
     private bool _hatchHeldOnBoard;
     private int _launchFastStage; // 지금 발사 클립 가속 단계(0 = 1배속, 1·2 = 가속 단계)
@@ -518,6 +520,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             _timeline = settings.CreateLobbyTimeline(ReplicatedWalkSeconds());
 
         double elapsed = ServerNow - start;
+        // 연출 내내(출격 확정 ~ 로딩) 모든 플레이어의 벽 뒤 실루엣을 끈다 — 로컬 시각 값. 발사대 벽 뒤로 걸어 들어갈 때 윤곽선이 컷을 깨지 않게.
+        _silhouettes.SuppressAll();
         UpdateLauncher(elapsed, _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start)),
             PodDropTimeline.EventElapsed(_launchFastAt.Value, start), PodDropTimeline.EventElapsed(_launchFast2At.Value, start));
         UpdateCamera(elapsed);
@@ -611,6 +615,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         _timeline = null;
 
         if (_overlay != null) _overlay.Clear();
+        _silhouettes.RestoreAll();
 
         if (_heldCamera != null)
         {

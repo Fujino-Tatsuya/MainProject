@@ -165,7 +165,7 @@ public struct PodDropMapTimings
     [Header("디졸브 · 레터박스 아웃 → 해제")]
     [Tooltip("해치 열기 끝 이벤트 → 디졸브 시작(초)")]
     [Min(0f)] public float dissolveDelaySeconds;
-    [Tooltip("포드가 디졸브로 사라지는 시간(초). 시작 순간 플레이어가 보이고(실루엣은 아직 안 그림), 끝나는 순간 조작·실루엣이 돌아오고 카메라가 플레이어로 넘어간다")]
+    [Tooltip("포드가 디졸브로 사라지는 시간(초). 시작 순간 플레이어가 보이고(실루엣은 연출 끝까지 안 그림), 끝나는 순간 조작이 돌아오고 카메라가 플레이어로 넘어간다")]
     [Min(0f)] public float dissolveSeconds;
     [Tooltip("디졸브 시작 → 레터박스가 다 걷힘(초). 디졸브·레터박스가 둘 다 끝나면 UI·튜토리얼(S0) 해제")]
     [Min(0f)] public float letterboxOutSeconds;
@@ -440,7 +440,7 @@ public sealed class PodDropLobbyTimeline
 /// 대기 → 빠른 낙하(날개 펴진 채) → 급감속(날개 접기·다리 펴기 시작) → 연출 높이 도착까지는 시각이 정해져 있고,
 /// 그 뒤는 서버가 받은 클립 이벤트 시각(접기·펴기 끝 <c>deployedAt</c>, 해치 열기 끝 <c>openedAt</c>)을 넣어 계산한다. 아직 안 온 이벤트는 <see cref="PodDropTimeline.NotYet"/>(+∞).
 /// 앞 구간 건너뛰기(<see cref="SkipApproach"/>, 할 일 198 기본 켬)면 t=0 = 접기·펴기 끝 상태(연출 높이) — 대기·낙하·급감속이 0 이고 도착 페이드 인이 t=0 부터.
-/// 접기·펴기 끝 → 추진력 없는 자유낙하(<see cref="PodDropTimeline.FreefallHeight"/>, 할 일 150) → 착지(해치 열기) → 열기 끝 → (지연) → 디졸브 시작 = 플레이어 보임·레터박스 아웃 시작 → 디졸브 끝 = 조작·실루엣·카메라 해제(<see cref="ReleaseAt"/>) → 디졸브·레터박스 둘 다 끝 = UI·튜토리얼(<see cref="EndAt"/>).
+/// 접기·펴기 끝 → 추진력 없는 자유낙하(<see cref="PodDropTimeline.FreefallHeight"/>, 할 일 150) → 착지(해치 열기) → 열기 끝 → (지연) → 디졸브 시작 = 플레이어 보임·레터박스 아웃 시작 → 디졸브 끝 = 조작·카메라 해제(<see cref="ReleaseAt"/>) → 디졸브·레터박스 둘 다 끝 = UI·실루엣·튜토리얼(<see cref="EndAt"/>).
 /// </summary>
 public sealed class PodDropMapTimeline
 {
@@ -481,7 +481,7 @@ public sealed class PodDropMapTimeline
     public float BrakeAt { get; }
     /// <summary>날개·다리 연출 높이 도착(급감속 끝) — 접기·펴기 끝 이벤트가 이보다 일찍 와도 자유낙하는 여기부터.</summary>
     public float HoverAt { get; }
-    /// <summary>열기 끝 이벤트 → 조작·실루엣·카메라 해제(초) = 디졸브 지연 + 디졸브.</summary>
+    /// <summary>열기 끝 이벤트 → 조작·카메라 해제(초) = 디졸브 지연 + 디졸브.</summary>
     public float ReleaseAfterOpenSeconds => DissolveDelaySeconds + DissolveSeconds;
     /// <summary>열기 끝 이벤트 → 연출 끝(초, UI·튜토리얼) = 디졸브 지연 + 디졸브·레터박스 아웃 중 긴 쪽.</summary>
     public float EndAfterOpenSeconds => DissolveDelaySeconds + Mathf.Max(DissolveSeconds, LetterboxOutSeconds);
@@ -537,16 +537,16 @@ public sealed class PodDropMapTimeline
     /// <summary>착지 순간 속도(m/s) = g·√(2h/g) = √(2gh). 시각표·로그용.</summary>
     public float TouchdownSpeed => PodDropTimeline.FreefallSpeed(FreefallGravity, FreefallSeconds);
 
-    /// <summary>디졸브 시작 = 열기 끝 이벤트 + 지연 = 플레이어가 보이고(실루엣은 아직) 레터박스가 걷히기 시작하는 시각.</summary>
+    /// <summary>디졸브 시작 = 열기 끝 이벤트 + 지연 = 플레이어가 보이고(실루엣은 연출 끝까지 끔) 레터박스가 걷히기 시작하는 시각.</summary>
     public double DissolveAt(double openedAt) => openedAt + DissolveDelaySeconds;
 
     /// <summary>레터박스 아웃 시작 = 디졸브 시작.</summary>
     public double LetterboxOutAt(double openedAt) => DissolveAt(openedAt);
 
-    /// <summary>디졸브 끝 = 조작·실루엣 해제, 카메라가 플레이어로 넘어가는 시각.</summary>
+    /// <summary>디졸브 끝 = 조작 해제, 카메라가 플레이어로 넘어가는 시각.</summary>
     public double ReleaseAt(double openedAt) => openedAt + ReleaseAfterOpenSeconds;
 
-    /// <summary>조작·실루엣·카메라를 돌려줬는가 — 디졸브가 끝난 뒤에만 true.</summary>
+    /// <summary>조작·카메라를 돌려줬는가 — 디졸브가 끝난 뒤에만 true.</summary>
     public bool IsReleasedAt(double elapsed, double openedAt) => elapsed >= ReleaseAt(openedAt);
 
     /// <summary>연출 끝(디졸브·레터박스 아웃 둘 다 끝) = UI·튜토리얼(S0).</summary>

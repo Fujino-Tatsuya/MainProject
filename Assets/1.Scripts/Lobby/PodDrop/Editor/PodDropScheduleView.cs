@@ -220,10 +220,10 @@ public static class PodDropScheduleView
         float open = MaxEvent(map.OpenStates, out string openText);
         double opened = touchdown + open;
         sb.Append($"\n  해치 열기         ≈{touchdown:0.##} ~ {opened:0.##}s ({openText})");
-        sb.Append($"\n  디졸브            ≈{t.DissolveAt(opened):0.##} ~ {t.ReleaseAt(opened):0.##}s (열기 끝 {t.DissolveDelaySeconds:0.##}s 뒤 — 시작 순간 플레이어 보임·레터박스 걷히기 시작, 실루엣은 끝까지 끔)");
+        sb.Append($"\n  디졸브            ≈{t.DissolveAt(opened):0.##} ~ {t.ReleaseAt(opened):0.##}s (열기 끝 {t.DissolveDelaySeconds:0.##}s 뒤 — 시작 순간 플레이어 보임·레터박스 걷히기 시작)");
         sb.Append($"\n  레터박스 걷힘     ≈{t.LetterboxOutAt(opened):0.##} ~ {t.LetterboxOutAt(opened) + t.LetterboxOutSeconds:0.##}s ({t.LetterboxOutEase})");
-        sb.Append($"\n  조작 해제         ≈{t.ReleaseAt(opened):0.##}s (디졸브 끝 — 입력·실루엣 복귀, 카메라 플레이어 추적)");
-        sb.Append($"\n  연출 끝           ≈{t.EndAt(opened):0.##}s (UI·튜토리얼 S0 — S0 환영 자막은 그 뒤 착지 1초, 튜토리얼 값)");
+        sb.Append($"\n  조작 해제         ≈{t.ReleaseAt(opened):0.##}s (디졸브 끝 — 입력 복귀, 카메라 플레이어 추적)");
+        sb.Append($"\n  연출 끝           ≈{t.EndAt(opened):0.##}s (UI·실루엣 복귀·튜토리얼 S0 — S0 환영 자막은 그 뒤 착지 1초, 튜토리얼 값)");
         sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
         return sb.ToString();
     }

@@ -16,7 +16,7 @@ using UnityEngine.SceneManagement;
 /// 단계는 호스트 포드 Animator 의 클립 이벤트(<see cref="PodAnimEventRelay"/>)로 확정한다 — 날개 접기·다리 펴기 둘 다 끝 → 자유낙하, 해치 열기 끝 → (지연) → 디졸브.
 /// 이벤트가 빠진 클립은 끝까지 돈 것으로 대신하고 경고한다. 연출 중 끊긴 사람은 건너뛰고 남은 인원으로 계속. 착지점을 못 찾거나 시작 시각이 오지 않으면 즉시 해제(폴백, 경고 로그).</item>
 /// <item>전 피어(로컬 표시): 레터박스(진입 때부터 덮임 → 디졸브 시작에 걷힘)·UI 숨김(<see cref="PodDropScreenOverlay"/>, 매 프레임 다시 찾음),
-/// 카메라 거리 배율 줌 + 임시 추적(연출 높이 약간 위 고정 지점 → 급감속부터 포드 → 디졸브 끝에 플레이어), 디졸브 끝까지 플레이어 실루엣 끔(<see cref="PlayerSilhouetteTag.SetSuppressed"/>),
+/// 카메라 거리 배율 줌 + 임시 추적(연출 높이 약간 위 고정 지점 → 급감속부터 포드 → 디졸브 끝에 플레이어), 연출 끝까지 플레이어 실루엣 끔(<see cref="PlayerSilhouetteSuppression"/>, 할 일 230),
 /// 앞 구간 건너뛰기(할 일 198, 기본 켬)면 검은 화면 아래 포드가 연출 높이·날개 접힘/다리 펴짐 끝 자세로 시작해 곧바로 도착 페이드 인 → 자유낙하(끄면 아래 예전 흐름, 페이드 인은 접기·펴기 끝부터).
 /// 포드(<c>PF_DropPod_PodOnly_Combined_v001</c> 런타임 생성, 콜라이더 끔) 날개 펴진 채 빠른 낙하 → 급감속하며 날개 접기·다리 펴기 → 연출 높이(기본 5m)
 /// → 추진력 없는 자유낙하로 내리꽂힘(이펙트·흔들림) → 해치 열기 → 1초 뒤 디졸브(<see cref="PodDissolve"/>) → 포드 제거. 클립은 1배속 재생(<see cref="PodAnimatorDriver"/>) —
@@ -105,9 +105,9 @@ public sealed class MapPodArrival : NetworkBehaviour
     private bool _impactPlayed;
     private Transform _cameraFocus;          // 카메라 임시 추적 지점(로컬 빈 오브젝트) — 고정 지점 → 포드 위치
     private CameraTargetSwitcher _followCamera; // 임시 추적을 건 리그(null = 안 걸었다)
-    private bool _releasedLocal;             // 디졸브 끝 — 실루엣·카메라를 돌려줬다
-    // 이 피어에서 실루엣을 꺼 둔 플레이어 — 디졸브 끝·연출 정리 때 반드시 되켠다.
-    private readonly List<PlayerSilhouetteTag> _suppressedSilhouettes = new List<PlayerSilhouetteTag>();
+    private bool _releasedLocal;             // 디졸브 끝 — 카메라를 플레이어에게 돌려줬다
+    // 이 피어에서 꺼 둔 플레이어 실루엣 — 연출 끝(ClearLocal) 때 반드시 되켠다(할 일 230 — 예전엔 디졸브 끝).
+    private readonly PlayerSilhouetteSuppression _silhouettes = new PlayerSilhouetteSuppression();
 
     private bool ArrivalDoneLocal
     {
@@ -420,20 +420,19 @@ public sealed class MapPodArrival : NetworkBehaviour
             return;
         }
 
-        // 디졸브 끝 = 서버가 잠금을 푸는 순간(조작 복귀) — 같은 순간 실루엣을 되켜고 카메라를 플레이어로 넘긴다.
+        // 디졸브 끝 = 서버가 잠금을 푸는 순간(조작 복귀) — 같은 순간 카메라를 플레이어로 넘긴다. 실루엣은 연출 끝(ClearLocal)까지 꺼 둔다(할 일 230).
         if (started && !_releasedLocal && timeline.IsReleasedAt(elapsed, opened))
         {
             _releasedLocal = true;
-            RestoreSilhouettes();
             ReleaseCameraFollow();
-            Debug.Log($"[SceneFlow] {Tag} 디졸브 끝 — 조작·실루엣 복귀, 카메라 플레이어 추적");
+            Debug.Log($"[SceneFlow] {Tag} 디졸브 끝 — 조작 복귀, 카메라 플레이어 추적");
         }
 
         _localActive = true;
         UpdateOverlay(timeline, elapsed, deployed, opened);
         UpdateCamera(timeline, elapsed, deployed);
-        if (!_releasedLocal)
-            SuppressSilhouettes();
+        // 연출(레터박스·UI 숨김) 내내 모든 플레이어의 벽 뒤 실루엣을 끈다 — 로컬 시각 값. 늦게 스폰된 플레이어도 태그 수가 바뀌면 다시 찾아 잡는다.
+        _silhouettes.SuppressAll();
         UpdatePod(timeline, started, elapsed, deployed, opened);
         if (started)
             UpdateStagesServer(timeline, elapsed, deployed);
@@ -497,33 +496,6 @@ public sealed class MapPodArrival : NetworkBehaviour
             Destroy(_cameraFocus.gameObject);
             _cameraFocus = null;
         }
-    }
-
-    // 디졸브 끝까지 모든 플레이어의 벽 뒤 실루엣을 끈다(보스 엘리베이터와 같은 경로 — 로컬 시각 값). 스폰이 늦은 플레이어도 잡게 태그 수가 바뀌면 다시 찾는다.
-    private void SuppressSilhouettes()
-    {
-        if (_suppressedSilhouettes.Count == PlayerSilhouetteTag.ActiveCount)
-            return;
-
-        foreach (PlayerSilhouetteTag silhouette in FindObjectsByType<PlayerSilhouetteTag>(FindObjectsSortMode.None))
-        {
-            if (silhouette == null || !silhouette.IsSpawned || _suppressedSilhouettes.Contains(silhouette)) continue;
-            silhouette.SetSuppressed(true);
-            _suppressedSilhouettes.Add(silhouette);
-        }
-
-        _suppressedSilhouettes.RemoveAll(s => s == null);
-    }
-
-    /// <summary>꺼 둔 실루엣을 전부 되켠다. 멱등.</summary>
-    private void RestoreSilhouettes()
-    {
-        foreach (PlayerSilhouetteTag silhouette in _suppressedSilhouettes)
-        {
-            if (silhouette != null) silhouette.SetSuppressed(false);
-        }
-
-        _suppressedSilhouettes.Clear();
     }
 
     private void UpdatePod(PodDropMapTimeline timeline, bool started, double elapsed, double deployed, double opened)
@@ -637,7 +609,7 @@ public sealed class MapPodArrival : NetworkBehaviour
     {
         _localActive = false;
         if (_overlay != null) _overlay.Clear();
-        RestoreSilhouettes();
+        _silhouettes.RestoreAll();
         ReleaseCameraFollow();
 
         if (_heldCamera != null)
