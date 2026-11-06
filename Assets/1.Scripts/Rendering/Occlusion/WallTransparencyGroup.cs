@@ -195,7 +195,11 @@ namespace VeyTrace.Rendering.Occlusion
         /// <summary>에디터 시각화(Group Painter 의 "벽 그룹" 표시)가 읽는다. 런타임은 쓰지 않는다.</summary>
         public IReadOnlyList<Renderer> TargetRenderers => targetRenderers;
 
-        private bool IsTransparencyActive => _transparencyRequestCount > 0;
+        // 컷신(보스 B 승리 연출 — 할 일 200)이 끄면 구역 안이어도 설정값1(밖) 쪽으로 돌아간다. 요청 수는 그대로 세어 두므로 풀리면 원래대로.
+        private bool IsTransparencyActive => _transparencyRequestCount > 0 && !SuppressedByCinematic;
+
+        /// <summary>컷신이 구역 벽 투명화를 잠시 끈다(보스 B 승리 연출 — 할 일 200). 평소 false. 켠 쪽이 끝날 때 false 로 되돌린다.</summary>
+        public static bool SuppressedByCinematic { get; set; }
 
         // 상단 그라데이션 = 설정값1 ↔ 설정값2 를 _zoneBlend 로 보간한 것.
         // Opacity 는 항상 1 이다 — 구역 효과를 불투명도가 아니라 그라데이션으로 낸다.

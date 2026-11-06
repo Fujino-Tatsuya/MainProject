@@ -5,12 +5,15 @@ using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
 /// <summary>
-/// 보스 B 승리 연출 렌더링(PLAN-boss-victory-cinematic §5.3·C9) — 인물·보스 마스크(+스텐실) → 전체 화면 합성.
+/// 보스 B 승리 연출 렌더링(PLAN-boss-victory-cinematic §5.3·C9) — 인물·보스 마스크 + 반투명 전 색 복사 → 반투명 뒤 전체 화면 합성.
 ///
 /// 🔴 렌더러 에셋(PC_Renderer)에 기능을 등록하지 않는다. 연출 동안에만 <see cref="RenderPipelineManager.beginCameraRendering"/> 에서
-///    게임 카메라에 패스를 넣는다 → 평소 비용 0, 에셋 무수정.
-/// 주입 시점 = 투명 렌더 직전, 안개(BeforeRenderingTransparents) **다음** → 인물 명도에 반투명이 섞이지 않고,
-/// 핵심 타격 VFX·타이포(투명 패스)는 합성 **위**에 원색으로 그려진다(레이어: 배경 → 타이포 → 인물·보스 → 핵심 이펙트).
+///    게임 카메라에 패스 2개를 넣는다 → 평소 비용 0, 에셋 무수정.
+/// <list type="number">
+/// <item>준비(투명 렌더 직전, 안개 다음): 마스크(ID 텍스처) + 반투명 전 씬색 복사.</item>
+/// <item>합성(투명 렌더 직후): 인물·보스(무기 포함) 단색 · <b>반투명이 바꾼 픽셀(이펙트) 단색</b> · 배경 단색 틴트(할 일 200 D1·D2).</item>
+/// </list>
+/// 색 강도가 0 이면 두 패스 다 건너뛴다(단계 0.72 전엔 비용 0). 두 패스 사이 텍스처는 프레임 데이터(<see cref="VictoryFrameData"/>)로 넘긴다.
 /// </summary>
 public static class BossVictoryRender
 {
@@ -23,39 +26,38 @@ public static class BossVictoryRender
     public const uint BossMask = 1u << BossLayerIndex;
     public const uint AllMask = KillerMask | TeammateMask | BossMask;
 
-    /// <summary>인물 픽셀 스텐실 비트 — 마스크 셰이더가 쓰고 타이포 TMP 재질이 NotEqual 로 읽는다.</summary>
-    public const int StencilBit = 128;
-
     public const string MaskShaderName = "Hidden/Rendering/BossVictoryMask";
     public const string CompositeShaderName = "Hidden/Rendering/BossVictoryComposite";
 
+    const int CompositePassIndex = 0;
+    const int CopyPassIndex = 1;
+
     static readonly int IdVictoryId = Shader.PropertyToID("_VictoryId");
     static readonly int IdIdTex = Shader.PropertyToID("_VictoryIdTex");
+    static readonly int IdPreTex = Shader.PropertyToID("_VictoryPreTex");
     static readonly int IdWeight = Shader.PropertyToID("_Weight");
     static readonly int IdBgTint = Shader.PropertyToID("_BgTint");
-    static readonly int IdGlitch = Shader.PropertyToID("_Glitch");
-    static readonly int IdGlitchTime = Shader.PropertyToID("_GlitchTime");
-    static readonly int IdGlitchShift = Shader.PropertyToID("_GlitchShift");
-    static readonly int IdGlitchStreak = Shader.PropertyToID("_GlitchStreak");
-    static readonly int IdGlitchWash = Shader.PropertyToID("_GlitchWash");
     static readonly int IdExposure = Shader.PropertyToID("_Exposure");
     static readonly int IdGamma = Shader.PropertyToID("_Gamma");
-    static readonly int IdBgTop = Shader.PropertyToID("_BgTop");
-    static readonly int IdBgBottom = Shader.PropertyToID("_BgBottom");
+    static readonly int IdEffectGain = Shader.PropertyToID("_EffectGain");
+    static readonly int IdBgColor = Shader.PropertyToID("_BgColor");
     static readonly int IdKiller = Shader.PropertyToID("_KillerColor");
     static readonly int IdTeammate = Shader.PropertyToID("_TeammateColor");
     static readonly int IdBoss = Shader.PropertyToID("_BossColor");
+    static readonly int IdEffect = Shader.PropertyToID("_EffectColor");
     static readonly int IdShadow = Shader.PropertyToID("_ShadowColor");
 
     static Material _maskKiller, _maskTeammate, _maskBoss, _composite;
-    static VictoryPass _pass;
+    static PreparePass _prepare;
+    static CompositePass _compositePass;
+    static float _weight;
     static bool _hooked;
 
-    /// <summary>켜져 있는가(마스크·스텐실이 그려진다).</summary>
+    /// <summary>켜져 있는가.</summary>
     public static bool Active => _hooked;
 
     /// <summary>
-    /// 켠다(멱등). 셰이더가 없으면 false — 그땐 색 전환 없이 카메라·타이포만 돈다(호출측이 진단을 남긴다).
+    /// 켠다(멱등). 셰이더가 없으면 false — 그땐 색 전환 없이 카메라만 돈다(호출측이 진단을 남긴다).
     /// </summary>
     public static bool Enable(BossVictoryConfig cfg)
     {
@@ -71,14 +73,18 @@ public static class BossVictoryRender
         _composite = CoreUtils.CreateEngineMaterial(comp);
         ApplyColors(cfg);
         SetWeight(0f);
-        SetGlitch(0f, 0f);
 
-        _pass = new VictoryPass(_maskKiller, _maskTeammate, _maskBoss, _composite)
+        _prepare = new PreparePass(_maskKiller, _maskTeammate, _maskBoss, _composite)
         {
-            // 안개(BeforeRenderingTransparents)와 같은 이벤트에 +1 — 안개 다음에 돈다.
+            // 안개(BeforeRenderingTransparents)와 같은 이벤트에 +1 — 안개 다음, 반투명 전.
             renderPassEvent = RenderPassEvent.BeforeRenderingTransparents + 1,
         };
-        _pass.ConfigureInput(ScriptableRenderPassInput.Depth);
+        _prepare.ConfigureInput(ScriptableRenderPassInput.Depth);
+        _compositePass = new CompositePass(_composite)
+        {
+            // 반투명(이펙트·무기 궤적) 뒤 — 이펙트까지 단색으로(할 일 200 D2). 후처리(블룸 등)는 그 뒤.
+            renderPassEvent = RenderPassEvent.AfterRenderingTransparents,
+        };
 
         RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         _hooked = true;
@@ -91,7 +97,8 @@ public static class BossVictoryRender
         if (!_hooked) return;
         RenderPipelineManager.beginCameraRendering -= OnBeginCamera;
         _hooked = false;
-        _pass = null;
+        _prepare = null;
+        _compositePass = null;
         CoreUtils.Destroy(_maskKiller);
         CoreUtils.Destroy(_maskTeammate);
         CoreUtils.Destroy(_maskBoss);
@@ -99,39 +106,26 @@ public static class BossVictoryRender
         _maskKiller = _maskTeammate = _maskBoss = _composite = null;
     }
 
-    /// <summary>색 전환 강도(0 = 원래 색). 색·글리치가 둘 다 0 이면 합성 블릿 자체를 건너뛴다.</summary>
+    /// <summary>색 전환 강도(0 = 원래 색). 0 이면 두 패스 다 건너뛴다.</summary>
     public static void SetWeight(float weight)
     {
-        if (_composite != null) _composite.SetFloat(IdWeight, Mathf.Clamp01(weight));
-        if (_pass != null) _pass.Weight = Mathf.Clamp01(weight);
-    }
-
-    /// <summary>글리치(지직거림) 세기 0~1. <paramref name="time"/> 은 패턴 시드(초) — 24fps 로 끊어 바뀐다.</summary>
-    public static void SetGlitch(float glitch, float time)
-    {
-        if (_composite != null)
-        {
-            _composite.SetFloat(IdGlitch, Mathf.Clamp01(glitch));
-            _composite.SetFloat(IdGlitchTime, time);
-        }
-        if (_pass != null) _pass.Glitch = Mathf.Clamp01(glitch);
+        _weight = Mathf.Clamp01(weight);
+        if (_composite != null) _composite.SetFloat(IdWeight, _weight);
     }
 
     public static void ApplyColors(BossVictoryConfig cfg)
     {
         if (_composite == null || cfg == null) return;
         _composite.SetFloat(IdBgTint, Mathf.Clamp01(cfg.backgroundTint));
-        _composite.SetFloat(IdGlitchShift, cfg.glitchShift);
-        _composite.SetFloat(IdGlitchStreak, cfg.glitchStreak);
-        _composite.SetFloat(IdGlitchWash, cfg.glitchWash);
         _composite.SetFloat(IdExposure, Mathf.Max(0.01f, cfg.characterExposure));
         _composite.SetFloat(IdGamma, Mathf.Max(0.01f, cfg.characterGamma));
+        _composite.SetFloat(IdEffectGain, Mathf.Max(0f, cfg.effectDetectGain));
         // 기획 HEX 는 sRGB 최종색 — 합성은 linear 공간이라 바꿔 넣는다.
-        _composite.SetColor(IdBgTop, cfg.backgroundTop.linear);
-        _composite.SetColor(IdBgBottom, cfg.backgroundBottom.linear);
+        _composite.SetColor(IdBgColor, cfg.backgroundColor.linear);
         _composite.SetColor(IdKiller, cfg.killerColor.linear);
         _composite.SetColor(IdTeammate, cfg.teammateColor.linear);
         _composite.SetColor(IdBoss, cfg.bossColor.linear);
+        _composite.SetColor(IdEffect, cfg.effectColor.linear);
         _composite.SetColor(IdShadow, cfg.shadowColor.linear);
     }
 
@@ -141,8 +135,9 @@ public static class BossVictoryRender
         if (root == null) return;
         foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
         {
-            if (r == null || r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;   // 몸만 — 이펙트는 마스크에 넣지 않는다(C9)
-            if (r.GetComponentInParent<ExcludeFromSilhouette>(true) != null) continue;                         // 에임 쿼드 등 표시용
+            // 몸·무기만 — 이펙트는 합성이 "반투명이 바꾼 픽셀"로 따로 잡는다.
+            if (r == null || r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+            if (r.GetComponentInParent<ExcludeFromSilhouette>(true) != null) continue;   // 에임 쿼드 등 표시용
             if ((r.renderingLayerMask & bit) != 0) continue;
             r.renderingLayerMask |= bit;
             tagged.Add(r);
@@ -165,17 +160,50 @@ public static class BossVictoryRender
 
     static void OnBeginCamera(ScriptableRenderContext ctx, Camera cam)
     {
-        if (_pass == null || cam == null || cam.cameraType != CameraType.Game) return;
+        if (_prepare == null || _weight <= 0.0001f || cam == null || cam.cameraType != CameraType.Game) return;
         UniversalAdditionalCameraData data = cam.GetUniversalAdditionalCameraData();
         if (data == null || data.renderType != CameraRenderType.Base || data.scriptableRenderer == null) return;
-        data.scriptableRenderer.EnqueuePass(_pass);
+        data.scriptableRenderer.EnqueuePass(_prepare);
+        data.scriptableRenderer.EnqueuePass(_compositePass);
     }
 
-    // ------------------------------------------------------------------------
-    sealed class VictoryPass : ScriptableRenderPass
+    static RenderTextureDescriptor ColorDesc(UniversalCameraData cameraData)
     {
-        static readonly Vector4 FullScreenScaleBias = new Vector4(1f, 1f, 0f, 0f);
+        RenderTextureDescriptor desc = cameraData.cameraTargetDescriptor;
+        desc.depthBufferBits = 0;
+        desc.msaaSamples = 1;
+        return desc;
+    }
 
+    static readonly Vector4 FullScreenScaleBias = new Vector4(1f, 1f, 0f, 0f);
+
+    // ------------------------------------------------------------------------
+    /// <summary>준비 패스 → 합성 패스로 넘기는 이번 프레임 텍스처. 프레임 번호로 다른 프레임 값을 거른다.</summary>
+    sealed class VictoryFrameData : ContextItem
+    {
+        public TextureHandle idTex;
+        public TextureHandle preTex;
+        public int frame = -1;
+
+        public override void Reset()
+        {
+            idTex = TextureHandle.nullHandle;
+            preTex = TextureHandle.nullHandle;
+            frame = -1;
+        }
+    }
+
+    class BlitData
+    {
+        public Material material;
+        public TextureHandle source;
+        public TextureHandle idTex;
+        public TextureHandle preTex;
+    }
+
+    // 1) 마스크 + 반투명 전 색 복사.
+    sealed class PreparePass : ScriptableRenderPass
+    {
         // 원본 셰이더의 패스 태그로 대상 렌더러를 고른다(실루엣과 같은 셋 — Flat Kit 본체는 UniversalForwardOnly).
         static readonly List<ShaderTagId> ShaderTags = new()
         {
@@ -185,28 +213,19 @@ public static class BossVictoryRender
         };
 
         readonly Material _maskKiller, _maskTeammate, _maskBoss, _composite;
-        public float Weight;
-        public float Glitch;
 
         class MaskData
         {
             public RendererListHandle killer, teammate, boss;
         }
 
-        class CompositeData
-        {
-            public Material material;
-            public TextureHandle source;
-            public TextureHandle idTex;
-        }
-
-        public VictoryPass(Material killer, Material teammate, Material boss, Material composite)
+        public PreparePass(Material killer, Material teammate, Material boss, Material composite)
         {
             _maskKiller = killer;
             _maskTeammate = teammate;
             _maskBoss = boss;
             _composite = composite;
-            profilingSampler = new ProfilingSampler("BossVictory");
+            profilingSampler = new ProfilingSampler("BossVictoryPrepare");
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -215,6 +234,8 @@ public static class BossVictoryRender
             UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
             UniversalRenderingData renderingData = frameData.Get<UniversalRenderingData>();
             UniversalLightData lightData = frameData.Get<UniversalLightData>();
+            VictoryFrameData shared = frameData.GetOrCreate<VictoryFrameData>();
+            shared.frame = -1;
 
             if (resourceData.isActiveTargetBackBuffer) return;
             TextureHandle color = resourceData.activeColorTexture;
@@ -228,7 +249,7 @@ public static class BossVictoryRender
             // 매 프레임 지운다(일부 픽셀에만 그리는 마스크 — 안 지우면 잔상).
             TextureHandle idTex = UniversalRenderer.CreateRenderGraphTexture(renderGraph, idDesc, "_BossVictoryId", true, FilterMode.Point);
 
-            // 1) 마스크 — 깊이 텍스처와 선형 거리 비교(보이는 표면만, 여유 8cm — 하드웨어 LEqual 은 이음새가 점선으로 빠졌다) · 스텐실 128. 타이포가 이 스텐실을 읽으므로 강도 0 이어도 그린다.
+            // 마스크 — 깊이 텍스처와 선형 거리 비교(보이는 표면만, 여유 8cm — 하드웨어 LEqual 은 이음새가 점선으로 빠졌다).
             using (var builder = renderGraph.AddRasterRenderPass<MaskData>("BossVictoryMask", out MaskData data))
             {
                 data.killer = List(renderGraph, renderingData, cameraData, lightData, _maskKiller, KillerMask);
@@ -242,7 +263,7 @@ public static class BossVictoryRender
                     builder.UseTexture(resourceData.cameraDepthTexture, AccessFlags.Read);
                 builder.UseAllGlobalTextures(true);
                 builder.SetRenderAttachment(idTex, 0, AccessFlags.Write);
-                builder.SetRenderAttachmentDepth(depth, AccessFlags.ReadWrite);   // 스텐실을 카메라 깊이·스텐실에 남긴다
+                builder.SetRenderAttachmentDepth(depth, AccessFlags.ReadWrite);   // 마스크 셰이더의 스텐실 기록(옛 타이포용 — 지금 읽는 곳 없음)
                 builder.SetRenderFunc(static (MaskData d, RasterGraphContext ctx) =>
                 {
                     // 보스 → 팀원 → 막타 순 — 겹치면 같은 깊이 판정이라 앞에 있는 쪽만 남는다.
@@ -252,30 +273,21 @@ public static class BossVictoryRender
                 });
             }
 
-            if (Weight <= 0.0001f && Glitch <= 0.0001f) return;   // 색·글리치 둘 다 없음 — 합성 블릿 생략
-
-            // 2) 합성 — source → dest, 카메라 컬러를 dest 로 넘긴다(안개와 같은 방식).
-            RenderTextureDescriptor desc = cameraData.cameraTargetDescriptor;
-            desc.depthBufferBits = 0;
-            desc.msaaSamples = 1;
-            TextureHandle dest = UniversalRenderer.CreateRenderGraphTexture(renderGraph, desc, "_BossVictoryColor", false, FilterMode.Bilinear);
-
-            using (var builder = renderGraph.AddRasterRenderPass<CompositeData>("BossVictoryComposite", out CompositeData data))
+            // 반투명 전 씬색 복사 — 합성이 "반투명(이펙트)이 바꾼 픽셀"을 이것과의 차이로 찾는다.
+            TextureHandle preTex = UniversalRenderer.CreateRenderGraphTexture(renderGraph, ColorDesc(cameraData), "_BossVictoryPre", false, FilterMode.Point);
+            using (var builder = renderGraph.AddRasterRenderPass<BlitData>("BossVictoryCopyPre", out BlitData data))
             {
                 data.material = _composite;
                 data.source = color;
-                data.idTex = idTex;
                 builder.UseTexture(color, AccessFlags.Read);
-                builder.UseTexture(idTex, AccessFlags.Read);
-                builder.SetRenderAttachment(dest, 0, AccessFlags.Write);
-                builder.SetRenderFunc(static (CompositeData d, RasterGraphContext ctx) =>
-                {
-                    d.material.SetTexture(IdIdTex, d.idTex);
-                    Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, d.material, 0);
-                });
+                builder.SetRenderAttachment(preTex, 0, AccessFlags.Write);
+                builder.SetRenderFunc(static (BlitData d, RasterGraphContext ctx) =>
+                    Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, d.material, CopyPassIndex));
             }
 
-            resourceData.cameraColor = dest;
+            shared.idTex = idTex;
+            shared.preTex = preTex;
+            shared.frame = Time.frameCount;
         }
 
         static RendererListHandle List(RenderGraph rg, UniversalRenderingData renderingData, UniversalCameraData cameraData,
@@ -286,6 +298,53 @@ public static class BossVictoryRender
             drawing.overrideMaterialPassIndex = 0;
             var filtering = new FilteringSettings(RenderQueueRange.opaque, -1, layerMask);
             return rg.CreateRendererList(new RendererListParams(renderingData.cullResults, drawing, filtering));
+        }
+    }
+
+    // 2) 합성 — source → dest, 카메라 컬러를 dest 로 넘긴다(안개와 같은 방식).
+    sealed class CompositePass : ScriptableRenderPass
+    {
+        readonly Material _composite;
+
+        public CompositePass(Material composite)
+        {
+            _composite = composite;
+            profilingSampler = new ProfilingSampler("BossVictoryComposite");
+        }
+
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+        {
+            if (!frameData.Contains<VictoryFrameData>()) return;
+            VictoryFrameData shared = frameData.Get<VictoryFrameData>();
+            if (shared.frame != Time.frameCount || !shared.idTex.IsValid() || !shared.preTex.IsValid()) return;
+            shared.frame = -1;
+
+            UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
+            UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
+            if (resourceData.isActiveTargetBackBuffer) return;
+            TextureHandle color = resourceData.activeColorTexture;
+            if (!color.IsValid()) return;
+
+            TextureHandle dest = UniversalRenderer.CreateRenderGraphTexture(renderGraph, ColorDesc(cameraData), "_BossVictoryColor", false, FilterMode.Bilinear);
+            using (var builder = renderGraph.AddRasterRenderPass<BlitData>("BossVictoryComposite", out BlitData data))
+            {
+                data.material = _composite;
+                data.source = color;
+                data.idTex = shared.idTex;
+                data.preTex = shared.preTex;
+                builder.UseTexture(color, AccessFlags.Read);
+                builder.UseTexture(shared.idTex, AccessFlags.Read);
+                builder.UseTexture(shared.preTex, AccessFlags.Read);
+                builder.SetRenderAttachment(dest, 0, AccessFlags.Write);
+                builder.SetRenderFunc(static (BlitData d, RasterGraphContext ctx) =>
+                {
+                    d.material.SetTexture(IdIdTex, d.idTex);
+                    d.material.SetTexture(IdPreTex, d.preTex);
+                    Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, d.material, CompositePassIndex);
+                });
+            }
+
+            resourceData.cameraColor = dest;
         }
     }
 }

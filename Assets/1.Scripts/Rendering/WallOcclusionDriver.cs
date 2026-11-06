@@ -22,6 +22,12 @@ public sealed class WallOcclusionDriver : MonoBehaviour
     private bool isActive;
     private bool loggedInactiveReason;
 
+    /// <summary>
+    /// 컷신이 벽 가림 처리를 잠시 끈다(보스 B 승리 연출 — 할 일 200). 켜져 있는 동안 셰이더 전역을 꺼 벽이 원래 불투명도로 그려진다.
+    /// 평소 플레이는 false 그대로. 켠 쪽이 끝날 때 false 로 되돌린다.
+    /// </summary>
+    public static bool SuppressedByCinematic;
+
     public WallOcclusionSettings Settings => settings;
 
     public void SetSettings(WallOcclusionSettings newSettings)
@@ -48,6 +54,13 @@ public sealed class WallOcclusionDriver : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (SuppressedByCinematic)
+        {
+            WallOcclusionGlobals.Disable();
+            isActive = false;
+            return;
+        }
+
         CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
         Camera gameplayCamera = switcher != null ? switcher.GameplayCamera : null;
         Transform followTarget = switcher != null ? switcher.CurrentFollowTarget : null;

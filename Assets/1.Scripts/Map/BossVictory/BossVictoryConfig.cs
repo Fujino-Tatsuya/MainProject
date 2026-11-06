@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -33,97 +32,43 @@ public sealed class BossVictoryConfig : ScriptableObject
     [Tooltip("방위각 후보(도, 막타 뒤 기준). 음수 = 카메라가 막타 오른쪽 뒤 → 막타가 화면 왼쪽. 앞에 있을수록 먼저 본다(같은 점수면 먼저 것).")]
     public float[] yawCandidates = { -25f, -35f, -15f, -45f, -55f, -5f, 15f, 30f };
 
-    [Header("벽 밖 방지(할 일 234)")]
-    [Tooltip("켜면 연출 카메라(24° 정지·32° 종료 구도)를 보스방 벽(InvisibleBoundaries 안쪽 면) 안에 둔다. 벽 안 후보가 없으면 주시점 쪽으로 당긴다. 평소 카메라는 무관.")]
-    public bool keepCameraInsideRoom = true;
-    [Tooltip("카메라가 벽 안쪽 면에서 떨어질 최소 거리(m). 카메라 near·벽 두께감 때문에 약간 띄운다.")]
-    [Min(0f)] public float wallMargin = 1f;
+    [Header("추가 연출 구간(할 일 200 — 타임라인 맨 앞, 아직 내용 없음)")]
+    [Tooltip("처치 확정 직후 '추가 연출'이 차지할 초. 이 구간이 끝난 뒤에 슬로모션·카메라 하강·색·보스 사망 애니가 시작되고, " +
+             "서버 사망 대기·결과 하한·안전망도 같은 만큼 밀린다. 0 = 예전 타임라인 그대로. 서버가 처치 순간 값을 복제 상태에 담는다(모든 피어 동일). " +
+             "연출을 꽂을 곳 = BossVictoryPresentation.PreludeStarted / PreludeEnded 이벤트.")]
+    [Min(0f)] public float preludeSeconds = 0f;
 
-    [Header("색(기획 v02 §4 — 최종 화면 목표색, sRGB)")]
-    public Color backgroundTop = new Color32(0xED, 0x9B, 0x25, 0xFF);
-    public Color backgroundBottom = new Color32(0xD6, 0x7A, 0x16, 0xFF);
+    [Header("색(최종 화면 목표색, sRGB)")]
+    [Tooltip("배경 틴트 단색(할 일 200 D1 — 예전 위/아래 그라데이션 두 색 대신). #EAAD70.")]
+    public Color backgroundColor = new Color32(0xEA, 0xAD, 0x70, 0xFF);
     public Color killerColor = new Color32(0xE9, 0xE9, 0xDF, 0xFF);
     public Color teammateColor = new Color32(0xC8, 0xD1, 0xD1, 0xFF);
     public Color bossColor = new Color32(0x4D, 0x56, 0x60, 0xFF);
+    [Tooltip("무기 궤적·이펙트 등 반투명으로 그려진 픽셀의 단색 밝은 쪽(할 일 200 D2 — 인물뿐 아니라 이펙트까지 단색).")]
+    public Color effectColor = new Color32(0xE9, 0xE9, 0xDF, 0xFF);
     public Color shadowColor = new Color32(0x12, 0x17, 0x1C, 0xFF);
-    [Tooltip("배경 주황 틴트 최대 강도(0 = 원래 화면, 1 = 단색 주황). 단색은 빼고 배경이 비치게 — 경석 10-27: 화면 캡처(약 40%)보다 15% 약하게 = 0.34.")]
+    [Tooltip("배경 주황 틴트 최대 강도(0 = 원래 화면, 1 = 단색 주황). 단색은 빼고 배경이 비치게 — 경석 10-27: 0.34.")]
     [Range(0f, 1f)] public float backgroundTint = 0.34f;
-    [Tooltip("⚠️ 미사용(10-27 틴트로 대체). 예전: 단색 배경에 남기던 환경 명암.")]
-    [Range(0f, 1f)] public float backgroundDetail = 0.35f;
-    [Tooltip("인물 명도 노출(조명 결과 명도에 곱한다). HDR 밝은 부분이 뭉치면 내린다.")]
-    public float characterExposure = 1.6f;
-    [Tooltip("인물 명도 곡선 지수(1 = 그대로, >1 = 어두운 쪽을 더 어둡게).")]
+    [Tooltip("인물·이펙트 명도 노출(조명 결과 명도에 곱한다). 할 일 200 D2: 1.6 → 1.75(아주 약간 밝게). HDR 밝은 부분이 뭉치면 내린다.")]
+    public float characterExposure = 1.75f;
+    [Tooltip("인물·이펙트 명도 곡선 지수(1 = 그대로, >1 = 어두운 쪽을 더 어둡게).")]
     public float characterGamma = 1.1f;
+    [Tooltip("반투명 패스(이펙트·무기 궤적)가 바꾼 색 차이를 이펙트 픽셀로 보는 배율 — 클수록 옅은 이펙트도 단색이 된다.")]
+    [Min(0f)] public float effectDetectGain = 6f;
 
-    [Header("글리치(지직거림 — 레퍼런스 1:30~1:33, 경석 10-27)")]
-    [Tooltip("터지는 구간 (시작초, 끝초, 세기 0~1). 기본: 막타~카메라 하강 · 카메라 멈춤 · 다시 움직임.")]
-    public Vector3[] glitchBursts =
-    {
-        new Vector3(0.12f, 0.72f, 0.85f),
-        new Vector3(0.72f, 0.90f, 1.00f),
-        new Vector3(2.00f, 2.14f, 0.65f),
-    };
-    [Tooltip("가로 띠가 좌우로 밀리는 최대 거리(화면 폭 비율).")]
-    public float glitchShift = 0.18f;
-    [Tooltip("가로 잔상(스트릭) 길이 배수.")]
-    public float glitchStreak = 1f;
-    [Tooltip("회색으로 밝게 날아가는 정도(0~1).")]
-    [Range(0f, 1f)] public float glitchWash = 0.85f;
-    [Tooltip("구간 안에서 세기가 프레임마다 흔들리는 정도(0 = 일정, 1 = 크게 깜빡임).")]
-    [Range(0f, 1f)] public float glitchFlicker = 0.5f;
-
-    [Header("외곽선(Flat Kit — 경석 10-27: 몬스터 외곽선이 너무 진하다)")]
-    [Tooltip("연출 동안 보스 외곽선 두께 배수(1 = 그대로). 보스 디졸브가 시작되면 원래대로.")]
-    [Range(0f, 1f)] public float bossOutlineScale = 0.35f;
-    [Tooltip("연출 동안 보스 외곽선 색(깔끔한 짙은 선).")]
-    public Color bossOutlineColor = new Color32(0x12, 0x17, 0x1C, 0xFF);
-    [Tooltip("연출 동안 플레이어 외곽선 두께 배수(1 = 그대로).")]
-    [Range(0f, 1f)] public float characterOutlineScale = 1f;
-
-    [Header("슬로모션(경석 10-27 — 0.12–2.00 완전 정지 대신)")]
-    [Tooltip("0.12–2.00 동안 인물·보스·핵심 VFX 재생 배율(0 = 완전 정지). 보스 사망 연출 서버 대기도 같은 배율로 센다.")]
+    [Header("슬로모션(경석 10-27 — 완전 정지 대신)")]
+    [Tooltip("슬로모션 구간(단계 0.12–2.00) 동안 인물·보스 재생 배율(0 = 완전 정지). 보스 사망 연출 서버 대기도 같은 배율로 센다.")]
     [Range(0f, 1f)] public float slowMotionScale = 0.1f;
 
-    [Header("타이포(기획 v02 §5)")]
-    public string typoText = "BOSS DOWN";
-    [Tooltip("0.92 부터 불투명도 0 → 1 에 걸리는 초(기획 0.16 — 경석 10-27 '너무 빠르다').")]
-    [Min(0.01f)] public float typoFadeInSeconds = 0.4f;
-    [Tooltip("0.92 부터 오른쪽에서 안착·두 띠 정렬에 걸리는 초(기획 0.15).")]
-    [Min(0.01f)] public float typoSettleSeconds = 0.45f;
-    [Tooltip("비우면 TMP 기본 폰트.")]
-    public TMP_FontAsset typoFont;
-    [Tooltip("글자 폭 = 화면 폭 × 이 값(1.09 = 양 끝 일부 잘림).")]
-    public float typoWidthRatio = 1.09f;
-    [Tooltip("글자 띠 중심 높이 — 화면 위에서부터 비율.")]
-    [Range(0f, 1f)] public float typoCenterFromTop = 0.51f;
-    [Tooltip("글자 높이 = 화면 높이 × 이 값(폭 비율과 함께 맞춘다 — 둘 중 작은 쪽).")]
-    public float typoMaxHeightRatio = 0.26f;
-    [Tooltip("기울임(TMP 이탤릭) + 약한 회전(도, 반시계 +).")]
-    public float typoRotation = 4f;
-    [Tooltip("진입 시작 때 오른쪽으로 밀린 거리 — 화면 폭 비율.")]
-    public float typoEnterOffset = 0.35f;
-    [Tooltip("가로로 잘린 얇은 두 띠의 어긋남 — 화면 폭 비율(진입 끝에 0).")]
-    public float typoBandOffset = 0.06f;
-    [Tooltip("두 띠의 세로 범위(글자 높이 기준 0 = 아래, 1 = 위).")]
-    public Vector2 typoBandA = new Vector2(0.30f, 0.38f);
-    public Vector2 typoBandB = new Vector2(0.62f, 0.70f);
-    [Tooltip("좌 → 우 4색(청록 → 보라 → 분홍 → 노랑).")]
-    public Color[] typoGradient =
-    {
-        new Color32(0x2C, 0xC9, 0xC6, 0xFF),
-        new Color32(0x8B, 0x5C, 0xE0, 0xFF),
-        new Color32(0xF2, 0x6B, 0xAE, 0xFF),
-        new Color32(0xF6, 0xD3, 0x3C, 0xFF),
-    };
-    [Tooltip("얇은 밝은 테두리.")]
-    public Color typoOutlineColor = new Color32(0xFF, 0xF9, 0xE6, 0xFF);
-    [Range(0f, 1f)] public float typoOutlineWidth = 0.22f;
-    [Tooltip("우하단 짙은 그림자.")]
-    public Color typoShadowColor = new Color32(0x12, 0x17, 0x1C, 0xD0);
-    public Vector2 typoShadowOffset = new Vector2(0.7f, -0.7f);
+    [Header("벽 숨김(할 일 200 추가 — 연출 카메라가 벽에 가리지 않게)")]
+    [Tooltip("앞면(방 안쪽 면)이 이 값보다 확실히 카메라를 향한 벽만 남긴다 — dot(벽 안쪽 법선, 카메라 반대 시선) ≤ 값이면 렌더러를 끈다. " +
+             "0 = 뒷면만 끔, 0.3 ≈ 시선과 72° 넘게 비스듬한 옆면도 끔. 카메라가 벽 바깥에 있으면 항상 끈다.")]
+    [Range(-1f, 1f)] public float wallFacingThreshold = 0.3f;
+    [Tooltip("벽 후보를 찾는 반경(m, 타격점 기준). 다른 구역 벽은 건드리지 않는다.")]
+    [Min(1f)] public float wallSearchRadius = 40f;
 
     [Header("핵심 타격 이펙트(Q2 — 승리 전용, 타격점에 새로 띄움)")]
-    [Tooltip("파티클 프리팹. 0.12초에 멈추고 2.00초에 재개, 3.20초 뒤 지운다. 비우면 없음.")]
+    [Tooltip("할 일 200 F: 비워 둠(나중에 추가 예정). 넣으면 슬로모션 시작에 늦추고 끝에 재개, 연출 단계 끝에 지운다.")]
     public GameObject hitVfxPrefab;
     public float hitVfxScale = 1.5f;
 
@@ -151,11 +96,8 @@ public sealed class BossVictoryConfig : ScriptableObject
         return _cached;
     }
 
-    /// <summary>구도 파라미터. <paramref name="room"/> = 보스방 경계(없으면 default) — <see cref="keepCameraInsideRoom"/> 이 꺼지면 버린다.</summary>
-    public BossVictoryRules.Framing ToFraming(BossVictoryRules.Arena room = default) => new BossVictoryRules.Framing
+    public BossVictoryRules.Framing ToFraming() => new BossVictoryRules.Framing
     {
-        Room = keepCameraInsideRoom ? room : default,
-        WallMargin = wallMargin,
         FinalPitch = finalPitch,
         EndPitch = endPitch,
         Fov = fov,

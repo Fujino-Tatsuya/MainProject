@@ -157,7 +157,7 @@ public static class UiStrings
     public static readonly UiString TitleExit = new UiString("UI.Title.Exit", "나가기", TitleWhere + "나가기 버튼");
 
     // 보스 등장 시네마틱(PLAN-boss-encounter-cutscene) — 스킵 버튼. en 초안 = Skip(localization-en-draft.md).
-    // 보스 처치 연출 타이포(BossVictoryPresentation) — 행이 없으면 BossVictoryConfig.typoText(BOSS DOWN)
+    // ⚠️ 미사용 — 할 일 200 E 로 보스 처치 연출 타이포(BOSS DOWN)를 뺐다. 시트 행 정리 전까지 키만 남긴다.
     public static readonly UiString BossVictoryTypo = new UiString("UI.BossVictory.Typo", "BOSS DOWN", "BossVictoryPresentation — 보스 처치 타이포(행이 없으면 BossVictoryConfig.typoText)(코드)");
     public static readonly UiString BossIntroSkip = new UiString("UI.BossIntro.Skip", "건너뛰기", "보스 등장 연출 — 스킵 버튼 문구(Space 1초 홀드, BossIntroPresentation) · 타이틀 접근 Esc 건너뛰기(TitleSkipHint)도 같이 씀");
     // 그만두기 팝업(PLAN-settings-ddol, 경석 10-22) — 오른쪽 선택 = 타이틀(로비 자리). 호스트는 다른 플레이어도 끊긴다는 경고.

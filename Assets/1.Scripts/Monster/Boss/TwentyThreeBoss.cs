@@ -6746,17 +6746,6 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             ? c.radius * Mathf.Max(Mathf.Abs(c.transform.lossyScale.x), Mathf.Abs(c.transform.lossyScale.z))
             : 1.5f;
 
-    /// <summary>
-    /// 보스방 바닥 사각형(벽 안쪽 면, <paramref name="root"/> 로컬 X·Z). 경계가 없으면 거짓. 승리 연출 카메라가 벽 안에 머물도록 읽는다(할 일 234).
-    /// </summary>
-    public bool TryGetArenaRect(out Transform root, out float minX, out float maxX, out float minZ, out float maxZ)
-    {
-        bool ok = ResolveArena();
-        root = ok ? _arenaRoot : null;
-        minX = _arenaMinX; maxX = _arenaMaxX; minZ = _arenaMinZ; maxZ = _arenaMaxZ;
-        return ok;
-    }
-
     // 🔴 경계 원본 = 저작된 `InvisibleBoundaries/Boundary_*` 박스의 **안쪽 면**(BossRoomAuthoring) — 투명벽 판정과 일치(Codex C7).
     // 🔴 이름(XMin…)은 **방 로컬 축** 기준이다. 존은 90° 단위로 돌아 배치되므로 월드 AABB(b.bounds)로 읽으면
     //    90°/270° 방에서 X·Z 가 뒤바뀌어 경계가 뒤집히고, 넉백 첫 틱에 벽 판정이 나서 반동만 남는다(09-29 확인).
@@ -6920,11 +6909,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         return _victoryHitValid;
     }
 
-    /// <summary>[서버] 승리 연출 슬로모션 구간(0.12~2.00)엔 사망 클립·디졸브 대기가 클라 애니와 같은 배율로만 흐른다(C6, 경석 10-27).</summary>
+    /// <summary>[서버] 승리 연출 중 사망 클립 대기가 클라 애니와 같은 배율로만 흐른다 — 추가 연출 구간 0 · 슬로모션 구간 slowMotionScale(C6, 경석 10-27 · 할 일 200 G).</summary>
     protected override float DeathPresentationTimeScale =>
-        BossEncounterDirector.Instance != null && BossEncounterDirector.Instance.IsVictoryWorldFrozenFor(this)
-            ? BossVictoryConfig.Load().slowMotionScale
-            : 1f;
+        BossEncounterDirector.Instance != null ? BossEncounterDirector.Instance.VictoryDeathTimeScaleFor(this) : 1f;
+
+    /// <summary>[서버] 보스 B 승리 연출이면 디졸브·디스폰 없이 사망 자세로 남는다 — 사망 클립 끝 + 대기 뒤 사망 완료만 알린다(할 일 200 G).</summary>
+    protected override bool KeepsCorpseOnDeath =>
+        BossEncounterDirector.Instance != null && BossEncounterDirector.Instance.IsVictoryBoss(this);
 
     // 승리 연출 대상(보스 B)일 수 있는 건 23호뿐 — 대기를 프레임 단위로 센다. 연출이 없으면 멈춤이 0 이라 결과는 같다.
     protected override bool CanPauseDeathPresentation => true;

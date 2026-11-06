@@ -2,25 +2,33 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 보스 B 승리 연출(BOSS DOWN — PLAN-boss-victory-cinematic) 순수 규칙. 타임라인 경계·보간 곡선·서버 구도 계산.
-/// 상태가 없어 EditMode 로 경계를 고정한다. 시간은 전부 <b>처치 확정 시점 t=0 기준 실제 경과 초</b>(기획 v02 §1).
+/// 보스 B 승리 연출(PLAN-boss-victory-cinematic) 순수 규칙. 타임라인 경계·보간 곡선·서버 구도 계산·연출 벽 숨김 판정.
+/// 상태가 없어 EditMode 로 경계를 고정한다.
+/// <para>
+/// 🔴 시간 두 가지(할 일 200): <b>경과 e</b> = 처치 확정 시점부터 실제 초. <b>단계 시각 t</b> = e − 추가 연출 구간 길이(<see cref="StageTime"/>).
+/// 아래 상수·함수는 전부 단계 시각 t 기준이다 — 추가 연출 구간(기본 0초)만큼 슬로우·카메라 하강·색·서버 대기·결과 하한이 함께 밀린다.
+/// 추가 연출 구간 동안 t &lt; 0 이다.
+/// </para>
 /// </summary>
 public static class BossVictoryRules
 {
-    // ── 타임라인(기획 v02 §1·§3·§4·§5) ──
-    public const float FreezeStart = 0.12f;      // 02 히트스톱 — 인물·보스·핵심 VFX 정지
-    public const float DescendStart = 0.22f;     // 03 카메라 하강
-    public const float DescendEnd = 0.72f;       // 04 정지 구도 완성
-    public const float ColorInEnd = 0.80f;       // 0.72–0.80 색 0 → 1
-    public const float TypoStart = 0.92f;        // 05 타이포 진입
-    public const float TypoSlideEnd = 1.07f;     // 0.92–1.07 왼쪽으로 안착 · 두 띠 정렬
-    public const float TypoFadeInEnd = 1.08f;    // 0.92–1.08 불투명도 0 → 1
-    public const float FreezeEnd = 2.00f;        // 06 정지 해제 · 붕괴 재개
-    public const float ColorOutEnd = 2.24f;      // 2.00–2.24 색 1 → 0
-    public const float End = 3.20f;              // 타이포 소거 끝 · 연출 상태 정리
+    // ── 타임라인(단계 시각 t — 기획 v02 §1·§3·§4) ──
+    public const float FreezeStart = 0.12f;      // 슬로모션 시작(인물·보스)
+    public const float DescendStart = 0.22f;     // 카메라 하강
+    public const float DescendEnd = 0.72f;       // 정지 구도 완성
+    public const float ColorInEnd = 0.80f;       // 0.72–0.80 색 0 → 1(이후 씬 끝까지 유지 — 할 일 200 D3)
+    public const float MidCueAt = 0.92f;         // 옛 타이포 진입 시각 — 사운드 키 sfxTypo 자리만 남김(할 일 200 E: 글자 제거)
+    public const float FreezeEnd = 2.00f;        // 슬로모션 해제 · 붕괴 재개 · 서버 정식 잠금
+    public const float End = 3.20f;              // 연출 단계 끝 = 결과 화면 하한
 
-    /// <summary>정지 구간 길이(1.88초) — 서버 사망 연출(클립·디졸브)이 이만큼 늦게 끝난다.</summary>
+    /// <summary>슬로모션 구간 길이(1.88초).</summary>
     public const float FreezeDuration = FreezeEnd - FreezeStart;
+
+    /// <summary>경과 e → 단계 시각 t(추가 연출 구간만큼 뺀다). 추가 연출 구간 동안 음수.</summary>
+    public static float StageTime(float elapsed, float preludeSeconds) => elapsed - Mathf.Max(0f, preludeSeconds);
+
+    /// <summary>추가 연출 구간(할 일 200 — 아직 내용 없음, 길이만) 안인가(단계 시각 t &lt; 0).</summary>
+    public static bool IsPrelude(float t) => t < 0f;
 
     /// <summary>기획 v02 §2 이동 곡선 <c>u²(3−2u)</c>. 0~1 밖은 잘라 낸다.</summary>
     public static float Smooth(float u)
@@ -33,11 +41,8 @@ public static class BossVictoryRules
     public static float SmoothBetween(float t, float a, float b) =>
         b <= a ? (t >= b ? 1f : 0f) : Smooth((t - a) / (b - a));
 
-    /// <summary>인물·보스·핵심 VFX 를 슬로모션으로 늦추는 구간인가(0.12 ≤ t &lt; 2.00). 완전 정지가 아니다(경석 10-27).</summary>
+    /// <summary>인물·보스를 슬로모션으로 늦추는 구간인가(0.12 ≤ t &lt; 2.00). 완전 정지가 아니다(경석 10-27).</summary>
     public static bool IsWorldFrozen(float t) => t >= FreezeStart && t < FreezeEnd;
-
-    /// <summary>색이 원래로 돌아가는 시간(초) — 보스 디졸브가 시작된 순간부터.</summary>
-    public const float ColorOutSeconds = ColorOutEnd - FreezeEnd;
 
     /// <summary>시작 카메라 → 24° 최종 구도 보간 비율(0.22–0.72).</summary>
     public static float DescendBlend(float t) => SmoothBetween(t, DescendStart, DescendEnd);
@@ -46,43 +51,24 @@ public static class BossVictoryRules
     public static float RiseBlend(float t) => SmoothBetween(t, FreezeEnd, End);
 
     /// <summary>
-    /// 색 전환 강도(0 = 원래 색, 1 = 주황 배경 틴트·회색 인물). 0.72–0.80 들어오고, <b>보스 디졸브가 시작될 때까지 유지</b>한 뒤
-    /// 0.24초에 원래 색으로(경석 10-27 — 기획 v02 의 2.00–2.24 원복 대신). <paramref name="dissolveAt"/> = 디졸브 시작 경과(초), 아직이면 +∞.
+    /// 색 전환 강도(0 = 원래 색, 1 = 주황 배경 틴트·단색 인물). 0.72–0.80 들어오고 <b>씬이 끝날 때까지 유지</b>한다
+    /// (할 일 200 D3 — 보스 디졸브에 맞춰 원래 색으로 돌아가던 연출 제거).
     /// </summary>
-    public static float ColorWeight(float t, float dissolveAt = float.PositiveInfinity)
+    public static float ColorWeight(float t) => t < DescendEnd ? 0f : SmoothBetween(t, DescendEnd, ColorInEnd);
+
+    /// <summary>
+    /// [서버] 보스 사망 표현(사망 클립 검출·클립 대기)이 지금 흐르는 배율. 추가 연출 구간(t &lt; 0) = 0(사망 애니는 그 뒤에 — 할 일 200 G),
+    /// 슬로모션 구간 = <paramref name="slowScale"/>, 그 밖 = 1. 클라 보스 Animator 도 같은 배율을 쓴다.
+    /// </summary>
+    public static float DeathTimeScale(float t, float slowScale)
     {
-        if (t < DescendEnd) return 0f;
-        float w = SmoothBetween(t, DescendEnd, ColorInEnd);
-        if (t >= dissolveAt) w *= 1f - SmoothBetween(t, dissolveAt, dissolveAt + ColorOutSeconds);
-        return w;
+        if (IsPrelude(t)) return 0f;
+        return IsWorldFrozen(t) ? Mathf.Max(0f, slowScale) : 1f;
     }
 
     /// <summary>
-    /// 글리치 구간 [start, end] 의 세기(0~1). 시작에 빠르게(0.03초) 올라 끝에서 0.06초에 빠진다 — 지직 하고 터졌다 사라지는 모양.
-    /// </summary>
-    public static float GlitchBurst(float t, float start, float end)
-    {
-        if (end <= start || t < start || t > end) return 0f;
-        float attack = Mathf.Clamp01((t - start) / 0.03f);
-        float release = Mathf.Clamp01((end - t) / 0.06f);
-        return Mathf.Min(attack, release);
-    }
-
-    /// <summary>타이포 불투명도(0.92 부터 <paramref name="fadeInSeconds"/> 동안 진입 · 2.00–3.20 소거).</summary>
-    public static float TypoAlpha(float t, float fadeInSeconds = TypoFadeInEnd - TypoStart)
-    {
-        if (t < TypoStart) return 0f;
-        if (t < FreezeEnd) return SmoothBetween(t, TypoStart, TypoStart + Mathf.Max(0.01f, fadeInSeconds));
-        return 1f - SmoothBetween(t, FreezeEnd, End);
-    }
-
-    /// <summary>타이포 진입 진행(0 = 화면 우측으로 밀린 자리, 1 = 안착). 0.92 부터 <paramref name="settleSeconds"/> 동안.</summary>
-    public static float TypoSettle(float t, float settleSeconds = TypoSlideEnd - TypoStart) =>
-        SmoothBetween(t, TypoStart, TypoStart + Mathf.Max(0.01f, settleSeconds));
-
-    /// <summary>
-    /// 사망 표현 진행 시간: 슬로모션 구간(0.12–2.00)은 <paramref name="slowScale"/> 배로만 흐른다. 서버 사망 연출 대기와 클라 애니가 같은 시계를 따른다.
-    /// a(t) = t (t &lt; 0.12) · 0.12 + (t − 0.12)·s (0.12 ≤ t &lt; 2.00) · 0.12 + 1.88·s + (t − 2.00) (t ≥ 2.00). s = 0 이면 완전 정지.
+    /// 사망 표현 진행 시간(<see cref="DeathTimeScale"/> 의 적분): 추가 연출 구간 = 0, 슬로모션 구간(0.12–2.00)은 <paramref name="slowScale"/> 배로만 흐른다.
+    /// a(t) = 0 (t &lt; 0) · t (0 ≤ t &lt; 0.12) · 0.12 + (t − 0.12)·s (0.12 ≤ t &lt; 2.00) · 0.12 + 1.88·s + (t − 2.00) (t ≥ 2.00). s = 0 이면 완전 정지.
     /// </summary>
     public static float DeathPresentationTime(float t, float slowScale = 0f)
     {
@@ -90,6 +76,45 @@ public static class BossVictoryRules
         if (t < FreezeStart) return Mathf.Max(0f, t);
         if (t < FreezeEnd) return FreezeStart + (t - FreezeStart) * s;
         return FreezeStart + FreezeDuration * s + (t - FreezeEnd);
+    }
+
+    /// <summary>
+    /// [서버] 승리 연출이 결과 화면 안전망을 미룰 초 — 추가 연출 구간 + 슬로모션 구간(그동안 사망 표현이 멈추거나 늦게 흐른다).
+    /// </summary>
+    public static float ResultSafetyDelay(float preludeSeconds) => Mathf.Max(0f, preludeSeconds) + FreezeDuration;
+
+    // ── 연출 벽 숨김(할 일 200 추가 — 234 벽 제한 대신) ──────────────────
+
+    /// <summary>
+    /// 벽 렌더러 바운즈 → 방 안쪽을 향한 수평 법선. 수평으로 얇은 축(두께 방향)이 법선 축이고 부호는 <paramref name="interior"/>(방 안 기준점) 쪽.
+    /// 모서리·기둥처럼 두 축이 비슷하면(차이 &lt; <paramref name="squareTolerance"/>) 기준점 쪽 수평 방향을 그대로 쓴다. 퇴화하면 zero.
+    /// </summary>
+    public static Vector3 WallInwardNormal(Bounds wall, Vector3 interior, float squareTolerance = 0.5f)
+    {
+        Vector3 toInside = Flat(interior - wall.center);
+        if (Mathf.Abs(wall.size.x - wall.size.z) < squareTolerance)
+            return toInside.sqrMagnitude > 0.0001f ? toInside.normalized : Vector3.zero;
+        Vector3 axis = wall.size.x < wall.size.z ? Vector3.right : Vector3.forward;
+        float side = Vector3.Dot(axis, toInside);
+        if (Mathf.Abs(side) < 0.0001f) return Vector3.zero;
+        return side > 0f ? axis : -axis;
+    }
+
+    /// <summary>
+    /// 연출 카메라에서 이 벽을 숨길까. <b>앞면(방 안쪽 면)이 확실히 카메라를 향한 벽만 남긴다</b>(사용자 11-06):
+    /// · 카메라가 벽면 바깥(뒷면 쪽)에 있다 → 숨김.
+    /// · 카메라 시선(수평)과 법선의 내적 <c>dot(n, −forward)</c> ≤ <paramref name="facingThreshold"/> → 숨김(뒷면 0 미만 · 옆면 ≈ 0).
+    /// 법선이 퇴화(zero)면 숨기지 않는다.
+    /// </summary>
+    public static bool ShouldHideWall(Vector3 inwardNormal, Vector3 wallCenter, Vector3 cameraPosition, Vector3 cameraForward, float facingThreshold)
+    {
+        Vector3 n = Flat(inwardNormal);
+        if (n.sqrMagnitude < 0.0001f) return false;
+        n.Normalize();
+        if (Vector3.Dot(n, Flat(cameraPosition - wallCenter)) < 0f) return true;   // 카메라가 벽 바깥 — 뒷면이 보인다
+        Vector3 back = Flat(-cameraForward);
+        if (back.sqrMagnitude < 0.0001f) return false;                              // 수직으로 내려다봄 — 시선만으론 못 가린다
+        return Vector3.Dot(n, back.normalized) <= facingThreshold;
     }
 
     // ── 구도(서버가 한 번 계산 — 모든 피어 같은 결과) ────────────────────
@@ -127,72 +152,6 @@ public static class BossVictoryRules
         /// <b>음수 = 카메라가 막타 오른쪽 뒤 → 막타가 화면 왼쪽</b>(원하는 구도). 양수도 넣어 두면 점수가 고른다.
         /// </summary>
         public float[] YawCandidates;
-        /// <summary>보스방 경계(벽 안쪽 면). <see cref="Arena.Valid"/> 가 거짓이면 제한 없이 예전처럼 고른다(할 일 234).</summary>
-        public Arena Room;
-        /// <summary>카메라가 벽 안쪽 면에서 떨어져 있어야 할 거리(방 로컬 단위, m).</summary>
-        public float WallMargin;
-    }
-
-    /// <summary>
-    /// 보스방 바닥 사각형(할 일 234 — 승리 연출 카메라를 벽 안에 가둔다). 원본 = <c>InvisibleBoundaries/Boundary_*</c> 안쪽 면
-    /// (<see cref="TwentyThreeBoss.TryGetArenaRect"/>). 존이 90° 단위로 돌아 배치되므로 방 로컬 좌표로 들고, 높이는 보지 않는다.
-    /// </summary>
-    public struct Arena
-    {
-        public bool Valid;
-        public Matrix4x4 WorldToLocal;
-        public Matrix4x4 LocalToWorld;
-        public float MinX, MaxX, MinZ, MaxZ;
-
-        public static Arena FromRect(Matrix4x4 localToWorld, float minX, float maxX, float minZ, float maxZ) => new Arena
-        {
-            Valid = true,
-            LocalToWorld = localToWorld,
-            WorldToLocal = localToWorld.inverse,
-            MinX = minX, MaxX = maxX, MinZ = minZ, MaxZ = maxZ,
-        };
-
-        /// <summary>월드 점이 벽에서 <paramref name="margin"/> 이상 안쪽인가(XZ 만). 경계가 없으면 항상 참.</summary>
-        public bool Contains(Vector3 world, float margin)
-        {
-            if (!Valid) return true;
-            Vector3 l = WorldToLocal.MultiplyPoint3x4(world);
-            return InRange(l.x, MinX + margin, MaxX - margin) && InRange(l.z, MinZ + margin, MaxZ - margin);
-        }
-
-        /// <summary>
-        /// <paramref name="pos"/> 가 벽 밖이면 <paramref name="look"/> → <paramref name="pos"/> 선을 따라 벽 안(여유 <paramref name="margin"/>)까지 당긴다.
-        /// 같은 선 위라 바라보는 방향은 그대로다. 주시점도 밖이면(비정상) XZ 만 사각형 안으로 자른다.
-        /// </summary>
-        public Vector3 PullInside(Vector3 look, Vector3 pos, float margin)
-        {
-            if (!Valid || Contains(pos, margin)) return pos;
-            Vector3 a = WorldToLocal.MultiplyPoint3x4(look);
-            Vector3 b = WorldToLocal.MultiplyPoint3x4(pos);
-            float x0 = MinX + margin, x1 = MaxX - margin, z0 = MinZ + margin, z1 = MaxZ - margin;
-            if (!InRange(a.x, x0, x1) || !InRange(a.z, z0, z1))
-            {
-                b.x = Clamp(b.x, x0, x1);
-                b.z = Clamp(b.z, z0, z1);
-                return LocalToWorld.MultiplyPoint3x4(b);
-            }
-            // a 는 안, b 는 밖 — 선분이 사각형을 나가는 비율 k(0~1) 중 가장 작은 값.
-            float k = 1f;
-            k = Mathf.Min(k, Exit(a.x, b.x, x0, x1));
-            k = Mathf.Min(k, Exit(a.z, b.z, z0, z1));
-            return LocalToWorld.MultiplyPoint3x4(Vector3.Lerp(a, b, k));
-        }
-
-        static float Exit(float a, float b, float lo, float hi)
-        {
-            float d = b - a;
-            if (d > 0.0001f && b > hi) return (hi - a) / d;
-            if (d < -0.0001f && b < lo) return (lo - a) / d;
-            return 1f;
-        }
-
-        static bool InRange(float v, float lo, float hi) => lo <= hi ? v >= lo && v <= hi : Mathf.Abs(v - (lo + hi) * 0.5f) < 0.0001f;
-        static float Clamp(float v, float lo, float hi) => lo <= hi ? Mathf.Clamp(v, lo, hi) : (lo + hi) * 0.5f;
     }
 
     public struct Pose
@@ -215,8 +174,6 @@ public static class BossVictoryRules
     /// <summary>
     /// 막타 = 좌측 전경, 타격점·보스 = 중앙~우측 중경, 팀원 = 좌우 후경(기획 v02 §2 표)을 점수로 고른다.
     /// 후보 = (방위각 × 거리)를 고정 순서로 돌고, 같은 점수면 먼저 나온 후보. 물리(가림) 판정은 하지 않는다 — 실제 전투 위치를 유지한다.
-    /// 보스방 경계(<see cref="Framing.Room"/>)가 있으면 24°·32° 카메라가 둘 다 벽 안(여유 <see cref="Framing.WallMargin"/>)인 후보만 고른다.
-    /// 그런 후보가 없으면 벽 무시 최고 후보를 주시점 쪽으로 당겨 벽 안에 넣는다(할 일 234).
     /// </summary>
     public static Composition Compose(Subjects s, Framing f)
     {
@@ -231,14 +188,9 @@ public static class BossVictoryRules
         float[] yaws = f.YawCandidates != null && f.YawCandidates.Length > 0 ? f.YawCandidates : new[] { 25f };
         float step = Mathf.Max(0.1f, f.DistanceStep);
 
-        // 벽 안 후보만 먼저 고르고(구도 점수 유지), 하나도 없으면 벽 무시로 고른 뒤 벽 안으로 당긴다(할 일 234).
-        float margin = Mathf.Max(0f, f.WallMargin);
         Composition best = default;
         best.Score = float.NegativeInfinity;
         bool found = false;
-        Composition bestAny = default;
-        bestAny.Score = float.NegativeInfinity;
-        bool foundAny = false;
 
         for (int y = 0; y < yaws.Length; y++)
         {
@@ -246,35 +198,20 @@ public static class BossVictoryRules
             {
                 Pose pose = PoseAt(look, fwd, yaws[y], f.FinalPitch, d);
                 float score = Score(pose, s, f, d);
-                if (float.IsNegativeInfinity(score)) continue;
-                var cand = new Composition { Final = pose, Yaw = yaws[y], Distance = d, Score = score };
-                if (score > bestAny.Score) { bestAny = cand; foundAny = true; }
-                if (score > best.Score && f.Room.Contains(pose.Position, margin) &&
-                    f.Room.Contains(EndPoseOf(look, fwd, cand, f).Position, margin))
+                if (score > best.Score)
                 {
-                    best = cand;
+                    best = new Composition { Final = pose, Yaw = yaws[y], Distance = d, Score = score };
                     found = true;
                 }
             }
         }
 
-        if (found)
-        {
-            best.EndPose = EndPoseOf(look, fwd, best, f);
-            return best;
-        }
+        if (!found)
+            best = new Composition { Final = PoseAt(look, fwd, yaws[0], f.FinalPitch, f.MaxDistance), Yaw = yaws[0], Distance = f.MaxDistance };
 
-        if (!foundAny)
-            bestAny = new Composition { Final = PoseAt(look, fwd, yaws[0], f.FinalPitch, f.MaxDistance), Yaw = yaws[0], Distance = f.MaxDistance };
-        bestAny.EndPose = EndPoseOf(look, fwd, bestAny, f);
-        // 당겨도 주시점을 향한 같은 선 위 — 회전은 그대로 둔다.
-        bestAny.Final.Position = f.Room.PullInside(look, bestAny.Final.Position, margin);
-        bestAny.EndPose.Position = f.Room.PullInside(look, bestAny.EndPose.Position, margin);
-        return bestAny;
+        best.EndPose = PoseAt(look, fwd, best.Yaw, f.EndPitch, best.Distance * Mathf.Max(1f, f.EndDistanceScale));
+        return best;
     }
-
-    static Pose EndPoseOf(Vector3 look, Vector3 fwd, Composition c, Framing f) =>
-        PoseAt(look, fwd, c.Yaw, f.EndPitch, c.Distance * Mathf.Max(1f, f.EndDistanceScale));
 
     /// <summary>주시점 <paramref name="look"/> 을 보는 카메라 자세. 막타 뒤(−fwd)에서 <paramref name="yaw"/> 도 돌리고 <paramref name="pitch"/> 도 내려다본다.</summary>
     public static Pose PoseAt(Vector3 look, Vector3 fwd, float yaw, float pitch, float distance)
