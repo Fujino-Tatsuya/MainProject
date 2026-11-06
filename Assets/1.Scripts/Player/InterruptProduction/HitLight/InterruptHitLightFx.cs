@@ -89,14 +89,21 @@ public sealed class InterruptHitLightFx : MonoBehaviour
         Play(InterruptHitLightPlacement.At(position), look, scale);
 
     /// <summary>성공 순간 재생 — 위치 + (틈 수직이면) 방향. 방향은 이 순간 고정이다.</summary>
-    public void Play(in InterruptHitLightPlacement placement, InterruptHitLightLook look, float scale = 1f)
+    public void Play(in InterruptHitLightPlacement placement, InterruptHitLightLook look, float scale = 1f) =>
+        Play(placement, look, default, scale);
+
+    /// <summary>
+    /// 성공 순간 재생 + 시전자 캐릭터 덮어쓰기(할 일 238 — 거너: 빛줄기·가로 빛줄·불꽃 숨김·라이트 색). <paramref name="fxOverride"/> 기본값 = 덮어쓰기 없음.
+    /// 숨긴 파티클은 이번 재생에서 틀지 않는다(지난 입자도 지운다) — 다음 재생(다른 캐릭터)은 다시 기본대로.
+    /// </summary>
+    public void Play(in InterruptHitLightPlacement placement, InterruptHitLightLook look, in InterruptHitLightFxOverride fxOverride, float scale = 1f)
     {
         float rootScale = Mathf.Max(0.01f, scale);
         transform.SetPositionAndRotation(placement.Position, Quaternion.identity);
         transform.localScale = Vector3.one * rootScale;
         _look = look;
 
-        PlayParticles(placement, look);
+        PlayParticles(placement, look, fxOverride);
 
         _light = InterruptEffectLight.Ensure(_light, transform, "HitLight");
         if (look == null)
@@ -106,7 +113,7 @@ public sealed class InterruptHitLightFx : MonoBehaviour
         }
 
         // 라이트 반경은 부모 스케일을 따르지 않는다 — 루트 스케일을 직접 곱한다.
-        InterruptEffectLight.Apply(_light, look.LightColor, look.LightRange * rootScale, look.LightShadows);
+        InterruptEffectLight.Apply(_light, fxOverride.LightColorOr(look.LightColor), look.LightRange * rootScale, look.LightShadows);
         _lightElapsed = 0f;
         _lightRealElapsed = 0f;
         InterruptEffectLight.SetIntensity(_light, LightIntensityAt(look, 0f));
@@ -193,7 +200,7 @@ public sealed class InterruptHitLightFx : MonoBehaviour
     public static float LightIntensityAt(InterruptHitLightLook look, float elapsed) =>
         look != null ? InterruptEffectLight.Pulse(look.LightCurve, look.LightIntensity, elapsed, look.LightDuration) : 0f;
 
-    private void PlayParticles(in InterruptHitLightPlacement placement, InterruptHitLightLook look)
+    private void PlayParticles(in InterruptHitLightPlacement placement, InterruptHitLightLook look, in InterruptHitLightFxOverride fxOverride)
     {
         EnsureSystems();
         _screenRays = null;
@@ -204,6 +211,13 @@ public sealed class InterruptHitLightFx : MonoBehaviour
             ParticleSystem.MainModule main = system.main;
             main.useUnscaledTime = !gameTime; // V3 = 게임 시간(슬로우·히트스톱 따라감), V1·V2 = 실시간
             system.Clear(false);
+
+            // 시전자 캐릭터 덮어쓰기(할 일 238) — 숨긴 파티클은 이번에 틀지 않는다(위에서 지난 입자도 지웠다).
+            if (fxOverride.Hides(system.gameObject.name))
+            {
+                system.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+                continue;
+            }
 
             bool rays = system.gameObject.name == RaysName;
             if (rays && look != null && look.RaySpace == InterruptHitLightRaySpace.Screen)

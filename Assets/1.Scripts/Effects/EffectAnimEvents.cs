@@ -134,13 +134,17 @@ public class EffectAnimEvents : MonoBehaviour
 
     // 간파 연출 스위치(할 일 104 B2·C1) — 간파 id 만 가린다. 재생을 막아도 Played 는 난다
     // (AssassinSkillView 가 올려치기 프레임을 성공 연출 기준으로 쓴다). Stop 은 막지 않는다.
+    // 간파 VFX 개별 토글(할 일 238, 랩 전용·이 피어만)도 같은 자리에서 같은 규칙으로 본다.
+
+    static bool Allows(string id) =>
+        InterruptProductionDirector.AllowsAnimEffect(id) && InterruptVfxToggles.AllowsAnimEffect(id);
 
     /// <summary>[릴레이] 원샷 재생.</summary>
     public void PlayEffect(string id)
     {
         IAnimEventEffect effect = Find(id);
         if (effect == null) return;
-        if (InterruptProductionDirector.AllowsAnimEffect(id)) effect.PlayOnce();
+        if (Allows(id)) effect.PlayOnce();
         Played?.Invoke(id);
     }
 
@@ -149,7 +153,7 @@ public class EffectAnimEvents : MonoBehaviour
     {
         IAnimEventEffect effect = Find(id);
         if (effect == null) return;
-        if (InterruptProductionDirector.AllowsAnimEffect(id)) effect.Play();
+        if (Allows(id)) effect.Play();
         Played?.Invoke(id);
     }
 

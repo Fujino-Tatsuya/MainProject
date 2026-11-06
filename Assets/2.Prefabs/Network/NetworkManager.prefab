@@ -223,13 +223,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InterruptProductionDirector
   keepCoSucceededBright: 1
   slowMotionSettings: {fileID: 11400000, guid: 311d260bdd940f441b0c2cd45d1afe7f, type: 2}
-  paladinShieldGlow: 0
-  paladinShieldCharge: 0
-  assassinInsightAttempt: 0
+  paladinShieldGlow: 1
+  paladinShieldCharge: 1
+  assassinInsightAttempt: 1
   hitStop: 1
   successFxSlot: 1
-  paladinWave: 0
-  assassinInsightSuccess: 0
+  paladinWave: 1
+  assassinInsightSuccess: 1
   targetFlash: 0
   darkAdaptation: 0
   ownerZoom: 1
@@ -272,6 +272,14 @@ MonoBehaviour:
   hitLightLookSuppress: {fileID: 11400000, guid: 91f6d84851adea7523ace7d9a22c98db, type: 2}
   hitLightVfxSuppress: {fileID: 7590261245222885139, guid: ed98b787169932a8cb6ca57f32499bd2, type: 3}
   suppressWhiteout: 1
+  gunnerHitLight:
+    enabled: 1
+    hiddenParticles:
+    - Rays
+    - Streak
+    - Sparks
+    overrideLightColor: 1
+    lightColor: {r: 0.41960788, g: 0.58787316, b: 1, a: 1}
   normalTier:
     ownerDim: 0
     flash: 4

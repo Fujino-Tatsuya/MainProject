@@ -403,7 +403,8 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     // [각 피어] C2 간파 성공 원샷.
     void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
     {
-        if (cue == InterruptProductionCue.AssassinInsightSuccess && insightSuccess != null)
+        if (cue == InterruptProductionCue.AssassinInsightSuccess && insightSuccess != null &&
+            InterruptVfxToggles.IsOn(InterruptVfx.AssassinSuccess)) // 238 랩 토글
             insightSuccess.PlayOnce();
     }
 
