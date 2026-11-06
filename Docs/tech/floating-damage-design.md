@@ -1,6 +1,6 @@
 # 플로팅 데미지(피해 숫자) — 실제 동작 기준 설계
 
-갱신 2026-11-02 (할 일 174 — 제압 가속 합산 §3.1), 2026-10-29 (할 일 154). 코드: `Assets/1.Scripts/UI/Combat/FloatingDamage/`, 수치: `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset`.
+갱신 2026-11-06 (할 일 242 — 디버그 씬 §12), 2026-11-02 (할 일 174 — 제압 가속 합산 §3.1), 2026-10-29 (할 일 154). 코드: `Assets/1.Scripts/UI/Combat/FloatingDamage/`, 수치: `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset`.
 
 **출처** — 기획 「Re:C 데미지 숫자 표기 v0.2」(§3 구간 · §4 위치 · §5 흐름, 수치는 임시값)
 + 은희 결정(2026-10-01: 누적 숫자는 대상을 따라감 · 누적 구간은 합계로 판정)
@@ -177,7 +177,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 
 - `ObjectPool`, 동시 최대 `maxConcurrentPopups` **32** — 넘치면 가장 오래된 숫자부터 즉시 반납.
 - 위치·크기·알파 반영은 스포너가 **`Canvas.willRenderCanvases`** 에서 `ApplyLayout` — 카메라가 LateUpdate 에서 움직인 뒤라 한 프레임 밀리지 않는다. 시간 진행은 각 숫자의 `Update`(`Time.deltaTime`).
-- 스포너는 씬 상주 1개(`2.Prefabs/Managers/FloatingDamageSpawner.prefab` — MapScene·디버그 씬 배치).
+- 스포너는 씬 상주 1개(`2.Prefabs/Managers/FloatingDamageSpawner.prefab` — MapScene·디버그 씬 배치 · 숫자 확인 씬 `DebugFloatingDamage`(§12)).
 
 ## 9. 코드 지도
 
@@ -204,6 +204,34 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 6. 굵은 스프라이트 없음 — 높음 구간 "굵게"는 표현하지 않는다(§1).
 7. 대상별 위치 오프셋 = 프리팹 루트 `FloatingDamageAnchor`, xlsx 미연결(§2-3·§10). 코드 수정 없음 — 프리팹 부착은 사용자 몫.
 8. 후속 — 간파 중 숨김(§5, 디렉터 A5) · 해상도 하한 `minScreenPixelHeight` 16(§4).
+
+## 12. 디버그 씬 — `Assets/0.Scenes/Debug/DebugFloatingDamage.unity` (할 일 242, 2026-11-06)
+
+숫자 크기·보스 위치를 **보면서** 고치는 씬. 씬을 열고 그냥 ▶(네트워크 없음 — 호스트·Dev Boot 불필요). 🔴 빌드 목록(EditorBuildSettings)에 넣지 않는다.
+
+- **배치**: 실제 프리팹 인스턴스 — 보스 `TwentyThree_Raid`(웰즈 포함, 가운데) · 비교용 `Player_Paladin`(왼쪽) · 일반 몬스터 `HumanoidBot`(오른쪽), 바닥 평면, `FloatingDamageSpawner.prefab`.
+  ▶ 하면 구동기 `DebugFloatingDamageLab`(`Assets/1.Scripts/Dev/FloatingDamageLab/`)이 대상 아래 스크립트를 전부 끈다(애니메이터·조명·앵커만 남김, 물리 정지) → AI·공격 없음.
+- **카메라** = 실제 플레이 카메라 값(`PlayerFollowCamera` FollowOffset (7,17,-7) · 각도 (59.787, -45, 0) · FOV 34). 기본은 가운데(보스) 기준 전체 보기, `F` = 선택 대상 중심(플레이어 시점처럼).
+- **띄우기** — 화면 왼쪽 패널(F1 숨김) 또는 단축키. 경로는 게임과 같은 `FloatingDamageSpawner.Submit`.
+
+  | 키 | 동작 |
+  |---|---|
+  | `1`~`9` | 대상 선택(23호·웰즈·팔라딘·휴머노이드 순) |
+  | `Space` | 띄우기 |
+  | `R` | 자동 반복 켜기/끄기(구동기 `autoInterval` 0.6초) |
+  | `M` | 단발 ↔ 누적(×`multiHits` 6번, 0.1초 간격 — 합계가 고른 구간이 되게 나눔) |
+  | `Z` `X` `C` | 구간 낮음·중간·높음(패널에서 '직접' = 값 입력) |
+  | `H` `S` `B` | HP · 보호막 · 둘 다(보호막 → HP 순, 게임과 같음). 회복·상태·텍스트는 패널 버튼 |
+  | `T` | 내 공격 ↔ 팀원 공격(표시 필터 '내 데미지 강조'면 팀원 = ×0.75·흐리게) |
+  | `F` | 카메라 = 선택 대상 중심 |
+- **구간 기준 최대 체력**: 네트워크 없이는 Unit 최대 체력이 0 이라 구동기 칸 `groups[i].baseMaxHp` 를 쓴다(요청 `baseMaxHpOverride` — 게임 경로는 안 씀). 기본 = 데이터 값 23호 레이드 2880(1인) · 팔라딘 220 · 휴머노이드 90.
+- **숫자 크기 고치기** = 설정 SO `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset` — `popupStyles[kind].height`(HP 36·보호막 34)·`tierLooks[*].holdScale`·`spawnOffset` 등.
+  패널의 `-4 -1 +1 +4` 버튼이 HP·보호막 높이를 SO 에 바로 쓰고 저장한다(Play 중이어도 남음). 인스펙터에서 고쳐도 같다 — **다음 숫자부터 반영**. 이 SO 는 **xlsx 미연결**(§10) — 확정 값은 에셋 커밋만.
+- **보스 위치 고치기** = 대상 프리팹 루트 `FloatingDamageAnchor`(23호 = `TwentyThree.prefab` 루트, 본 `anchorTransform` + `worldOffset`). 패널 `Y ±0.1/±0.5` 또는 인스펙터에서 Play 중 조정 → 떠 있는 누적 숫자도 바로 따라온다.
+  Play 중 값은 끝나면 날아가므로 **'현재 앵커 값을 프리팹에 저장'** 버튼 — 컴포넌트가 정의된 원본 프리팹(`TwentyThree.prefab`, 레이드 변형이 물려받음)에 `localOffset`·`worldOffset` 을 쓴다(본 지정은 그대로). 중간 변형이 같은 칸을 덮어쓰면 패널·콘솔에 경고.
+- **기즈모**: 노란 구 = 앵커 점, 초록 구 = 앵커 없음(콜라이더 중심), 선 = 대상 발 → 생성점. 에디트 모드 씬 뷰에서도 보이고, Game 뷰는 Gizmos 켬일 때.
+- 알려진 한계: 꺼진 스크립트도 `Awake` 는 돈다(네트워크 없는 경고가 콘솔에 날 수 있음 — 숫자와 무관) · 플레이어·몬스터에는 앵커가 없어 콜라이더 중심 · 앵커 '저장'은 에디터에서만.
+- 테스트: `Assets/Tests/EditMode/FloatingDamage/Editor/FloatingDamageDebugLabTests.cs`(메뉴 `Tools/Tests/데미지 숫자 EditMode 테스트 실행`).
 
 ## 역사
 2026-08-05 초안은 World-space TMP · NetworkVariable 복제 기반 · "체력바 옆 Active 상태머신"을 검토했으나, 구현은

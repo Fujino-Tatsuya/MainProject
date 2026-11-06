@@ -69,7 +69,7 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
             accumulation,
             out FloatingDamageAccumulationKey key);
 
-        FloatingDamageTier tier = settings.ClassifyTier(request.amount, request.target.MaxHp, request.target.Rank);
+        FloatingDamageTier tier = settings.ClassifyTier(request.amount, request.BaseMaxHp, request.target.Rank);
 
         if (canAccumulate && _activeByKey.TryGetValue(key, out FloatingDamagePopup active) &&
             active != null && active.TryAccumulate(request.amount))

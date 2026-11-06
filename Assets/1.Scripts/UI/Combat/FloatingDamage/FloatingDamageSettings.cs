@@ -99,6 +99,15 @@ public struct FloatingPopupRequest
     public AttackType attackType;
     public AttackHitPattern hitPattern;
 
+    /// <summary>
+    /// 구간 판정 기준 최대 체력 덮어쓰기(242 디버그 씬 — 네트워크 없이는 Unit 최대 체력이 0 이라). 0 이하 = 대상 <see cref="Unit.MaxHp"/>.
+    /// 게임 경로(Presenter·훈련 더미)는 쓰지 않는다.
+    /// </summary>
+    public int baseMaxHpOverride;
+
+    /// <summary>구간 판정 기준 최대 체력 — 덮어쓰기가 있으면 그것, 없으면 대상 최대 체력(대상 없으면 0).</summary>
+    public int BaseMaxHp => baseMaxHpOverride > 0 ? baseMaxHpOverride : target != null ? target.MaxHp : 0;
+
     public FloatingPopupRequest(Unit target, PopupKind kind, int amount, bool fromLocalPlayer,
         ulong attackerClientId, AttackType attackType, AttackHitPattern hitPattern)
     {
@@ -109,6 +118,7 @@ public struct FloatingPopupRequest
         this.attackerClientId = attackerClientId;
         this.attackType = attackType;
         this.hitPattern = hitPattern;
+        baseMaxHpOverride = 0;
     }
 }
 
@@ -330,6 +340,26 @@ public sealed class FloatingDamageSettings : ScriptableObject
 
         Debug.LogError($"[FloatingDamage] {rank} 피해 구간이 Settings 에 없다 — Low 로 표시한다.", this);
         return FloatingDamageTier.Low;
+    }
+
+    /// <summary>등급별 구간 경계(%) — 없으면 false. 242 디버그 씬이 구간별 피해량을 고를 때 쓴다.</summary>
+    public bool TryGetTierThresholds(MonsterRank rank, out float midPercent, out float highPercent)
+    {
+        if (tierThresholds != null)
+        {
+            for (int i = 0; i < tierThresholds.Length; i++)
+            {
+                if (tierThresholds[i].rank == rank)
+                {
+                    midPercent = tierThresholds[i].midPercent;
+                    highPercent = tierThresholds[i].highPercent;
+                    return true;
+                }
+            }
+        }
+
+        midPercent = highPercent = 0f;
+        return false;
     }
 
     public FloatingDamageTierLook GetLook(FloatingDamageTier tier)
