@@ -175,3 +175,24 @@ MonoBehaviour:
   fallbackBodyRadius: 0.5
   strikeScale: 1
   overdriveColors: {fileID: 11400000, guid: 04c5f7c72031487c923d4ee6481d5e20, type: 2}
+  otherClientAlpha:
+  - material: {fileID: 2100000, guid: 9871abe7fa290fb489b97165f9016101, type: 2}
+    property: _TintColor
+    channel: 0
+    multiplier: 0.4
+  - material: {fileID: 2100000, guid: 0000f6afd2e29ae4284c42957fcb510f, type: 2}
+    property: _Color
+    channel: 1
+    multiplier: 0.2
+  - material: {fileID: 2100000, guid: 0000f6afd2e29ae4284c42957fcb510f, type: 2}
+    property: _Opacity
+    channel: 0
+    multiplier: 0.1
+  - material: {fileID: 2100000, guid: bcb990f6ea85b644e98f1f80dd07fb17, type: 2}
+    property: "_TintColor\t"
+    channel: 0
+    multiplier: 0.4
+  - material: {fileID: 2100000, guid: bcb990f6ea85b644e98f1f80dd07fb17, type: 2}
+    property: "_TintColor\t"
+    channel: 1
+    multiplier: 0.4

@@ -8,6 +8,9 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-11-06 · 민경(Claude) · **거너 R 다른 클라 화면 알파(낙뢰 빔·장판 바닥 선 × 0.6) + EffectManager 머티리얼 알파 재생**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 · ⏳ 컴파일·EditMode·MPPM · 미커밋 · **은희 영역(`GunnerTrackingLaserSkill`) 한 줄** · 핸드오프 [handoff-gunner-ult-ally-alpha.md](Docs/tech/handoff-gunner-ult-ally-alpha.md)
+- 수정 파일: `Effects/EffectMaterialAlpha.cs`(새) · `Effects/EffectManager.cs` · `Player/Gunner/GunnerTrackingLaserView.cs` · `GunnerTrackingLaserSkill.cs` · `2.Prefabs/Player/Gunner/GunnerTrackingLaser.prefab` · 새 테스트 `Player/Editor/GunnerUltOtherClientAlphaTests.cs`
+
 ## ▶▶ 작업 세션 (2026-11-06 · 민경(Claude) · **거너 좌클릭·Q 벽까지 거리 = 접촉 거리 + 부서지는 프롭 Hurtbox +0.1m**, 브랜치 `feature/VFX`) — ✅ 구현·커밋 · ⏳ 컴파일·EditMode·Play(Unity 꺼져 있었음) · 미병합 · **은희 영역(`GunnerBeamAttack`) 수정** · `PF_box_3stack`·`PF_box2stack` 자식 Hurtbox 구조로 변환 · 핸드오프 [handoff-gunner-beam-contact-length.md](Docs/tech/handoff-gunner-beam-contact-length.md)
 - 수정 파일: `Player/Gunner/GunnerBeamAttack.cs` · `GunnerBeamView.cs`(주석) · `Dev/TraitLab/TraitLabAttackGizmos.cs` · 새 테스트 `Player/Editor/GunnerBeamContactDistanceTests.cs` · 프롭 8개(`2.Prefabs/Environment/Props/Containers/`)
 

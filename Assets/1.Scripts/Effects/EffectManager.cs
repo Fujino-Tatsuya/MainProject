@@ -358,7 +358,29 @@ public class EffectManager : MonoBehaviour
 
         active.tint = tint;
         for (int i = 0; i < active.instances.Count; i++)
-            EffectRecolor.Apply(active.instances[i].go, tint);
+        {
+            GameObject go = active.instances[i].go;
+            // 색 지정은 렌더러의 원래 머티리얼 색을 처음 칠할 때 기억한다 — 알파 복사본이 꽂혀 있으면 잠깐 원래로 돌려 칠하고 다시 건다.
+            if (active.alphaRules != null) EffectMaterialAlpha.Apply(go, null);
+            EffectRecolor.Apply(go, tint);
+            if (active.alphaRules != null) EffectMaterialAlpha.Apply(go, active.alphaRules);
+        }
+    }
+
+    /// <summary>
+    /// <b>머티리얼 알파 재생</b> — 규칙의 머티리얼을 쓰는 렌더러 슬롯을 알파를 곱한 복사본으로 바꾼다(2026-11-06 민경, 거너 R 다른 클라 화면).
+    /// 이미 나온 파트는 지금, 이후 터지는 파트(delay·outro)도 같은 규칙으로 나온다. null·빈 목록이면 원래 머티리얼로 되돌린다.
+    /// 반납 때 원래 머티리얼로 자동 복구된다(풀 오염 없음). 색 지정(<see cref="SetTint"/>)과 함께 써도 서로 덮어쓰지 않는다
+    /// (색 = 파티클 색·블록, 알파 = 머티리얼). 규칙 목록은 참조로 들고 있으므로 재생 중에 바꾸지 말 것.
+    /// 핸들이 필요하다 — 원샷도 <see cref="PlayRecallable"/> 로 재생한다. 반납된 핸들이면 조용한 no-op.
+    /// </summary>
+    public void SetMaterialAlpha(EffectHandle handle, IReadOnlyList<EffectMaterialAlphaRule> rules)
+    {
+        if (!TryResolve(handle, out ActiveEffect active)) return;
+
+        active.alphaRules = rules != null && rules.Count > 0 ? rules : null;
+        for (int i = 0; i < active.instances.Count; i++)
+            EffectMaterialAlpha.Apply(active.instances[i].go, active.alphaRules);
     }
 
     #endregion
@@ -595,6 +617,8 @@ public class EffectManager : MonoBehaviour
             instance.transform.SetPositionAndRotation(worldPosition, active.rotation);
             // 켜기 전에 칠한다 — 입자는 켜진 뒤 첫 시뮬레이션에서 방출되며 그때의 시작색을 읽는다.
             if (active.tint.IsSet) EffectRecolor.Apply(instance, active.tint);
+            // 알파는 색 다음 — 색 지정이 원래 머티리얼 색을 기억한 뒤에 복사본을 꽂는다.
+            if (active.alphaRules != null) EffectMaterialAlpha.Apply(instance, active.alphaRules);
             instance.SetActive(true);
 
             IEffectSystem driver = DriverOf(instance);
@@ -627,6 +651,9 @@ public class EffectManager : MonoBehaviour
             // 색 지정 재생으로 칠한 색을 저작 색으로 — 풀 키가 프리팹이라 다음 대출자(다른 플레이어·색 없는 재생)가 그대로 물려받는다.
             EffectRecolor recolor = instance.GetComponent<EffectRecolor>();
             if (recolor != null) recolor.Restore();
+            // 머티리얼 알파 재생으로 꽂은 복사본을 원래 머티리얼로 — 같은 이유(다음 대출자가 물려받음).
+            EffectMaterialAlpha alpha = instance.GetComponent<EffectMaterialAlpha>();
+            if (alpha != null) alpha.Restore();
             _pool.Return(instance);
         }
 
@@ -642,6 +669,7 @@ public class EffectManager : MonoBehaviour
         active.scale = 1f;
         active.axisScale = Vector3.one;
         active.tint = EffectTint.None;
+        active.alphaRules = null;
         active.driverDuration = 0f;
         active.inUse = false;      // 세대는 다음 대출에서 새로 발급된다 → stale 핸들은 여기서 죽는다
 
@@ -848,6 +876,7 @@ public class EffectManager : MonoBehaviour
         public float scale = 1f;   // 프리팹 크기에 곱해지는 배율. 파트 offset에도 곱해진다
         public Vector3 axisScale = Vector3.one;   // 축별 배율(원샷 오버로드 전용). localScale 에만 곱한다
         public EffectTint tint;                   // 색 지정 재생(SetTint). None = 원래 색. 이후 터지는 파트(delay·outro)에도 같이 칠한다
+        public IReadOnlyList<EffectMaterialAlphaRule> alphaRules;   // 머티리얼 알파 재생(SetMaterialAlpha). null = 원래 머티리얼. 이후 파트에도 같이
 
         // 드라이버에게 넘길 시간(초). 루프 전용이다 — 원샷은 남은 수명(life)을 그대로 쓴다.
         // 루프는 수명이 외부 이벤트(Release)로 정해지므로 "얼마나 살지"와 "파트가 얼마 동안 움직일지"가
