@@ -138,15 +138,7 @@ public sealed partial class BossEncounterDirector
             BossHeight = bossBounds.size.y,
             Teammates = teammates,
         };
-        // 보스방 벽 안에 카메라를 둔다(할 일 234) — 경계 = 23호가 넉백 벽 판정에 쓰는 InvisibleBoundaries 안쪽 면.
-        BossVictoryRules.Arena room = default;
-        if (boss.TryGetArenaRect(out Transform arenaRoot, out float minX, out float maxX, out float minZ, out float maxZ) && arenaRoot != null)
-            room = BossVictoryRules.Arena.FromRect(arenaRoot.localToWorldMatrix, minX, maxX, minZ, maxZ);
-        BossVictoryRules.Framing framing = cfg.ToFraming(room);
-        BossVictoryRules.Composition comp = BossVictoryRules.Compose(subjects, framing);
-        float checkMargin = Mathf.Max(0f, framing.WallMargin - 0.01f);   // 당긴 자리는 여유 경계 위라 부동소수 오차를 둔다
-        bool inside = framing.Room.Contains(comp.Final.Position, checkMargin) &&
-                      framing.Room.Contains(comp.EndPose.Position, checkMargin);
+        BossVictoryRules.Composition comp = BossVictoryRules.Compose(subjects, cfg.ToFraming());
 
         double now = NetworkManager.ServerTime.Time;
         _victory.Value = new VictoryState
@@ -175,8 +167,7 @@ public sealed partial class BossEncounterDirector
         if (_resultTransitionAt > 0d) _resultTransitionAt += BossVictoryRules.FreezeDuration;
 
         Edit.Log($"[BossVictory] 시작 — 막타 client {killer.OwnerClientId}(기록 {(killer.OwnerClientId == hitClientId ? "있음" : "없음 → 대체")}) · " +
-                 $"팀원 {teammates.Count}명 · 구도 방위 {comp.Yaw:0}° 거리 {comp.Distance:0.0}m 점수 {comp.Score:0.00} · " +
-                 $"벽 제한 {(!framing.Room.Valid ? (cfg.keepCameraInsideRoom ? "경계 없음" : "끔") : inside ? "벽 안" : "벽 밖(확인 필요)")}", this);
+                 $"팀원 {teammates.Count}명 · 구도 방위 {comp.Yaw:0}° 거리 {comp.Distance:0.0}m 점수 {comp.Score:0.00}", this);
     }
 
     // [서버] Update — 2.00초에 정식 잠금(Q1: 정지가 풀리며 스킬 취소·전투 입력 차단).

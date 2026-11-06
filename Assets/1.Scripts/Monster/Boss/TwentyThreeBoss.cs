@@ -6746,17 +6746,6 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
             ? c.radius * Mathf.Max(Mathf.Abs(c.transform.lossyScale.x), Mathf.Abs(c.transform.lossyScale.z))
             : 1.5f;
 
-    /// <summary>
-    /// 보스방 바닥 사각형(벽 안쪽 면, <paramref name="root"/> 로컬 X·Z). 경계가 없으면 거짓. 승리 연출 카메라가 벽 안에 머물도록 읽는다(할 일 234).
-    /// </summary>
-    public bool TryGetArenaRect(out Transform root, out float minX, out float maxX, out float minZ, out float maxZ)
-    {
-        bool ok = ResolveArena();
-        root = ok ? _arenaRoot : null;
-        minX = _arenaMinX; maxX = _arenaMaxX; minZ = _arenaMinZ; maxZ = _arenaMaxZ;
-        return ok;
-    }
-
     // 🔴 경계 원본 = 저작된 `InvisibleBoundaries/Boundary_*` 박스의 **안쪽 면**(BossRoomAuthoring) — 투명벽 판정과 일치(Codex C7).
     // 🔴 이름(XMin…)은 **방 로컬 축** 기준이다. 존은 90° 단위로 돌아 배치되므로 월드 AABB(b.bounds)로 읽으면
     //    90°/270° 방에서 X·Z 가 뒤바뀌어 경계가 뒤집히고, 넉백 첫 틱에 벽 판정이 나서 반동만 남는다(09-29 확인).

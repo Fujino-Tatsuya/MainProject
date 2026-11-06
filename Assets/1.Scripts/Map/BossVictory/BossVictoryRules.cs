@@ -127,72 +127,6 @@ public static class BossVictoryRules
         /// <b>음수 = 카메라가 막타 오른쪽 뒤 → 막타가 화면 왼쪽</b>(원하는 구도). 양수도 넣어 두면 점수가 고른다.
         /// </summary>
         public float[] YawCandidates;
-        /// <summary>보스방 경계(벽 안쪽 면). <see cref="Arena.Valid"/> 가 거짓이면 제한 없이 예전처럼 고른다(할 일 234).</summary>
-        public Arena Room;
-        /// <summary>카메라가 벽 안쪽 면에서 떨어져 있어야 할 거리(방 로컬 단위, m).</summary>
-        public float WallMargin;
-    }
-
-    /// <summary>
-    /// 보스방 바닥 사각형(할 일 234 — 승리 연출 카메라를 벽 안에 가둔다). 원본 = <c>InvisibleBoundaries/Boundary_*</c> 안쪽 면
-    /// (<see cref="TwentyThreeBoss.TryGetArenaRect"/>). 존이 90° 단위로 돌아 배치되므로 방 로컬 좌표로 들고, 높이는 보지 않는다.
-    /// </summary>
-    public struct Arena
-    {
-        public bool Valid;
-        public Matrix4x4 WorldToLocal;
-        public Matrix4x4 LocalToWorld;
-        public float MinX, MaxX, MinZ, MaxZ;
-
-        public static Arena FromRect(Matrix4x4 localToWorld, float minX, float maxX, float minZ, float maxZ) => new Arena
-        {
-            Valid = true,
-            LocalToWorld = localToWorld,
-            WorldToLocal = localToWorld.inverse,
-            MinX = minX, MaxX = maxX, MinZ = minZ, MaxZ = maxZ,
-        };
-
-        /// <summary>월드 점이 벽에서 <paramref name="margin"/> 이상 안쪽인가(XZ 만). 경계가 없으면 항상 참.</summary>
-        public bool Contains(Vector3 world, float margin)
-        {
-            if (!Valid) return true;
-            Vector3 l = WorldToLocal.MultiplyPoint3x4(world);
-            return InRange(l.x, MinX + margin, MaxX - margin) && InRange(l.z, MinZ + margin, MaxZ - margin);
-        }
-
-        /// <summary>
-        /// <paramref name="pos"/> 가 벽 밖이면 <paramref name="look"/> → <paramref name="pos"/> 선을 따라 벽 안(여유 <paramref name="margin"/>)까지 당긴다.
-        /// 같은 선 위라 바라보는 방향은 그대로다. 주시점도 밖이면(비정상) XZ 만 사각형 안으로 자른다.
-        /// </summary>
-        public Vector3 PullInside(Vector3 look, Vector3 pos, float margin)
-        {
-            if (!Valid || Contains(pos, margin)) return pos;
-            Vector3 a = WorldToLocal.MultiplyPoint3x4(look);
-            Vector3 b = WorldToLocal.MultiplyPoint3x4(pos);
-            float x0 = MinX + margin, x1 = MaxX - margin, z0 = MinZ + margin, z1 = MaxZ - margin;
-            if (!InRange(a.x, x0, x1) || !InRange(a.z, z0, z1))
-            {
-                b.x = Clamp(b.x, x0, x1);
-                b.z = Clamp(b.z, z0, z1);
-                return LocalToWorld.MultiplyPoint3x4(b);
-            }
-            // a 는 안, b 는 밖 — 선분이 사각형을 나가는 비율 k(0~1) 중 가장 작은 값.
-            float k = 1f;
-            k = Mathf.Min(k, Exit(a.x, b.x, x0, x1));
-            k = Mathf.Min(k, Exit(a.z, b.z, z0, z1));
-            return LocalToWorld.MultiplyPoint3x4(Vector3.Lerp(a, b, k));
-        }
-
-        static float Exit(float a, float b, float lo, float hi)
-        {
-            float d = b - a;
-            if (d > 0.0001f && b > hi) return (hi - a) / d;
-            if (d < -0.0001f && b < lo) return (lo - a) / d;
-            return 1f;
-        }
-
-        static bool InRange(float v, float lo, float hi) => lo <= hi ? v >= lo && v <= hi : Mathf.Abs(v - (lo + hi) * 0.5f) < 0.0001f;
-        static float Clamp(float v, float lo, float hi) => lo <= hi ? Mathf.Clamp(v, lo, hi) : (lo + hi) * 0.5f;
     }
 
     public struct Pose
@@ -215,8 +149,6 @@ public static class BossVictoryRules
     /// <summary>
     /// 막타 = 좌측 전경, 타격점·보스 = 중앙~우측 중경, 팀원 = 좌우 후경(기획 v02 §2 표)을 점수로 고른다.
     /// 후보 = (방위각 × 거리)를 고정 순서로 돌고, 같은 점수면 먼저 나온 후보. 물리(가림) 판정은 하지 않는다 — 실제 전투 위치를 유지한다.
-    /// 보스방 경계(<see cref="Framing.Room"/>)가 있으면 24°·32° 카메라가 둘 다 벽 안(여유 <see cref="Framing.WallMargin"/>)인 후보만 고른다.
-    /// 그런 후보가 없으면 벽 무시 최고 후보를 주시점 쪽으로 당겨 벽 안에 넣는다(할 일 234).
     /// </summary>
     public static Composition Compose(Subjects s, Framing f)
     {
@@ -231,14 +163,9 @@ public static class BossVictoryRules
         float[] yaws = f.YawCandidates != null && f.YawCandidates.Length > 0 ? f.YawCandidates : new[] { 25f };
         float step = Mathf.Max(0.1f, f.DistanceStep);
 
-        // 벽 안 후보만 먼저 고르고(구도 점수 유지), 하나도 없으면 벽 무시로 고른 뒤 벽 안으로 당긴다(할 일 234).
-        float margin = Mathf.Max(0f, f.WallMargin);
         Composition best = default;
         best.Score = float.NegativeInfinity;
         bool found = false;
-        Composition bestAny = default;
-        bestAny.Score = float.NegativeInfinity;
-        bool foundAny = false;
 
         for (int y = 0; y < yaws.Length; y++)
         {
@@ -246,35 +173,20 @@ public static class BossVictoryRules
             {
                 Pose pose = PoseAt(look, fwd, yaws[y], f.FinalPitch, d);
                 float score = Score(pose, s, f, d);
-                if (float.IsNegativeInfinity(score)) continue;
-                var cand = new Composition { Final = pose, Yaw = yaws[y], Distance = d, Score = score };
-                if (score > bestAny.Score) { bestAny = cand; foundAny = true; }
-                if (score > best.Score && f.Room.Contains(pose.Position, margin) &&
-                    f.Room.Contains(EndPoseOf(look, fwd, cand, f).Position, margin))
+                if (score > best.Score)
                 {
-                    best = cand;
+                    best = new Composition { Final = pose, Yaw = yaws[y], Distance = d, Score = score };
                     found = true;
                 }
             }
         }
 
-        if (found)
-        {
-            best.EndPose = EndPoseOf(look, fwd, best, f);
-            return best;
-        }
+        if (!found)
+            best = new Composition { Final = PoseAt(look, fwd, yaws[0], f.FinalPitch, f.MaxDistance), Yaw = yaws[0], Distance = f.MaxDistance };
 
-        if (!foundAny)
-            bestAny = new Composition { Final = PoseAt(look, fwd, yaws[0], f.FinalPitch, f.MaxDistance), Yaw = yaws[0], Distance = f.MaxDistance };
-        bestAny.EndPose = EndPoseOf(look, fwd, bestAny, f);
-        // 당겨도 주시점을 향한 같은 선 위 — 회전은 그대로 둔다.
-        bestAny.Final.Position = f.Room.PullInside(look, bestAny.Final.Position, margin);
-        bestAny.EndPose.Position = f.Room.PullInside(look, bestAny.EndPose.Position, margin);
-        return bestAny;
+        best.EndPose = PoseAt(look, fwd, best.Yaw, f.EndPitch, best.Distance * Mathf.Max(1f, f.EndDistanceScale));
+        return best;
     }
-
-    static Pose EndPoseOf(Vector3 look, Vector3 fwd, Composition c, Framing f) =>
-        PoseAt(look, fwd, c.Yaw, f.EndPitch, c.Distance * Mathf.Max(1f, f.EndDistanceScale));
 
     /// <summary>주시점 <paramref name="look"/> 을 보는 카메라 자세. 막타 뒤(−fwd)에서 <paramref name="yaw"/> 도 돌리고 <paramref name="pitch"/> 도 내려다본다.</summary>
     public static Pose PoseAt(Vector3 look, Vector3 fwd, float yaw, float pitch, float distance)
