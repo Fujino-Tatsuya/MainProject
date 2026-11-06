@@ -12,6 +12,7 @@ using UnityEngine;
 /// <item>허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>). A6·A7 섬광 시퀀스 칸은 11-04(할 일 211) 런타임에서 빠져 버튼도 뺐다.</item>
 /// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>).</item>
 /// <item>카메라 대상 중심 토글(할 일 196) — '전부 켬'·'암전만' 은 건드리지 않는다(따로 둔 스위치).</item>
+/// <item>간파 스킬 캐릭터 VFX 개별 켜고 끄기(할 일 238) — <see cref="InterruptVfxToggles"/>(정적·저장 안 함), 디렉터 없어도 보인다. 목록 Docs/tech/interrupt-vfx-list.md.</item>
 /// <item>배치(11-05 정리) — 성격별 접는 섹션(<see cref="Section"/>: 간파 재생 / 단계·버전 / 화이트아웃·제압 / 화면 효과 / 카메라 / 허수아비·서버 / 배속),
 ///       같은 폭 버튼 줄, 넘치면 스크롤. 접힘 상태만 PlayerPrefs(<see cref="FoldPrefsPrefix"/>)에 기억 — 칸 값은 저장하지 않는다.</item>
 /// </list>
@@ -113,6 +114,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         Effects,       // 화면 효과 — 효과 칸 켜기/끄기
         Camera,        // 카메라 — 대상 중심
         Server,        // 허수아비·서버 — 허수아비 간파 = 제압 간파
+        CharacterVfx,  // 간파 스킬 캐릭터 VFX 개별 켜고 끄기(할 일 238)
         Speed,         // 배속(슬로우)
     }
 
@@ -125,6 +127,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         Section.Effects => "화면 효과",
         Section.Camera => "카메라",
         Section.Server => "허수아비·서버",
+        Section.CharacterVfx => "캐릭터 VFX 개별 켜고 끄기 (238)",
         _ => "배속",
     };
 
@@ -167,6 +170,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
                 DrawSection(Section.Server, DrawSuppressRepro);
             }
 
+            DrawSection(Section.CharacterVfx, DrawCharacterVfx); // 디렉터와 무관(정적 토글)
             DrawSection(Section.Speed, DrawSpeed);
             GUILayout.EndScrollView();
         }
@@ -374,6 +378,45 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             GUILayout.Label("※ 호스트 화면에서만 효과(표식은 서버)");
         else if (_suppressRepro.Enabled)
             GUILayout.Label($"허수아비 {_suppressRepro.DummyCount} · 제압 간파 {_suppressRepro.MarkedCount}회");
+    }
+
+    // 간파 스킬 캐릭터 VFX 개별 켜고 끄기(할 일 238) — InterruptVfxToggles(정적·이 피어만·저장 안 함, Play 시작마다 전부 켬).
+    // 끄면 그 VFX 재생만 건너뛴다(판정·슬로우·공용 간파 연출 그대로). 목록 = Docs/tech/interrupt-vfx-list.md.
+    void DrawCharacterVfx()
+    {
+        switch (ButtonRow("전체 켬", "전체 끔"))
+        {
+            case 0: InterruptVfxToggles.SetAll(true); break;
+            case 1: InterruptVfxToggles.SetAll(false); break;
+        }
+
+        InterruptVfxCharacter? group = null;
+        foreach (InterruptVfx vfx in InterruptVfxToggles.All)
+        {
+            InterruptVfxCharacter character = InterruptVfxToggles.CharacterOf(vfx);
+            if (group != character)
+            {
+                group = character;
+                GUILayout.Space(Gap);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(InterruptVfxToggles.CharacterLabel(character), GUILayout.Width(ButtonWidth(3)));
+                if (GUILayout.Button("켬", GUILayout.Width(ButtonWidth(3)), GUILayout.Height(RowHeight)))
+                    InterruptVfxToggles.SetCharacter(character, true);
+                GUILayout.Space(Gap);
+                if (GUILayout.Button("끔", GUILayout.Width(ButtonWidth(3)), GUILayout.Height(RowHeight)))
+                    InterruptVfxToggles.SetCharacter(character, false);
+                GUILayout.EndHorizontal();
+            }
+
+            bool on = InterruptVfxToggles.Get(vfx);
+            bool next = Toggle(on, InterruptVfxToggles.Label(vfx));
+            if (next != on)
+                InterruptVfxToggles.Set(vfx, next);
+        }
+
+        if (!InterruptVfxToggles.GateActive)
+            GUILayout.Label("※ 릴리스 빌드 — 토글이 무시된다(늘 켬)");
+        GUILayout.Label("※ 이 화면만·저장 안 함. 다음 재생부터(루프 중이면 다음 시전)");
     }
 
     void DrawSpeed()

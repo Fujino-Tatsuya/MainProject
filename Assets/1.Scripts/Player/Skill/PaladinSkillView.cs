@@ -447,8 +447,11 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     /// </summary>
     public void BeginInterruptGlow()
     {
-        shieldGlow?.FadeIn();
-        interruptGlowLoop?.Play();
+        // 238 랩 개별 토글(이 피어만) — 끄는 쪽(EndInterruptVfx)은 늘 돈다.
+        if (InterruptVfxToggles.IsOn(InterruptVfx.PaladinShieldMaterialGlow))
+            shieldGlow?.FadeIn();
+        if (InterruptVfxToggles.IsOn(InterruptVfx.PaladinShieldGlowLoop))
+            interruptGlowLoop?.Play();
     }
 
     /// <summary>
@@ -582,7 +585,7 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     // [각 피어] B3 충격파 원샷.
     void IInterruptCueSink.PlayCue(InterruptProductionCue cue, in InterruptProductionEvent e)
     {
-        if (cue == InterruptProductionCue.PaladinWave)
+        if (cue == InterruptProductionCue.PaladinWave && InterruptVfxToggles.IsOn(InterruptVfx.PaladinShieldWave)) // 238 랩 토글
             interruptWave?.PlayOnce();
     }
 

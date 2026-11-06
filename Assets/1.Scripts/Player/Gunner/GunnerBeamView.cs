@@ -837,6 +837,9 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// </summary>
     public void ShowInterrupt(Vector3 origin, Vector3 end)
     {
+        if (!InterruptVfxToggles.IsOn(InterruptVfx.GunnerMuzzleBlast)) // 238 랩 토글(이 피어만, 임시 선 포함)
+            return;
+
         if (interruptPlayer == null)
         {
             ShowLocal(Kind.Interrupt, origin, end, 1f);   // 미배선 — 예전 연출

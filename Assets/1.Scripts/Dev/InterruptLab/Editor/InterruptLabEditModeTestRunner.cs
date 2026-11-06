@@ -19,6 +19,7 @@ internal static class InterruptLabEditModeTestRunner
         "^TrainingDummyInterruptCycleTests$",
         "^InterruptJudgeShapeGizmoTests$",
         "^HitboxAnchorShapeTests$",
+        "^InterruptVfxTogglesTests$", // 238 캐릭터 VFX 개별 토글
     };
 
     const string Tag = "[InterruptLabTests]";
