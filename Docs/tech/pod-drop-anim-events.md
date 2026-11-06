@@ -1,4 +1,4 @@
-# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198)
+# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198 · 230)
 
 로비 포드 발사(`LobbyPodLaunch`)와 맵 포드 착륙(`MapPodArrival`)에서 **어느 구간을 클립 애니 이벤트가 정하고, 어느 구간을 SO 초가 정하는지** 한 곳에 모은다.
 수치 원본은 `GameData.xlsx` Lobby 시트(`PodDropSettings`), 이벤트 원본은 SVN FBX 임포트 설정이다.
@@ -24,7 +24,12 @@
 
 ## 2. 로비 발사 — 끝 페이드 (할 일 198)
 
-`발사 클립(DP_LaunchCycle) 시작 → … → 하강 시작 이벤트(종류 3) → launchEndWaitSeconds(기본 0.5) → 끝 페이드 아웃 launchEndFadeSeconds(1) → 다 검어진 순간 서버가 로딩`
+`발사 클립(DP_LaunchCycle) 시작 → … → 하강 시작 이벤트(종류 3) → launchEndWaitSeconds(기본 0.5) → 끝 페이드 아웃 launchEndFadeSeconds(1) → 다 검어짐(EndBlackAt) → 암전 유지 launchEndBlackHoldSeconds(1, 할 일 230) → 서버가 로딩`
+
+- **암전 유지(230)**: 사용자 요청 "화면이 완전히 암전된 뒤 1초 뒤 로딩 씬". `LoadAt = EndBlackAt + launchEndBlackHoldSeconds`(xlsx Lobby 행 `lobby.launchEndBlackHoldSeconds`). 0 = 예전처럼 다 검어진 순간 로딩.
+  - 모든 피어가 같은 시간표(서버 시간 + 복제 시각)로 페이드를 그리므로, 서버가 로딩을 거는 순간 클라는 이미 유지 시간만큼 검은 채다 — 클라 서버시간 추정 오차·복제 지연이 유지 시간(1초)보다 작으면 깜빡임 없음.
+    하강 이벤트가 없는 클립의 예비 기준(`_launchEndedAt` 복제)은 클라가 복제 지연만큼 늦게 검어지는데, 그것도 유지 시간 안에 흡수된다.
+  - 로딩을 건 뒤에도 검은 화면(500)은 로비 씬이 내려갈 때까지(디스폰 → `Clear`) 그대로고, 로딩 화면(1000)이 그 위에 뜬다. HUD 숨김 규칙 그대로.
 
 - 예전(121)엔 **발사 클립 끝** + 대기 1초였다. 이제는 하강 시작 기준이라 발사 클립이 끝나기 전에 로딩으로 넘어갈 수 있다.
 - `launchEndWaitSeconds` 는 이름 그대로 두고 뜻만 "하강 시작 이벤트 → 페이드 시작"으로 바꿨다(xlsx 행 그대로, 값 1 → 0.5).
@@ -53,3 +58,29 @@
 
 - 로비: t=0(출격 확정) ~ 해치 클립 시작 — 레터박스·시작 암전·순간이동·카메라 줌.
 - 맵: 페이드 인·디졸브·레터박스 아웃·카메라 줌·흔들림 길이, (건너뛰기 끔일 때) 대기·빠른 낙하·급감속.
+
+## 5. 레터박스·검은 화면 프리팹 (할 일 230)
+
+로비 출격(`LobbyPodLaunch`)·맵 착륙(`MapPodArrival`)이 같은 화면 오버레이(`PodDropScreenOverlay`)를 쓰고, 그 캔버스를 **프리팹에서 고친다**.
+
+- 프리팹: `Assets/2.Prefabs/UI/PodDrop/PodDropOverlay.prefab` — 루트 `Canvas`(Screen Space Overlay)·`CanvasScaler`, 직계 자식 `LetterboxTop`·`LetterboxBottom`(검은 `Image`)·`Fade`(전체 검은 화면, 알파 0·꺼짐). `Fade` 는 마지막 형제(띠 위에 그린다).
+- 연결: `PodDropSettings.overlayPrefab`(`Assets/9.ScriptableObject/Lobby/PodDropSettings.asset`, 화면 칸). 비우면 코드가 같은 구성(검은 띠)을 만든다 = 예전 동작.
+- 처음 만들기: `Tools/Lobby/포드 레터박스 프리팹 만들기 (없을 때만)` — 띠를 `letterboxHeight` 높이로 저장하고 `overlayPrefab` 칸이 비었으면 채운다. 있으면 덮어쓰지 않는다.
+- **코드가 바꾸는 것(매 프레임)**: 위 띠 `anchorMin.y`·아래 띠 `anchorMax.y`(= 시간표 알파 × `letterboxHeight`), `Fade` 색의 알파·`enabled`, 루트 `sortingOrder` = **500 고정**(로딩 화면 1000·ESC 메뉴 900 아래, HUD 위).
+  그 밖의 값 — 띠 색·스프라이트·재질, anchor x·offset, 자식 장식(띠 아래에 붙인 선·글자 등), `Fade` 의 RGB — 은 프리팹 값 그대로다.
+- 이름 계약: 자식 이름 `LetterboxTop`·`LetterboxBottom`·`Fade` 를 바꾸거나 지우면 경고 한 줄 후 코드 기본 구성으로 대체한다. 장식은 이 세 오브젝트의 **자식**이나 새 형제로 붙인다.
+- 띠 높이는 프리팹이 아니라 `PodDropSettings.letterboxHeight`(xlsx `Lobby` 시트 행)가 원본이다 — 프리팹에 저장된 높이는 편집 화면 미리보기용이고 연출 중엔 덮인다.
+- 보면서 고치기:
+  - Play 없이: 프리팹을 열면(Prefab Mode) 띠가 기본 높이로 보인다(Game 뷰 비율로 미리 보려면 Prefab Mode 의 Canvas 환경). 높이를 바꿔 보려면 `LetterboxTop`·`LetterboxBottom` anchor y 를 직접 움직여 보고, 확정 값은 `letterboxHeight` 에 넣는다.
+  - Play 중: `letterboxHeight` 는 매 프레임 읽어서 인스펙터에서 바꾸면 바로 반영된다(테이블 모드면 Play 가 끝날 때 xlsx 값으로 되돌아간다 — 확정은 xlsx). 프리팹 에셋 수정은 **이미 만든 복제본에는 안 들어간다** — 다음 연출(다음 Play·다음 씬의 첫 연출)부터. Play 중 모양은 Hierarchy 의 `LobbyPodLaunch`/`MapPodArrival` 오브젝트 아래 `PodDropOverlay` 복제본을 고쳐 보고(Play 끝나면 사라짐) 프리팹에 옮긴다.
+  - 출격·착륙 연출만 다시 트는 디버그 단축키·메뉴는 없다 — 로비 출격 집결 → 맵 착륙 정상 흐름으로 본다.
+- 테스트: `PodDropScreenOverlayTests`(프리팹 값 보존·대체·커밋된 프리팹 계약).
+
+## 6. 연출 중 플레이어 실루엣 끔 (할 일 230)
+
+사용자 요청 "연출 상태에서는 캐릭터 실루엣 비활성화".
+
+- 로비 출격: 출격 확정(시작 시각 복제)부터 로딩으로 로비 씬이 사라질 때까지(`ClearLocal`) 모든 플레이어의 벽 뒤 실루엣을 끈다 — 발사대 벽 뒤로 걸어 들어갈 때 윤곽선이 컷을 깨던 것.
+- 맵 착륙: 진입(로딩 화면 아래)부터 **연출 끝**(`EndAt` — UI·튜토리얼이 돌아오는 순간, `ClearLocal`)까지. 예전엔 디졸브 끝(조작 복귀)에 되켰다 — 조작은 그대로 디졸브 끝에 돌아오고, 실루엣만 UI 와 같이 돌아온다.
+- 방식: `PlayerSilhouetteSuppression`(`Rendering/Silhouette/`) — 스폰된 `PlayerSilhouetteTag` 마다 `SetSuppressed(true)`, 태그 수가 바뀌면 다시 찾아 늦게 스폰된 플레이어도 잡는다. 로컬 시각 값(복제 없음, 피어마다 자기 화면). 두 연출이 같은 묶음 클래스를 쓴다.
+- 보스 승리 연출의 `PlayerSilhouetteFeature.SuppressedByCinematic`(피처 전체 끔, 정적 bool 하나)은 쓰지 않는다 — 여러 연출이 한 bool 을 쓰면 먼저 끝난 쪽이 다른 연출의 끔을 풀 수 있다. 보스 엘리베이터(`BossTeleportManager`)도 태그별 경로다.

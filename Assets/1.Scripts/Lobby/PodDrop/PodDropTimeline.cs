@@ -58,9 +58,12 @@ public struct PodDropLobbyTimings
     [Tooltip("포드 하강 시작 이벤트(발사 클립 PodClipEvent 정수 인자 3 — 포드가 아래로 내려가기 시작하는 프레임) → 끝 페이드 아웃 시작(초, 실시간). " +
              "0 = 하강 시작 순간 곧바로 페이드. 하강 이벤트 위치는 FBX 임포트 창 Animation 탭에서 옮긴다. 클립에 하강 이벤트가 없으면 발사 클립 끝(끝 이벤트)부터 잰다(경고)")]
     [Min(0f)] public float launchEndWaitSeconds;
-    [Tooltip("끝 페이드 아웃 — 화면이 다 검어지기까지(초, 선형 — 시작 암전과 같은 검은 화면). 다 검어진 순간 서버가 로딩을 건다(로딩 화면이 검은 화면 위에 뜬다 — 발사 클립이 아직 돌고 있어도). " +
-             "대기·페이드 둘 다 0 = 하강 시작 순간 곧바로 로딩(페이드 없음)")]
+    [Tooltip("끝 페이드 아웃 — 화면이 다 검어지기까지(초, 선형 — 시작 암전과 같은 검은 화면). 다 검어진 뒤 아래 암전 유지 시간이 지나면 서버가 로딩을 건다(발사 클립이 아직 돌고 있어도). " +
+             "대기·페이드·유지 모두 0 = 하강 시작 순간 곧바로 로딩(페이드 없음)")]
     [Min(0f)] public float launchEndFadeSeconds;
+    [Tooltip("끝 페이드가 완전히 검어진 순간 → 로딩 씬 전환(초, 실시간, 할 일 230). 이 동안 모든 피어 화면은 검은 채다 — 클라 시계·복제 지연 여유도 된다. " +
+             "0 = 다 검어진 순간 곧바로 로딩. 로딩 화면(정렬 1000)이 검은 화면(500) 위에 뜬다")]
+    [Min(0f)] public float launchEndBlackHoldSeconds;
 
     [Header("화면 UI")]
     [Tooltip("연출 도중 새로 뜬 화면 UI 를 다시 찾아 숨기는 간격(초). 0 = 매 프레임")]
@@ -87,6 +90,7 @@ public struct PodDropLobbyTimings
         launchFastSpeed2 = 1f,
         launchEndWaitSeconds = 0.5f, // 할 일 198 — 하강 시작 이벤트 뒤 0.5초
         launchEndFadeSeconds = 1f,
+        launchEndBlackHoldSeconds = 1f, // 할 일 230 — 다 검어진 뒤 1초
         hudRescanSeconds = 0.5f,
     };
 }
@@ -161,7 +165,7 @@ public struct PodDropMapTimings
     [Header("디졸브 · 레터박스 아웃 → 해제")]
     [Tooltip("해치 열기 끝 이벤트 → 디졸브 시작(초)")]
     [Min(0f)] public float dissolveDelaySeconds;
-    [Tooltip("포드가 디졸브로 사라지는 시간(초). 시작 순간 플레이어가 보이고(실루엣은 아직 안 그림), 끝나는 순간 조작·실루엣이 돌아오고 카메라가 플레이어로 넘어간다")]
+    [Tooltip("포드가 디졸브로 사라지는 시간(초). 시작 순간 플레이어가 보이고(실루엣은 연출 끝까지 안 그림), 끝나는 순간 조작이 돌아오고 카메라가 플레이어로 넘어간다")]
     [Min(0f)] public float dissolveSeconds;
     [Tooltip("디졸브 시작 → 레터박스가 다 걷힘(초). 디졸브·레터박스가 둘 다 끝나면 UI·튜토리얼(S0) 해제")]
     [Min(0f)] public float letterboxOutSeconds;
@@ -263,8 +267,10 @@ public sealed class PodDropLobbyTimeline
     public float LaunchEndWaitSeconds { get; }
     /// <summary>끝 페이드 아웃 — 다 검어지기까지(초).</summary>
     public float LaunchEndFadeSeconds { get; }
-    /// <summary>포드 하강 시작 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드.</summary>
-    public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds;
+    /// <summary>끝 페이드가 다 검어진 순간 → 로딩 시작(초, 할 일 230).</summary>
+    public float LaunchEndBlackHoldSeconds { get; }
+    /// <summary>포드 하강 시작 이벤트 → 로딩 시작(초) = 끝 대기 + 끝 페이드 + 암전 유지.</summary>
+    public float LoadAfterLaunchEndSeconds => LaunchEndWaitSeconds + LaunchEndFadeSeconds + LaunchEndBlackHoldSeconds;
 
     // 슬롯별 보행 시간(초, 걷기 시작 지점 → 좌석) — 수평 경로 길이 ÷ 걷는 속도(<see cref="WalkSecondsFor"/>).
     private readonly float[] _walkSeconds;
@@ -295,6 +301,7 @@ public sealed class PodDropLobbyTimeline
         WalkInterval = Mathf.Max(0f, timings.walkInterval);
         LaunchEndWaitSeconds = Mathf.Max(0f, timings.launchEndWaitSeconds);
         LaunchEndFadeSeconds = Mathf.Max(0f, timings.launchEndFadeSeconds);
+        LaunchEndBlackHoldSeconds = Mathf.Max(0f, timings.launchEndBlackHoldSeconds);
         _walkSeconds = new float[walkSeconds != null ? walkSeconds.Count : 0];
         for (int i = 0; i < _walkSeconds.Length; i++)
             _walkSeconds[i] = walkSeconds[i] > 0f ? walkSeconds[i] : 0f; // NaN 도 0
@@ -316,8 +323,11 @@ public sealed class PodDropLobbyTimeline
     /// <summary>끝 페이드 아웃 시작 = 포드 하강 시작 + 끝 대기. 하강 시각을 아직 모르면 +∞.</summary>
     public double EndFadeAt(double descentAt) => descentAt + LaunchEndWaitSeconds;
 
-    /// <summary>로딩 시작 = 끝 페이드가 다 검어진 순간(하강 시작 + 대기 + 페이드). 서버가 이 시각에 로딩을 건다(발사 클립이 아직 돌아도). 하강 시각을 아직 모르면 +∞.</summary>
-    public double LoadAt(double descentAt) => descentAt + LoadAfterLaunchEndSeconds;
+    /// <summary>끝 페이드가 다 검어진 순간 = 하강 시작 + 대기 + 페이드. 하강 시각을 아직 모르면 +∞.</summary>
+    public double EndBlackAt(double descentAt) => EndFadeAt(descentAt) + LaunchEndFadeSeconds;
+
+    /// <summary>로딩 시작 = 다 검어진 순간 + 암전 유지(할 일 230). 서버가 이 시각에 로딩을 건다(발사 클립이 아직 돌아도). 하강 시각을 아직 모르면 +∞.</summary>
+    public double LoadAt(double descentAt) => EndBlackAt(descentAt) + LaunchEndBlackHoldSeconds;
 
     /// <summary>슬롯(0 = P1)이 걷기 시작하는 경과 시각(초).</summary>
     public double WalkStartAt(int slot, double boardAt) => boardAt + Mathf.Max(0, slot) * WalkInterval;
@@ -430,7 +440,7 @@ public sealed class PodDropLobbyTimeline
 /// 대기 → 빠른 낙하(날개 펴진 채) → 급감속(날개 접기·다리 펴기 시작) → 연출 높이 도착까지는 시각이 정해져 있고,
 /// 그 뒤는 서버가 받은 클립 이벤트 시각(접기·펴기 끝 <c>deployedAt</c>, 해치 열기 끝 <c>openedAt</c>)을 넣어 계산한다. 아직 안 온 이벤트는 <see cref="PodDropTimeline.NotYet"/>(+∞).
 /// 앞 구간 건너뛰기(<see cref="SkipApproach"/>, 할 일 198 기본 켬)면 t=0 = 접기·펴기 끝 상태(연출 높이) — 대기·낙하·급감속이 0 이고 도착 페이드 인이 t=0 부터.
-/// 접기·펴기 끝 → 추진력 없는 자유낙하(<see cref="PodDropTimeline.FreefallHeight"/>, 할 일 150) → 착지(해치 열기) → 열기 끝 → (지연) → 디졸브 시작 = 플레이어 보임·레터박스 아웃 시작 → 디졸브 끝 = 조작·실루엣·카메라 해제(<see cref="ReleaseAt"/>) → 디졸브·레터박스 둘 다 끝 = UI·튜토리얼(<see cref="EndAt"/>).
+/// 접기·펴기 끝 → 추진력 없는 자유낙하(<see cref="PodDropTimeline.FreefallHeight"/>, 할 일 150) → 착지(해치 열기) → 열기 끝 → (지연) → 디졸브 시작 = 플레이어 보임·레터박스 아웃 시작 → 디졸브 끝 = 조작·카메라 해제(<see cref="ReleaseAt"/>) → 디졸브·레터박스 둘 다 끝 = UI·실루엣·튜토리얼(<see cref="EndAt"/>).
 /// </summary>
 public sealed class PodDropMapTimeline
 {
@@ -471,7 +481,7 @@ public sealed class PodDropMapTimeline
     public float BrakeAt { get; }
     /// <summary>날개·다리 연출 높이 도착(급감속 끝) — 접기·펴기 끝 이벤트가 이보다 일찍 와도 자유낙하는 여기부터.</summary>
     public float HoverAt { get; }
-    /// <summary>열기 끝 이벤트 → 조작·실루엣·카메라 해제(초) = 디졸브 지연 + 디졸브.</summary>
+    /// <summary>열기 끝 이벤트 → 조작·카메라 해제(초) = 디졸브 지연 + 디졸브.</summary>
     public float ReleaseAfterOpenSeconds => DissolveDelaySeconds + DissolveSeconds;
     /// <summary>열기 끝 이벤트 → 연출 끝(초, UI·튜토리얼) = 디졸브 지연 + 디졸브·레터박스 아웃 중 긴 쪽.</summary>
     public float EndAfterOpenSeconds => DissolveDelaySeconds + Mathf.Max(DissolveSeconds, LetterboxOutSeconds);
@@ -527,16 +537,16 @@ public sealed class PodDropMapTimeline
     /// <summary>착지 순간 속도(m/s) = g·√(2h/g) = √(2gh). 시각표·로그용.</summary>
     public float TouchdownSpeed => PodDropTimeline.FreefallSpeed(FreefallGravity, FreefallSeconds);
 
-    /// <summary>디졸브 시작 = 열기 끝 이벤트 + 지연 = 플레이어가 보이고(실루엣은 아직) 레터박스가 걷히기 시작하는 시각.</summary>
+    /// <summary>디졸브 시작 = 열기 끝 이벤트 + 지연 = 플레이어가 보이고(실루엣은 연출 끝까지 끔) 레터박스가 걷히기 시작하는 시각.</summary>
     public double DissolveAt(double openedAt) => openedAt + DissolveDelaySeconds;
 
     /// <summary>레터박스 아웃 시작 = 디졸브 시작.</summary>
     public double LetterboxOutAt(double openedAt) => DissolveAt(openedAt);
 
-    /// <summary>디졸브 끝 = 조작·실루엣 해제, 카메라가 플레이어로 넘어가는 시각.</summary>
+    /// <summary>디졸브 끝 = 조작 해제, 카메라가 플레이어로 넘어가는 시각.</summary>
     public double ReleaseAt(double openedAt) => openedAt + ReleaseAfterOpenSeconds;
 
-    /// <summary>조작·실루엣·카메라를 돌려줬는가 — 디졸브가 끝난 뒤에만 true.</summary>
+    /// <summary>조작·카메라를 돌려줬는가 — 디졸브가 끝난 뒤에만 true.</summary>
     public bool IsReleasedAt(double elapsed, double openedAt) => elapsed >= ReleaseAt(openedAt);
 
     /// <summary>연출 끝(디졸브·레터박스 아웃 둘 다 끝) = UI·튜토리얼(S0).</summary>

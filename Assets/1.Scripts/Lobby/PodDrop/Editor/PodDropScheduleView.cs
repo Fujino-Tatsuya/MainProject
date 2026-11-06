@@ -108,16 +108,18 @@ public static class PodDropScheduleView
     private static string EndLines(PodDropLobbyTimeline t, double? descentAt, double? launchAt, string source = null)
     {
         if (descentAt == null)
-            return $"\n  끝 대기·페이드     하강 시작 +0 ~ {t.LaunchEndWaitSeconds:0.##}s 대기 · ~ {t.LoadAfterLaunchEndSeconds:0.##}s 검게 → 로딩";
+            return $"\n  끝 대기·페이드     하강 시작 +0 ~ {t.LaunchEndWaitSeconds:0.##}s 대기 · ~ {t.LaunchEndWaitSeconds + t.LaunchEndFadeSeconds:0.##}s 검게 · " +
+                   $"~ {t.LoadAfterLaunchEndSeconds:0.##}s 암전 유지 → 로딩";
 
         double end = descentAt.Value;
         string fromLaunch = launchAt != null ? $", 발사 시작 기준 +{end - launchAt.Value:0.##}s" : "";
         return $"\n  포드 하강 시작    ≈{end:0.##}s ({source}{fromLaunch})" +
                $"\n  끝 대기           ≈{end:0.##} ~ {t.EndFadeAt(end):0.##}s ({t.LaunchEndWaitSeconds:0.##}s, 발사 클립은 계속 돈다)" +
                (t.LaunchEndFadeSeconds > 0f
-                   ? $"\n  끝 페이드 아웃    ≈{t.EndFadeAt(end):0.##} ~ {t.LoadAt(end):0.##}s (검게, 선형 — 시작 암전과 같은 검은 화면)"
-                   : "\n  끝 페이드 아웃    없음 (대기 끝에 곧바로 로딩)") +
-               $"\n  로딩 시작         ≈{t.LoadAt(end):0.##}s (다 검어진 순간 서버가 건다 — 로딩 화면이 검은 화면 위에 뜬다)";
+                   ? $"\n  끝 페이드 아웃    ≈{t.EndFadeAt(end):0.##} ~ {t.EndBlackAt(end):0.##}s (검게, 선형 — 시작 암전과 같은 검은 화면)"
+                   : "\n  끝 페이드 아웃    없음 (대기 끝에 곧바로 검다)") +
+               $"\n  암전 유지         ≈{t.EndBlackAt(end):0.##} ~ {t.LoadAt(end):0.##}s ({t.LaunchEndBlackHoldSeconds:0.##}s, 완전히 검은 채)" +
+               $"\n  로딩 시작         ≈{t.LoadAt(end):0.##}s (서버가 건다 — 로딩 화면이 검은 화면 위에 뜬다)";
     }
 
     /// <summary>발사 클립 시점(클립 초, 1배속) — 가속 1단계 · 2단계 · 끝 이벤트. 이벤트가 없는 가속 단계는 클립 끝(그 단계 없음).</summary>
@@ -218,10 +220,10 @@ public static class PodDropScheduleView
         float open = MaxEvent(map.OpenStates, out string openText);
         double opened = touchdown + open;
         sb.Append($"\n  해치 열기         ≈{touchdown:0.##} ~ {opened:0.##}s ({openText})");
-        sb.Append($"\n  디졸브            ≈{t.DissolveAt(opened):0.##} ~ {t.ReleaseAt(opened):0.##}s (열기 끝 {t.DissolveDelaySeconds:0.##}s 뒤 — 시작 순간 플레이어 보임·레터박스 걷히기 시작, 실루엣은 끝까지 끔)");
+        sb.Append($"\n  디졸브            ≈{t.DissolveAt(opened):0.##} ~ {t.ReleaseAt(opened):0.##}s (열기 끝 {t.DissolveDelaySeconds:0.##}s 뒤 — 시작 순간 플레이어 보임·레터박스 걷히기 시작)");
         sb.Append($"\n  레터박스 걷힘     ≈{t.LetterboxOutAt(opened):0.##} ~ {t.LetterboxOutAt(opened) + t.LetterboxOutSeconds:0.##}s ({t.LetterboxOutEase})");
-        sb.Append($"\n  조작 해제         ≈{t.ReleaseAt(opened):0.##}s (디졸브 끝 — 입력·실루엣 복귀, 카메라 플레이어 추적)");
-        sb.Append($"\n  연출 끝           ≈{t.EndAt(opened):0.##}s (UI·튜토리얼 S0 — S0 환영 자막은 그 뒤 착지 1초, 튜토리얼 값)");
+        sb.Append($"\n  조작 해제         ≈{t.ReleaseAt(opened):0.##}s (디졸브 끝 — 입력 복귀, 카메라 플레이어 추적)");
+        sb.Append($"\n  연출 끝           ≈{t.EndAt(opened):0.##}s (UI·실루엣 복귀·튜토리얼 S0 — S0 환영 자막은 그 뒤 착지 1초, 튜토리얼 값)");
         sb.Append(CameraLine(t.CameraZoomDelaySeconds, t.CameraZoomSeconds, t.CameraStartDistance, t.CameraEndDistance, t.CameraZoomEase));
         return sb.ToString();
     }

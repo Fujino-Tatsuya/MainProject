@@ -15,6 +15,9 @@ public sealed class PodDropSettings : ScriptableObject
     [Tooltip("레터박스 위·아래 띠 각각의 화면 높이 비율(보스 등장 연출 기본 0.04 와 같은 단위)")]
     [SerializeField, Range(0f, 0.2f)] private float letterboxHeight = 0.04f;
 
+    [Tooltip("레터박스·검은 화면 오버레이 프리팹(할 일 230). 루트 Canvas + 직계 자식 LetterboxTop·LetterboxBottom·Fade. 코드는 띠 높이 anchor·검은 화면 알파·정렬(500)만 바꾸고 색·스프라이트·장식은 프리팹 그대로. 비우면 코드 기본 구성(검은 띠). 처음 만들기 = Tools/Lobby/포드 레터박스 프리팹 만들기")]
+    [SerializeField, DataTableIgnore] private GameObject overlayPrefab;
+
     [Tooltip("로비 단계 — t=0 = 출격 집결 확정")]
     [SerializeField] private PodDropLobbyTimings lobby = PodDropLobbyTimings.Default;
 
@@ -22,6 +25,7 @@ public sealed class PodDropSettings : ScriptableObject
     [SerializeField] private PodDropMapTimings map = PodDropMapTimings.Default;
 
     public float LetterboxHeight => letterboxHeight;
+    public GameObject OverlayPrefab => overlayPrefab;
     public PodDropLobbyTimings Lobby => lobby;
     public PodDropMapTimings Map => map;
 
