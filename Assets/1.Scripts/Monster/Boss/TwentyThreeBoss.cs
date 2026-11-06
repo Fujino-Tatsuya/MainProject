@@ -479,8 +479,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     //    그래서 지속 상태(Idle/Groggy/Dead)를 **23호의 NetworkObject 에 실어** 복제한다(정본 §10.1).
     //    투척은 **일회성 이벤트**라 NetworkVariable 로 못 싣는다(같은 값이면 OnValueChanged 가 안 뜬다)
     //    → ClientRpc 로 보낸다. 이 프로젝트의 "지속=복제 / 일회성=RPC" 분리와 같다.
-    readonly NetworkVariable<BossWellsState> _wellsState = new NetworkVariable<BossWellsState>(
-        BossWellsState.Idle,
+    //    할 일 240: 순간 클립(돌진·예고·간파·제압)도 이 한 칸으로 보낸다 — 상태 + 순번(BossWellsCue)이라 같은 순간이
+    //    연달아 와도(레이지 3회) 값이 바뀌어 모든 피어가 다시 튼다. 새 RPC 없음. 늦은 클라는 마지막 순간을 한 번 튼다.
+    readonly NetworkVariable<BossWellsCue> _wellsState = new NetworkVariable<BossWellsCue>(
+        new BossWellsCue(BossWellsState.Idle, 0),
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
@@ -532,7 +534,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _wells = GetComponentInChildren<BossWells>(true);
         _wellsState.OnValueChanged += OnWellsStateChanged;
         if (_wells != null)
-            _wells.PlayState(_wellsState.Value); // 늦게 접속한 클라도 현재 상태를 받는다
+            _wells.PlayState(_wellsState.Value.State); // 늦게 접속한 클라도 현재 상태를 받는다
 
         // 전기 장판 · 자폭 드론(PLAN-boss-electric-drone) — 전 피어에 붙인다(서버는 판정, 클라는 연출).
         // NetworkBehaviour 가 아니라 프리팹 구성이 안 바뀐다. RPC 는 이 클래스가 대신 보낸다(SendFloor*/SendDrone*).
@@ -2186,6 +2188,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         float telegraph = TelegraphTime(e);
 
         _attackPhase = BossAttackPhase.Telegraph;
+        if (e.attackId == BossAttackId.Dash) CueWellsServer(BossWellsState.Windup);   // 웰즈 Charge!(할 일 240) — 돌진 예고(DashPrep 자세) 시작
         _attackPhaseTimer = telegraph;
 
         // 🔴 **예고 시작에 한 번에 스냅해 조준을 확정한다**(팀장 확정 2026-09-18).
@@ -3543,6 +3546,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// </summary>
     void BeginJumpTakeoff()
     {
+        CueWellsServer(BossWellsState.Rush);   // 웰즈 yaho!(할 일 240) — 점프 공격·송전기 진입 점프 이륙 시작
         if (JumpTakeoffDuration > 0f && !string.IsNullOrEmpty(JumpTakeoffState))
         {
             CrossFadeJumpTakeoffClientRpc();
@@ -4578,21 +4582,49 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     {
         if (!IsServer) return;
 
+        bool stunned = bossState == MonsterState.Groggy || bossState == MonsterState.Hit;
         BossWellsState next = bossState switch
         {
             MonsterState.Dead => BossWellsState.Dead,
             // Hit 은 카운터 성공 리액션이고 곧 Groggy 로 이어지므로 함께 멈춘다.
-            MonsterState.Groggy or MonsterState.Hit => BossWellsState.Groggy,
+            // 할 일 240: 그로기 종류는 진입점(StunForCounter)이 정한다 — 간파 = getownedV1, 제압 = Fear, 나머지 = groggy.
+            MonsterState.Groggy or MonsterState.Hit => _wellsStunCue,
             _ => BossWellsState.Idle,
         };
+        if (!stunned) _wellsStunCue = BossWellsState.Groggy;   // 그로기를 벗어나면 기본(그 밖 그로기 = groggy)으로
 
         _wells?.SetSuppressed(next != BossWellsState.Idle);
 
-        if (_wellsState.Value != next)
-            _wellsState.Value = next;
+        // 같은 상태면 다시 보내지 않는다(지속 상태). 순간 클립은 CueWellsServer 가 매번 보낸다.
+        // 제압 끝 groggy(GroggyEnd)로 이미 넘어간 뒤의 같은 그로기 재푸시는 Fear 로 되돌리지 않는다.
+        BossWellsState cur = _wellsState.Value.State;
+        if (cur == next || (next == BossWellsState.Fear && cur == BossWellsState.GroggyEnd)) return;
+        CueWellsServer(next);
     }
 
-    void OnWellsStateChanged(BossWellsState previous, BossWellsState next) => _wells?.PlayState(next);
+    // [서버] 다음 그로기에 웰즈가 틀 클립(할 일 240). StunForCounter 가 ForceGroggy 직전에 세우고, 그로기를 벗어나면 Groggy 로 돌아간다.
+    BossWellsState _wellsStunCue = BossWellsState.Groggy;
+
+    /// <summary>
+    /// [서버] 웰즈 순간 클립(할 일 240) — 같은 값이어도 순번을 올려 모든 피어가 다시 튼다(레이지 돌진 매 회 yaho!).
+    /// 복제는 기존 <c>_wellsState</c> 한 칸(새 RPC 없음).
+    /// </summary>
+    void CueWellsServer(BossWellsState state)
+    {
+        if (!IsServer || !IsSpawned || _wells == null) return;
+        if (State == MonsterState.Dead && state != BossWellsState.Dead) return;   // 사망 뒤엔 Fear(Die) 그대로
+        _wellsState.Value = new BossWellsCue(state, unchecked((byte)(_wellsState.Value.Seq + 1)));
+    }
+
+    // [서버] 제압 끝 무렵 Fear → groggy(할 일 240) — 기존 그로기 남은 시간(_stateTimer)이 웰즈 앞당김 초 이하가 되는 틱에 한 번.
+    void TickWellsSuppressGroggyEnd()
+    {
+        if (_wells == null || State != MonsterState.Groggy || _wellsState.Value.State != BossWellsState.Fear) return;
+        if (_stateTimer > _wells.SuppressGroggyLeadSeconds) return;
+        CueWellsServer(BossWellsState.GroggyEnd);
+    }
+
+    void OnWellsStateChanged(BossWellsCue previous, BossWellsCue next) => _wells?.PlayState(next.State);
 
     #endregion
 
@@ -5044,6 +5076,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _rageDashHitPlayed = false;
         _rageDashBlockedAhead = StartDashMove(_rageDashDir, RageDashSpeedMul, RageDashMaxDistance);
 
+        CueWellsServer(BossWellsState.Rush);   // 웰즈 yaho!(할 일 240) — 레이지 돌진 매 회
         EnterPhase(BossAttackPhase.RageDash, RageDashDuration);
     }
 
@@ -5163,6 +5196,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 아직 아무도 안 끌고 있으니 여유 0. 캐리가 성립하는 순간 다시 잡는다.
         _dashBlockedAhead = StartDashMove(_dashDir, DashSpeedMul, DashMaxDistance);
 
+        CueWellsServer(BossWellsState.Rush);   // 웰즈 yaho!(할 일 240) — 실제로 전진하기 시작하는 순간
         EnterPhase(BossAttackPhase.Dash, DashDuration);
     }
 
@@ -6301,7 +6335,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         if (IsInGimmick)
         {
             _groggyKind = BossPauseCondition.CounterGroggy;
-            StunForCounter(Mathf.Max(0.05f, groggyDuration), parryHit: true);
+            StunForCounter(Mathf.Max(0.05f, groggyDuration), parryHit: true, wellsCue: BossWellsState.ParryHit);   // 웰즈 getownedV1(할 일 240)
             Debug.Log($"[23호] 간파 성공(기믹 중) — 칸 유지 {SuppressSegmentsRemaining}/{SuppressSegmentTotal} → 그로기 {groggyDuration:0.#}초", this);
             StartVulnerable();
             return;
@@ -6324,7 +6358,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         }
 
         _groggyKind = BossPauseCondition.CounterGroggy;
-        StunForCounter(outcome.Duration, parryHit: true);   // 일반 간파 = 간파 피격 클립(쓰러지지 않음)
+        StunForCounter(outcome.Duration, parryHit: true, wellsCue: BossWellsState.ParryHit);   // 일반 간파 = 간파 피격 클립(쓰러지지 않음) · 웰즈 getownedV1(할 일 240)
         Debug.Log($"[23호] 간파 성공 — 남은 칸 {outcome.NextSegments}/{SuppressSegmentTotal} → 그로기 {outcome.Duration:0.#}초", this);
         StartVulnerable();   // 그로기 시작 시점부터 4초(D1)
     }
@@ -6377,7 +6411,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 끝날 때 칸을 다시 채우는가 — 칸으로 들어왔거나, 칸 0 예약이 기믹 보상 제압에 흡수된 경우(안 채우면 0 에 갇힌다).
         _suppressRefillsSegments = fromSegments || SuppressSegmentsRemaining == 0;
         _groggyKind = BossPauseCondition.Suppress;
-        StunForCounter(duration);
+        StunForCounter(duration, wellsCue: BossWellsState.Fear);   // 웰즈 Fear → 끝 무렵 groggy(할 일 240, TickWellsSuppressGroggyEnd)
         Debug.Log($"[23호] 제압 진입 ({reason}) — {duration:0.#}초 · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##}", this);
         SuppressStarted?.Invoke(this, duration);
     }
@@ -6603,6 +6637,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     protected override bool OnServerPreTick(float dt)
     {
+        TickWellsSuppressGroggyEnd();   // 웰즈 제압 끝 무렵 Fear → groggy(할 일 240) — 상태 무관 틱 앞, 그로기 남은 시간 기준
         // 🔴 넉백을 **먼저** 민다 — 같은 틱의 벽 도달과 취약 만료가 겹치면 환경 쪽이 먼저다(§6.5).
         bool pushing = _kbActive;
         if (_kbActive) TickVulnerableKnockback(dt);
@@ -7117,9 +7152,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     // 간파 성공·송전기·제압이 공유하는 "쓰러뜨리기". 체인 정리 + 그로기.
     /// <param name="parryHit">true = 일반 간파 성공 — 쓰러지는 그로기 대신 간파 피격 클립(<see cref="_parryHitGroggy"/>).</param>
-    void StunForCounter(float duration, bool parryHit = false)
+    /// <param name="wellsCue">웰즈가 이 그로기 동안 틀 클립(할 일 240) — 간파 = ParryHit, 제압 = Fear, 그 밖(송전기·탈진·연쇄 일부) = Groggy.</param>
+    void StunForCounter(float duration, bool parryHit = false, BossWellsState wellsCue = BossWellsState.Groggy)
     {
         _parryHitGroggy.Value = parryHit;   // 🔴 ForceGroggy(상태 변경)보다 먼저 — 같은 틱에 상태보다 먼저 적용된다
+        _wellsStunCue = wellsCue;           // 🔴 ForceGroggy 보다 먼저 — 상태 변경 콜백(PushWellsState)이 이 값을 읽는다
         // 🔴 [G6] 리액션 방향을 **체인 정리보다 먼저** 확정한다 — AbortAttackChain 이 진행 중 공격을
         //    비우고 나면 "무엇을 끊었는지"를 알 수 없다.
         _hitReactionRight.Value = ResolveHitReactionRight(_currentEntry);
@@ -7132,6 +7169,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         //    ForceHitReaction(HitReactionDuration, groggy) 라 SO 의 0.5 위에 0.4 가 얹혀
         //    실제 행동 불능이 0.9초였다 — SO 값이 곧 체감 시간이어야 튜닝이 성립한다.
         ForceGroggy(duration);
+        // 이미 그로기였으면 상태 변경 콜백이 안 뜬다(간파 그로기 중 제압 등) — 웰즈 클립만 다시 민다(같으면 무시).
+        PushWellsState(State);
     }
 
     /// <param name="windowDuration">열 때 판정 창 길이를 알면 넘긴다 → 표시가 그보다 0.15초 먼저 꺼진다. 0 이하 = 닫을 때 끈다.</param>

@@ -155,6 +155,7 @@ public partial class TwentyThreeBoss
         if (_raidGimmick == RaidGimmick.PushNorth) ReleasePushNorthDownPose();   // 얼린 채면 피격 리액션이 안 넘어간다
         if (_boss != null && !string.IsNullOrEmpty(_boss.hitReactionState))
             CrossFadeStateClientRpc(_boss.hitReactionState);
+        CueWellsServer(BossWellsState.ParryHit);   // 웰즈 getownedV1(할 일 240) — 릴레이·연쇄·북진 압박 간파 경직
 
         if (_raidGimmick == RaidGimmick.Relay) OnRelayCounter(id);
         else if (_raidGimmick == RaidGimmick.PushNorth) OnPushNorthCounter();

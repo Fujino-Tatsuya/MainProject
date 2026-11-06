@@ -499,6 +499,27 @@ TakeDamage → EvaluatePhase():
 클립: `Boss_welz_idle` / `_throwing` / `_jump` / `_groggy` / `_die`.
 `Throw`·`Jump` 는 `hasExitTime: true` 라 클립이 끝나면 스스로 Idle 로 돌아온다(23호와 반대).
 
+### 10.3 웰즈 순간 클립 (할 일 240, 2026-11-06)
+
+클립은 239 메뉴 `Tools/Boss/웰즈 애니 클립 분리 (239)` 가 FBX 서브클립에서 뽑은 `.anim`(`Assets/4.Animations/Wells&No.23/Wells/Clips/`)이다.
+같은 메뉴가 이 절의 상태·전이(`Fear` 상태, `yaho!`·`getownedV1`·`Throw` → Idle exit-time 0.95)도 만든다. 다시 실행해도 GUID 와 이미 있는 전이는 그대로다.
+
+| 순간(서버 지점) | 웰즈 상태 | 애니메이터 상태(클립) | 끝 |
+|---|---|---|---|
+| 돌진 예고 시작 — `BeginTelegraph`(공격 종류 Dash, DashPrep 자세) | `Windup` | `Throw`(Charge!) | 끝까지 재생 후 Idle |
+| 평소 돌진 전진 — `EnterPhase(Dash)` · 레이지 돌진 매 회 — `EnterPhase(RageDash)` | `Rush` | `yaho!` | 끝까지 재생 후 Idle |
+| 점프 이륙 — `BeginJumpTakeoff`(점프 공격·송전기 진입 점프) | `Rush` | `yaho!` | 끝까지 재생 후 Idle |
+| 간파 당함 — 일반·대쉬·기믹 중 간파(`StunForCounter(…, ParryHit)`), 릴레이·연쇄·북진 압박 간파 경직(`OnRaidGimmickCounter`) | `ParryHit` | `getownedV1` | 끝까지 재생 후 Idle |
+| 제압(칸 0·기믹 보상·구출 전부 `EnterSuppress`) | `Fear` | `Fear` | 마지막 프레임 유지 |
+| 제압 남은 그로기 시간(`_stateTimer`) ≤ `BossWells.suppressGroggyLeadSeconds`(기본 2초) | `GroggyEnd` | `Groggy`(groggy) | 제압이 끝나면 `IsInit` 으로 Idle |
+| 그 밖 그로기(송전기 전멸·Q 경직·릴레이 탈진·연쇄 일부 성공) | `Groggy` | `Groggy` | 기존 그대로 |
+| 사망 | `Dead` | `Die`(Fear) | 기존 그대로 |
+
+- **복제**: 기존 `_wellsState` 한 칸을 `BossWellsCue`(상태 + 순번 byte)로 바꿨다 — 같은 순간이 연달아 와도(레이지 3회) 순번이 바뀌어 모든 피어가 다시 튼다. 새 RPC 없음. 늦은 클라는 마지막 순간을 한 번 튼다.
+- **덮어쓰기**: 다음 순간이 오면 즉시 CrossFade(0.1초 고정). 23호가 Idle 로 돌아와도 재생 중인 한 번짜리 클립은 끊지 않는다(`BossWells.ReturnToIdle`).
+- **코드 구동 방식**: 순간 클립은 트리거가 아니라 **상태 이름으로 바로 CrossFade** 한다(`BossWells` 의 `rushState`·`windupState`·`parryHitState`·`fearState`·`groggyEndState`·`idleState` 칸). 상태가 없으면 조용히 안 나오고, 스폰 때 `ValidateContract` 가 경고한다.
+- 레이드 기믹 돌진(`BeginGimmickDash` — 실패 돌진·지목 돌진)은 이번 범위 밖이다(예고·전진 모두 웰즈 클립 없음 = Idle). 넣으려면 `BeginGimmickDash` 에 `CueWellsServer(Rush)` 한 줄.
+
 ---
 
 ## 10.5 폭탄 / 장판 — 물리 채택 + 장판 일반화 🔴 신규 범위
