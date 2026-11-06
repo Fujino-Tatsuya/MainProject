@@ -103,7 +103,7 @@ public static class InterruptVfxToggles
 
     /// <summary>
     /// 그 VFX 를 함께 막는 디렉터 칸(B1·B2·B3·C1·C2). 거너는 없음(false).
-    /// 🔴 이 칸들은 NetworkManager.prefab 에서 기본 꺼짐(할 일 104) — 꺼져 있으면 이 토글이 켬이어도 안 나온다. 랩은 켤 때 이 칸도 런타임으로 켠다.
+    /// 이 칸들은 11-06(할 일 238 사용자 결정)부터 NetworkManager.prefab 기본 켬(104~238 사이엔 꺼짐). 꺼져 있으면 이 토글이 켬이어도 안 나온다 — 랩은 켤 때 이 칸도 런타임으로 켠다.
     /// </summary>
     public static bool TryGetDirectorCue(InterruptVfx vfx, out InterruptProductionCue cue)
     {

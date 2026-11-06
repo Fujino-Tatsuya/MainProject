@@ -113,7 +113,7 @@ public sealed class InterruptVfxTogglesTests
         var go = new UnityEngine.GameObject("Director");
         try
         {
-            var director = go.AddComponent<InterruptProductionDirector>(); // 새 컴포넌트 = 칸 전부 꺼짐(프리팹 기본과 같다)
+            var director = go.AddComponent<InterruptProductionDirector>(); // 새 컴포넌트 = 칸 전부 꺼짐(코드 기본값 — 프리팹은 11-06부터 켬)
             foreach (InterruptVfx vfx in InterruptVfxToggles.All)
             {
                 bool hasCue = InterruptVfxToggles.TryGetDirectorCue(vfx, out InterruptProductionCue cue);

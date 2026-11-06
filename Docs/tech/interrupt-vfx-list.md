@@ -3,6 +3,8 @@
 > 플레이어 캐릭터(팔라딘·거너·어쌔신) **간파 스킬 자체**의 VFX 목록과, DebugInterruptLab 에서 하나씩 켜고 끄는 방법.
 > 공용 간파 연출(`InterruptProductionDirector` 의 V3 적중 라이트·암순응·블룸·화이트아웃·불꽃·빛줄기·슬로우 등)은 **이 문서와 토글 범위 밖**이다
 > — 그쪽은 [interrupt-presentation.md](interrupt-presentation.md) 와 랩의 '단계·버전 선택'·'화면 효과' 섹션.
+> 예외 하나(할 일 238, 11-06): **거너가 간파 성공하면** 공용 V3 적중 라이트의 빛줄기(`Rays`)·불꽃(`Sparks`)을 빼고 포인트 라이트를 거너 이펙트 파랑(`FX_Arrow_hail` LightFlash)으로 — 일반·대쉬·제압 모두.
+> 칸은 디렉터 `gunnerHitLight`(랩 토글 아님), 상세 [interrupt-presentation.md §9.10](interrupt-presentation.md).
 
 ## 1. 목록
 
@@ -49,9 +51,9 @@
   - 클립 이벤트 VFX: `EffectAnimEvents.PlayEffect`·`StartEffect` 가 id → 키(`InterruptVfxToggles.TryGetAnimEffect`)로 묻는다. 꺼도 `Played` 이벤트는 그대로 난다 — 어쌔신 성공 VFX 가 올려치기 프레임을 기준으로 쓰기 때문.
 - 규칙
   - 기본 전부 켬. 끄면 그 VFX **재생만** 건너뛴다 — 판정·슬로우·공용 간파 연출·다른 VFX 는 그대로. 끄는 쪽(Stop·FadeOut·회수)은 막지 않는다.
-  - 디렉터 칸(B1·B2·B3·C1·C2)과 **둘 다 켜져 있어야** 나온다. 🔴 그 칸들은 `NetworkManager.prefab` 에서 **기본 꺼짐**(할 일 104 이후 그대로 — dev 도 같다)이라
-    지금 게임에선 팔라딘·어쌔신 간파 VFX 가 안 나온다(거너는 칸이 없어 나옴). 랩 토글은 '실제로 나오는가'(`IsEffective` = 토글 ∧ 칸)를 보여 주고,
-    켤 때 그 칸도 런타임으로 켠다(`SetEffective`, 저장 안 함). 끌 때는 토글만 끈다(칸은 같은 칸의 다른 VFX 도 막으므로). 게임 기본값을 켤지는 별도 결정.
+  - 디렉터 칸(B1·B2·B3·C1·C2)과 **둘 다 켜져 있어야** 나온다. 그 칸들은 11-06(할 일 238 사용자 결정)부터 `NetworkManager.prefab` **기본 켬** —
+    팔라딘·어쌔신 간파 VFX 가 실전에 나온다(할 일 104~238 사이엔 꺼져 있어 안 나왔음, 거너는 칸이 없어 늘 나옴). 그래서 랩 토글 기본(전부 켬)이 실전과 같다.
+    랩 토글은 '실제로 나오는가'(`IsEffective` = 토글 ∧ 칸)를 보여 주고, 켤 때 그 칸도 런타임으로 켠다(`SetEffective`, 저장 안 함). 끌 때는 토글만 끈다(칸은 같은 칸의 다른 VFX 도 막으므로).
   - 로컬(복제 안 함) — 이 피어 화면만. 저장 안 함(PlayerPrefs 없음) — Play 를 시작할 때마다 전부 켬(`RuntimeInitializeOnLoadMethod(SubsystemRegistration)`).
   - 에디터·개발 빌드에서만 동작(`GateActive`). 릴리스 빌드는 늘 켬.
   - 루프(방패 발광·기 모으기)를 재생 중에 꺼도 이번 재생은 끝까지 간다 — 다음 시전부터.

@@ -191,6 +191,13 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
     [Tooltip("3단계 제압 간파 화이트아웃 스위치(본인 화면만) — 끄면 제압 SO 의 whiteoutFrames 와 무관하게 안 나온다. SO 프레임 0 으로도 끌 수 있다(둘 중 하나만 꺼도 끔)")]
     [DataTableIgnore, SerializeField] private bool suppressWhiteout = true;
 
+    [Header("성공 — 시전자 캐릭터별 적중 라이트(할 일 238)")]
+    [Tooltip("거너가 간파 성공했을 때만 — 숨길 파티클(기본 빛줄기 Rays·불꽃 Sparks)·포인트 라이트 색(기본 = FX_Arrow_hail LightFlash 색). 일반·대쉬·제압 세 단계 공통. 팔라딘·어쌔신은 그대로")]
+    [DataTableIgnore, SerializeField] private InterruptHitLightCasterOverride gunnerHitLight = new InterruptHitLightCasterOverride();
+
+    /// <summary>거너 적중 라이트 덮어쓰기 칸(할 일 238) — 런타임 값(디버그·테스트).</summary>
+    public InterruptHitLightCasterOverride GunnerHitLight => gunnerHitLight;
+
     // 간파 연출 4단계(할 일 192) — 실패 / 간파 / 대쉬 간파 / 제압 간파. 단계는 성공 사건(슬로우 Start 이벤트의 제압·대쉬 칸)으로 고르고,
     // 오너 시도 암전은 입력 순간 예측한 단계로 고른다. 이 피어 값을 쓴다(사건마다 읽음). 문서: interrupt-presentation.md §8.
     // 실패 = 단계 설정 없음(약 예측 = 약한 줌만, 강 예측의 판정 실패 = 그 순간 연출 종료 — 191 D4).
@@ -1017,8 +1024,15 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
             Tier = e.Tier,                       // 219 — V3 단계별 SO·프리팹(빈 칸 = 1단계)·제압 화이트아웃
             SuppressWhiteout = suppressWhiteout,
+            FxOverride = CasterHitLightOverride(e.CasterClientId), // 238 — 거너: 빛줄기·불꽃 숨김·라이트 색(세 단계 공통)
         }, Time.unscaledTime, Time.frameCount);
     }
+
+    // 시전자 캐릭터별 적중 라이트 덮어쓰기(할 일 238) — 시전자 플레이어의 간파 스킬 종류로 고른다(모든 피어가 자기 스폰 목록으로 같은 답).
+    private InterruptHitLightFxOverride CasterHitLightOverride(ulong casterClientId) =>
+        FindInterruptSkill(casterClientId) is GunnerInterruptSkill
+            ? InterruptHitLightCasterOverride.ToFx(gunnerHitLight)
+            : default;
 
     // 빛 모임 — 발동자 소유의 켜진 InterruptLightGatherSocket(Player.prefab base 루트). 찾는 방식은 FindSuccessFxSinks 와 같다.
     private IInterruptLightGatherPlayer FindLightGatherSocket(ulong casterClientId)

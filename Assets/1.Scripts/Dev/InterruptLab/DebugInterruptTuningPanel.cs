@@ -418,8 +418,8 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     // 끄면 그 VFX 재생만 건너뛴다(판정·슬로우·공용 간파 연출 그대로). 목록 = Docs/tech/interrupt-vfx-list.md.
     void DrawCharacterVfx()
     {
-        // 표시·조작 = '실제로 나오는가'(이 토글 ∧ 디렉터 B1·B2·B3·C1·C2 칸). 그 칸들은 NetworkManager.prefab 에서 기본 꺼짐(할 일 104)이라
-        // 켤 때 칸도 런타임으로 켠다(저장 안 함 — Play 끝나면 프리팹 값). 끌 때는 이 토글만.
+        // 표시·조작 = '실제로 나오는가'(이 토글 ∧ 디렉터 B1·B2·B3·C1·C2 칸). 그 칸들은 11-06(할 일 238)부터 NetworkManager.prefab 기본 켬 —
+        // 런타임에 꺼져 있으면 켤 때 칸도 런타임으로 켠다(저장 안 함 — Play 끝나면 프리팹 값). 끌 때는 이 토글만.
         InterruptProductionDirector director = InterruptProductionDirector.Instance;
         switch (ButtonRow("전체 켬", "전체 끔"))
         {
