@@ -31,6 +31,9 @@ public class HealthVignetteHUD : MonoBehaviour
     [Header("피격 플래시")]
     [SerializeField, Min(0f)] private float flashDuration = 0.2f;
     [SerializeField, Range(0f, 1f)] private float flashAlpha = 0.7f;
+    [Tooltip("피격 플래시 알파 모양. 가로 = 피격 후 경과(0 = 맞은 순간, 1 = 플래시 시간 끝), 세로 = 플래시 알파 대비 배율(1 = 플래시 알파 그대로, 0 = 안 보임). " +
+             "기본 = (0,1)→(1,0) 직선(선형으로 빠짐). 1 이 넘어도 최종 알파는 1 에서 잘린다. 키를 다 지우면 직선으로 돈다.")]
+    [SerializeField] private AnimationCurve flashCurve = HealthVignetteModel.DefaultFlashCurve();
     [Tooltip("시작 비율 이상에서 맞을 때 플래시 색.")]
     [SerializeField] private Color flashSafeColor = Color.white;
     [Tooltip("체력 0 에 가까울 때 플래시 색. 시작 비율 아래에서 안전색 → 이 색으로 보간.")]
@@ -180,7 +183,7 @@ public class HealthVignetteHUD : MonoBehaviour
         if (flashElapsed < float.MaxValue)
             flashElapsed += deltaTime;
         float currentFlashAlpha = HealthVignetteModel.ActiveFlashAlpha(
-            alive, HealthVignetteModel.FlashAlpha(flashElapsed, flashDuration, flashAlpha));
+            alive, HealthVignetteModel.FlashAlpha(flashElapsed, flashDuration, flashAlpha, flashCurve));
         Color currentFlashColor = HealthVignetteModel.FlashColor(ratio, startRatio, flashSafeColor, flashDangerColor);
 
         Color color = HealthVignetteModel.Compose(vignetteColor, vignetteAlpha, currentFlashColor, currentFlashAlpha, darken);

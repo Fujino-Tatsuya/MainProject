@@ -134,6 +134,34 @@ public sealed class HealthVignetteModelTests
     }
 
     [Test]
+    public void FlashAlpha_DefaultCurveMatchesLinear()
+    {
+        AnimationCurve curve = HealthVignetteModel.DefaultFlashCurve();
+        foreach (float elapsed in new[] { -0.01f, 0f, 0.03f, 0.05f, 0.1f, 0.15f, 0.199f, 0.2f, 1f, float.MaxValue })
+        {
+            Assert.That(HealthVignetteModel.FlashAlpha(elapsed, 0.2f, 0.7f, curve),
+                Is.EqualTo(HealthVignetteModel.FlashAlpha(elapsed, 0.2f, 0.7f)).Within(Tolerance), $"elapsed={elapsed}");
+        }
+        Assert.That(HealthVignetteModel.FlashAlpha(0f, 0f, 0.7f, curve), Is.EqualTo(0f));
+    }
+
+    [Test]
+    public void FlashAlpha_EmptyCurveFallsBackToLinear()
+    {
+        Assert.That(HealthVignetteModel.FlashAlpha(0.1f, 0.2f, 0.7f, null), Is.EqualTo(0.35f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.FlashAlpha(0.1f, 0.2f, 0.7f, new AnimationCurve()), Is.EqualTo(0.35f).Within(Tolerance));
+    }
+
+    [Test]
+    public void FlashAlpha_CustomCurveScalesPeakAndClampsNegative()
+    {
+        // 0.5 지점까지 1 유지 후 -1 로 — 앞 구간은 peak 그대로, 음수 배율은 0 으로 잘림.
+        var hold = new AnimationCurve(new Keyframe(0f, 1f, 0f, 0f), new Keyframe(0.5f, 1f, 0f, 0f), new Keyframe(1f, -1f, 0f, 0f));
+        Assert.That(HealthVignetteModel.FlashAlpha(0.1f, 1f, 0.7f, hold), Is.EqualTo(0.7f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.FlashAlpha(0.99f, 1f, 0.7f, hold), Is.EqualTo(0f));
+    }
+
+    [Test]
     public void Compose_FlashOverridesColorWhileStrongerThanVignette()
     {
         Color composed = HealthVignetteModel.Compose(Color.red, 0.2f, Color.white, 0.8f, 0f);

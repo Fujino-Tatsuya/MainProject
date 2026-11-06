@@ -76,6 +76,28 @@ public static class HealthVignetteModel
     }
 
     /// <summary>
+    /// 피격 플래시 알파를 커브로. 커브 x = 정규화 시간(0 = 피격 순간, 1 = duration 끝), y = peak 대비 배율.
+    /// duration 밖이면 0, 음수 배율은 0 으로 자른다. 커브가 비었으면(null·키 없음) 선형 <see cref="FlashAlpha(float, float, float)"/>.
+    /// 기본 커브 <see cref="DefaultFlashCurve"/> = (0,1)→(1,0) 직선이라 선형 버전과 같은 값.
+    /// </summary>
+    public static float FlashAlpha(float elapsed, float duration, float peakAlpha, AnimationCurve curve)
+    {
+        if (curve == null || curve.length == 0)
+            return FlashAlpha(elapsed, duration, peakAlpha);
+
+        if (duration <= 0f || elapsed < 0f || elapsed >= duration)
+            return 0f;
+
+        return Mathf.Max(0f, peakAlpha * curve.Evaluate(elapsed / duration));
+    }
+
+    /// <summary>피격 플래시 기본 커브 — (0,1)→(1,0) 직선(기존 선형 감쇠와 동일).</summary>
+    public static AnimationCurve DefaultFlashCurve()
+    {
+        return AnimationCurve.Linear(0f, 1f, 1f, 0f);
+    }
+
+    /// <summary>
     /// 평상시 비네팅과 플래시를 이미지 하나의 색으로 합친다. 알파는 둘 중 큰 쪽, RGB 는 플래시 비중만큼 플래시 색으로.
     /// 마지막에 <paramref name="darken"/>(0..1)만큼 RGB 에 검은색을 곱한다 — 사망·Soul·관전 표현.
     /// </summary>
