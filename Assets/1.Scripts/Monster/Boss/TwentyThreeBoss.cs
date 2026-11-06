@@ -6909,11 +6909,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         return _victoryHitValid;
     }
 
-    /// <summary>[서버] 승리 연출 슬로모션 구간(0.12~2.00)엔 사망 클립·디졸브 대기가 클라 애니와 같은 배율로만 흐른다(C6, 경석 10-27).</summary>
+    /// <summary>[서버] 승리 연출 중 사망 클립 대기가 클라 애니와 같은 배율로만 흐른다 — 추가 연출 구간 0 · 슬로모션 구간 slowMotionScale(C6, 경석 10-27 · 할 일 200 G).</summary>
     protected override float DeathPresentationTimeScale =>
-        BossEncounterDirector.Instance != null && BossEncounterDirector.Instance.IsVictoryWorldFrozenFor(this)
-            ? BossVictoryConfig.Load().slowMotionScale
-            : 1f;
+        BossEncounterDirector.Instance != null ? BossEncounterDirector.Instance.VictoryDeathTimeScaleFor(this) : 1f;
+
+    /// <summary>[서버] 보스 B 승리 연출이면 디졸브·디스폰 없이 사망 자세로 남는다 — 사망 클립 끝 + 대기 뒤 사망 완료만 알린다(할 일 200 G).</summary>
+    protected override bool KeepsCorpseOnDeath =>
+        BossEncounterDirector.Instance != null && BossEncounterDirector.Instance.IsVictoryBoss(this);
 
     // 승리 연출 대상(보스 B)일 수 있는 건 23호뿐 — 대기를 프레임 단위로 센다. 연출이 없으면 멈춤이 0 이라 결과는 같다.
     protected override bool CanPauseDeathPresentation => true;

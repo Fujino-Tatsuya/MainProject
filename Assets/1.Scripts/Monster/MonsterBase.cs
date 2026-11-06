@@ -2000,6 +2000,7 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     IEnumerator PlayDeathEffectAfterClip(IDeathEffect fx)
     {
         float hold = 0f;
+        float clipLead = 0f;   // hold 에서 뺀 디졸브 앞당김 — 디졸브 없이 사망 자세로 남을 땐 다시 기다린다(클립 끝까지)
         // 클립 없는 몹(deathTrigger 파라미터 없음)은 PlayStateAnimation 이 애니를 얼린다 → 기다릴 게 없다.
         if (animator != null && data != null && HasParameter(animator, data.deathTrigger))
         {
@@ -2020,7 +2021,9 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
 
                 // length 는 상태 속도가 반영된 초. 이미 흐른 만큼 뺀다. 루프 클립은 한 바퀴로 친다.
                 float remain = st.length * (1f - Mathf.Clamp01(st.normalizedTime));
-                hold = Mathf.Max(0f, Mathf.Min(remain, MaxDeathClipHold) - fx.LeadBeforeClipEnd) + fx.DelayAfterClipEnd;
+                float clip = Mathf.Min(remain, MaxDeathClipHold);
+                clipLead = Mathf.Min(Mathf.Max(0f, fx.LeadBeforeClipEnd), clip);
+                hold = Mathf.Max(0f, clip - fx.LeadBeforeClipEnd) + fx.DelayAfterClipEnd;
                 // 사망은 몹당 한 번뿐인 사건이라 로그가 넘치지 않는다. "끝났는데 안 녹는다"를 숫자로 가리는 용도.
                 Debug.Log($"[Death] {name}: 사망 클립 남은 {remain:0.00}초 − 앞당김 {fx.LeadBeforeClipEnd:0.00}초 " +
                           $"+ 끝난 뒤 대기 {fx.DelayAfterClipEnd:0.00}초 → {hold:0.00}초 뒤 디졸브", this);
@@ -2029,11 +2032,28 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
         }
 
         yield return WaitUnpaused(hold);
+
+        // 보스 B 승리 연출: 디졸브·디스폰 없이 사망 자세로 남는다 — 사망 클립 끝 + 끝난 뒤 대기에서 '사망 연출 끝'만 알린다(할 일 200 G).
+        if (KeepsCorpseOnDeath)
+        {
+            yield return WaitUnpaused(clipLead);
+            Debug.Log($"[Death] {name}: 사망 자세 유지(디졸브 없음) — 사망 연출 끝 알림", this);
+            ServerDeathSequenceCompleted?.Invoke();
+            yield break;
+        }
+
         fx.Play(DespawnNow);
     }
 
     /// <summary>
-    /// [서버] 지금 사망 표현이 흐르는 배율(보스 B 승리 연출 0.12~2.00초 슬로모션 — PLAN-boss-victory-cinematic C6, 경석 10-27).
+    /// [서버] 디졸브·디스폰 없이 사망 자세로 남는가(보스 B 승리 연출 — 할 일 200 G). 클립 대기가 끝난 시점에 읽는다(처치 순간 연출 시작 뒤).
+    /// true 면 사망 클립 끝 + <see cref="IDeathEffect.DelayAfterClipEnd"/> 에 <see cref="ServerDeathSequenceCompleted"/> 만 올리고 NetworkObject 는 남긴다(씬 전환이 정리).
+    /// 기본 false = 기존 동작.
+    /// </summary>
+    protected virtual bool KeepsCorpseOnDeath => false;
+
+    /// <summary>
+    /// [서버] 지금 사망 표현이 흐르는 배율(보스 B 승리 연출 — 추가 연출 구간 0 · 슬로모션 구간 늦춤, PLAN-boss-victory-cinematic C6 · 경석 10-27 · 할 일 200).
     /// 기본 1 = 기존 동작 그대로. 1 보다 작으면 사망 클립 검출·클립 대기·지연 디스폰이 그 배율로만 흐른다 → 애니와 같은 시계(0 = 완전 정지).
     /// </summary>
     protected virtual float DeathPresentationTimeScale => 1f;

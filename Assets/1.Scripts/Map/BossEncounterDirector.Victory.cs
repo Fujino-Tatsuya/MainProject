@@ -27,6 +27,8 @@ public sealed partial class BossEncounterDirector
         public Vector3 EndPosition;
         public Quaternion EndRotation;
         public float Fov;
+        /// <summary>추가 연출 구간 길이(초, 할 일 200) — 처치 순간 서버가 설정에서 읽어 담는다. 단계 시각 = 경과 − 이 값.</summary>
+        public float PreludeSeconds;
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
@@ -41,16 +43,20 @@ public sealed partial class BossEncounterDirector
             s.SerializeValue(ref EndPosition);
             s.SerializeValue(ref EndRotation);
             s.SerializeValue(ref Fov);
+            s.SerializeValue(ref PreludeSeconds);
         }
 
         public bool Equals(VictoryState o) =>
             Active == o.Active && Sequence == o.Sequence && StartServerTime.Equals(o.StartServerTime) &&
             BossNetworkObjectId == o.BossNetworkObjectId && KillerClientId == o.KillerClientId &&
             HitPoint == o.HitPoint && FinalPosition == o.FinalPosition && FinalRotation == o.FinalRotation &&
-            EndPosition == o.EndPosition && EndRotation == o.EndRotation && Fov.Equals(o.Fov);
+            EndPosition == o.EndPosition && EndRotation == o.EndRotation && Fov.Equals(o.Fov) && PreludeSeconds.Equals(o.PreludeSeconds);
 
         /// <summary>처치 확정부터 지난 시간(초).</summary>
         public float Elapsed(double serverNow) => (float)(serverNow - StartServerTime);
+
+        /// <summary>단계 시각(경과 − 추가 연출 구간). <see cref="BossVictoryRules"/> 의 경계는 전부 이 시각 기준이다.</summary>
+        public float StageTime(double serverNow) => BossVictoryRules.StageTime(Elapsed(serverNow), PreludeSeconds);
     }
 
     private readonly NetworkVariable<VictoryState> _victory = new NetworkVariable<VictoryState>(
@@ -64,13 +70,24 @@ public sealed partial class BossEncounterDirector
     private bool _victoryLockApplied;       // 2.00초에 정식 잠금(스킬 취소·무적)을 걸었다(Q1)
     private double _victoryMinResultAt;     // 결과 화면 전환 하한 = 시작 + 3.20초(C6)
 
-    /// <summary>[서버] 이 보스의 사망 표현이 지금 멈춰 있어야 하는가(0.12~2.00초). 사망 연출 대기가 읽는다.</summary>
-    public bool IsVictoryWorldFrozenFor(NetworkBehaviour boss)
+    /// <summary>
+    /// [서버] 이 보스의 사망 표현이 지금 흐르는 배율 — 승리 연출 대상이 아니면 1. 추가 연출 구간 = 0(사망 애니는 그 뒤 — 할 일 200 G),
+    /// 슬로모션 구간 = <see cref="BossVictoryConfig.slowMotionScale"/>. 사망 연출 대기(<c>MonsterBase.DeathPresentationTimeScale</c>)가 읽는다.
+    /// </summary>
+    public float VictoryDeathTimeScaleFor(NetworkBehaviour boss)
+    {
+        if (!IsSpawned || boss == null) return 1f;
+        VictoryState v = _victory.Value;
+        if (!v.Active || v.BossNetworkObjectId != boss.NetworkObjectId) return 1f;
+        return BossVictoryRules.DeathTimeScale(v.StageTime(NetworkManager.ServerTime.Time), BossVictoryConfig.Load().slowMotionScale);
+    }
+
+    /// <summary>[서버] 이 보스가 승리 연출(보스 B) 대상인가 — 디졸브·디스폰 없이 사망 자세로 남는다(할 일 200 G).</summary>
+    public bool IsVictoryBoss(NetworkBehaviour boss)
     {
         if (!IsSpawned || boss == null) return false;
         VictoryState v = _victory.Value;
-        if (!v.Active || v.BossNetworkObjectId != boss.NetworkObjectId) return false;
-        return BossVictoryRules.IsWorldFrozen(v.Elapsed(NetworkManager.ServerTime.Time));
+        return v.Active && v.BossNetworkObjectId == boss.NetworkObjectId;
     }
 
     // [서버] 보스 스폰 직후 — 이 인스턴스가 B 인가.
@@ -140,6 +157,7 @@ public sealed partial class BossEncounterDirector
         };
         BossVictoryRules.Composition comp = BossVictoryRules.Compose(subjects, cfg.ToFraming());
 
+        float prelude = Mathf.Max(0f, cfg.preludeSeconds);   // 추가 연출 구간(할 일 200) — 이 뒤로 모든 단계가 밀린다
         double now = NetworkManager.ServerTime.Time;
         _victory.Value = new VictoryState
         {
@@ -154,6 +172,7 @@ public sealed partial class BossEncounterDirector
             EndPosition = comp.EndPose.Position,
             EndRotation = comp.EndPose.Rotation,
             Fov = cfg.fov,
+            PreludeSeconds = prelude,
         };
 
         // 처치 순간: 피해 무시(D3) · 전역 슬로모션 강제 해제(C11). 입력은 각 오너가 상태를 보고 막는다(Q1 — 공격 동작은 살려 둔다).
@@ -161,21 +180,21 @@ public sealed partial class BossEncounterDirector
             players[i].GetComponent<PlayerInvulnerability>()?.AddServerToken(InvulnerabilityCause.BossVictory, 0.0);
         GlobalTimeScale.Instance?.ServerForceReset();
 
-        // 결과 화면: 하한 = 끝(3.20초), 안전망은 정지 구간만큼 미룬다(C6).
+        // 결과 화면: 하한 = 추가 연출 구간 + 단계 끝(3.20초), 안전망은 추가 연출 구간 + 슬로모션 구간만큼 미룬다(C6 · 할 일 200).
         _victoryLockApplied = false;
-        _victoryMinResultAt = now + BossVictoryRules.End;
-        if (_resultTransitionAt > 0d) _resultTransitionAt += BossVictoryRules.FreezeDuration;
+        _victoryMinResultAt = now + prelude + BossVictoryRules.End;
+        if (_resultTransitionAt > 0d) _resultTransitionAt += BossVictoryRules.ResultSafetyDelay(prelude);
 
         Edit.Log($"[BossVictory] 시작 — 막타 client {killer.OwnerClientId}(기록 {(killer.OwnerClientId == hitClientId ? "있음" : "없음 → 대체")}) · " +
-                 $"팀원 {teammates.Count}명 · 구도 방위 {comp.Yaw:0}° 거리 {comp.Distance:0.0}m 점수 {comp.Score:0.00}", this);
+                 $"팀원 {teammates.Count}명 · 구도 방위 {comp.Yaw:0}° 거리 {comp.Distance:0.0}m 점수 {comp.Score:0.00} · 추가 연출 구간 {prelude:0.00}초", this);
     }
 
-    // [서버] Update — 2.00초에 정식 잠금(Q1: 정지가 풀리며 스킬 취소·전투 입력 차단).
+    // [서버] Update — 단계 2.00초(추가 연출 구간 뒤)에 정식 잠금(Q1: 정지가 풀리며 스킬 취소·전투 입력 차단).
     private void TickVictoryServer()
     {
         VictoryState v = _victory.Value;
         if (!v.Active || _victoryLockApplied) return;
-        if (v.Elapsed(NetworkManager.ServerTime.Time) < BossVictoryRules.FreezeEnd) return;
+        if (v.StageTime(NetworkManager.ServerTime.Time) < BossVictoryRules.FreezeEnd) return;
 
         _victoryLockApplied = true;
         foreach (KeyValuePair<ulong, NetworkClient> pair in NetworkManager.ConnectedClients)
@@ -184,10 +203,10 @@ public sealed partial class BossEncounterDirector
             PlayerEncounterLock encounterLock = po != null ? po.GetComponent<PlayerEncounterLock>() : null;
             if (encounterLock != null) encounterLock.SetCinematicInputLockServer(true);
         }
-        Edit.Log("[BossVictory] 2.00초 — 정지 해제 · 전원 연출 잠금(스킬 취소)", this);
+        Edit.Log("[BossVictory] 단계 2.00초 — 슬로모션 해제 · 전원 연출 잠금(스킬 취소)", this);
     }
 
-    // 결과 화면 전환을 지금 막아야 하는가(승리 연출 3.20초 전).
+    // 결과 화면 전환을 지금 막아야 하는가(추가 연출 구간 + 단계 3.20초 전).
     private bool HoldsResultForVictory() =>
         _victoryMinResultAt > 0d && NetworkManager.ServerTime.Time < _victoryMinResultAt;
 

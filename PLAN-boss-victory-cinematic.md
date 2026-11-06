@@ -1,6 +1,7 @@
 # PLAN — 보스 B 승리 연출 (BOSS DOWN)
 
 > 상태: ✅ 경석 승인(2026-10-27 — Q1~Q3 권장안, R1~R6 문서대로) → ✅ 구현(10-27, 미커밋) · 컴파일 0 · 전투 EditMode 402/0(승리 규칙 38 추가) · ⏳ 경석 Play · ⏳ MPPM. 브랜치 `feature/SettingsDdol`(development `6135a330` 위).
+> **11-06 할 일 200 1차 정리 → [§10](#10-할-일-200--엔딩-연출-1차-정리-11-06-사용자-결정--브랜치-featurebossvictoryrework1)** — 추가 연출 구간·단색 배경·이펙트 단색·색 원복/글리치/타이포/디졸브 삭제·234 벽 제한 삭제 → 벽 숨김. 앞 절과 다르면 §10 이 맞다.
 > 기획 원본: `C:\Users\user\Downloads\보스_승리연출_v02_프로그래머_전달사양.md`(2026-10-26, 콘티 v02) — 이 문서의 시간·색·배치 수치를 시작값으로 쓴다.
 > 레퍼런스: Zenless Zone Zero WIPEOUT 모음(https://www.youtube.com/watch?v=KfjGNVzCIdA) — 막타 → 흰 번쩍 → 낮은 카메라 정지 · 주황 배경 · 탈색 인물 · 인물 **뒤** 큰 글자.
 
@@ -187,3 +188,39 @@
 | 보스 이펙트 | 처치 순간(모든 피어) 보스 공격·타격·바닥 예고를 전부 걷는다 — 훅 도중 처치되면 이펙트가 컷에 남았다(`TwentyThreeBoss.StopPresentationEffectsLocal`: 소켓 이펙트 Stop · 보스 추종 EffectManager 즉시 반납(`ReleaseAllFollowingImmediate`) · 착지 예고 원 · 부채꼴·점프 바닥 예고 · 차징 오라 · 몸 파티클) |
 | 보스 위 주황 점선 | 마스크를 하드웨어 깊이(LEqual) 대신 깊이 텍스처 선형 비교(여유 8cm)로 — 이음새에서 픽셀이 빠져 배경(주황)으로 칠해지던 것 |
 | 몬스터 외곽선 | 연출 동안 보스 Flat Kit 외곽선 두께 ×0.35·색 #12171C(`bossOutlineScale`·`bossOutlineColor`), 플레이어는 그대로(`characterOutlineScale` 1). HitFlash 가 블록을 비우므로 매 프레임 덮고, 디졸브 시작에 원래 값 |
+
+## 10. 할 일 200 — 엔딩 연출 1차 정리 (11-06, 사용자 결정 · 브랜치 `feature/BossVictoryRework1`)
+> 이 절이 앞 절(§5.2 표·§8·§9)과 다르면 **이 절이 맞다**. A(서버 판정·무적·안전망·입력 잠금)·B(카메라)·H(HUD·월드 UI 숨김)·I(넘어가기)·J(소리 키) 는 그대로.
+
+### 10.1 바뀐 것
+| 요소 | 변경 |
+|---|---|
+| C 추가 연출 구간 | 타임라인 맨 앞에 **추가 연출 구간**(설정 `preludeSeconds`, 기본 0초 — 아직 내용 없음). 서버가 처치 순간 값을 복제 상태 `VictoryState.PreludeSeconds` 에 담는다(새 RPC 없음, 모든 피어 동일). **단계 시각 t = 경과 − 구간**(`BossVictoryRules.StageTime`) — 슬로모션·카메라 하강·색·서버 사망 대기·2.00 정식 잠금·결과 하한(구간 + 3.20)·안전망(+구간 + 1.88)이 전부 같은 만큼 밀린다. 연출을 꽂는 곳 = `BossVictoryPresentation.PreludeStarted / PreludeEnded`(static event, 모든 피어 로컬) |
+| D1 배경 | 위/아래 그라데이션 두 색 → **단색 `#EAAD70`**(`backgroundColor`). 틴트 강도 0.34 그대로 |
+| D2 단색 | 인물·무기(몸 렌더러 마스크)뿐 아니라 **반투명으로 그려진 이펙트·궤적까지 단색**. 합성을 반투명 **뒤**(AfterRenderingTransparents)로 옮기고, 반투명 전 색 복사본과 차이가 나는 픽셀을 이펙트로 보고 단색 램프(`effectColor`, `effectDetectGain`). 노출 1.6 → **1.75**(`characterExposure`) |
+| D3 색 원복 | 삭제 — 단색·주황 상태 **씬 끝까지 유지** |
+| D4 글리치 | 전 구간 삭제(설정 칸·셰이더 코드·규칙·테스트). TV 글리치를 넣을 자리 = 합성 셰이더 Frag 끝 |
+| D5 외곽선 | 연출 동안 플레이어·보스 Flat Kit 외곽선 **폭 0**(매 프레임, 씬 끝까지). 옛 `bossOutlineScale`·`bossOutlineColor`·`characterOutlineScale` 칸 삭제 |
+| D6 | 실루엣·적 호버 외곽선 끔 유지 |
+| E 타이포 | `BOSS DOWN` 생성 자체를 뺐다(타이포 칸·글꼴 배선·규칙 삭제). `UiStrings.BossVictoryTypo` 키·시트 행은 미사용으로 남음. 사운드 키 `sfxTypo` 는 옛 진입 시각(단계 0.92)에 그대로 |
+| F 타격 VFX | 승리 전용 타격 VFX 칸(`hitVfxPrefab`) **비움**(코드는 남김 — 나중에 추가). 저작 메뉴도 더는 자동으로 채우지 않는다. 보스 이펙트 정리는 그대로 |
+| G 보스 사망 | 사망 애니는 추가 연출 구간 **뒤**에(서버 사망 대기 배율 0 · 클라 보스 몸 Animator 0 — 웰즈 Fear 는 그대로). **디졸브 삭제(보스 B 승리 경로)**: `MonsterBase.KeepsCorpseOnDeath`(23호 = 승리 연출 대상일 때) → 사망 클립 끝 + `DelayAfterClipEnd` 에 `ServerDeathSequenceCompleted` 만 올리고 디스폰하지 않는다 → 기존 `HandleBossVanished`(+1초) → 결과 화면. 보스는 사망 자세로 남는다 |
+
+### 10.2 카메라·벽 (사용자 추가 지시 11-06)
+- **할 일 234(카메라 벽 밖 방지) 삭제** — `d38ed4c3` 되돌림(`keepCameraInsideRoom`·`wallMargin`·`Arena`·`TwentyThreeBoss.TryGetArenaRect`·테스트 5·wall-concept §7).
+- 승리 연출 동안 **벽 가림 처리 끔**: `WallOcclusionDriver.SuppressedByCinematic`(플레이어 주변 디더 전역 끔) · `WallTransparencyGroup.SuppressedByCinematic`(구역 상단 그라데이션 → 밖 값). 평소 플레이는 그대로(연출이 켜고 씬 종료 때 끈다).
+- 대신 **앞면이 확실히 카메라를 향한 벽만 남기고 나머지 벽 렌더러를 끈다**(모든 피어 로컬, 한 번 끄면 씬 끝까지): 후보 = 타격점 반경 `wallSearchRadius`(40m) 안의 Wall 레이어·Wall 태그·이름 `wall*` 조상 아래 렌더러. 법선 = 바운즈 얇은 축(방 안쪽), 숨김 = 카메라가 벽 바깥 **또는** `dot(법선, −수평 시선) ≤ wallFacingThreshold`(0.3 — 뒷면·옆면). 규칙 `BossVictoryRules.WallInwardNormal / ShouldHideWall`.
+
+### 10.3 새 타임라인 (경과 e = 처치 확정부터, P = 추가 연출 구간 기본 0)
+| 경과 | 단계 t | 화면(모든 피어) | 서버 |
+|---|---|---|---|
+| 0 | −P | HUD·월드 UI 숨김 · 연출 카메라 = 지금 플레이 카메라 · 입력 홀드 · 외곽선 0 · 벽 가림 끔 · 보스 이펙트 정리 · `PreludeStarted` | 무적 · 전역 슬로우 리셋 · 결과 하한 = P + 3.20 · 안전망 + P + 1.88 |
+| 0 ~ P | −P ~ 0 | 추가 연출 구간(내용 없음) · 보스 몸 정지(사망 애니 대기) · 플레이어 공격 동작은 흐름 | 사망 대기 배율 0 |
+| P | 0 | `PreludeEnded` · 보스 사망 애니 시작 | 사망 대기 배율 1 |
+| P + 0.12 | 0.12 | 슬로모션(×0.1) 시작 · 사운드 `sfxHitStop` | 배율 0.1 |
+| P + 0.22 ~ 0.72 | 0.22 ~ 0.72 | 카메라 하강 → 24° 구도(모든 피어 같은 화면) | |
+| P + 0.72 ~ 0.80 | 0.72 ~ 0.80 | 배경 단색 주황 틴트 · 인물·무기·이펙트 단색 들어옴 → **씬 끝까지 유지** | |
+| P + 0.92 | 0.92 | 사운드 `sfxTypo`(글자는 없음) | |
+| P + 2.00 | 2.00 | 슬로모션 해제 · 카메라 32° 로 상승 시작 · `sfxResume` | 배율 1 · 전원 연출 잠금(스킬 취소) |
+| P + 3.20 | 3.20 | 32° 구도 유지 | 결과 하한 |
+| 사망 클립 끝 + `DelayAfterClipEnd` | — | 보스 사망 자세로 남음(디졸브 없음) | `ServerDeathSequenceCompleted` → +1초 결과 화면 |
