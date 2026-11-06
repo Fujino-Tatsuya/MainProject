@@ -143,6 +143,7 @@ public sealed partial class BossEncounterDirector
         for (int i = 0; i < players.Count; i++)
             if (players[i] != killer && IsAliveForVictory(players[i]))   // D7: 사망 팀원은 구도 계산에서 뺀다
                 teammates.Add(players[i].transform.position);
+        DevAppendVictoryTeammates(teammates);   // 디버그 랩(244) 표시용 팀원 — 개발 빌드 Dev.cs 만 구현, 릴리스엔 호출째 없다
 
         Bounds bossBounds = BossBounds(boss, cfg);
         var subjects = new BossVictoryRules.Subjects
@@ -205,6 +206,11 @@ public sealed partial class BossEncounterDirector
         }
         Edit.Log("[BossVictory] 단계 2.00초 — 슬로모션 해제 · 전원 연출 잠금(스킬 취소)", this);
     }
+
+    // 디버그 랩(244, DebugBossVictory 씬) 진입점 — 구현은 BossEncounterDirector.Dev.cs(UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS).
+    // 구현이 없으면 C# 이 호출째 지운다 → 릴리스 동작 불변.
+    partial void DevAppendVictoryTeammates(List<Vector3> teammates);
+    partial void DevBlockResultTransition(ref bool block);
 
     // 결과 화면 전환을 지금 막아야 하는가(추가 연출 구간 + 단계 3.20초 전).
     private bool HoldsResultForVictory() =>

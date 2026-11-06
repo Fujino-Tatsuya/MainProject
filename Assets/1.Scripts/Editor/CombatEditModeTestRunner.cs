@@ -45,7 +45,8 @@ internal static class CombatEditModeTestRunner
         "^MonsterOverheadHealthBar", // MonsterOverheadHealthBarVisibilityTests — 몬스터 발밑 체력바 표시·부착 판단
         "^MonsterInspectorCatalog", // MonsterInspectorCatalogTests — 몬스터 데이터 인스펙터 칸 사전(PLAN-monster-data-inspector)
         "^MonsterStatusEffectVfx", // MonsterStatusEffectVfxSetTests — 몬스터 머리 위 기절 이펙트 표(팔라딘 Q 경직)
-        "^BossVictoryRules" // BossVictoryRulesTests — 보스 B 승리 연출 타임라인·곡선·구도(PLAN-boss-victory-cinematic)
+        "^BossVictoryRules", // BossVictoryRulesTests — 보스 B 승리 연출 타임라인·곡선·구도(PLAN-boss-victory-cinematic)
+        "^BossVictoryLab" // BossVictoryLabRulesTests — 처치 연출 반복 디버그 랩 단계 이름·배치·점프·시계·씬 격리(할 일 244)
     };
 
     const string Tag = "[CombatTests]";

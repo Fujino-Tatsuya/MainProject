@@ -32,6 +32,8 @@
 | F4 | 살아 있는 보스(23호·웰즈) 체력 최대치의 10% 깎기(호스트) — 정상 피해 경로라 페이즈 전환이 실제처럼 난다 | `Dev/DevBossHpCut.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F5 | 보스방 진입 패드로 파티 워프 | `Dev/DevBossEntranceWarp.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F6 | 보스 전투 중(Phase = Combat) 누른 사람만 보스방 지정 지점으로 이동(호스트·클라, 오너 권한) — 지점 = `bossroom.prefab` 의 빈 오브젝트 `[Dev] BossWarpPoint`(옮기면 위치·y축 회전이 바뀜). 연출·낙하 복구 중엔 안 함 | `Dev/DevBossPointWarp.cs` (자동 생성) | DEV_HOTKEYS | — (신규) | |
+| F7 | 보스 처치 연출 처음부터 다시(원상복구 → 처치) — **DebugBossVictory 씬 전용**(호스트). [PLAN-boss-victory-cinematic.md §10.4](../../PLAN-boss-victory-cinematic.md) | `Dev/BossVictoryLab/DebugBossVictoryLab.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 244) | |
+| F8 | 보스 처치 연출 일시정지/재개 — **DebugBossVictory 씬 전용**(호스트) | `Dev/BossVictoryLab/DebugBossVictoryLab.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 244) | |
 | F9 / Shift+F9 | 가장 가까운 몬스터 / 전부 즉사 (호스트) | `Utility/DevMonsterKill.cs` (자동 생성) | DEV_HOTKEYS | ✗ |  |
 | F10 | 디버그 부활(로컬 오너, 소울 상태일 때) | `Player/Life/PlayerReviveController.cs` (Player 프리팹) | 없음 | ✓ | |
 | F11 | 보스 막타 직전까지 자동 진행(호스트) — 어디서든: 튜토리얼 중이면 게이트 G10 까지 강제 개방 + 단계 보스 진입(디버그 메뉴 경로, 한 프레임 — 순서 규칙에 막힐 때만 Alt+8 경로) → 엘리베이터 스킵(정상 엘리베이터 경로에 시작 시각만 마지막 페이드 직전으로 당김 — 카메라 복귀도 정상 경로) → 등장 연출 스킵(전원 동의 스킵 경로) → 전투 시작 뒤 23호 남은 HP 페이즈 기믹·0줄 자폭을 끝난 것으로 두고 HP 1. 다음 한 대가 실제 처치(보스 B 승리 연출 테스트). 진행 중인 엘리베이터·기믹은 끝나길 기다림, 60초 제한 | `Dev/DevBossFinalBlow.cs` (자동 생성) + `TwentyThreeBoss.DevPrepareFinalBlowServer` · `BossTeleportManager.DevStartElevatorSkippedServer` · `Map/BossEncounterDirector.Dev.cs` | DEV_HOTKEYS | — (신규, 10-27) | |

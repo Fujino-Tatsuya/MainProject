@@ -91,7 +91,12 @@ public sealed class BossVictoryPresentation : MonoBehaviour
     {
         if (_director == null || !_director.IsSpawned) return;
         BossEncounterDirector.VictoryState v = _director.Victory;
-        if (!v.Active) return;
+        if (!v.Active)
+        {
+            // 실게임에선 한 번 켜지면 씬이 끝날 때까지 켜져 있다 — 꺼지는 건 디버그 랩(244) 원상복구뿐.
+            if (_running) Teardown();
+            return;
+        }
 
         if (v.Sequence != _sequence)
         {
@@ -157,6 +162,16 @@ public sealed class BossVictoryPresentation : MonoBehaviour
             CollectAnimators(p.gameObject, isPlayer: true);
             CollectOutlines(p.gameObject);
         }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        // 디버그 랩(244) 표시용 팀원 복제본 — Player 가 아니라 위 루프에 안 잡힌다. 비어 있으면 실게임과 같다.
+        foreach (GameObject mate in BossEncounterDirector.DevVictoryExtraTeammates)
+        {
+            if (mate == null || !mate.activeInHierarchy) continue;
+            BossVictoryRender.Tag(mate, BossVictoryRender.TeammateMask, _tagged);
+            CollectAnimators(mate, isPlayer: true);
+            CollectOutlines(mate);
+        }
+#endif
         if (bossGo != null)
         {
             BossVictoryRender.Tag(bossGo, BossVictoryRender.BossMask, _tagged);

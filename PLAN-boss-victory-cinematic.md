@@ -224,3 +224,43 @@
 | P + 2.00 | 2.00 | 슬로모션 해제 · 카메라 32° 로 상승 시작 · `sfxResume` | 배율 1 · 전원 연출 잠금(스킬 취소) |
 | P + 3.20 | 3.20 | 32° 구도 유지 | 결과 하한 |
 | 사망 클립 끝 + `DelayAfterClipEnd` | — | 보스 사망 자세로 남음(디졸브 없음) | `ServerDeathSequenceCompleted` → +1초 결과 화면 |
+
+### 10.4 반복 디버그 씬 — 할 일 244 (11-06, 브랜치 `feature/BossVictoryDebugScene`)
+처치 연출을 처음부터 끝까지 반복해서 보며 수치를 맞추는 랩. 200 결과(승리 연출 중 구역 벽 투명화 끔 포함)는 그대로다.
+
+**씬** `Assets/0.Scenes/Debug/DebugBossVictory.unity` — 빌드 목록(EditorBuildSettings)에 넣지 않는다. 씬에 든 것 = 방향광·Global Volume(맵씬 복사) · `CameraSwitcher` · `EffectManager` · `FloatingDamageSpawner` · `BossVictoryLab`(`Dev/BossVictoryLab/DebugBossVictoryLab`). **네트워크 오브젝트는 씬에 두지 않고** 랩이 런타임에 만든다:
+- 보스방 지형 = `bossroom.prefab` 복제(벽 포함 — 벽 숨김 판정을 실제 벽으로 본다, 안의 송전탑 NetworkObject 는 꺼 둠).
+- 보스 디렉터 = `BossEncounterDirector.prefab` 을 호스트가 뜨면 스폰 → **23호 B(`TwentyThree_Raid`, 웰즈 포함)를 실게임 스폰 경로(`SpawnBossServer`)로** 착지점에 세운다(등장 연출 없이, 서버 FSM 은 멈춘 채 — 서 있기만).
+- 막타 = Dev Boot 가 띄운 내 플레이어(툴바 캐릭터). 팀원 = 몸·무기만 남긴 표시용 복제본(`CharacterSelectPreviewPool.CreatePreviewObject`, 네트워크·입력·물리 없음) 0~2명.
+
+**실행** 툴바 Dev Boot 드롭다운에서 `DebugBossVictory` → ▶(솔로 호스트). 툴바 보스 = **B**(기본값)여야 연출이 뜬다(A 면 패널이 알려 준다).
+
+**한 바퀴(실게임 경로)** 원상복구 → 보스·막타·팀원 배치 → 0.8초(카메라 복귀) → 막타 공격 애니(`killerAttackState`, 없으면 생략) → 막타 준비(`DevPrepareFinalBlowServer` — F11 과 같음) → **내 플레이어가 준 피해 한 대**(`ReceiveAttack`) → Died → `HandleBossDefeated` → `TryStartVictoryServer` → 사망 표현 → 결과 대기. 결과 화면으로 넘어갈 순간에 랩이 전환을 막고 1.5초 뒤 처음부터(자동 반복 끄면 거기서 멈춤).
+
+**조작**(패널 = 화면 왼쪽 위)
+| 항목 | 내용 |
+|---|---|
+| F7 / 처음부터 | 원상복구 후 다시 |
+| F8 / 일시정지 | 멈춤·재개 |
+| 자동 반복 | 끝나면 원상복구 → 처음부터 |
+| 배속 ×0.1·0.25·0.5·1 | 느리게 보기 |
+| 점프(슬라이더·0.72·2.00·3.20) | 처음부터 다시 돌려 그 **단계 시각**까지 빨리 감은 뒤(최대 ×8) 멈춘다 — 애니·사망 대기·벽 숨김까지 그 시각의 실제 상태 |
+| 막타 각도·거리·방향 보정 | 보스 기준(0° = 화면 아래, + = 시계 방향). 구도 후보가 바뀐다. 다음 재생에 반영 |
+| 팀원 0~2명·캐릭터 ▶ | 플레이어 1~3명. 팀원 위치 = 막타 기준 로컬(`teammateOffsets`) |
+| 표시 | 단계 시각·경과·추가 연출 구간·단계 이름·배속 |
+
+**설정 값** `Resources/BossVictory/BossVictoryConfig.asset` 인스펙터(패널 "설정 SO 선택")에서 바꾸면 **다음 재생에 반영**(서버 구도·추가 연출 구간·색 켜기는 처치 순간에 읽고, 슬로 배율·벽 기준 등 몇 칸은 바로). 🔴 **SO 라 Play 를 끝내도 값이 남는다** — 원하지 않으면 git 으로 되돌린다.
+
+**배속·점프 원리** 표시(카메라·색·단계)는 서버 시각 기준 경과, 애니·서버 사망 대기는 게임 시간이다. 랩은 Time.timeScale 을 바꾸면서 매 프레임 복제 상태의 처치 시각(`StartServerTime`)을 (실제 Δ − 게임 Δ)만큼 밀어 둘을 같은 시계로 묶는다(`BossVictoryLabRules.ClockShift`).
+
+**실게임 코드 변경(동작 불변)**
+- `BossEncounterDirector.Victory.cs` partial 메서드 2개(`DevAppendVictoryTeammates` · `DevBlockResultTransition`) 선언 + 호출 1곳씩(`TryStartVictoryServer` 팀원 목록 끝 · `TickResultTransition` 하한 검사 뒤). 구현은 `BossEncounterDirector.Dev.cs`(`UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS`)에만 — 릴리스 빌드엔 C# 이 호출째 지운다.
+- `Dev.cs`: 표시용 팀원 목록·결과 차단 플래그·`DevSpawnVictoryBossServer`·`DevResetVictoryServer`·`DevShiftVictoryClockServer`.
+- `BossVictoryPresentation`: 복제 상태가 **꺼지면 정리**(실게임은 한 번 켜지면 씬 끝까지라 영향 없음) · 개발 빌드에서만 표시용 팀원도 팀원 단색 마스크.
+
+**알려진 한계**
+- 씬에 `BossTeleportManager`·`MapSceneManager` 가 없어 디렉터 스폰 때 `BossTeleportManager를 찾지 못했습니다` 오류 1줄이 뜬다(정상).
+- 조명은 맵씬 방향광·Global Volume 만 복사했다(라이트맵·물·안개 없음). 보스방 안 조명(LGT_*)은 프리팹에 있어 그대로다.
+- 팀원 복제본은 Idle 자세 그대로(공격 클립 홀드 없음). 막타 공격 상태 이름은 캐릭터마다 다르다(팔라딘 `Default_Attack1` — 없는 이름이면 그냥 서서 처치).
+- 보스방 NavMesh 가 없어 보스 에이전트는 꺼 둔 채다(서 있기만 하므로 무관).
+- 호스트 1인 전용(클라 창은 패널만 보인다).

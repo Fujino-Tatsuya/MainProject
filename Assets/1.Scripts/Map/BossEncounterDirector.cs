@@ -1368,6 +1368,12 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         if (HoldsResultForVictory())
             return;
 
+        // 디버그 랩(244)이 결과 화면 대신 처음부터 다시 돌릴 때만 막는다(Dev.cs 구현 — 릴리스엔 호출째 없다).
+        bool devBlock = false;
+        DevBlockResultTransition(ref devBlock);
+        if (devBlock)
+            return;
+
         _resultTransitionAt = 0d;
 
         if (mapSceneManager == null)
