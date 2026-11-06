@@ -15,7 +15,7 @@ using UnityEngine;
 /// · 복사 = 플로트 커브(GetCurveBindings/GetEditorCurve) + ObjectReference 커브 + AnimationClipSettings(loopTime 등) + 이벤트.
 ///   구간을 자르는 클립은 끝 프레임 뒤 키를 지우고 끝 프레임/frameRate 지점에 원본 값으로 키를 남긴다. 프레임레이트 = FBX 클립 값.
 /// · 다시 실행해도 같은 경로의 .anim 에 덮어써 GUID 가 유지된다.
-/// · 컨트롤러: 기존 4상태(Idle·Throw·Groggy·Die) 모션 교체 + 상태 2개(yaho!·getownedV1) 추가만, 전이는 만들지 않는다(사용자가 직접 연결).
+/// · 컨트롤러: 기존 4상태(Idle·Throw·Groggy·Die) 모션 교체 + 상태 2개(yaho!·getownedV1) 추가 + 할 일 240 순간 클립용 Fear 상태·한 번짜리 → Idle exit-time 전이(ApplyCueStates). 그 밖 전이는 사용자가 다듬는다.
 /// · 저장은 SaveAssetIfDirty 로 만든 .anim·컨트롤러만 — 씬·다른 에셋을 저장하지 않는다.
 /// </summary>
 public static class WellsClipSplitAuthoring
@@ -226,8 +226,57 @@ public static class WellsClipSplitAuthoring
             state.motion = clip;
         }
 
+        ApplyCueStates(sm, made, report);
+
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssetIfDirty(controller);
+    }
+
+    // ─── 할 일 240 — 코드(BossWells 순간 클립)가 쓰는 상태·전이 ─────────────
+    // 코드는 상태 이름으로 바로 CrossFade 한다(파라미터 없음). 여기서 만드는 것:
+    //  · Fear 상태(Fear 클립, 나가는 전이 없음 — 제압 동안 마지막 프레임 유지). Die 는 그대로 Fear 클립.
+    //  · yaho!·getownedV1 → Idle exit-time 전이(끝까지 재생 후 Idle). Throw(Charge!) → Idle 은 원래 있다.
+    // 이미 있으면 건드리지 않는다(사용자가 다듬은 값 보존).
+    const string FearState = "Fear";
+    const string IdleState = "Idle";
+    static readonly string[] OneShotStates = { "yaho!", "getownedV1", "Throw" };
+
+    static void ApplyCueStates(AnimatorStateMachine sm, Dictionary<string, AnimationClip> made, StringBuilder report)
+    {
+        AnimatorState Find(string n) => sm.states.Select(c => c.state).FirstOrDefault(st => st.name == n);
+
+        AnimatorState idle = Find(IdleState);
+        if (idle == null)
+        {
+            Debug.LogWarning("[WellsClipSplit] Idle 상태가 없어 순간 클립 전이를 만들지 않았다.");
+            return;
+        }
+
+        AnimatorState fear = Find(FearState);
+        if (fear == null)
+        {
+            fear = sm.AddState(FearState, new Vector3(560f, 180f, 0f));
+            report.AppendLine("  컨트롤러: 상태 추가 Fear (나가는 전이 없음 — 제압 동안 유지)");
+        }
+        fear.motion = made["Fear"];
+
+        foreach (string name in OneShotStates)
+        {
+            AnimatorState st = Find(name);
+            if (st == null)
+            {
+                Debug.LogWarning($"[WellsClipSplit] 상태 {name} 가 없어 Idle 복귀 전이를 못 만들었다.");
+                continue;
+            }
+            if (st.transitions.Any(t => t.destinationState == idle && t.hasExitTime)) continue;
+
+            AnimatorStateTransition tr = st.AddTransition(idle);
+            tr.hasExitTime = true;
+            tr.exitTime = 0.95f;
+            tr.hasFixedDuration = true;
+            tr.duration = 0.1f;
+            report.AppendLine($"  컨트롤러: {name} → Idle exit-time 전이 추가(끝까지 재생 후 Idle)");
+        }
     }
 }
 #endif

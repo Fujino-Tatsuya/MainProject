@@ -39,6 +39,25 @@ public class BossWells : MonoBehaviour
     [SerializeField] [Tooltip("AnyState → Die 트리거.")] string deadTrigger = "IsDead";
     [SerializeField] [Tooltip("Groggy → Idle 복귀 트리거.")] string initTrigger = "IsInit";
 
+    [Header("순간 클립(할 일 240) — 상태 이름으로 바로 CrossFade. 메뉴 Tools/Boss/웰즈 애니 클립 분리 (239) 가 만든다")]
+    [SerializeField] [Tooltip("돌진·점프 이륙 → yaho!(끝나면 exit-time 으로 Idle).")] string rushState = "yaho!";
+    [SerializeField] [Tooltip("23호 돌진 예고 시작 → Charge!(Throw 상태, 끝나면 Idle).")] string windupState = "Throw";
+    [SerializeField] [Tooltip("간파 당함 → getownedV1(끝나면 Idle).")] string parryHitState = "getownedV1";
+    [SerializeField] [Tooltip("제압 중 → Fear(마지막 프레임 유지, 나가는 전이 없음).")] string fearState = "Fear";
+    [SerializeField] [Tooltip("제압 끝 무렵 → groggy(Groggy 상태, IsInit 으로 Idle).")] string groggyEndState = "Groggy";
+    [SerializeField] [Tooltip("복귀 대상 Idle 상태 이름.")] string idleState = "Idle";
+    [SerializeField] [Min(0f)] [Tooltip("순간 클립 CrossFade 길이(초, 고정 시간).")] float cueCrossFade = 0.1f;
+    [SerializeField] [Min(0f)]
+    [Tooltip("제압 앞당김(초) — 23호 제압 남은 시간이 이 값 이하가 되면 Fear → groggy. 서버가 읽는다(23호 그로기 남은 시간 기준).")]
+    float suppressGroggyLeadSeconds = 2f;
+
+    /// <summary>[서버가 읽음] 제압 남은 시간이 이 값 이하면 Fear → groggy(할 일 240).</summary>
+    public float SuppressGroggyLeadSeconds => suppressGroggyLeadSeconds;
+
+    // [로컬] 마지막으로 튼 한 번짜리 클립(yaho!·Charge!·getownedV1) — 끝까지 재생되는 동안 Idle 복귀를 미룬다.
+    int _oneShotHash;
+    int _oneShotFrame = -1;
+
     [Header("투척")]
     [SerializeField]
     [Tooltip("폭탄이 생성될 손 소켓. 비우면 이 오브젝트 위치에서 던진다.")]
@@ -118,6 +137,25 @@ public class BossWells : MonoBehaviour
 
         switch (next)
         {
+            // ── 할 일 240 순간 클립 — 다음 순간이 오면 즉시 덮어쓴다 ──
+            case BossWellsState.Rush:
+                PlayOneShot(rushState);
+                return;
+            case BossWellsState.Windup:
+                PlayOneShot(windupState);
+                return;
+            case BossWellsState.ParryHit:
+                PlayOneShot(parryHitState);
+                return;
+            case BossWellsState.Fear:
+                ShowHeldBomb(false);
+                CrossFadeTo(fearState);
+                return;
+            case BossWellsState.GroggyEnd:
+                ShowHeldBomb(false);
+                CrossFadeTo(groggyEndState);
+                return;
+
             case BossWellsState.Throw:
                 ShowHeldBomb(true);
                 SafeTrigger(throwTrigger);
@@ -134,10 +172,54 @@ public class BossWells : MonoBehaviour
                 break;
 
             case BossWellsState.Idle:
-                // Groggy 에서 돌아올 때만 의미가 있다. Throw 는 hasExitTime 으로 스스로 Idle 로 간다.
-                SafeTrigger(initTrigger);
+                ReturnToIdle();
                 break;
         }
+    }
+
+    // Idle 복귀(할 일 240 규칙 7) — 한 번짜리 클립은 끝까지 틀고 exit-time 으로 Idle 에 간다(여기서 끊지 않는다).
+    // Groggy 상태면 기존 IsInit 전이로, Fear 등 나가는 전이가 없는 상태면 직접 CrossFade. 이미 Idle 이면 아무것도 안 한다.
+    // 🔴 Groggy 가 아닐 때 IsInit 을 걸면 소비되지 않고 남아 다음 Groggy 진입(제압 끝 groggy)을 바로 끊는다 — 그래서 상태를 보고 고른다.
+    void ReturnToIdle()
+    {
+        if (IsOneShotPlaying()) return;
+
+        AnimatorStateInfo cur = animator.GetCurrentAnimatorStateInfo(0);
+        if (animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).IsName(idleState)) return;
+        if (cur.IsName(idleState) && !animator.IsInTransition(0)) return;
+
+        if (cur.IsName(groggyEndState) && !string.IsNullOrEmpty(initTrigger)) SafeTrigger(initTrigger);
+        else CrossFadeTo(idleState);
+    }
+
+    void PlayOneShot(string state)
+    {
+        ShowHeldBomb(false);
+        if (!CrossFadeTo(state)) return;
+        _oneShotHash = Animator.StringToHash(state);
+        _oneShotFrame = Time.frameCount;
+    }
+
+    bool IsOneShotPlaying()
+    {
+        if (_oneShotHash == 0) return false;
+        if (_oneShotFrame == Time.frameCount) return true;   // 같은 프레임 CrossFade 는 아직 상태 정보에 안 보인다
+        if (animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).shortNameHash == _oneShotHash) return true;
+        AnimatorStateInfo cur = animator.GetCurrentAnimatorStateInfo(0);
+        if (cur.shortNameHash == _oneShotHash && cur.normalizedTime < 1f) return true;
+        _oneShotHash = 0;
+        return false;
+    }
+
+    // 상태가 없으면(메뉴 미실행 등) 조용히 false — 계약 검증(ValidateContract)이 경고한다.
+    bool CrossFadeTo(string state)
+    {
+        if (string.IsNullOrEmpty(state)) return false;
+        int hash = Animator.StringToHash(state);
+        if (!animator.HasState(0, hash)) return false;
+        animator.CrossFadeInFixedTime(hash, cueCrossFade, 0, 0f);
+        if (state != rushState && state != windupState && state != parryHitState) _oneShotHash = 0;
+        return true;
     }
 
     // ─── 애니메이션 이벤트 (fbx/SVN 에 박힌 이름 — 바꾸지 말 것) ─────────
@@ -221,6 +303,14 @@ public class BossWells : MonoBehaviour
         RequireParam(ownerName, deadTrigger, nameof(deadTrigger));
         RequireParam(ownerName, initTrigger, nameof(initTrigger));
 
+        // 할 일 240 순간 클립 상태 — 없으면 그 순간 클립이 조용히 안 나온다(메뉴 Tools/Boss/웰즈 애니 클립 분리 (239) 재실행).
+        RequireState(ownerName, rushState, nameof(rushState));
+        RequireState(ownerName, windupState, nameof(windupState));
+        RequireState(ownerName, parryHitState, nameof(parryHitState));
+        RequireState(ownerName, fearState, nameof(fearState));
+        RequireState(ownerName, groggyEndState, nameof(groggyEndState));
+        RequireState(ownerName, idleState, nameof(idleState));
+
         if (bombSocket == null)
             Debug.LogWarning(
                 $"{ownerName}/Wells: bombSocket 이 비어 있어 Wells 원점에서 폭탄이 나간다(손이 아니다).", this);
@@ -236,6 +326,13 @@ public class BossWells : MonoBehaviour
 
         Debug.LogError(
             $"{ownerName}/Wells: {field}=\"{param}\" 파라미터가 Wells 애니메이터에 없다 — 조용히 무시된다.", this);
+    }
+
+    void RequireState(string ownerName, string state, string field)
+    {
+        if (string.IsNullOrEmpty(state) || animator.HasState(0, Animator.StringToHash(state))) return;
+        Debug.LogWarning(
+            $"{ownerName}/Wells: {field}=\"{state}\" 상태가 Wells 애니메이터에 없다 — 그 순간 클립이 안 나온다(메뉴 Tools/Boss/웰즈 애니 클립 분리 (239) 실행).", this);
     }
 
     // 🔴 NetworkBehaviour.IsServer 를 쓰면 안 된다(미스폰 중첩 NetworkObject 라 영원히 false).
