@@ -241,6 +241,14 @@ public class PlayerSkillTargeting : MonoBehaviour
             return;
         }
 
+        // 조준·자동 접근 중에 특성을 골라 파티 대기에 들어가면(할 일 236) 겨눔을 조용히 물린다 — 진입 차단은 PlayerSkillController.TryUse.
+        if ((isTargeting || isMovingToCast) && controller != null &&
+            controller.IsBlockedByTraitWait(controller.GetSkill(isMovingToCast ? pendingSlot : currentSlot)))
+        {
+            Cancel();
+            return;
+        }
+
         if (rangePreviewActive && !isTargeting)
             UpdateRangePreviewMarker();
 

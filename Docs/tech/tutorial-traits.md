@@ -195,6 +195,20 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 - **의존 방향**: 특성 모듈은 맵씬 디렉터를 모른다. 복도 흐름(`MapSceneTraitCorridorFlow`, **모든 피어**)이 `TraitSelectionView.Instance.SetDeadline(visible, remaining, total, done, count)` 로 넣는다.
 - **시간**: 창이 `Time.unscaledDeltaTime` 으로 로컬 감소(0 에서 멈춤 — 만료 처리는 서버), 다음 `SetDeadline` 이 다시 맞춘다. `TraitDeadlineModel.UrgentSeconds`(10초) 이하면 `deadlineUrgentColor`.
 
+### 8.1 특성 고른 뒤 파티 대기 중 타겟팅 스킬 금지 (할 일 236)
+
+복도 개인 뒤 배리어가 서 있는 동안 벽 너머로 타겟팅 스킬(조준 대상·지점)을 쓸 수 있던 문제 — 타겟팅 스킬엔 벽 검사가 없다.
+
+- **기간**: 내가 그 복도 특성을 고른 순간(디렉터 개인 체크 `TraitCorridorN` 켜짐 — 수동·자동·0장 바로 체크 모두)부터 그 복도 출구 게이트(G2/G4/G7/G10)가 열릴 때까지.
+  맵씬 진행 활성이고 `IsFinished` 전만(만료 강제 이동으로 G10 이 닫힌 채 보스방에 가도 풀린다). 목표 패널 '동료 대기'(`MapSceneTraitCorridorTask.Wait`)와 같은 조건이다.
+- **대상**: `PlayerSkillData.TargetingMode` 가 `None` 이 아닌 스킬 전부 — 가렌 R·거너 R 추적 레이저·어쌔신 변신 E 원 공격. 새 타겟팅 스킬도 자동. 평타·대시·방향형 Q/E/우클릭은 그대로.
+- **판정**: 순수 `TraitWaitTargetingRules`(`IsBlocked(gateOpen, pickedThisGate)`·`IsWaitingForParty`·`AppliesTo`) + 어댑터 `TraitWaitTargeting`(디렉터 복제 게이트·체크 마스크) — `PlayerSkillController.IsBlockedByTraitWait`.
+  - 오너 1차: `TryUse` 가 조준 진입 전에 막는다(겨눔 표시가 안 뜸). 조준·자동 접근 중에 대기에 들어가면 `PlayerSkillTargeting.Update` 가 조용히 취소한다.
+  - 서버 2차: `CanApproveSkill` → `PlayerSkillApproval.TraitWait`(원격 오너 1차 검증도 같은 함수).
+- **피드백 없음**: 거부 사운드·회색 아이콘 없음. 선입력 버퍼는 [skill-reject-feedback.md §0](skill-reject-feedback.md) '그 밖'(즉시 버림, 이벤트 없음).
+- **범위 밖**: 벽 너머 피해 판정(`AttackShapeQuery` 벽 관통)·몬스터 공격은 그대로.
+- 테스트: `TraitWaitTargetingRulesTests`(맵씬 EditMode 메뉴에 포함).
+
 ## 9. 전멸 리스폰 뒤 특성 초기화 · 재선택 (할 일 30 3단계)
 
 > 사양·흐름 원본: [party-lives-respawn.md §4](party-lives-respawn.md#4-특성-초기화--재선택-3단계--구현됨). 여기는 특성 모듈 쪽 API·구조만.
