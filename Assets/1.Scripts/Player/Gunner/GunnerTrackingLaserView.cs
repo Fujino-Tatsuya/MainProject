@@ -177,14 +177,16 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
         EffectTint tint = OverdriveTint;
         for (int i = 0; i < positions.Length; i++)
         {
+            // 맞은 적 발밑(루트)이 아니라 그 아래 바닥에 꽂는다 — 송전탑처럼 루트가 올라온 대상도 바닥 파문이 바닥에 눕는다.
+            Vector3 position = FloorPoint(positions[i]);
             if (!tint.IsSet)
             {
-                effects.Play(strikeEffect, positions[i], Quaternion.identity, strikeScale);
+                effects.Play(strikeEffect, position, Quaternion.identity, strikeScale);
                 continue;
             }
 
             // 색 지정 재생은 핸들이 있어야 한다 — 수명·반납은 Play 와 같다.
-            EffectHandle strike = effects.PlayRecallable(strikeEffect, positions[i], Quaternion.identity, strikeScale);
+            EffectHandle strike = effects.PlayRecallable(strikeEffect, position, Quaternion.identity, strikeScale);
             effects.SetTint(strike, tint);
         }
     }
@@ -204,15 +206,31 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
     {
         if (zoneEffect == null) return;
 
+        // 레이저는 수평으로만 움직이고 높이는 스폰 높이(조준점·대상 위치) 그대로라, 올라온 송전탑을 노리면 공중에 뜬다.
+        // 장판은 레이저 바로 아래 바닥에 눕힌다(이동하며 바닥 높이가 바뀌어도 따라가도록 매 프레임).
+        Vector3 floor = FloorPoint(transform.position);
+
         if (!zone.IsSet)
         {
-            zone = effects.PlayLooping(zoneEffect, transform.position, Quaternion.identity, Radius * 2f);
+            zone = effects.PlayLooping(zoneEffect, floor, Quaternion.identity, Radius * 2f);
             effects.SetTint(zone, OverdriveTint);
         }
 
         effects.GetInstances(zone, instances);
         for (int i = 0; i < instances.Count; i++)
-            instances[i].transform.position = transform.position;
+            instances[i].transform.position = floor;
+    }
+
+    /// <summary>
+    /// <paramref name="point"/> 바로 아래 바닥 + <see cref="GroundProbe.SurfaceOffset"/>. 못 찾으면 그대로.
+    /// <see cref="GroundProbe"/> 는 Unit 계층 콜라이더(송전탑·몹 몸)를 건너뛰므로 대상 자신은 바닥으로 잡히지 않는다.
+    /// 팔라딘 R 표식·낙뢰(<c>PaladinSkillView.PlayTargetFloorLocal</c>)와 같은 규칙.
+    /// </summary>
+    private static Vector3 FloorPoint(Vector3 point)
+    {
+        if (GroundProbe.TryFindGround(point, 0, out RaycastHit ground, out _))
+            point.y = GroundProbe.SurfaceY(ground);
+        return point;
     }
 
     private void UpdateLocks(EffectManager effects)
