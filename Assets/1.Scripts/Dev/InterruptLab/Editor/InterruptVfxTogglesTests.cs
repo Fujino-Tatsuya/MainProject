@@ -98,6 +98,70 @@ public sealed class InterruptVfxTogglesTests
         Assert.IsTrue(InterruptVfxToggles.AllowsAnimEffect(id));
     }
 
+    // ─── 디렉터 칸(B1·B2·B3·C1·C2)과 함께 — 칸이 꺼져 있으면 토글 켬이어도 안 나왔다(11-06 제보) ───
+
+    [Test]
+    public void 거너만_디렉터_칸이_없다()
+    {
+        foreach (InterruptVfx vfx in InterruptVfxToggles.All)
+            Assert.AreEqual(vfx != InterruptVfx.GunnerMuzzleBlast, InterruptVfxToggles.TryGetDirectorCue(vfx, out _), vfx.ToString());
+    }
+
+    [Test]
+    public void 디렉터_칸이_꺼져_있으면_토글_켬이어도_안_나오고_랩에서_켜면_나온다()
+    {
+        var go = new UnityEngine.GameObject("Director");
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>(); // 새 컴포넌트 = 칸 전부 꺼짐(프리팹 기본과 같다)
+            foreach (InterruptVfx vfx in InterruptVfxToggles.All)
+            {
+                bool hasCue = InterruptVfxToggles.TryGetDirectorCue(vfx, out InterruptProductionCue cue);
+                Assert.IsTrue(InterruptVfxToggles.IsOn(vfx));
+                Assert.AreEqual(!hasCue, InterruptVfxToggles.IsEffective(vfx, director), "칸 꺼짐 = 안 나옴: " + vfx);
+
+                InterruptVfxToggles.SetEffective(vfx, true, director);
+                Assert.IsTrue(InterruptVfxToggles.IsEffective(vfx, director), "랩 켬 = 칸도 켜서 나옴: " + vfx);
+                if (hasCue)
+                    Assert.IsTrue(director.Get(cue), vfx.ToString());
+
+                InterruptVfxToggles.SetEffective(vfx, false, director);
+                Assert.IsFalse(InterruptVfxToggles.IsEffective(vfx, director), vfx.ToString());
+                if (hasCue)
+                    Assert.IsTrue(director.Get(cue), "끌 때 디렉터 칸은 그대로(같은 칸의 다른 VFX): " + vfx);
+            }
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+        }
+    }
+
+    [Test]
+    public void 디렉터가_없으면_칸_있는_VFX_는_안_나온다()
+    {
+        Assert.IsFalse(InterruptVfxToggles.IsEffective(InterruptVfx.PaladinShieldGlowLoop, null));
+        Assert.IsTrue(InterruptVfxToggles.IsEffective(InterruptVfx.GunnerMuzzleBlast, null));
+    }
+
+    [Test]
+    public void 클립_이벤트는_토글과_디렉터_칸_둘_다_켜져야_허용()
+    {
+        var go = new UnityEngine.GameObject("Director");
+        try
+        {
+            var director = go.AddComponent<InterruptProductionDirector>();
+            string id = InterruptProductionRules.PaladinShieldChargeId;
+            Assert.IsFalse(InterruptProductionRules.AllowsAnimEffect(director, id) && InterruptVfxToggles.AllowsAnimEffect(id), "칸 꺼짐");
+            InterruptVfxToggles.SetEffective(InterruptVfx.PaladinShieldCharge, true, director);
+            Assert.IsTrue(InterruptProductionRules.AllowsAnimEffect(director, id) && InterruptVfxToggles.AllowsAnimEffect(id), "랩 켬");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(go);
+        }
+    }
+
     // 클립 이벤트 id 가 실제 Variant 소켓에 있는지 — 이름이 바뀌면 토글이 조용히 안 먹는다(프리팹 YAML 텍스트만 읽음).
     [TestCase("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab", InterruptProductionRules.PaladinShieldChargeId)]
     [TestCase("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab", InterruptProductionRules.AssassinInsightWindupId)]

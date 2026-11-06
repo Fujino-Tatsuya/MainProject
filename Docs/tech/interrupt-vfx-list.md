@@ -49,7 +49,9 @@
   - 클립 이벤트 VFX: `EffectAnimEvents.PlayEffect`·`StartEffect` 가 id → 키(`InterruptVfxToggles.TryGetAnimEffect`)로 묻는다. 꺼도 `Played` 이벤트는 그대로 난다 — 어쌔신 성공 VFX 가 올려치기 프레임을 기준으로 쓰기 때문.
 - 규칙
   - 기본 전부 켬. 끄면 그 VFX **재생만** 건너뛴다 — 판정·슬로우·공용 간파 연출·다른 VFX 는 그대로. 끄는 쪽(Stop·FadeOut·회수)은 막지 않는다.
-  - 디렉터 칸(B1·B2·B3·C1·C2)과 **둘 다 켜져 있어야** 나온다. 디렉터 칸은 이 패널에 없다(NetworkManager 프리팹 값).
+  - 디렉터 칸(B1·B2·B3·C1·C2)과 **둘 다 켜져 있어야** 나온다. 🔴 그 칸들은 `NetworkManager.prefab` 에서 **기본 꺼짐**(할 일 104 이후 그대로 — dev 도 같다)이라
+    지금 게임에선 팔라딘·어쌔신 간파 VFX 가 안 나온다(거너는 칸이 없어 나옴). 랩 토글은 '실제로 나오는가'(`IsEffective` = 토글 ∧ 칸)를 보여 주고,
+    켤 때 그 칸도 런타임으로 켠다(`SetEffective`, 저장 안 함). 끌 때는 토글만 끈다(칸은 같은 칸의 다른 VFX 도 막으므로). 게임 기본값을 켤지는 별도 결정.
   - 로컬(복제 안 함) — 이 피어 화면만. 저장 안 함(PlayerPrefs 없음) — Play 를 시작할 때마다 전부 켬(`RuntimeInitializeOnLoadMethod(SubsystemRegistration)`).
   - 에디터·개발 빌드에서만 동작(`GateActive`). 릴리스 빌드는 늘 켬.
   - 루프(방패 발광·기 모으기)를 재생 중에 꺼도 이번 재생은 끝까지 간다 — 다음 시전부터.

@@ -101,6 +101,41 @@ public static class InterruptVfxToggles
         _ => InterruptVfxCharacter.Paladin,
     };
 
+    /// <summary>
+    /// 그 VFX 를 함께 막는 디렉터 칸(B1·B2·B3·C1·C2). 거너는 없음(false).
+    /// 🔴 이 칸들은 NetworkManager.prefab 에서 기본 꺼짐(할 일 104) — 꺼져 있으면 이 토글이 켬이어도 안 나온다. 랩은 켤 때 이 칸도 런타임으로 켠다.
+    /// </summary>
+    public static bool TryGetDirectorCue(InterruptVfx vfx, out InterruptProductionCue cue)
+    {
+        switch (vfx)
+        {
+            case InterruptVfx.PaladinShieldMaterialGlow:
+            case InterruptVfx.PaladinShieldGlowLoop: cue = InterruptProductionCue.PaladinShieldGlow; return true;
+            case InterruptVfx.PaladinShieldCharge: cue = InterruptProductionCue.PaladinShieldCharge; return true;
+            case InterruptVfx.PaladinShieldWave: cue = InterruptProductionCue.PaladinWave; return true;
+            case InterruptVfx.AssassinWindup:
+            case InterruptVfx.AssassinPop:
+            case InterruptVfx.AssassinSlash: cue = InterruptProductionCue.AssassinInsightAttempt; return true;
+            case InterruptVfx.AssassinSuccess: cue = InterruptProductionCue.AssassinInsightSuccess; return true;
+            default: cue = default; return false;
+        }
+    }
+
+    /// <summary>이 피어에서 실제로 나오는가 — 이 토글 ∧ 디렉터 칸(있으면). 디렉터 없음 = 칸 꺼짐.</summary>
+    public static bool IsEffective(InterruptVfx vfx, InterruptProductionDirector director) =>
+        IsOn(vfx) && (!TryGetDirectorCue(vfx, out InterruptProductionCue cue) || InterruptProductionRules.IsOn(director, cue));
+
+    /// <summary>
+    /// [랩] 실제로 켜거나 끈다 — 켜면 이 토글과 디렉터 칸(런타임 값, 저장 안 함)을 함께 켠다. 끄면 이 토글만 끈다
+    /// (디렉터 칸은 같은 칸의 다른 VFX 도 막으므로 건드리지 않는다).
+    /// </summary>
+    public static void SetEffective(InterruptVfx vfx, bool on, InterruptProductionDirector director)
+    {
+        Set(vfx, on);
+        if (on && director != null && TryGetDirectorCue(vfx, out InterruptProductionCue cue))
+            director.Set(cue, true);
+    }
+
     /// <summary>클립 이벤트 이펙트 id → VFX(<see cref="EffectAnimEvents"/>). 간파 VFX id 가 아니면 false.</summary>
     public static bool TryGetAnimEffect(string id, out InterruptVfx vfx)
     {

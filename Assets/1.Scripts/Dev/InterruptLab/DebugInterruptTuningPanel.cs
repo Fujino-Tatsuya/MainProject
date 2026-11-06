@@ -418,10 +418,13 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     // 끄면 그 VFX 재생만 건너뛴다(판정·슬로우·공용 간파 연출 그대로). 목록 = Docs/tech/interrupt-vfx-list.md.
     void DrawCharacterVfx()
     {
+        // 표시·조작 = '실제로 나오는가'(이 토글 ∧ 디렉터 B1·B2·B3·C1·C2 칸). 그 칸들은 NetworkManager.prefab 에서 기본 꺼짐(할 일 104)이라
+        // 켤 때 칸도 런타임으로 켠다(저장 안 함 — Play 끝나면 프리팹 값). 끌 때는 이 토글만.
+        InterruptProductionDirector director = InterruptProductionDirector.Instance;
         switch (ButtonRow("전체 켬", "전체 끔"))
         {
-            case 0: InterruptVfxToggles.SetAll(true); break;
-            case 1: InterruptVfxToggles.SetAll(false); break;
+            case 0: SetVfx(director, _ => true, true); break;
+            case 1: SetVfx(director, _ => true, false); break;
         }
 
         InterruptVfxCharacter? group = null;
@@ -435,22 +438,33 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(InterruptVfxToggles.CharacterLabel(character), GUILayout.Width(ButtonWidth(3)));
                 if (GUILayout.Button("켬", GUILayout.Width(ButtonWidth(3)), GUILayout.Height(RowHeight)))
-                    InterruptVfxToggles.SetCharacter(character, true);
+                    SetVfx(director, v => InterruptVfxToggles.CharacterOf(v) == character, true);
                 GUILayout.Space(Gap);
                 if (GUILayout.Button("끔", GUILayout.Width(ButtonWidth(3)), GUILayout.Height(RowHeight)))
-                    InterruptVfxToggles.SetCharacter(character, false);
+                    SetVfx(director, v => InterruptVfxToggles.CharacterOf(v) == character, false);
                 GUILayout.EndHorizontal();
             }
 
-            bool on = InterruptVfxToggles.Get(vfx);
+            bool on = InterruptVfxToggles.IsEffective(vfx, director);
             bool next = Toggle(on, InterruptVfxToggles.Label(vfx));
             if (next != on)
-                InterruptVfxToggles.Set(vfx, next);
+                InterruptVfxToggles.SetEffective(vfx, next, director);
         }
 
+        if (director == null)
+            GUILayout.Label("※ 디렉터 없음 — 팔라딘·어쌔신 VFX 는 디렉터 칸이 있어야 나온다");
         if (!InterruptVfxToggles.GateActive)
             GUILayout.Label("※ 릴리스 빌드 — 토글이 무시된다(늘 켬)");
         GUILayout.Label("※ 이 화면만·저장 안 함. 다음 재생부터(루프 중이면 다음 시전)");
+    }
+
+    static void SetVfx(InterruptProductionDirector director, System.Func<InterruptVfx, bool> match, bool on)
+    {
+        foreach (InterruptVfx vfx in InterruptVfxToggles.All)
+        {
+            if (match(vfx))
+                InterruptVfxToggles.SetEffective(vfx, on, director);
+        }
     }
 
     void DrawSpeed()
