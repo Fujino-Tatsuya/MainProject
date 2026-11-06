@@ -136,6 +136,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | — | `TraitStatEffect` | 수치 | PlayerStats 기본%·전체%·가하는 피해% |
 
 - **모드 변경 7개**(돌파의 방패·집속 연사·그림자 회귀·한계 돌파·축열 포격·정온 운용·절제된 분노)는 효과 클래스가 아니다 — 스킬이 `PlayerTraitModifiers.HasTrait(TraitModeIds.…)` 로 묻고 자기 코드 안에서 분기한다.
+  - 절제된 분노 HUD: 머리 위 분노 줄·`AssassinHUD` 분노 줄은 숨기고, 공용 스킬 바 R 칸은 **숨기지 않고 아이콘만 회색조**(할 일 237 — 133 의 칸 숨김 대체). 규칙 `AssassinRestraintRules.GraysHudSlot`, `SkillCooldownHUD` 가 R 아이콘·쿨타임 마스크 안 사본에 재질 `Assets/3.Materials/UI/MA_UIGrayscale.mat`(셰이더 `UI/Grayscale` = UI/Default + 채도 0·밝기 0.85, 스텐실·RectMask2D 지원)을 끼우고 풀리면 원래 재질로. 프레임·키 글자·툴팁은 그대로.
 - **사건**: `AttackLanded` 는 `Player.ServerAttackLanded` 에서 자동(시전 ID·형태 포함). `GuardSucceeded`·`PassiveProc`·`SkillCompleted`·`BasicAttackFired` 는
   스킬이 `PlayerTraitEffects.RaiseServer(trigger, skill)` 로 알린다(캐릭터 레인 몫). 거름 = `TraitTriggerFilter`(시전당 1회·간격, `TraitProcGate`).
 - **시전 ID**: `PlayerAttackLanded.CastId` — 스킬은 서버 승인 때 `PlayerSkillBase.ServerCastId` 를 받고, 그 스킬을 출처로 낸 적중은 자동으로 묶인다.
