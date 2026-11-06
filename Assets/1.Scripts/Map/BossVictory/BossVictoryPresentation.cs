@@ -49,6 +49,7 @@ public sealed class BossVictoryPresentation : MonoBehaviour
 
     private readonly List<Renderer> _tagged = new List<Renderer>();
     private bool _renderOn;
+    private Vector3 _circleCenter;   // 발밑 회색 원(246) 중심 — 표시 시작 순간 막타 발밑(없으면 타격점)
 
     private readonly List<Animator> _animators = new List<Animator>();
     private readonly List<float> _animatorSpeeds = new List<float>();   // 늦추기 전 원래 속도
@@ -154,9 +155,11 @@ public sealed class BossVictoryPresentation : MonoBehaviour
 
         // 마스크 대상 — 막타 / 팀원(사망 포함, D7) / 보스.
         GameObject bossGo = FindSpawned(v.BossNetworkObjectId);
+        _circleCenter = v.HitPoint;
         foreach (Player p in FindObjectsByType<Player>(FindObjectsSortMode.None))
         {
             if (p == null) continue;
+            if (p.OwnerClientId == v.KillerClientId) _circleCenter = p.transform.position;
             uint bit = p.OwnerClientId == v.KillerClientId ? BossVictoryRender.KillerMask : BossVictoryRender.TeammateMask;
             BossVictoryRender.Tag(p.gameObject, bit, _tagged);
             CollectAnimators(p.gameObject, isPlayer: true);
@@ -244,7 +247,14 @@ public sealed class BossVictoryPresentation : MonoBehaviour
         ApplyOutlines(zero: true);
 
         // 색 — 씬 끝까지 유지(D3).
-        if (_renderOn) BossVictoryRender.SetWeight(BossVictoryRules.ColorWeight(t));
+        if (_renderOn)
+        {
+            BossVictoryRender.SetWeight(BossVictoryRules.ColorWeight(t));
+            // 발밑 회색 원(246) — 주황이 들어오는 단계 0.72초부터 반경 0 → 목표.
+            BossVictoryRender.SetGroundCircle(_circleCenter,
+                BossVictoryRules.GroundCircleRadius(t, _cfg.groundCircleRadius, _cfg.groundCircleGrowSeconds),
+                _cfg.groundCircleSoftness, _cfg.groundCircleBrightness);
+        }
 
         // 사운드(K4 — 키가 비면 무음)
         if (!_sfxHitStopPlayed && t >= BossVictoryRules.FreezeStart) { _sfxHitStopPlayed = true; PlaySfx(_cfg.sfxHitStop, v.HitPoint); }

@@ -264,3 +264,19 @@
 - 팀원 복제본은 Idle 자세 그대로(공격 클립 홀드 없음). 막타 공격 상태 이름은 캐릭터마다 다르다(팔라딘 `Default_Attack1` — 없는 이름이면 그냥 서서 처치).
 - 보스방 NavMesh 가 없어 보스 에이전트는 꺼 둔 채다(서 있기만 하므로 무관).
 - 호스트 1인 전용(클라 창은 패널만 보인다).
+
+**구도 프리셋 — 244 후속 A (11-06 사용자 결정)** Config 의 카메라 구도 규칙 값 묶음(부감 24°/32°·FOV·기준 화면비·거리 범위·간격·종료 거리 배수·몸 높이·방위각 후보)을 이름 붙여 저장·불러오기·삭제한다.
+- 목록 = git 추적 SO `Assets/1.Scripts/Dev/BossVictoryLab/BossVictoryCameraPresets.asset`(클래스 `BossVictoryCameraPresets` — 팀 공유). 기본 항목 `기본(200)` = 지금 값. 랩 `cameraPresets` 칸에 연결돼 있다.
+- 패널 아래 "구도 프리셋": 이름 칸 + [현재 값 저장](같은 이름 = 덮어씀) · 항목마다 [불러오기]·[삭제]. 불러오면 **Config 에 덮어써 다음 재생부터**(구도는 처치 순간 서버가 고른다). 에디터에선 저장·불러오기·삭제 때 두 SO 를 바로 디스크에 쓴다.
+- 런타임 게임 코드는 이 SO 를 읽지 않는다(Config 만).
+
+### 10.5 발밑 회색 원 — 할 일 246 (11-06, 브랜치 `feature/BossVictoryDebugScene`)
+주황 틴트 동안 막타 발밑 둘레는 주황 대신 흑백.
+- **중심** = 표시가 시작되는 순간(처치 확정) 막타 플레이어(`KillerClientId`) 위치. 그 피어에서 못 찾으면 타격점. 이후 고정.
+- **범위** = 중심에서 **수평(XZ) 거리**만 본다 — 위에서 봤을 때 원 안에 드는 바닥·벽·소품 전부, 높이 한도 없음(원기둥). 픽셀 월드 위치는 합성 패스가 `_CameraDepthTexture` 로 되살린다(합성 패스 `ConfigureInput(Depth)`).
+- **모습** = 배경 픽셀만: 원래 명도(조명 결과, 무늬 유지) × 밝기 배율의 흑백. 인물·보스·이펙트 단색은 그대로. 가장자리는 반경 안쪽 "부드러움"(m)에 걸쳐 흑백 → 주황. 원래 화면과의 섞임(`_Weight`, 0.72–0.80 들어옴)은 그 위에 그대로.
+- **커짐** = 주황이 들어오기 시작하는 단계 0.72초(`DescendEnd`)부터 반경 0 → 목표, smoothstep(`BossVictoryRules.GroundCircleRadius`). 커지는 시간 0 = 바로 목표.
+- **Config 칸**(`BossVictoryConfig` "발밑 회색 원") `groundCircleRadius` 6m(0 = 끔) · `groundCircleGrowSeconds` 0.6초 · `groundCircleSoftness` 1m · `groundCircleBrightness` ×1. 표시가 매 프레임 읽어 재생 중에도 바로 반영.
+- **랩** 패널 아래 "발밑 회색 원" 슬라이더 4개(반경 0–20·커지는 시간 0–3·부드러움 0–5·밝기 0–2)가 Config 를 직접 고친다(SetDirty — 프로젝트 저장 때 디스크에 남는다). 커지는 모습 = '0.72' 점프 → 재개(F8), 느리게는 배속 ×0.25.
+- 파일: `BossVictoryConfig`·`BossVictoryRules.GroundCircleRadius`(+EditMode 테스트 2)·`BossVictoryRender.SetGroundCircle`·`BossVictoryComposite.shader`·`BossVictoryPresentation`(중심 저장·매 프레임 설정).
+- 한계: 하늘·깊이 없는 픽셀은 원 밖으로 본다. 반투명(이펙트)은 깊이에 안 써서 그 뒤 바닥 기준으로 판정되지만 이펙트는 어차피 단색 쪽이 이긴다.

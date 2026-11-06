@@ -46,6 +46,8 @@ public static class BossVictoryRender
     static readonly int IdBoss = Shader.PropertyToID("_BossColor");
     static readonly int IdEffect = Shader.PropertyToID("_EffectColor");
     static readonly int IdShadow = Shader.PropertyToID("_ShadowColor");
+    static readonly int IdCircle = Shader.PropertyToID("_GroundCircle");          // xyz 중심(월드), w 반경(m)
+    static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
 
     static Material _maskKiller, _maskTeammate, _maskBoss, _composite;
     static PreparePass _prepare;
@@ -73,6 +75,7 @@ public static class BossVictoryRender
         _composite = CoreUtils.CreateEngineMaterial(comp);
         ApplyColors(cfg);
         SetWeight(0f);
+        SetGroundCircle(Vector3.zero, 0f, 0f, 1f);
 
         _prepare = new PreparePass(_maskKiller, _maskTeammate, _maskBoss, _composite)
         {
@@ -85,6 +88,7 @@ public static class BossVictoryRender
             // 반투명(이펙트·무기 궤적) 뒤 — 이펙트까지 단색으로(할 일 200 D2). 후처리(블룸 등)는 그 뒤.
             renderPassEvent = RenderPassEvent.AfterRenderingTransparents,
         };
+        _compositePass.ConfigureInput(ScriptableRenderPassInput.Depth); // 발밑 회색 원(246) — 픽셀 월드 위치
 
         RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         _hooked = true;
@@ -111,6 +115,17 @@ public static class BossVictoryRender
     {
         _weight = Mathf.Clamp01(weight);
         if (_composite != null) _composite.SetFloat(IdWeight, _weight);
+    }
+
+    /// <summary>
+    /// 발밑 회색 원(할 일 246) — 중심에서 <b>수평</b> 거리 <paramref name="radius"/> 안의 배경(바닥·벽·소품 — 높이 한도 없음, 원기둥)을
+    /// 주황 틴트 대신 흑백(원래 명도 × <paramref name="brightness"/>)으로. 반경 0 = 끔. 표시가 매 프레임 부른다.
+    /// </summary>
+    public static void SetGroundCircle(Vector3 center, float radius, float softness, float brightness)
+    {
+        if (_composite == null) return;
+        _composite.SetVector(IdCircle, new Vector4(center.x, center.y, center.z, Mathf.Max(0f, radius)));
+        _composite.SetVector(IdCircleLook, new Vector4(Mathf.Max(0f, softness), Mathf.Max(0f, brightness), 0f, 0f));
     }
 
     public static void ApplyColors(BossVictoryConfig cfg)
@@ -335,6 +350,10 @@ public static class BossVictoryRender
                 builder.UseTexture(color, AccessFlags.Read);
                 builder.UseTexture(shared.idTex, AccessFlags.Read);
                 builder.UseTexture(shared.preTex, AccessFlags.Read);
+                // 발밑 회색 원(246) — 셰이더가 _CameraDepthTexture 로 픽셀 월드 위치를 되살린다.
+                if (resourceData.cameraDepthTexture.IsValid())
+                    builder.UseTexture(resourceData.cameraDepthTexture, AccessFlags.Read);
+                builder.UseAllGlobalTextures(true);
                 builder.SetRenderAttachment(dest, 0, AccessFlags.Write);
                 builder.SetRenderFunc(static (BlitData d, RasterGraphContext ctx) =>
                 {

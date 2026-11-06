@@ -16,6 +16,7 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · 패널 = 자동 반복·배속·점프(그 시각까지 빨리 감은 뒤 멈춤)·막타 각도/거리/방향·팀원 수.</item>
 /// <item>연출 수치 = <c>Resources/BossVictory/BossVictoryConfig.asset</c> 인스펙터. 다음 재생에 반영된다(몇 칸은 바로). 🔴 SO 라 Play 를 끝내도 값이 남는다.</item>
+/// <item>패널 아래 = 발밑 회색 원(246) 반경·커지는 시간·부드러움·밝기 슬라이더(Config 직접, 바로 반영) · 구도 프리셋(244 후속 A, <see cref="BossVictoryCameraPresets"/> — 저장·불러오기·삭제, 불러오면 다음 재생부터).</item>
 /// <item>배속·점프는 Time.timeScale 과 승리 연출 복제 시계(처치 시각)를 같이 민다 — 카메라·색·단계와 애니·사망 대기가 같은 시계로 흐른다.</item>
 /// <item>호스트 1인 전용. 게이트 = <c>UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS</c>.</item>
 /// </list>
@@ -70,6 +71,10 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     [SerializeField] Vector2 panelPosition = new Vector2(10f, 10f);
     [SerializeField, Min(240f)] float panelWidth = 380f;
 
+    [Header("구도 프리셋(244 후속 A)")]
+    [Tooltip("Config 구도 규칙 값 묶음 목록(git 추적). 패널에서 저장·불러오기·삭제 — 불러오면 Config 에 덮어써 다음 재생부터.")]
+    [SerializeField] BossVictoryCameraPresets cameraPresets;
+
     BossEncounterDirector _director;
     GameObject _room;
     Transform _landing;
@@ -88,6 +93,9 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     float _pastEndSince = -1f;
     string _status = "호스트 대기";
     bool _folded;
+    Vector2 _scroll;
+    string _presetName = "";
+    string _presetNote = "";
 
     // ── 수명 ────────────────────────────────────────────────────────────────
 
@@ -416,13 +424,14 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
     void OnGUI()
     {
-        float height = _folded ? 30f : Mathf.Min(Screen.height - panelPosition.y - 10f, 640f);
+        float height = _folded ? 30f : Screen.height - panelPosition.y - 10f;
         GUILayout.BeginArea(new Rect(panelPosition.x, panelPosition.y, panelWidth, height), GUI.skin.box);
         GUILayout.BeginHorizontal();
         GUILayout.Label("<b>보스 처치 연출 랩 (244)</b>", Rich());
         if (GUILayout.Button(_folded ? "펼치기" : "접기", GUILayout.Width(60f))) _folded = !_folded;
         GUILayout.EndHorizontal();
         if (_folded) { GUILayout.EndArea(); return; }
+        _scroll = GUILayout.BeginScrollView(_scroll);
 
         bool ready = _director != null && _director.IsSpawned;
         BossEncounterDirector.VictoryState v = ready ? _director.Victory : default;
@@ -500,8 +509,89 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             UnityEditor.EditorGUIUtility.PingObject(cfg);
         }
 #endif
+
+        GUILayout.Space(4f);
+        GUI.enabled = true;   // 아래 두 묶음은 연출이 없어도 고칠 수 있다
+        DrawGroundCircle(cfg);
+        GUILayout.Space(4f);
+        DrawCameraPresets(cfg);
+
         GUI.enabled = true;
+        GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    // 발밑 회색 원(할 일 246) — Config 칸을 직접 고친다. 매 프레임 읽으므로 재생 중에도 바로 보인다(반경·부드러움·밝기 — 커지는 시간은 0.72초 뒤 구간에서).
+    void DrawGroundCircle(BossVictoryConfig cfg)
+    {
+        GUILayout.Label("<b>발밑 회색 원 (246)</b> — 바로 반영 · Config 에 남는다(SO)", Rich());
+        GUI.changed = false;
+        cfg.groundCircleRadius = LabeledSlider($"반경 {cfg.groundCircleRadius:0.0}m (0 = 끔)", cfg.groundCircleRadius, 0f, 20f);
+        cfg.groundCircleGrowSeconds = LabeledSlider($"커지는 시간 {cfg.groundCircleGrowSeconds:0.00}초 (0.72초부터)", cfg.groundCircleGrowSeconds, 0f, 3f);
+        cfg.groundCircleSoftness = LabeledSlider($"가장자리 부드러움 {cfg.groundCircleSoftness:0.0}m", cfg.groundCircleSoftness, 0f, 5f);
+        cfg.groundCircleBrightness = LabeledSlider($"흑백 밝기 ×{cfg.groundCircleBrightness:0.00}", cfg.groundCircleBrightness, 0f, 2f);
+        if (GUI.changed) MarkDirty(cfg, save: false);   // 드래그 중 매번 디스크에 쓰지 않는다 — 프로젝트 저장(Ctrl+S) 때 남는다
+        GUILayout.Label("커지는 모습 = 위 '0.72' 점프 → 재개(F8), 느리게 보려면 배속 ×0.25.");
+    }
+
+    // 구도 프리셋(244 후속 A) — Config 구도 규칙 값 묶음 저장·불러오기·삭제. 불러오면 Config 에 덮어써 다음 재생부터.
+    void DrawCameraPresets(BossVictoryConfig cfg)
+    {
+        GUILayout.Label("<b>구도 프리셋</b> — 불러오면 Config 에 덮어써 다음 재생부터", Rich());
+        if (cameraPresets == null)
+        {
+            GUILayout.Label("프리셋 목록 SO 가 비어 있다(랩 cameraPresets 칸).");
+            return;
+        }
+        GUILayout.Label($"지금 Config: 부감 {cfg.finalPitch:0.#}°→{cfg.endPitch:0.#}° · FOV {cfg.fov:0.#} · 거리 {cfg.minDistance:0.#}–{cfg.maxDistance:0.#}m · 방위 {(cfg.yawCandidates != null ? cfg.yawCandidates.Length : 0)}개", Rich());
+        GUILayout.BeginHorizontal();
+        _presetName = GUILayout.TextField(_presetName ?? "", GUILayout.Width(panelWidth - 150f));
+        if (GUILayout.Button("현재 값 저장"))
+        {
+            bool overwrite = cameraPresets.IndexOf(_presetName?.Trim()) >= 0;
+            if (cameraPresets.Save(_presetName, cfg))
+            {
+                MarkDirty(cameraPresets);
+                _presetNote = $"'{_presetName.Trim()}' {(overwrite ? "덮어씀" : "저장")}";
+            }
+            else _presetNote = "이름을 적어야 저장된다";
+        }
+        GUILayout.EndHorizontal();
+        if (!string.IsNullOrEmpty(_presetNote)) GUILayout.Label(_presetNote);
+
+        for (int i = 0; i < cameraPresets.entries.Count; i++)
+        {
+            BossVictoryCameraPresets.Entry e = cameraPresets.entries[i];
+            if (e == null) continue;
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{e.name}  ({e.finalPitch:0.#}°/{e.endPitch:0.#}° · FOV {e.fov:0.#})", GUILayout.Width(panelWidth - 150f));
+            if (GUILayout.Button("불러오기"))
+            {
+                e.ApplyTo(cfg);
+                MarkDirty(cfg);
+                _presetName = e.name;
+                _presetNote = $"'{e.name}' 불러옴 — 다음 재생부터";
+            }
+            if (GUILayout.Button("삭제"))
+            {
+                cameraPresets.entries.RemoveAt(i);
+                MarkDirty(cameraPresets);
+                _presetNote = $"'{e.name}' 삭제";
+                GUILayout.EndHorizontal();
+                break;
+            }
+            GUILayout.EndHorizontal();
+        }
+    }
+
+    // 에디터에선 디스크까지 저장한다(SO 는 Play 를 끝내도 남는다 — 프리셋 목록은 git 추적). 빌드에선 메모리만.
+    static void MarkDirty(Object asset, bool save = true)
+    {
+#if UNITY_EDITOR
+        if (asset == null) return;
+        UnityEditor.EditorUtility.SetDirty(asset);
+        if (save) UnityEditor.AssetDatabase.SaveAssetIfDirty(asset);
+#endif
     }
 
     void SetCharacterIndex(int slot, int value)

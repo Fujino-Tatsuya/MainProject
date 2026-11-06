@@ -43,6 +43,10 @@ MonoBehaviour:
   characterExposure: 1.75
   characterGamma: 1.1
   effectDetectGain: 6
+  groundCircleRadius: 6
+  groundCircleGrowSeconds: 0.6
+  groundCircleSoftness: 1
+  groundCircleBrightness: 1
   slowMotionScale: 0.1
   wallFacingThreshold: 0.3
   wallSearchRadius: 40

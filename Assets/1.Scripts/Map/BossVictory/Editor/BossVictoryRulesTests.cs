@@ -252,4 +252,27 @@ public sealed class BossVictoryRulesTests
         Assert.That(float.IsNaN(c.Final.Position.x), Is.False);
         Assert.That(float.IsNaN(c.Final.Rotation.x), Is.False);
     }
+
+    // 발밑 회색 원(246) — 주황 들어오기 전엔 0, 0.72초부터 커져 grow 초 뒤 목표 반경, 그 뒤 유지.
+    [Test]
+    public void GroundCircleRadius_GrowsFromDescendEnd()
+    {
+        float d = BossVictoryRules.DescendEnd;
+        Assert.That(BossVictoryRules.GroundCircleRadius(d - 0.01f, 6f, 0.6f), Is.EqualTo(0f));
+        Assert.That(BossVictoryRules.GroundCircleRadius(d, 6f, 0.6f), Is.EqualTo(0f).Within(1e-4f));
+        float mid = BossVictoryRules.GroundCircleRadius(d + 0.3f, 6f, 0.6f);
+        Assert.That(mid, Is.GreaterThan(0f).And.LessThan(6f));
+        Assert.That(BossVictoryRules.GroundCircleRadius(d + 0.6f, 6f, 0.6f), Is.EqualTo(6f).Within(1e-4f));
+        Assert.That(BossVictoryRules.GroundCircleRadius(d + 3f, 6f, 0.6f), Is.EqualTo(6f).Within(1e-4f));
+    }
+
+    // 커지는 시간 0 = 0.72초부터 바로 목표 반경, 반경 0 = 끔.
+    [Test]
+    public void GroundCircleRadius_ZeroGrowOrZeroRadius()
+    {
+        float d = BossVictoryRules.DescendEnd;
+        Assert.That(BossVictoryRules.GroundCircleRadius(d, 6f, 0f), Is.EqualTo(6f));
+        Assert.That(BossVictoryRules.GroundCircleRadius(d - 0.01f, 6f, 0f), Is.EqualTo(0f));
+        Assert.That(BossVictoryRules.GroundCircleRadius(d + 1f, 0f, 0.6f), Is.EqualTo(0f));
+    }
 }

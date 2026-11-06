@@ -83,6 +83,17 @@ public static class BossVictoryRules
     /// </summary>
     public static float ResultSafetyDelay(float preludeSeconds) => Mathf.Max(0f, preludeSeconds) + FreezeDuration;
 
+    /// <summary>
+    /// 발밑 회색 원 반경(할 일 246) — 주황이 들어오기 시작하는 단계 <see cref="DescendEnd"/>(0.72)부터 <paramref name="growSeconds"/> 동안
+    /// 0 → <paramref name="radius"/> 로 커진다(smoothstep). 그 전엔 0. growSeconds ≤ 0 이면 0.72 부터 바로 목표 반경.
+    /// </summary>
+    public static float GroundCircleRadius(float t, float radius, float growSeconds)
+    {
+        if (radius <= 0f || t < DescendEnd) return 0f;
+        if (growSeconds <= 0f) return radius;
+        return radius * Smooth((t - DescendEnd) / growSeconds);
+    }
+
     // ── 연출 벽 숨김(할 일 200 추가 — 234 벽 제한 대신) ──────────────────
 
     /// <summary>
