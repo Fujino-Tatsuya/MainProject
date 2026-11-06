@@ -118,10 +118,10 @@ public static class AssassinShadowReturnRules
     public static bool OpensReturn(bool returnLinked, bool hasShadowReturn) => returnLinked && hasShadowReturn;
 
     /// <summary>
-    /// 복귀 돌진 방향·거리 — 현재 위치 → 저장된 출발점(수평), 거리 = min(남은 거리, 현재 Q 최대 거리). 저장점 도착은 보장하지 않는다(지형 정지는 이동 규칙).
-    /// 이미 출발점 위면 거리 0, 방향은 <paramref name="fallbackForward"/>(수평, 없으면 +Z).
+    /// 복귀 돌진 방향·거리 — 현재 위치 → 저장된 출발점(수평), 거리 = 남은 거리 전부(할 일 243 — 사거리 제한 없음, 창 안이면 항상 출발점까지).
+    /// 지형(벽·낭떠러지) 앞 정지만 기존 대시 이동 규칙대로. 이미 출발점 위면 거리 0, 방향은 <paramref name="fallbackForward"/>(수평, 없으면 +Z).
     /// </summary>
-    public static void Resolve(Vector3 current, Vector3 origin, float maxDistance, Vector3 fallbackForward,
+    public static void Resolve(Vector3 current, Vector3 origin, Vector3 fallbackForward,
         out Vector3 direction, out float distance)
     {
         Vector3 toOrigin = origin - current;
@@ -136,7 +136,7 @@ public static class AssassinShadowReturnRules
         }
 
         direction = toOrigin / remaining;
-        distance = Mathf.Min(remaining, Mathf.Max(0f, maxDistance));
+        distance = remaining;
     }
 
     /// <summary>복귀 단계 기준 피해 = 그 단계 실행 때 원래 Q 기준 피해 × 비율(반올림 한 번). 이 값이 판정 피해이자 그 단계 추격의 궤적 기준이다.</summary>

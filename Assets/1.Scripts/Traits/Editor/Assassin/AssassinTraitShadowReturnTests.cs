@@ -232,18 +232,18 @@ public sealed class AssassinTraitShadowReturnTests
     // ── 복귀 방향·거리 ─────────────────────────────────────────────────
 
     [Test]
-    public void ReturnDirection_TowardSavedOrigin_DistanceCappedByQMax()
+    public void ReturnDirection_TowardSavedOrigin_NoDistanceCap()
     {
-        AssassinShadowReturnRules.Resolve(new Vector3(0f, 0f, 4f), new Vector3(0f, 1f, 1f), 4f, Vector3.forward,
+        AssassinShadowReturnRules.Resolve(new Vector3(0f, 0f, 4f), new Vector3(0f, 1f, 1f), Vector3.forward,
             out Vector3 direction, out float distance);
         Assert.AreEqual(0f, Vector3.Distance(Vector3.back, direction), Eps, "현재 위치 → 저장점(수평)");
         Assert.AreEqual(3f, distance, Eps, "남은 거리가 짧으면 저장점까지");
 
-        AssassinShadowReturnRules.Resolve(new Vector3(10f, 0f, 0f), Vector3.zero, 4f, Vector3.forward, out direction, out distance);
+        AssassinShadowReturnRules.Resolve(new Vector3(30f, 0f, 0f), Vector3.zero, Vector3.forward, out direction, out distance);
         Assert.AreEqual(0f, Vector3.Distance(Vector3.left, direction), Eps);
-        Assert.AreEqual(4f, distance, Eps, "멀어졌으면 현재 Q 최대 거리까지만 — 저장점 도착 보장 없음");
+        Assert.AreEqual(30f, distance, Eps, "멀어져도 저장점까지 전부 — 사거리 제한 없음(할 일 243)");
 
-        AssassinShadowReturnRules.Resolve(Vector3.one, Vector3.one, 4f, Vector3.right, out direction, out distance);
+        AssassinShadowReturnRules.Resolve(Vector3.one, Vector3.one, Vector3.right, out direction, out distance);
         Assert.AreEqual(0f, distance, Eps, "이미 저장점 위 = 이동 0");
         Assert.AreEqual(0f, Vector3.Distance(Vector3.right, direction), Eps);
     }

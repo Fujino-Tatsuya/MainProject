@@ -11,8 +11,8 @@ using UnityEngine;
 /// <item>그림자 회귀 = 특성 ASN_2_RETURN 을 <see cref="TraitDirector.ReplaceAcquiredServer"/> 로 넣고 뺀다(특성 랩과 같은 정식 경로).
 ///   랩 씬에는 디렉터가 없어 처음 켤 때 NetworkManager 프리팹 목록의 <c>TraitDirector</c> 를 서버가 스폰한다. 어쌔신이 아니면 비운다.</item>
 /// <item>Q·E·R 쿨 0 = 랩 오브젝트의 <see cref="DebugZeroCooldown.Skills"/>.</item>
-/// <item>사거리 표시(게임 화면, 라인) — 하늘색 원 = 플레이어 중심 반경 Q 돌진 거리(<see cref="AssassinDashStrikeSkillData.DashDistance"/>, 회귀 최대 거리도 같은 칸).
-///   회귀 창이 열려 있으면 출발점 표식 + 지금 위치 → 출발점 선(초록 = 회귀로 닿음, 주황 = 남은 거리가 Q 거리보다 길어 못 닿음).</item>
+/// <item>사거리 표시(게임 화면, 라인) — 하늘색 원 = 플레이어 중심 반경 Q 돌진 거리(<see cref="AssassinDashStrikeSkillData.DashDistance"/>, 출발 Q 만).
+///   회귀 창이 열려 있으면 출발점 표식 + 지금 위치 → 출발점 선(초록). 회귀는 사거리 제한이 없다(할 일 243 — 거리 상관없이 출발점까지, 벽만 예외).</item>
 /// <item>마지막 Q/회귀 = 오너가 본 스킬 시작 → 끝 이동 거리·시간(실제 시간). 끝 = 클립 End 이벤트(또는 안전망).</item>
 /// </list>
 /// 호스트 1인 기준, 새 RPC 없음.
@@ -195,7 +195,7 @@ internal sealed class DashPassLabAssassinQ
             GUI.enabled = true;
         }
 
-        showRange = GUILayout.Toggle(showRange, " 사거리 표시(하늘색 원 = Q·회귀 최대 거리)");
+        showRange = GUILayout.Toggle(showRange, " 사거리 표시(하늘색 원 = Q 거리 · 초록 선 = 회귀 경로)");
 
         if (q != null)
         {
@@ -210,7 +210,7 @@ internal sealed class DashPassLabAssassinQ
             if (open && data != null && q.LocalReturnOrigin.TryPeek(out Vector3 origin))
             {
                 float toOrigin = Flat(origin - player.transform.position).magnitude;
-                returnText += $" · 출발점까지 {toOrigin:F2}m → 회귀 이동 {Mathf.Min(toOrigin, data.DashDistance):F2}m";
+                returnText += $" · 출발점까지 {toOrigin:F2}m(회귀 = 전부, 사거리 제한 없음)";
             }
 
             GUILayout.Label($"쿨 남음 {remaining:F1}s · {returnText}");
@@ -261,8 +261,7 @@ internal sealed class DashPassLabAssassinQ
         if (!hasOrigin)
             return;
 
-        bool reaches = Flat(origin - center).magnitude <= data.DashDistance + 0.01f;
-        Color color = reaches ? new Color(0.3f, 1f, 0.4f) : new Color(1f, 0.6f, 0.15f);
+        Color color = new Color(0.3f, 1f, 0.4f); // 회귀는 거리 제한 없음(243) — 항상 출발점까지(벽만 예외)
         originLine.startColor = originLine.endColor = color;
         originMark.startColor = originMark.endColor = color;
         originLine.SetPosition(0, Ground(center));
