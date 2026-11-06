@@ -19,11 +19,11 @@ MonoBehaviour:
   canvasSortingOrder: 50
   screenEdgePadding: {x: 60, y: 30}
   minScreenPixelHeight: 16
-  spawnOffset: 20
-  spawnScatter: {x: 12, y: 6}
+  spawnOffset: -33
+  spawnScatter: {x: 12, y: 0.9}
   riseDuration: 0.2
   riseDistance: 24
-  fallDistance: 12
+  fallDistance: 0
   fadeDuration: 0.25
   accumulateHold: 0.5
   riseEase: 8
@@ -48,23 +48,23 @@ MonoBehaviour:
     highPercent: 3
   tierLooks:
   - tier: 0
-    fillColor: {r: 1, g: 0.85, b: 0.2, a: 1}
-    holdScale: 0.5
-    spawnScale: 0.5
-    spawnSettleDuration: 0
-    shake: 0
+    fillColor: {r: 0.4869865, g: 0.83396226, b: 0.1998362, a: 1}
+    holdScale: 0.8
+    spawnScale: 1.1
+    spawnSettleDuration: 0.08
+    shake: 1
     singleDuration: 0.65
   - tier: 1
     fillColor: {r: 1, g: 0.55, b: 0.1, a: 1}
-    holdScale: 1
-    spawnScale: 1.1
+    holdScale: 0.9
+    spawnScale: 1.2
     spawnSettleDuration: 0.08
     shake: 0
     singleDuration: 0.75
   - tier: 2
     fillColor: {r: 1, g: 0.2, b: 0.15, a: 1}
-    holdScale: 1.4
-    spawnScale: 1.63
+    holdScale: 1
+    spawnScale: 1.75
     spawnSettleDuration: 0.12
     shake: 1
     singleDuration: 0.85
@@ -73,7 +73,7 @@ MonoBehaviour:
   popupStyles:
   - kind: 0
     color: {r: 1, g: 0.82, b: 0.18, a: 1}
-    height: 36
+    height: 74
     offset: {x: 0, y: 0}
   - kind: 1
     color: {r: 0.28, g: 1, b: 0.38, a: 1}
@@ -81,7 +81,7 @@ MonoBehaviour:
     offset: {x: 0, y: 0}
   - kind: 2
     color: {r: 0.49803922, g: 0.84705883, b: 1, a: 1}
-    height: 34
+    height: 54
     offset: {x: 0, y: 64}
   - kind: 3
     color: {r: 0.85, g: 0.55, b: 1, a: 1}
