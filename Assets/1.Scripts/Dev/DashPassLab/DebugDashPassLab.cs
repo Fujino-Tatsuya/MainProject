@@ -10,6 +10,7 @@ using UnityEngine;
 /// 바로 <see cref="MonsterBase.SetServerLogicSuspended"/>(true) 로 FSM 을 멈춰 인지·추격·공격하지 않게 한다(피격은 그대로 — 보스 연출 정지와 같은 게이트).
 /// 몬스터를 씬에 직접 두지 않는 이유: 씬 배치 NetworkObject 는 해시가 씬 저장 때 정해져 저작 메뉴로 다시 만들 때 어긋나기 쉽다.
 /// 패널 버튼 = 다시 놓기(죽였거나 밀린 몬스터를 처음 자리로). 호스트 1인 기준, 새 RPC 없음.
+/// 할 일 243: 패널 아래 어쌔신 Q 구역(어쌔신으로·그림자 회귀 특성·Q 쿨 0·사거리 라인·마지막 이동 측정) = <see cref="DashPassLabAssassinQ"/>.
 /// 씬은 저작 메뉴 <c>Tools/Debug/209 대시 관통 테스트 씬 만들기</c> 로 다시 만든다(<c>DashPassLabSceneBuilder</c>).
 /// </summary>
 [DisallowMultipleComponent]
@@ -38,6 +39,7 @@ public sealed class DebugDashPassLab : MonoBehaviour
     private readonly List<NetworkObject> spawned = new List<NetworkObject>();
     private bool spawnedOnce;
     private string status = string.Empty;
+    private DashPassLabAssassinQ assassinQ; // 할 일 243 — 어쌔신 Q 패널·사거리 표시
 
     public IReadOnlyList<Entry> Entries => entries;
 
@@ -49,6 +51,9 @@ public sealed class DebugDashPassLab : MonoBehaviour
 
     private void Update()
     {
+        assassinQ ??= new DashPassLabAssassinQ(this);
+        assassinQ.Tick();
+
         if (spawnedOnce)
             return;
 
@@ -64,6 +69,8 @@ public sealed class DebugDashPassLab : MonoBehaviour
     private void OnDisable()
     {
         spawned.Clear();
+        assassinQ?.Dispose();
+        assassinQ = null;
     }
 
     private void SpawnAll()
@@ -109,9 +116,10 @@ public sealed class DebugDashPassLab : MonoBehaviour
     private void OnGUI()
     {
         NetworkManager networkManager = NetworkManager.Singleton;
-        GUILayout.BeginArea(new Rect(panelPosition.x, panelPosition.y, 360f, 170f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(panelPosition.x, panelPosition.y, 420f, 360f), GUI.skin.box);
         GUILayout.Label("209 대시 관통 테스트 — 각 레인 START 칸에서 +Z(W) 방향으로 대시");
         GUILayout.Label("A: 일반 3 일렬 → 2마리 관통·3번째 앞 정지 / B: 중간보스 / C: 일반 1 + 벽 / D: 일반 2 붙임(겹친 채 끝) / E: 23호");
+        GUILayout.Label("F1 = 캐릭터 순환. 어쌔신 Q 는 유닛을 전부 통과하고 벽(C)에서만 멈춘다.");
         bool server = networkManager != null && networkManager.IsListening && networkManager.IsServer;
         GUI.enabled = server;
         if (GUILayout.Button("몬스터 다시 놓기"))
@@ -122,6 +130,7 @@ public sealed class DebugDashPassLab : MonoBehaviour
         GUI.enabled = true;
         if (!string.IsNullOrEmpty(status))
             GUILayout.Label(status);
+        assassinQ?.DrawGui(server);
         GUILayout.EndArea();
     }
 }
