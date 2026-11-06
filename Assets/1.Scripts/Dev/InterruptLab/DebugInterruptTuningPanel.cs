@@ -11,7 +11,8 @@ using UnityEngine;
 /// <item>꺼진 효과는 그리기만 안 한다 — 상태 기계·시간표·섬광 순간(암전 걷힘 등)은 그대로 돈다.</item>
 /// <item>허수아비 간파를 제압 간파로 재현하는 토글(179 후속 3, <see cref="DebugSuppressInterruptRepro"/>). A6·A7 섬광 시퀀스 칸은 11-04(할 일 211) 런타임에서 빠져 버튼도 뺐다.</item>
 /// <item>간파 연출 4단계(할 일 192) — 지금 단계 표시, 실패/근접/대쉬/제압 재현 버튼(<see cref="DebugInterruptTierPreview"/>).</item>
-/// <item>카메라 대상 중심 토글(할 일 196) — '전부 켬'·'암전만' 은 건드리지 않는다(따로 둔 스위치).</item>
+/// <item>카메라 대상 중심 토글(할 일 196).</item>
+/// <item>11-06(할 일 238) 정리 — 버전 V0~V2 버튼·눌러도 안 보이는 효과 칸(오너 암전·②~⑥·월드 섬광·적중 지점 라이트·A2·A4)·'전부 켬'·'암전만' 삭제. 남은 버튼은 모두 V3 런타임에 연결.</item>
 /// <item>간파 스킬 캐릭터 VFX 개별 켜고 끄기(할 일 238) — <see cref="InterruptVfxToggles"/>(정적·저장 안 함), 디렉터 없어도 보인다. 목록 Docs/tech/interrupt-vfx-list.md.</item>
 /// <item>배치(11-05 정리) — 성격별 접는 섹션(<see cref="Section"/>: 간파 재생 / 단계·버전 / 화이트아웃·제압 / 화면 효과 / 카메라 / 허수아비·서버 / 배속),
 ///       같은 폭 버튼 줄, 넘치면 스크롤. 접힘 상태만 PlayerPrefs(<see cref="FoldPrefsPrefix"/>)에 기억 — 칸 값은 저장하지 않는다.</item>
@@ -59,20 +60,14 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         }
     }
 
-    /// <summary>패널 줄 — 계획서 §17-1 의 효과 전부(효과 칸 9 + 팀원 암순응 A2) + A4 성공 이펙트 칸(프리팹 값 켬 그대로).</summary>
+    /// <summary>
+    /// 패널 줄 — 지금 런타임(일반·대쉬·제압 = V3, 단계 ownerDim 전부 끔)에서 실제로 보이는 칸만(11-06 할 일 238 정리).
+    /// 뺀 칸: 오너 암전(단계 ownerDim 끔이라 안 켜짐)·②~⑥·월드 섬광·적중 지점 라이트·팀원 암순응 A2(V0 섬광 순간 경로에서만 쓰임 — V3 는 안 지남)·
+    /// 성공 이펙트 A4(세 Variant 칸이 비어 아무것도 안 나옴). 디렉터 칸 자체는 그대로(인스펙터).
+    /// </summary>
     public static readonly Row[] Rows =
     {
-        new Row("오너 암전", InterruptPresentationEffect.OwnerDim),
-        new Row("빛 모임 (VFX+라이트)", InterruptPresentationEffect.LightGather),
-        new Row("② 스타버스트", InterruptPresentationEffect.Starburst),
-        new Row("③ 화이트아웃", InterruptPresentationEffect.Whiteout),
-        new Row("④ 스미어", InterruptPresentationEffect.Smear),
-        new Row("⑤ 색수차 블러", InterruptPresentationEffect.Aberration),
-        new Row("⑥ 가라앉음 (블룸)", InterruptPresentationEffect.Settle),
-        new Row("월드 섬광", InterruptPresentationEffect.WorldFlash),
-        new Row("적중 지점 라이트", InterruptPresentationEffect.HitLight),
-        new Row("팀원 암순응 (A2)", InterruptProductionCue.DarkAdaptation),
-        new Row("성공 이펙트 (A4)", InterruptProductionCue.SuccessFxSlot),
+        new Row("빛 모임 (팀원 강 시도 — 남의 화면)", InterruptPresentationEffect.LightGather),
     };
 
     /// <summary>카메라 대상 중심 토글 글자(할 일 196).</summary>
@@ -119,7 +114,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     {
         Replay,        // 간파 재생 — 지금 단계 표시·단계 재현
         Character,     // 캐릭터 변경 — 팔라딘/거너/어쌔신(할 일 238, F1 순환과 같은 길)
-        Versions,      // 단계·버전 선택 — 일반·대쉬·제압 V0~V3·암순응·위치
+        Versions,      // 단계별 적중 라이트 — 일반·대쉬·제압 암순응 가/나·위치·재생(버전 버튼은 238 에서 삭제, V3)
         Whiteout,      // 화이트아웃·제압 — 3단계 화이트아웃 스위치·단계 에셋
         Effects,       // 화면 효과 — 효과 칸 켜기/끄기
         Camera,        // 카메라 — 대상 중심
@@ -133,7 +128,7 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
     {
         Section.Replay => "간파 재생",
         Section.Character => "캐릭터 변경",
-        Section.Versions => "단계·버전 선택",
+        Section.Versions => "단계별 적중 라이트 (V3)",
         Section.Whiteout => "화이트아웃·제압 (219)",
         Section.Effects => "화면 효과",
         Section.Camera => "카메라",
@@ -280,8 +275,8 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
         GUILayout.Label("※ 재현은 이 화면만·슬로우 없음(줌·슬로우는 실제 간파)");
     }
 
-    // 적중 라이트 연출 버전(할 일 194) — 일반·대쉬·제압 단계마다 V0~V3·암순응 가/나·월드 이펙트 위치(이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생.
-    // '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
+    // 단계별 적중 라이트(할 일 194 → 11-06 238 정리: 버전 V0~V2 버튼 삭제, 런타임 = V3) — 일반·대쉬·제압 단계마다 암순응 가/나·월드 이펙트 위치
+    // (이 피어 런타임 값만, 다음 성공부터) + 그 단계 재생. '실제' = 데이터·프리팹이 없어 V0 로 돌아갔는지까지 반영한 값.
     void DrawTierVersions(InterruptProductionDirector director)
     {
         bool first = true;
@@ -301,14 +296,6 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
                 _tierPreview.Begin(director, tier, Time.unscaledTime);
             GUILayout.EndHorizontal();
 
-            InterruptTierFlash[] versions = DebugInterruptTierPreview.Versions;
-            var versionLabels = new string[versions.Length];
-            for (int i = 0; i < versions.Length; i++)
-                versionLabels[i] = DebugInterruptTierPreview.Selected(DebugInterruptTierPreview.VersionLabel(versions[i]), profile.flash == versions[i]);
-            int v = ButtonRow(versionLabels);
-            if (v >= 0)
-                SelectVersion(profile, versions[v]);
-
             InterruptDarkAdaptMode[] modes = DebugInterruptTierPreview.DarkAdaptModes;
             var modeLabels = new string[modes.Length];
             for (int i = 0; i < modes.Length; i++)
@@ -325,18 +312,6 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             if (o >= 0)
                 profile.hitLightOrigin = origins[o];
         }
-    }
-
-    /// <summary>버전 버튼 — 섬광 종류를 바꾸고, V3 면 암순응도 그 기본(나)으로 맞춘다(194 후속, 누른 뒤 가로 다시 고를 수 있다).</summary>
-    public static void SelectVersion(InterruptTierProfile profile, InterruptTierFlash flash)
-    {
-        if (profile == null)
-            return;
-
-        profile.flash = flash;
-        InterruptDarkAdaptMode? darkAdapt = InterruptPresentationTierRules.DefaultDarkAdapt(flash);
-        if (darkAdapt.HasValue)
-            profile.darkAdapt = darkAdapt.Value;
     }
 
     /// <summary>제압 화이트아웃 토글 글자(할 일 219).</summary>
@@ -364,12 +339,6 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             bool next = Toggle(on, row.Label);
             if (next != on)
                 row.Set(director, next);
-        }
-
-        switch (ButtonRow("전부 켬", "암전만"))
-        {
-            case 0: SetAll(director, true); break;
-            case 1: SetDefaults(director); break;
         }
     }
 
@@ -504,25 +473,4 @@ public sealed class DebugInterruptTuningPanel : MonoBehaviour
             _timeScale.Scale = SpeedButtons[clicked];
     }
 
-    /// <summary>모든 줄을 켜거나 끈다.</summary>
-    public static void SetAll(InterruptProductionDirector director, bool on)
-    {
-        foreach (Row row in Rows)
-            row.Set(director, on);
-    }
-
-    /// <summary>
-    /// 기본값(오너 암전만 켬 — §17-1)으로 되돌린다. 팀원 암순응(A2)도 끈다.
-    /// A4 성공 이펙트 칸은 §17 효과 칸이 아니라 켬 유지 스위치라 건드리지 않는다(지금 값 그대로).
-    /// </summary>
-    public static void SetDefaults(InterruptProductionDirector director)
-    {
-        foreach (Row row in Rows)
-        {
-            if (row.IsCue && row.Cue == InterruptProductionCue.SuccessFxSlot)
-                continue;
-
-            row.Set(director, !row.IsCue && InterruptPresentationEffectRules.DefaultOn(row.Effect));
-        }
-    }
 }

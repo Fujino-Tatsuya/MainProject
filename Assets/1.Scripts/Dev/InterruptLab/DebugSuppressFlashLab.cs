@@ -113,27 +113,15 @@ public sealed class DebugInterruptTierPreview
         _ => "제압 간파",
     };
 
-    // ---- 적중 라이트 연출 버전(할 일 194) — 일반·대쉬·제압 단계별 V0/V1/V2/V3·암순응 가/나 ----
+    // ---- 단계별 적중 라이트(할 일 194) — 일반·대쉬·제압 단계별 암순응 가/나·위치. 버전 V0~V3 버튼은 11-06(할 일 238) 삭제(런타임 = V3) ----
 
-    /// <summary>버전을 고를 수 있는 단계 — 제압도 11-04(할 일 211)부터 같은 버전 표(옛 섬광 시퀀스는 Legacy).</summary>
+    /// <summary>설정을 고를 수 있는 단계 — 제압도 11-04(할 일 211)부터 같은 표(옛 섬광 시퀀스는 Legacy).</summary>
     public static readonly InterruptPresentationTier[] VersionTiers =
         { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash, InterruptPresentationTier.Suppress };
 
-    /// <summary>버튼 순서 = V0 / V1 / V2 / V3(194 후속 레퍼런스 맞춤).</summary>
-    public static readonly InterruptTierFlash[] Versions =
-        { InterruptTierFlash.HitFlash, InterruptTierFlash.HitLight, InterruptTierFlash.HitLightWhiteout, InterruptTierFlash.HitLightReference };
-
     public static readonly InterruptDarkAdaptMode[] DarkAdaptModes = { InterruptDarkAdaptMode.ScreenPass, InterruptDarkAdaptMode.SceneLight };
 
-    public static string VersionLabel(InterruptTierFlash flash) => flash switch
-    {
-        InterruptTierFlash.HitFlash => "V0",
-        InterruptTierFlash.HitLight => "V1",
-        InterruptTierFlash.HitLightWhiteout => "V2",
-        InterruptTierFlash.HitLightReference => "V3",
-        _ => "?",
-    };
-
+    /// <summary>지금 실제 섬광 표시 — V3 데이터·프리팹이 없으면 V0 로 돌아간 것까지 보인다.</summary>
     public static string LookLabel(InterruptSuccessLook look) => look switch
     {
         InterruptSuccessLook.HitFlash => "V0",

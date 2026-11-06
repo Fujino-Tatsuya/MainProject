@@ -188,26 +188,32 @@ public sealed class DebugInterruptLabTests
         Assert.IsFalse(DebugZeroCooldown.NeedsOwnerRefill(0, 0)); // 장부 없음(준비 전)
     }
 
-    // ─── 132 §17 튜닝 패널 ─────────────────────────────────────────────
+    // ─── 132 §17 튜닝 패널 (11-06 할 일 238 정리 — V3 런타임에서 보이는 칸만) ───
 
     [Test]
-    public void 튜닝_패널은_모든_효과와_팀원_암순응_성공_이펙트를_한_줄씩()
+    public void 튜닝_패널_효과_줄은_V3_런타임에서_보이는_빛_모임만()
     {
-        var effects = new System.Collections.Generic.List<InterruptPresentationEffect>();
-        var cues = new System.Collections.Generic.List<InterruptProductionCue>();
-        foreach (DebugInterruptTuningPanel.Row row in DebugInterruptTuningPanel.Rows)
-        {
-            Assert.IsFalse(string.IsNullOrEmpty(row.Label));
-            if (row.IsCue)
-                cues.Add(row.Cue);
-            else
-                effects.Add(row.Effect);
-        }
+        Assert.AreEqual(1, DebugInterruptTuningPanel.Rows.Length);
+        DebugInterruptTuningPanel.Row row = DebugInterruptTuningPanel.Rows[0];
+        Assert.IsFalse(row.IsCue);
+        Assert.AreEqual(InterruptPresentationEffect.LightGather, row.Effect);
+        Assert.IsFalse(string.IsNullOrEmpty(row.Label));
+    }
 
-        CollectionAssert.AreEquivalent(InterruptPresentationEffectRules.All, effects, "효과 칸 하나에 한 줄");
-        CollectionAssert.AreEquivalent(
-            new[] { InterruptProductionCue.DarkAdaptation, InterruptProductionCue.SuccessFxSlot }, cues,
-            "스위치 칸 줄은 팀원 암순응(A2)·성공 이펙트(A4)만");
+    // 지운 칸(오너 암전·②~⑥·월드 섬광·적중 지점 라이트·A2)이 정말 안 보이는 전제 — NetworkManager 디렉터의 세 단계가 V3·암전 끔.
+    // 단계 설정이 바뀌면(V0~V2 로 되돌리거나 ownerDim 켬) 이 테스트가 깨진다 → 랩 줄을 다시 넣을 것.
+    [Test]
+    public void 지운_효과_줄의_전제_세_단계가_V3_이고_오너_암전_끔()
+    {
+        string text = System.IO.File.ReadAllText("Assets/2.Prefabs/Network/NetworkManager.prefab").Replace("\r\n", "\n");
+        foreach (string tier in new[] { "normalTier", "dashTier", "suppressTier" })
+        {
+            int at = text.IndexOf("  " + tier + ":\n", System.StringComparison.Ordinal);
+            Assert.GreaterOrEqual(at, 0, tier);
+            string block = text.Substring(at, System.Math.Min(200, text.Length - at));
+            StringAssert.Contains("ownerDim: 0\n", block, tier);
+            StringAssert.Contains("flash: " + (int)InterruptTierFlash.HitLightReference + "\n", block, tier);
+        }
     }
 
     [Test]
@@ -226,21 +232,12 @@ public sealed class DebugInterruptLabTests
         try
         {
             var director = go.AddComponent<InterruptProductionDirector>();
-            DebugInterruptTuningPanel.SetAll(director, true);
-            foreach (DebugInterruptTuningPanel.Row row in DebugInterruptTuningPanel.Rows)
-                Assert.IsTrue(row.Get(director), row.Label);
-
-            DebugInterruptTuningPanel.SetDefaults(director);
-            foreach (InterruptPresentationEffect effect in InterruptPresentationEffectRules.All)
-                Assert.AreEqual(effect == InterruptPresentationEffect.OwnerDim, director.IsEffectOn(effect), effect.ToString());
-            Assert.IsFalse(director.Get(InterruptProductionCue.DarkAdaptation), "기본값 = 팀원 암순응 끔");
-            Assert.IsTrue(director.Get(InterruptProductionCue.SuccessFxSlot), "암전만 = A4 는 건드리지 않음(켬 유지)");
-
-            director.Set(InterruptProductionCue.SuccessFxSlot, false);
-            DebugInterruptTuningPanel.SetDefaults(director);
-            Assert.IsFalse(director.Get(InterruptProductionCue.SuccessFxSlot), "암전만 = A4 지금 값 그대로(끈 것도 그대로)");
-
-            Assert.IsFalse(DebugInterruptTuningPanel.Rows[0].Get(null), "디렉터가 없으면 꺼짐");
+            DebugInterruptTuningPanel.Row row = DebugInterruptTuningPanel.Rows[0];
+            row.Set(director, true);
+            Assert.IsTrue(row.Get(director));
+            row.Set(director, false);
+            Assert.IsFalse(row.Get(director));
+            Assert.IsFalse(row.Get(null), "디렉터가 없으면 꺼짐");
         }
         finally
         {
@@ -251,7 +248,7 @@ public sealed class DebugInterruptLabTests
     // ---- 카메라 대상 중심 토글(196) ----
 
     [Test]
-    public void 카메라_대상_중심_토글은_일괄_버튼과_따로()
+    public void 카메라_대상_중심_토글은_기본_켬()
     {
         var go = new UnityEngine.GameObject("Director");
         try
@@ -259,19 +256,22 @@ public sealed class DebugInterruptLabTests
             var director = go.AddComponent<InterruptProductionDirector>();
             Assert.IsTrue(director.CameraCenterEnabled, "기본 = 켬");
             Assert.IsFalse(string.IsNullOrEmpty(DebugInterruptTuningPanel.CameraCenterLabel));
-
-            director.CameraCenterEnabled = false;
-            DebugInterruptTuningPanel.SetAll(director, true);
-            Assert.IsFalse(director.CameraCenterEnabled, "전부 켬 = 카메라 대상 중심은 건드리지 않음");
-
-            director.CameraCenterEnabled = true;
-            DebugInterruptTuningPanel.SetDefaults(director);
-            Assert.IsTrue(director.CameraCenterEnabled, "암전만 = 카메라 대상 중심은 건드리지 않음");
         }
         finally
         {
             UnityEngine.Object.DestroyImmediate(go);
         }
+    }
+
+    // ---- 238 캐릭터 변경 버튼 ----
+
+    [Test]
+    public void 캐릭터_변경_버튼은_팔라딘_거너_어쌔신()
+    {
+        CollectionAssert.AreEqual(new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin },
+            DebugInterruptTuningPanel.CharacterButtons);
+        CollectionAssert.AreEqual(new[] { "팔라딘", "거너", "어쌔신" },
+            System.Array.ConvertAll(DebugInterruptTuningPanel.CharacterButtons, DebugInterruptTuningPanel.CharacterButtonLabel));
     }
 
     // ---- 허수아비 간파 = 제압 간파 재현(179 후속 3). A6·A7 토글은 11-04(할 일 211) 시퀀스와 함께 뺐다 ----
@@ -288,24 +288,23 @@ public sealed class DebugInterruptLabTests
         Assert.AreEqual(0, repro.DummyCount);
     }
 
-    // ---- 194 — 적중 라이트 연출 버전 버튼 ----
+    // ---- 194 — 단계별 적중 라이트(버전 버튼은 11-06 할 일 238 삭제) ----
 
     [Test]
-    public void 버전_버튼은_일반_대쉬_제압_단계에_V0_V1_V2_V3와_암순응_가_나()
+    public void 단계별_버튼은_일반_대쉬_제압에_암순응_가_나()
     {
         CollectionAssert.AreEqual(new[] { InterruptPresentationTier.Normal, InterruptPresentationTier.Dash, InterruptPresentationTier.Suppress },
-            DebugInterruptTierPreview.VersionTiers, "제압도 같은 버전 표(11-04 할 일 211)");
-        CollectionAssert.AreEqual(new[] { "V0", "V1", "V2", "V3" },
-            System.Array.ConvertAll(DebugInterruptTierPreview.Versions, DebugInterruptTierPreview.VersionLabel));
+            DebugInterruptTierPreview.VersionTiers, "제압도 같은 표(11-04 할 일 211)");
         Assert.AreEqual(2, DebugInterruptTierPreview.DarkAdaptModes.Length);
         StringAssert.StartsWith("가", DebugInterruptTierPreview.DarkAdaptLabel(InterruptDarkAdaptMode.ScreenPass));
         StringAssert.StartsWith("나", DebugInterruptTierPreview.DarkAdaptLabel(InterruptDarkAdaptMode.SceneLight));
-        Assert.AreEqual("[V1]", DebugInterruptTierPreview.Selected("V1", true));
-        Assert.AreEqual("V1", DebugInterruptTierPreview.Selected("V1", false));
+        Assert.AreEqual("[가]", DebugInterruptTierPreview.Selected("가", true));
+        Assert.AreEqual("가", DebugInterruptTierPreview.Selected("가", false));
+        Assert.AreEqual("V3", DebugInterruptTierPreview.LookLabel(InterruptSuccessLook.HitLightReference));
     }
 
     [Test]
-    public void 버전_버튼으로_바꾼_단계_값이_다음_성공의_섬광을_고른다()
+    public void 단계_섬광_값이_다음_성공의_섬광을_고른다()
     {
         var go = new GameObject("Director");
         try
@@ -318,7 +317,6 @@ public sealed class DebugInterruptLabTests
                 AssetDatabase.LoadAssetAtPath<InterruptHitLightFx>("Assets/5.VFX/Interrupt/HitLight/FX_InterruptHitLight.prefab");
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            // 패널 버튼과 같은 일 — 단계 설정 값을 바꾼다(런타임 값만).
             director.TierProfile(InterruptPresentationTier.Normal).flash = InterruptTierFlash.HitLightWhiteout;
             director.TierProfile(InterruptPresentationTier.Dash).flash = InterruptTierFlash.HitFlash;
 
@@ -330,21 +328,5 @@ public sealed class DebugInterruptLabTests
         {
             Object.DestroyImmediate(go);
         }
-    }
-
-    [Test]
-    public void V3_버튼은_암순응을_나로_맞추고_다른_버전은_암순응을_그대로_둔다()
-    {
-        var profile = new InterruptTierProfile(false, InterruptTierFlash.HitLight, InterruptDarkAdaptMode.ScreenPass);
-
-        DebugInterruptTuningPanel.SelectVersion(profile, InterruptTierFlash.HitLightReference);
-        Assert.AreEqual(InterruptTierFlash.HitLightReference, profile.flash);
-        Assert.AreEqual(InterruptDarkAdaptMode.SceneLight, profile.darkAdapt, "V3 기본 = 나");
-
-        profile.darkAdapt = InterruptDarkAdaptMode.ScreenPass; // 누른 뒤 가로 다시 고를 수 있다
-        DebugInterruptTuningPanel.SelectVersion(profile, InterruptTierFlash.HitLightWhiteout);
-        Assert.AreEqual(InterruptTierFlash.HitLightWhiteout, profile.flash);
-        Assert.AreEqual(InterruptDarkAdaptMode.ScreenPass, profile.darkAdapt, "V0~V2 는 암순응을 안 바꾼다");
-        Assert.AreEqual("V3", DebugInterruptTierPreview.LookLabel(InterruptSuccessLook.HitLightReference));
     }
 }
