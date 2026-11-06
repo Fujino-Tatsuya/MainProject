@@ -1024,7 +1024,7 @@ public sealed partial class InterruptProductionDirector : MonoBehaviour, IInterr
             DarkAdapt = profile != null ? profile.darkAdapt : InterruptDarkAdaptMode.ScreenPass,
             Tier = e.Tier,                       // 219 — V3 단계별 SO·프리팹(빈 칸 = 1단계)·제압 화이트아웃
             SuppressWhiteout = suppressWhiteout,
-            FxOverride = CasterHitLightOverride(e.CasterClientId), // 238 — 거너: 빛줄기·불꽃 숨김·라이트 색(세 단계 공통)
+            FxOverride = CasterHitLightOverride(e.CasterClientId), // 238 — 거너: 빛줄기·가로 빛줄·불꽃 숨김·라이트 색(세 단계 공통)
         }, Time.unscaledTime, Time.frameCount);
     }
 

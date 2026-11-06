@@ -12,8 +12,8 @@ public sealed class InterruptHitLightCasterOverride
     [Tooltip("켜면 이 캐릭터가 간파 성공했을 때 아래 값을 얹는다")]
     public bool enabled = true;
 
-    [Tooltip("재생하지 않을 월드 이펙트 파티클 이름(FX_InterruptHitLight* 의 자식 이름 — Core·Streak·Sparks·Rays). 기본 = 빛줄기 Rays + 불꽃 Sparks")]
-    public string[] hiddenParticles = { InterruptHitLightFx.RaysName, InterruptHitLightFx.SparksName };
+    [Tooltip("재생하지 않을 월드 이펙트 파티클 이름(FX_InterruptHitLight* 의 자식 이름 — Core·Streak·Sparks·Rays). 기본 = 빛줄기로 보이는 것 전부(화면 렌즈 빛줄기 Rays + 가로 빛줄 Streak) + 불꽃 Sparks. Core(빛 덩어리)만 남는다")]
+    public string[] hiddenParticles = { InterruptHitLightFx.RaysName, InterruptHitLightFx.StreakName, InterruptHitLightFx.SparksName };
 
     [Tooltip("켜면 포인트 라이트 색을 아래 색으로(SO LightColor 대신). 세기·반경·곡선은 SO 그대로")]
     public bool overrideLightColor = true;

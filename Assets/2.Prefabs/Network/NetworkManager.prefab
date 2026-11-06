@@ -276,6 +276,7 @@ MonoBehaviour:
     enabled: 1
     hiddenParticles:
     - Rays
+    - Streak
     - Sparks
     overrideLightColor: 1
     lightColor: {r: 0.41960788, g: 0.58787316, b: 1, a: 1}

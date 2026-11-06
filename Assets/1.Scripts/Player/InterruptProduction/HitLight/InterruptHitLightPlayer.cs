@@ -19,7 +19,7 @@ public struct InterruptHitLightRequest
     public InterruptPresentationTier Tier;
     /// <summary>디렉터 스위치 '제압 화이트아웃'(할 일 219) — 꺼지면 V3 제압 단계 화이트아웃 없음(SO 프레임 수와 무관). V2 화이트아웃과는 무관.</summary>
     public bool SuppressWhiteout;
-    /// <summary>시전자 캐릭터 덮어쓰기(할 일 238 — 거너: 빛줄기·불꽃 숨김·라이트 색). 기본값 = 없음.</summary>
+    /// <summary>시전자 캐릭터 덮어쓰기(할 일 238 — 거너: 빛줄기·가로 빛줄·불꽃 숨김·라이트 색). 기본값 = 없음.</summary>
     public InterruptHitLightFxOverride FxOverride;
 }
 

@@ -93,7 +93,7 @@ public sealed class InterruptHitLightFx : MonoBehaviour
         Play(placement, look, default, scale);
 
     /// <summary>
-    /// 성공 순간 재생 + 시전자 캐릭터 덮어쓰기(할 일 238 — 거너: 빛줄기·불꽃 숨김·라이트 색). <paramref name="fxOverride"/> 기본값 = 덮어쓰기 없음.
+    /// 성공 순간 재생 + 시전자 캐릭터 덮어쓰기(할 일 238 — 거너: 빛줄기·가로 빛줄·불꽃 숨김·라이트 색). <paramref name="fxOverride"/> 기본값 = 덮어쓰기 없음.
     /// 숨긴 파티클은 이번 재생에서 틀지 않는다(지난 입자도 지운다) — 다음 재생(다른 캐릭터)은 다시 기본대로.
     /// </summary>
     public void Play(in InterruptHitLightPlacement placement, InterruptHitLightLook look, in InterruptHitLightFxOverride fxOverride, float scale = 1f)

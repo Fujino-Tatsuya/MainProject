@@ -3,7 +3,7 @@
 > 플레이어 캐릭터(팔라딘·거너·어쌔신) **간파 스킬 자체**의 VFX 목록과, DebugInterruptLab 에서 하나씩 켜고 끄는 방법.
 > 공용 간파 연출(`InterruptProductionDirector` 의 V3 적중 라이트·암순응·블룸·화이트아웃·불꽃·빛줄기·슬로우 등)은 **이 문서와 토글 범위 밖**이다
 > — 그쪽은 [interrupt-presentation.md](interrupt-presentation.md) 와 랩의 '단계·버전 선택'·'화면 효과' 섹션.
-> 예외 하나(할 일 238, 11-06): **거너가 간파 성공하면** 공용 V3 적중 라이트의 빛줄기(`Rays`)·불꽃(`Sparks`)을 빼고 포인트 라이트를 거너 이펙트 파랑(`FX_Arrow_hail` LightFlash)으로 — 일반·대쉬·제압 모두.
+> 예외 하나(할 일 238, 11-06): **거너가 간파 성공하면** 공용 V3 적중 라이트의 빛줄기(`Rays`)·가로 빛줄(`Streak`)·불꽃(`Sparks`)을 빼고(`Core` 만 남김) 포인트 라이트를 거너 이펙트 파랑(`FX_Arrow_hail` LightFlash)으로 — 일반·대쉬·제압 모두.
 > 칸은 디렉터 `gunnerHitLight`(랩 토글 아님), 상세 [interrupt-presentation.md §9.10](interrupt-presentation.md).
 
 ## 1. 목록

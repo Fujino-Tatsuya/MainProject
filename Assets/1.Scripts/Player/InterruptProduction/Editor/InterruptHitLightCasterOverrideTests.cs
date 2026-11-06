@@ -34,12 +34,12 @@ public sealed class InterruptHitLightCasterOverrideTests
     }
 
     [Test]
-    public void 거너_기본값은_빛줄기_불꽃만_숨기고_파란_라이트()
+    public void 거너_기본값은_빛줄기_가로빛줄_불꽃을_숨기고_Core_만_남기며_파란_라이트()
     {
         InterruptHitLightFxOverride fx = InterruptHitLightCasterOverride.ToFx(new InterruptHitLightCasterOverride());
         Assert.IsTrue(fx.Hides(InterruptHitLightFx.RaysName));
         Assert.IsTrue(fx.Hides(InterruptHitLightFx.SparksName));
-        Assert.IsFalse(fx.Hides(InterruptHitLightFx.StreakName));
+        Assert.IsTrue(fx.Hides(InterruptHitLightFx.StreakName), "가로 빛줄도 빛줄기로 보인다(238 버그 — 사용자 \"빛줄기 그대로\")");
         Assert.IsFalse(fx.Hides("Core"));
         Assert.IsFalse(fx.Hides(null));
         Color c = fx.LightColorOr(Color.white);
@@ -60,13 +60,14 @@ public sealed class InterruptHitLightCasterOverrideTests
         fx.Play(InterruptHitLightPlacement.At(Vector3.zero), look, InterruptHitLightCasterOverride.ToFx(gunner));
         Assert.IsFalse(rays.isPlaying, "빛줄기 숨김");
         Assert.IsFalse(sparks.isPlaying, "불꽃 숨김");
-        Assert.IsTrue(streak.isPlaying, "가로 빛줄은 그대로");
+        Assert.IsFalse(streak.isPlaying, "가로 빛줄 숨김");
         Assert.AreEqual(gunner.lightColor, fx.HitLight.color);
 
         // 다음 재생(다른 캐릭터 = 덮어쓰기 없음)은 다시 기본대로.
         fx.Play(InterruptHitLightPlacement.At(Vector3.zero), look);
         Assert.IsTrue(rays.isPlaying);
         Assert.IsTrue(sparks.isPlaying);
+        Assert.IsTrue(streak.isPlaying);
         Assert.AreEqual(look.LightColor, fx.HitLight.color);
     }
 
@@ -90,6 +91,7 @@ public sealed class InterruptHitLightCasterOverrideTests
         string block = text.Substring(at, System.Math.Min(260, text.Length - at));
         StringAssert.Contains("enabled: 1", block);
         StringAssert.Contains("- Rays", block);
+        StringAssert.Contains("- Streak", block);
         StringAssert.Contains("- Sparks", block);
         StringAssert.Contains("overrideLightColor: 1", block);
     }

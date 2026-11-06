@@ -956,12 +956,13 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - 게임 시간 라이트는 슬로우만큼 실시간으로 더 오래 켜져 있어 진행기 끝(실시간)보다 늦게 꺼질 수 있다 — 서로 독립이라 문제 없음.
 - 테스트: `InterruptTierScalingTests` — V3 프리팹만 게임 시간 · 재생 시 파티클 시간 기준 · 히트스톱 중 라이트 곡선 정지 + 안전장치 · 규칙.
 
-### 9.10 거너 간파 적중 라이트 — 빛줄기·불꽃 숨김 + 라이트 색 (할 일 238, 2026-11-06)
+### 9.10 거너 간파 적중 라이트 — 빛줄기·가로 빛줄·불꽃 숨김 + 라이트 색 (할 일 238, 2026-11-06)
 
 - **사용자 결정(11-06)**: 거너가 간파 성공했을 때만 V3 적중 라이트의 빛줄기와 쇳조각(파편) 파티클을 빼고, 포인트 라이트 색을 거너 간파 이펙트 색에 맞춘다. 팔라딘·어쌔신은 그대로.
 - **칸 = 디렉터 `gunnerHitLight`**(`InterruptHitLightCasterOverride`, `NetworkManager.prefab` 의 `InterruptProductionDirector`, 헤더 "성공 — 시전자 캐릭터별 적중 라이트")
   - `enabled` 켬 — 끄면 거너도 다른 캐릭터와 같다.
-  - `hiddenParticles` = `Rays`(빛줄기)·`Sparks`(불꽃) — 월드 이펙트 자식 파티클 이름 목록. 이 이름의 파티클은 재생하지 않는다(그 재생만 `Stop`+`Clear`). `Streak`(가로 빛줄)·`Core` 는 그대로.
+  - `hiddenParticles` = `Rays`(화면 렌즈 빛줄기)·`Streak`(가로 빛줄)·`Sparks`(불꽃) — 월드 이펙트 자식 파티클 이름 목록. 이 이름의 파티클은 재생하지 않는다(그 재생만 `Stop`+`Clear`). 남는 것 = `Core`(빛 덩어리)·포인트 라이트.
+    - 11-06 버그("거너 빛줄기 그대론데?") — 처음엔 `Rays`·`Sparks` 만 숨겼는데 가로 빛줄 `Streak` 도 눈엔 빛줄기라 기본 목록에 넣었다. V3·V3/Dash·V3/Suppress 프리팹 자식 이름(Core·Rays·Sparks·Streak)은 셋 다 같다.
     - 🟨 "쇳조각(파편)" = `Sparks` 로 해석: V3 에는 `Debris` 가 없다(11-05 삭제, §9.6). 다르면 이 목록만 고친다.
   - `overrideLightColor` 켬 · `lightColor` = (0.42, 0.588, 1) — 거너 간파 이펙트 `FX_Arrow_hail` 의 `LightFlash` 시작 색. 세기·반경·곡선은 단계 SO 그대로, 색만 바꾼다.
 - **세 단계 모두**: 일반·대쉬·제압 단계 SO·프리팹(`V3`·`V3/Dash`·`V3/Suppress`)을 복제하지 않고, 디렉터가 재생 요청(`InterruptHitLightRequest.FxOverride`)에 같은 값을 얹는다 → `InterruptHitLightFx.Play(…, fxOverride)`. 다음 재생(다른 캐릭터)은 덮어쓰기 없이 기본대로.
