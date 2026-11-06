@@ -378,6 +378,14 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         //    "이 피어가 지금 그리고 있는 위치"에 가깝다(보간 차이를 안 탄다).
         _targetPosition = target != null ? target.position : fallbackPosition;
 
+        // 대상 아래 바닥으로 내린다 — 표식도 마무리 낙뢰도 바닥에 꽂힌다.
+        // 송전탑(BossChargingPylon)처럼 루트가 올라와 있는 대상도 바닥 기준이 된다.
+        // GroundProbe 는 Unit 계층 콜라이더를 건너뛰므로 대상 자신은 바닥으로 잡히지 않는다.
+        // 바닥에 서 있는 대상은 SurfaceOffset(0.05m)만큼만 달라진다. 못 찾으면 대상 위치 그대로.
+        // 표식 엔트리가 비어 있어도 낙뢰가 이 자리를 쓰므로 아래 early return 보다 먼저 한다.
+        if (GroundProbe.TryFindGround(_targetPosition, 0, out RaycastHit ground, out _))
+            _targetPosition.y = GroundProbe.SurfaceY(ground);
+
         // 재시전으로 두 겹이 되지 않게 먼저 회수한다(EffectSocketPlayer.Play 와 같은 규칙).
         StopTargetFloorLocal();
 
