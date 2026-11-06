@@ -48,7 +48,7 @@ MonoBehaviour:
   interruptWeakZoomFactor: 1
   interruptSuccessProfile:
     scale: 0.1
-    hitStopDuration: 0.5
+    hitStopDuration: 0.6
     hitStopScale: 0.7
     enterDuration: 0
     holdDuration: 0
