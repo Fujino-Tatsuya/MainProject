@@ -96,6 +96,8 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     Vector2 _scroll;
     string _presetName = "";
     string _presetNote = "";
+    bool _liveCamera;
+    BossVictoryConfig _cfgDefaults;   // 코드 기본값(기본값 버튼용) — Config 에셋이 아니다
 
     // ── 수명 ────────────────────────────────────────────────────────────────
 
@@ -110,6 +112,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         BossEncounterDirector.DevHoldVictoryResult = false;
         ClearMates();
         if (_ownsTimeScale) Time.timeScale = 1f;
+        if (_cfgDefaults != null) Destroy(_cfgDefaults);
     }
 
     void BuildRoom()
@@ -534,9 +537,106 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         GUILayout.Label("커지는 모습 = 위 '0.72' 점프 → 재개(F8), 느리게 보려면 배속 ×0.25.");
     }
 
+    // 카메라 구도 슬라이더(244 추가) — Config 구도 규칙 칸을 직접 고친다. 구도는 처치 순간 서버가 고르므로 다음 재생부터,
+    // 라이브 모드면 진행 중 연출도 지금 값으로 다시 계산(랩 전용 훅 DevRecomposeVictoryServer — 실게임 경로 없음).
+    void DrawCameraSliders(BossVictoryConfig cfg)
+    {
+        _cfgDefaults ??= ScriptableObject.CreateInstance<BossVictoryConfig>();
+        BossVictoryConfig d = _cfgDefaults;
+        GUILayout.Label("<b>카메라 구도</b> — 처치 순간 서버가 계산 → <b>다음 재생부터</b> 반영", Rich());
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("바로 다시 재생 (F7)")) Replay(null);
+        _liveCamera = GUILayout.Toggle(_liveCamera, " 라이브(재생 중 구도도 다시 계산)", GUI.skin.button);
+        GUILayout.EndHorizontal();
+
+        bool changed = false;
+        cfg.finalPitch = DefaultSlider("정지 구도 부감", "°", cfg.finalPitch, 0f, 89f, d.finalPitch, ref changed);
+        cfg.endPitch = DefaultSlider("끝 구도 부감", "°", cfg.endPitch, 0f, 89f, d.endPitch, ref changed);
+        cfg.fov = DefaultSlider("FOV", "°", cfg.fov, 10f, 90f, d.fov, ref changed);
+        cfg.referenceAspect = DefaultSlider("기준 화면비", "", cfg.referenceAspect, 1f, 2.5f, d.referenceAspect, ref changed);
+        cfg.minDistance = DefaultSlider("최소 거리", "m", cfg.minDistance, 1f, 40f, d.minDistance, ref changed);
+        cfg.maxDistance = DefaultSlider("최대 거리", "m", cfg.maxDistance, 1f, 60f, d.maxDistance, ref changed);
+        if (cfg.maxDistance < cfg.minDistance) cfg.maxDistance = cfg.minDistance;
+        cfg.distanceStep = DefaultSlider("거리 간격", "m", cfg.distanceStep, 0.1f, 5f, d.distanceStep, ref changed);
+        cfg.endDistanceScale = DefaultSlider("끝 구도 거리 배수", "×", cfg.endDistanceScale, 0.5f, 3f, d.endDistanceScale, ref changed);
+        cfg.characterHeight = DefaultSlider("플레이어 몸 높이", "m", cfg.characterHeight, 0.5f, 4f, d.characterHeight, ref changed);
+
+        // 방위각 후보 — 앞일수록 먼저 본다(같은 점수면 먼저 것). 음수 = 막타가 화면 왼쪽.
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("방위각 후보(앞일수록 우선)");
+        if (GUILayout.Button("+", GUILayout.Width(28f)))
+        {
+            var list = new List<float>(cfg.yawCandidates ?? System.Array.Empty<float>()) { 0f };
+            cfg.yawCandidates = list.ToArray();
+            changed = true;
+        }
+        if (GUILayout.Button("기본값", GUILayout.Width(60f)))
+        {
+            cfg.yawCandidates = (float[])d.yawCandidates.Clone();
+            changed = true;
+        }
+        GUILayout.EndHorizontal();
+        if (cfg.yawCandidates != null)
+        {
+            for (int i = 0; i < cfg.yawCandidates.Length; i++)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"{i + 1}. {cfg.yawCandidates[i]:0}°", GUILayout.Width(70f));
+                float yaw = GUILayout.HorizontalSlider(cfg.yawCandidates[i], -180f, 180f);
+                if (!Mathf.Approximately(yaw, cfg.yawCandidates[i])) { cfg.yawCandidates[i] = Mathf.Round(yaw); changed = true; }
+                if (GUILayout.Button("−", GUILayout.Width(28f)))
+                {
+                    var list = new List<float>(cfg.yawCandidates);
+                    list.RemoveAt(i);
+                    cfg.yawCandidates = list.ToArray();
+                    changed = true;
+                    GUILayout.EndHorizontal();
+                    break;
+                }
+                GUILayout.EndHorizontal();
+            }
+        }
+        if (GUILayout.Button("구도 전부 기본값으로"))
+        {
+            BossVictoryCameraPresets.Entry.Capture("", d).ApplyTo(cfg);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            MarkDirty(cfg, save: false);   // 드래그 중 매번 디스크에 쓰지 않는다 — 프로젝트 저장(Ctrl+S) 때 남는다
+            if (_liveCamera) Recompose(cfg);
+        }
+    }
+
+    void Recompose(BossVictoryConfig cfg)
+    {
+        if (_director != null && _director.IsSpawned) _director.DevRecomposeVictoryServer(cfg);
+    }
+
+    // 이름·값·단위 + 슬라이더 + [기본값]. 값이 바뀌면 changed = true.
+    static float DefaultSlider(string label, string unit, float value, float min, float max, float defaultValue, ref bool changed)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label($"{label} {value:0.##}{unit}");
+        if (GUILayout.Button($"기본 {defaultValue:0.##}", GUILayout.Width(80f)) && !Mathf.Approximately(value, defaultValue))
+        {
+            changed = true;
+            GUILayout.EndHorizontal();
+            GUILayout.HorizontalSlider(defaultValue, min, max);
+            return defaultValue;
+        }
+        GUILayout.EndHorizontal();
+        float next = GUILayout.HorizontalSlider(value, min, max);
+        if (!Mathf.Approximately(next, value)) changed = true;
+        return next;
+    }
+
     // 구도 프리셋(244 후속 A) — Config 구도 규칙 값 묶음 저장·불러오기·삭제. 불러오면 Config 에 덮어써 다음 재생부터.
     void DrawCameraPresets(BossVictoryConfig cfg)
     {
+        DrawCameraSliders(cfg);
+        GUILayout.Space(4f);
         GUILayout.Label("<b>구도 프리셋</b> — 불러오면 Config 에 덮어써 다음 재생부터", Rich());
         if (cameraPresets == null)
         {
@@ -569,6 +669,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             {
                 e.ApplyTo(cfg);
                 MarkDirty(cfg);
+                if (_liveCamera) Recompose(cfg);
                 _presetName = e.name;
                 _presetNote = $"'{e.name}' 불러옴 — 다음 재생부터";
             }

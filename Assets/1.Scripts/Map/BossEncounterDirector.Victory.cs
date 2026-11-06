@@ -157,6 +157,7 @@ public sealed partial class BossEncounterDirector
             Teammates = teammates,
         };
         BossVictoryRules.Composition comp = BossVictoryRules.Compose(subjects, cfg.ToFraming());
+        DevRememberVictorySubjects(subjects);   // 디버그 랩 라이브 구도(244) — 개발 빌드 Dev.cs 만 구현
 
         float prelude = Mathf.Max(0f, cfg.preludeSeconds);   // 추가 연출 구간(할 일 200) — 이 뒤로 모든 단계가 밀린다
         double now = NetworkManager.ServerTime.Time;
@@ -211,6 +212,7 @@ public sealed partial class BossEncounterDirector
     // 구현이 없으면 C# 이 호출째 지운다 → 릴리스 동작 불변.
     partial void DevAppendVictoryTeammates(List<Vector3> teammates);
     partial void DevBlockResultTransition(ref bool block);
+    partial void DevRememberVictorySubjects(BossVictoryRules.Subjects subjects);
 
     // 결과 화면 전환을 지금 막아야 하는가(추가 연출 구간 + 단계 3.20초 전).
     private bool HoldsResultForVictory() =>

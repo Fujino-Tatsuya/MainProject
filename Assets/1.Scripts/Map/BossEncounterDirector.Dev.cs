@@ -159,5 +159,34 @@ public sealed partial class BossEncounterDirector
         _victory.Value = v;
         _victoryMinResultAt += seconds;
     }
+
+    // 랩 라이브 구도(244) — 처치 순간 구도 입력(막타·타격점·보스·팀원 위치)을 기억해 둔다.
+    BossVictoryRules.Subjects _devVictorySubjects;
+    bool _devHasVictorySubjects;
+
+    partial void DevRememberVictorySubjects(BossVictoryRules.Subjects subjects)
+    {
+        _devVictorySubjects = subjects;
+        _devHasVictorySubjects = true;
+    }
+
+    /// <summary>
+    /// [서버] 진행 중인 승리 연출 구도를 지금 Config 로 다시 계산해 복제 상태(정지·끝 구도·FOV)에 덮어쓴다 — 디버그 랩 라이브 모드(244) 전용.
+    /// 입력은 처치 순간 기억해 둔 위치 그대로라 다음 재생에서 같은 배치로 나올 구도와 같다. 연출이 없으면 아무것도 안 한다.
+    /// </summary>
+    public bool DevRecomposeVictoryServer(BossVictoryConfig cfg)
+    {
+        if (!IsServer || !IsSpawned || cfg == null || !_devHasVictorySubjects) return false;
+        VictoryState v = _victory.Value;
+        if (!v.Active) return false;
+        BossVictoryRules.Composition comp = BossVictoryRules.Compose(_devVictorySubjects, cfg.ToFraming());
+        v.FinalPosition = comp.Final.Position;
+        v.FinalRotation = comp.Final.Rotation;
+        v.EndPosition = comp.EndPose.Position;
+        v.EndRotation = comp.EndPose.Rotation;
+        v.Fov = cfg.fov;
+        _victory.Value = v;
+        return true;
+    }
 }
 #endif
