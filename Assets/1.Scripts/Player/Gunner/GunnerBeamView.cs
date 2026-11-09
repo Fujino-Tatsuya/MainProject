@@ -971,7 +971,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <summary>
     /// 끝점 바로 앞에서 빔 방향으로 짧게 쏴 지형 면을 찾고, 쏜 사람 쪽(-빔 방향)을 그 면의 normal 로 돌리는
     /// 회전 차만큼 <paramref name="facing"/> 을 돌린다. 못 찾으면 그대로.
-    /// 끝점은 SphereCast 가 닿은 순간의 구 중심이라 면이 최대 반경(width/2)만큼 앞에 있다 — 그만큼 더 쏜다.
+    /// 끝점은 구 표면이 닿은 접촉 거리(<see cref="GunnerBeamAttack.ContactDistance(float, Vector3, Vector3, Vector3, float)"/>)라 보통 면 바로 위다
+    /// (2026-11-06 — 예전엔 구 중심이라 면이 반경만큼 앞에 있었다). 0.05m 뒤에서 쏘고, 모서리 접촉으로 면이 조금 더 앞일 수 있어 여유를 둔다.
     /// </summary>
     private Quaternion SurfaceFacing(Vector3 end, Vector3 delta, float width, Quaternion facing)
     {

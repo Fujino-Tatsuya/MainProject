@@ -1,3 +1,37 @@
+# ▶▶▶ 계획 = **거너 R — 다른 클라 화면에서 낙뢰 빔·장판 바닥 선 알파 낮추기** (2026-11-06 · grill 확정 · ✅ 민경 승인 · ✅ 구현 · ⏳ 컴파일·MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-06). 스폰 코드 한 줄 = **은희 영역**(`GunnerTrackingLaserSkill`) → 핸드오프.
+
+## 사실
+- `M_GUlt_StrikeBeam`(`Shader_IntegratedEffect`, 알파 = `_BaseColor.a`) → `FX_GunnerUlt_Strike`(낙뢰 원샷, 렌더러 1개). `GunnerUlt_FloorLine`(`HS_Blend_CG`, 알파 = `_Opacity`) → `FX_GunnerUlt_Zone2`(장판 루프 `FX_GunnerUlt_Zone_Entry`, 렌더러 1개). 둘 다 지연 파트 없음, `EffectManager` 풀 재사용.
+- R 레이저는 서버 스폰(소유자 = 서버), 시전자는 서버만 안다(`GunnerTrackingLaser.caster`).
+- 한계 돌파 색(`EffectRecolor`)은 파티클 색 + 채도 있는 재질 색 MaterialPropertyBlock, 반납 때 빈 블록으로 원복. 흰 재질에 블록을 걸면 이 셰이더들이 다르게 그려지는 기록 있음([handoff-overdrive-vfx.md](Docs/tech/handoff-overdrive-vfx.md)).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 범위(Q1) | 위 두 머티리얼을 쓰는 렌더러만. 목록 형태라 나중에 추가 가능 |
+| 알파(Q2) | 곱하기 — 원래 값 × 배율 |
+| 값 위치(Q3·Q8) | `GunnerTrackingLaserView` 목록 {머티리얼, 속성 이름, 배율}. Color 속성 = a 에, Float = 값에 곱함. 기본 2줄: (`M_GUlt_StrikeBeam`, `_BaseColor`, 0.6) · (`GunnerUlt_FloorLine`, `_Opacity`, 0.6) |
+| 기준(Q4) | R 을 쏜 거너 본인 화면만 원래대로, 나머지 전부 배율 적용. 호스트 시전 = 호스트 원래대로, 오프라인 = 본인 취급 |
+| 한계 돌파 색(Q5) | 그대로 칠하고 알파만 낮춤 |
+| 시전자 복제(Q6) | `GunnerTrackingLaserView` 에 NetworkVariable 1개(시전자 ClientId) — 서버가 스폰 전에 씀(한계 돌파 단계와 같은 경로). 새 RPC 없음, 판정 무변경 |
+| 방식(Q7) | **머티리얼 교체** — `EffectManager` 공용 기능(핸들에 머티리얼 알파 규칙, 재생·지연 파트 적용, 반납 때 원래 머티리얼로). 복사본은 (원본, 속성, 배율)마다 1번 만들어 캐시 |
+| 도중 변화(Q10) | 시전자 끊김·사망에도 그대로(스폰 순간 결정) |
+
+## 작업
+1. `EffectManager`: 머티리얼 알파 규칙 지정 API(`SetMaterialAlpha(handle, rules)`), 활성 이펙트에 저장 → 인스턴스·이후 파트 적용, 반납 직전 원래 sharedMaterials 복원. 복사본 캐시.
+2. `GunnerTrackingLaserView`: 알파 목록 칸 + `netCasterClientId`(+오프라인 로컬값) + `ServerSetCaster(clientId)` · 장판(`zone`)·낙뢰(`PlayStrikes`, 항상 핸들 재생)에 "내가 시전자가 아니면" 규칙 적용.
+3. `GunnerTrackingLaserSkill`(은희): 스폰 전 `view.ServerSetCaster(owner.OwnerClientId)` 한 줄.
+4. `Player_Gunner` R 레이저 프리팹에 기본 2줄 연결.
+5. 테스트(순수 규칙: 배율 계산·시전자 판정) · 핸드오프 `Docs/tech/handoff-gunner-ult-ally-alpha.md` · CONTEXT.
+
+## 리스크·검증
+- 리스크: 반납 원복 누락 시 다른 시전에 흐린 머티리얼이 남음 → 반납 경로에서 복원, 테스트. 셰이더 그래프 `_Opacity` 가 실제 알파에 쓰이는지 Play 확인.
+- 검증: 컴파일 0 · EditMode · MPPM 2인(거너 클라 = 원래, 다른 클라·호스트 = 0.6) · 한계 돌파 색 함께 · 연속 R 시 원복.
+
+---
+
 # ▶▶▶ 계획 = **23호 잡기 — 끌려갈 대상 표식 + 끌려갈 때 VFX** (2026-11-05 · grill 확정 · ✅ 민경 "추천대로" · ✅ Codex 파일 제작·연결·오프라인 검증 · ⏳ 민경 Play·MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-05). **기획 = Claude, 제작·연결 = Codex 세션 "Add Blender MCP server"**(Unity·Codex 앱 끈 상태).
