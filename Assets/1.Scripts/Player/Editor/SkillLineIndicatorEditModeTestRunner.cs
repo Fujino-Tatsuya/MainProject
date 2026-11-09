@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// 스킬 직선 인디케이터 모양 계산 + 미리보기가 기대는 모터 스윕 EditMode 테스트를 메뉴 한 번으로 돌리고 결과를 콘솔에 남긴다.
 ///
-/// 지점 지정(GroundPoint) 조준 계산(GroundPointTargetingTests)도 같이 돈다.
+/// 지점 지정(GroundPoint) 조준 계산(GroundPointTargetingTests)과 네이티브 커서 픽셀 변환(NativeCursorPixelsTests, 250)도 같이 돈다.
 ///
 /// 모두 asmdef 없는 <c>Assembly-CSharp-Editor</c> 에 있어 풀네임 정규식으로 고른다.
 /// 모터 테스트를 같이 도는 건 미리보기용 오버로드가 기존 이동·리플레이를 안 바꿨는지 보려는 것이다.
@@ -20,7 +20,8 @@ internal static class SkillLineIndicatorEditModeTestRunner
         "^PlayerMotionSweepStepTests",
         "^PlayerMovementSimulationTests",
         "^GroundPointTargetingTests",
-        "^SkillLineLengthFadeTests"
+        "^SkillLineLengthFadeTests",
+        "^NativeCursorPixelsTests"
     };
 
     const string Tag = "[SkillLineIndicatorTests]";
