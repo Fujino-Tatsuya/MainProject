@@ -1,37 +1,25 @@
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 /// <summary>
 /// 제압 가속 비네팅(할 일 91 T7, PLAN-91 §3.5) — 로컬 플레이어에게 제압 가속 대표 상태이상(<see cref="StatusEffectType.CooldownRateModifier"/>)이
-/// 있는 동안 화면 가장자리 연출을 페이드 인, 없어지면 페이드 아웃(순수 클라 연출).
-/// - 249: 주인공 = 셰이더 절차 생성 스피드 라인(재질 MA_SpeedLines, 셰이더 UI/SpeedLines) — Awake 에서 만드는 자식 RawImage.
+/// 있는 동안 화면 가장자리 스피드 라인을 페이드 인, 없어지면 페이드 아웃(순수 클라 연출).
+/// - 249: 셰이더 절차 생성 스피드 라인(재질 MA_SpeedLines, 셰이더 UI/SpeedLines) — Awake 에서 만드는 자식 RawImage.
 ///   가장자리에서 중앙으로 향하는 방사형 선이 갱신 fps 마다 위치·길이·두께가 바뀌며 깜빡이고, 중앙(타원)은 비운다.
 ///   켜지는 순간 버스트 시간 동안 선 밀도·알파가 버스트 배율만큼 높았다가 은은하게 내려온다.
-///   기존 흰 가장자리 스프라이트(이 오브젝트의 Image)는 은은한 채움으로 남는다(채움 알파 0 = 선만).
+/// - 252: 옛 흰 가장자리 채움(이 오브젝트의 Image·임시 스프라이트)은 삭제 — 스피드 라인만 남는다.
 /// - 표시 여부는 <see cref="StatusEffectController.EffectsChanged"/> 때만 다시 읽는다(매 프레임 탐색 없음).
 /// - 로컬 플레이어는 <see cref="Player.LocalPlayerChanged"/> 로 직접 받는다 — CombatHUD 코드는 건드리지 않고 프리팹 인스턴스만 둔다.
 /// - 페이드 시간은 xlsx <c>SuppressHaste</c> 시트(<see cref="SuppressHasteData"/>). 스피드 라인·버스트 칸은 이 HUD 인스펙터(시트 대상 아님).
 /// 페이드는 <see cref="SuppressHasteVignetteModel.StepAlpha"/>, 버스트·프레임도 <see cref="SuppressHasteVignetteModel"/>.
 /// 에디터 미리보기: Play 가 아닐 때 "에디터 미리보기" 를 켜면 저장 안 되는 자식으로 그 강도·버스트 시점의 모습을 그린다
-/// (<see cref="VignetteEditorPreview"/>). 실제 Image 는 건드리지 않고, Play·빌드에선 미리보기 칸을 무시한다.
+/// (<see cref="VignetteEditorPreview"/>). Play·빌드에선 미리보기 칸을 무시한다.
 /// </summary>
 [ExecuteAlways]
 public class SuppressHasteVignetteHUD : MonoBehaviour
 {
-    [SerializeField] private Image image;
-    [Tooltip("가장자리 채움 스프라이트(가장자리 불투명·중앙 투명). 이미지로 바꿀 땐 이것만 교체한다.")]
-    [SerializeField] private Sprite vignetteSprite;
-
-    [Header("가장자리 채움")]
-    [Tooltip("스프라이트에 곱하는 색. 흰색이면 스프라이트 색 그대로.")]
-    [SerializeField] private Color vignetteColor = Color.white;
-    [Tooltip("버프가 있을 때 채움 알파(0 = 스피드 라인만).")]
-    [FormerlySerializedAs("maxAlpha")]
-    [SerializeField, Range(0f, 1f)] private float fillAlpha = 0.25f;
-
     [Header("스피드 라인(249)")]
-    [Tooltip("스피드 라인 재질 — MA_SpeedLines(셰이더 UI/SpeedLines). 비면 스피드 라인 없음(채움만).")]
+    [Tooltip("스피드 라인 재질 — MA_SpeedLines(셰이더 UI/SpeedLines). 비면 아무것도 안 그린다.")]
     [SerializeField] private Material speedLineMaterial;
     [Tooltip("선 색.")]
     [SerializeField] private Color lineColor = Color.white;
@@ -69,7 +57,7 @@ public class SuppressHasteVignetteHUD : MonoBehaviour
     // 빌드에선 읽는 곳이 없다(에디터 전용 미리보기) — 직렬화 배치를 에디터·빌드 같게 두려고 #if 밖에 둔다.
 #pragma warning disable 0414, 0169
     [Header("에디터 미리보기(Play·빌드에선 무시)")]
-    [Tooltip("켜면 Play 없이 Prefab Mode·씬뷰·게임뷰에서 채움+스피드 라인을 아래 값으로 보여 준다(저장 안 되는 임시 자식). 실제 Image 값은 바뀌지 않는다.")]
+    [Tooltip("켜면 Play 없이 Prefab Mode·씬뷰·게임뷰에서 스피드 라인을 아래 값으로 보여 준다(저장 안 되는 임시 자식).")]
     [SerializeField] private bool editorPreview;
     [Tooltip("미리보기 강도 = 페이드 비율(0 = 안 보임, 1 = 버프가 있을 때 최종 모습).")]
     [SerializeField, Range(0f, 1f)] private float editorPreviewStrength = 1f;
@@ -81,7 +69,7 @@ public class SuppressHasteVignetteHUD : MonoBehaviour
 
     private StatusEffectController effects;
     private bool show;
-    private float fade;                 // 0..1 — 채움 알파 = × fillAlpha, 선 알파 = × lineAlpha × 버스트
+    private float fade;                 // 0..1 — 선 알파 = × lineAlpha × 버스트
     private float burstElapsed = float.MaxValue;
     private float lineTime;
 
@@ -96,28 +84,18 @@ public class SuppressHasteVignetteHUD : MonoBehaviour
     {
         rectTransform = transform as RectTransform;
         if (!Application.isPlaying)
-            return;   // [ExecuteAlways] — 에디터에선 실제 Image 를 건드리지 않는다(미리보기는 별도 자식)
+            return;   // [ExecuteAlways] — 에디터에선 런타임 레이어를 만들지 않는다(미리보기는 별도 자식)
 #if UNITY_EDITOR
         VignetteEditorPreview.Clear(transform);   // 씬 리로드 없이 Play 에 들어와 남은 미리보기 자식
 #endif
 
-        if (image == null)
-            image = GetComponent<Image>();
-
         if (data == null)
             data = Resources.Load<SuppressHasteData>(SuppressHasteData.ResourcesPath);
-
-        if (image != null)
-        {
-            image.raycastTarget = false;
-            if (vignetteSprite != null)
-                image.sprite = vignetteSprite;
-        }
 
         CreateLineLayer();
     }
 
-    // 자식으로 붙여 채움 위에 그린다. 프리팹엔 재질 참조만 두고 오브젝트는 런타임에 만든다(프리팹 변경 최소화).
+    // 자식으로 붙여 그린다. 프리팹엔 재질 참조만 두고 오브젝트는 런타임에 만든다(프리팹 변경 최소화).
     private void CreateLineLayer()
     {
         if (speedLineMaterial == null || lineImage != null)
@@ -221,9 +199,6 @@ public class SuppressHasteVignetteHUD : MonoBehaviour
     {
         float burst = SuppressHasteVignetteModel.BurstFactor(burstElapsed, burstDuration, burstMultiplier);
 
-        if (image != null)
-            ApplyLayer(image, vignetteColor, vignetteColor.a * fade * fillAlpha);
-
         if (lineImage != null)
         {
             ApplyLayer(lineImage, lineColor, Mathf.Min(1f, fade * lineAlpha * burst));
@@ -253,8 +228,7 @@ public class SuppressHasteVignetteHUD : MonoBehaviour
     }
 
 #if UNITY_EDITOR
-    // ── 에디터 미리보기 ── 저장 안 되는 자식 2장(채움 Image·스피드 라인 RawImage)에만 그린다. 칸을 바꾸면(OnValidate)·크기가 바뀌면 다시 칠한다.
-    private const string PreviewFillName = "__Preview_SuppressHasteFill";
+    // ── 에디터 미리보기 ── 저장 안 되는 자식(스피드 라인 RawImage)에만 그린다. 칸을 바꾸면(OnValidate)·크기가 바뀌면 다시 칠한다.
     private const string PreviewLineName = "__Preview_SuppressHasteLines";
     private Material previewMaterial;
 
@@ -279,11 +253,6 @@ public class SuppressHasteVignetteHUD : MonoBehaviour
         }
 
         float burst = SuppressHasteVignetteModel.BurstFactor(editorPreviewBurstTime * burstDuration, burstDuration, burstMultiplier);
-
-        Image fill = VignetteEditorPreview.Ensure<Image>(transform, PreviewFillName);
-        fill.sprite = vignetteSprite;
-        fill.enabled = vignetteSprite != null;
-        fill.color = new Color(vignetteColor.r, vignetteColor.g, vignetteColor.b, vignetteColor.a * editorPreviewStrength * fillAlpha);
 
         RawImage lines = VignetteEditorPreview.Ensure<RawImage>(transform, PreviewLineName);
         if (speedLineMaterial == null)
