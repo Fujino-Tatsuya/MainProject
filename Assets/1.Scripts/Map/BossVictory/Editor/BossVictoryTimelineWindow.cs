@@ -29,6 +29,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     [SerializeField] float _pixelsPerSecond = 160f;
     [SerializeField] float _scrollTime;
     [SerializeField] float _playhead;
+    [SerializeField] bool _initialFit;
 
     [MenuItem(MenuPath)]
     static void Open()
@@ -62,6 +63,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             return;
         }
         _settings.timeline ??= BossVictoryTimeline.CreateDefault();
+        if (!_initialFit && Event.current.type == EventType.Layout)
+        {
+            _initialFit = true;   // 처음 열 때 전체 보기 — 로비 전환 마커(끝)까지 한 화면에
+            FitAll();
+        }
 
         int rows = BossVictoryTimeline.Tracks.Length + BossVictoryTimeline.Markers.Length;
         Rect area = GUILayoutUtility.GetRect(position.width, RulerHeight + rows * RowHeight + 16f);
@@ -116,8 +122,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     float XToTime(Rect lanes, float x) => _scrollTime + (x - lanes.x) / _pixelsPerSecond;
 
     Rect RowRect(Rect lanes, int row) => new Rect(lanes.x, lanes.y + row * RowHeight, lanes.width, RowHeight);
-    static int TrackRow(BossVictoryTrack track) => (int)track;
-    static int MarkerRow(BossVictoryMarker marker) => BossVictoryTimeline.Tracks.Length + (int)marker;
+    // 위 = 마커 줄(로비 전환·카메라·숨김 — 첫 화면에 바로 보이게), 아래 = 클립 트랙.
+    static int MarkerRow(BossVictoryMarker marker) => (int)marker;
+    static int TrackRow(BossVictoryTrack track) => BossVictoryTimeline.Markers.Length + (int)track;
 
     Rect ClipRect(Rect lanes, int row, BossVictoryClip clip)
     {
@@ -151,6 +158,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void DrawRows(Rect labels, Rect lanes)
     {
         int row = 0;
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        {
+            DrawRowBackground(labels, lanes, row);
+            GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight),
+                "◆ " + BossVictoryTimeline.MarkerLabel(marker), MarkerLabelStyle(marker));
+            row++;
+        }
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             DrawRowBackground(labels, lanes, row);
@@ -162,13 +176,6 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             };
             GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight),
                 BossVictoryTimeline.TrackLabel(track) + kind, EditorStyles.miniLabel);
-            row++;
-        }
-        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
-        {
-            DrawRowBackground(labels, lanes, row);
-            GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight),
-                "◆ " + BossVictoryTimeline.MarkerLabel(marker), EditorStyles.miniLabel);
             row++;
         }
     }
@@ -255,22 +262,91 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         EditorGUI.DrawRect(new Rect(r.xMax - 1f, r.y, 1f, r.height), c);
     }
 
+    static readonly Color LobbyColor = new Color(0.35f, 0.95f, 0.55f);
+
+    static Color MarkerTint(BossVictoryMarker marker) => marker == BossVictoryMarker.LobbyTransition ? LobbyColor : MarkerColor;
+
+    static GUIStyle s_markerLabel, s_lobbyLabel;
+
+    static GUIStyle MarkerLabelStyle(BossVictoryMarker marker)
+    {
+        s_markerLabel ??= new GUIStyle(EditorStyles.miniBoldLabel) { normal = { textColor = MarkerColor } };
+        s_lobbyLabel ??= new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = LobbyColor } };
+        return marker == BossVictoryMarker.LobbyTransition ? s_lobbyLabel : s_markerLabel;
+    }
+
+    static string MarkerText(BossVictoryTimeline tl, BossVictoryMarker marker) =>
+        $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
+
+    // 마커 = 줄 전체를 지나는 세로선 + 큰 마름모 + "이름 시각s" 라벨(상시). 화면 밖이면 그 줄 끝에 ◀/▶ 라벨을 붙여 둔다(누르면 그쪽으로 이동).
     void DrawMarkers(Rect lanes)
     {
         GUI.BeginClip(lanes);
         Rect local = new Rect(0f, 0f, lanes.width, lanes.height);
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
+            bool lobby = marker == BossVictoryMarker.LobbyTransition;
             float x = TimeToX(local, Timeline.MarkerTime(marker));
-            Color c = IsSelectedMarker(marker) ? Color.white : MarkerColor;
-            EditorGUI.DrawRect(new Rect(x - 0.5f, 0f, 1f, local.height), new Color(c.r, c.g, c.b, 0.35f));
+            Color c = IsSelectedMarker(marker) ? Color.white : MarkerTint(marker);
             Rect row = RowRect(local, MarkerRow(marker));
+            string text = MarkerText(Timeline, marker);
+            GUIStyle style = MarkerLabelStyle(marker);
+            float textWidth = style.CalcSize(new GUIContent(text)).x;
+            if (x < 0f || x > local.width)
+            {
+                string arrow = x < 0f ? "◀ " + text : text + " ▶";
+                float w = textWidth + 18f;
+                Rect pin = x < 0f ? new Rect(2f, row.y + 3f, w, row.height - 6f) : new Rect(local.width - w - 2f, row.y + 3f, w, row.height - 6f);
+                EditorGUI.DrawRect(pin, new Color(0f, 0f, 0f, 0.55f));
+                GUI.Label(pin, arrow, style);
+                continue;
+            }
+            float lineWidth = lobby ? 2.5f : 1.5f;
+            EditorGUI.DrawRect(new Rect(x - lineWidth * 0.5f, 0f, lineWidth, local.height), new Color(c.r, c.g, c.b, lobby ? 0.8f : 0.45f));
             Vector3 mid = new Vector3(x, row.center.y, 0f);
+            float s = lobby ? MarkerSizeLobby : MarkerSize;
             Handles.color = c;
-            Handles.DrawAAConvexPolygon(mid + Vector3.up * 7f, mid + Vector3.right * 6f, mid + Vector3.down * 7f, mid + Vector3.left * 6f);
-            GUI.Label(new Rect(x + 8f, row.y + 4f, 80f, 16f), Timeline.MarkerTime(marker).ToString("0.00"), EditorStyles.miniLabel);
+            Handles.DrawAAConvexPolygon(mid + Vector3.up * s, mid + Vector3.right * s, mid + Vector3.down * s, mid + Vector3.left * s);
+            Rect label = MarkerLabelRect(row, x, textWidth, local.width);
+            EditorGUI.DrawRect(label, new Color(0f, 0f, 0f, 0.55f));
+            GUI.Label(label, text, style);
         }
         GUI.EndClip();
+    }
+
+    const float MarkerSize = 7f;
+    const float MarkerSizeLobby = 10f;
+
+    // 라벨은 마름모 오른쪽, 오른쪽 끝에 닿으면 왼쪽.
+    static Rect MarkerLabelRect(Rect row, float x, float textWidth, float width)
+    {
+        float w = textWidth + 8f;
+        float lx = x + MarkerSizeLobby + 3f;
+        if (lx + w > width) lx = x - MarkerSizeLobby - 3f - w;
+        return new Rect(lx, row.y + 3f, w, row.height - 6f);
+    }
+
+    // 마커 잡기 — 마름모 ±(크기+4)px 또는 라벨 위. 화면 밖 ◀/▶ 라벨을 누르면 그 마커가 보이게 옮긴다.
+    bool PickMarker(Rect lanes, Vector2 mouse, out BossVictoryMarker picked)
+    {
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        {
+            picked = marker;
+            Rect row = RowRect(lanes, MarkerRow(marker));
+            if (!row.Contains(mouse)) continue;
+            float x = TimeToX(lanes, Timeline.MarkerTime(marker));
+            if (x < lanes.x || x > lanes.xMax)
+            {
+                _scrollTime = Mathf.Max(0f, Timeline.MarkerTime(marker) - lanes.width * 0.5f / _pixelsPerSecond);
+                Repaint();
+                return false;
+            }
+            float textWidth = MarkerLabelStyle(marker).CalcSize(new GUIContent(MarkerText(Timeline, marker))).x;
+            Rect label = MarkerLabelRect(new Rect(lanes.x, row.y, lanes.width, row.height), x, textWidth, lanes.xMax);
+            if (Mathf.Abs(mouse.x - x) <= MarkerSizeLobby + 4f || label.Contains(mouse)) return true;
+        }
+        picked = default;
+        return false;
     }
 
     void DrawPlayhead(Rect ruler, Rect lanes)
@@ -303,6 +379,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     BossVictoryClip _dragOrig;
     float _dragMouseT0;
     bool _dragRecorded;
+    float _dragMarkerOrig;
     static bool s_hasClipboard;
     static BossVictoryClip s_clipboard;
     static BossVictoryTrack s_clipboardTrack;
@@ -479,11 +556,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         _dragRecorded = false;
         _dragMouseT0 = XToTime(lanes, mouse.x);
-        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        if (PickMarker(lanes, mouse, out BossVictoryMarker picked))
         {
-            Rect row = RowRect(lanes, MarkerRow(marker));
-            if (!row.Contains(mouse) || Mathf.Abs(mouse.x - TimeToX(lanes, Timeline.MarkerTime(marker))) > HandleSize + 1f) continue;
-            Select(-1, -1, (int)marker);
+            Select(-1, -1, (int)picked);
+            _dragMarkerOrig = Timeline.MarkerTime(picked);
             _drag = DragMode.Marker;
             return;
         }
@@ -567,6 +643,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 마우스 커서 — 끝 = 좌우 화살표 · 몸통 = 이동 · 페이드 네모 = 밀기.
     void AddCursorRects(Rect lanes)
     {
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        {
+            Rect row = RowRect(lanes, MarkerRow(marker));
+            float x = TimeToX(lanes, Timeline.MarkerTime(marker));
+            AddCursor(lanes, new Rect(x - MarkerSizeLobby - 4f, row.y, (MarkerSizeLobby + 4f) * 2f, row.height), MouseCursor.ResizeHorizontal);
+        }
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             List<BossVictoryClip> clips = Timeline.Clips(track);
@@ -610,7 +692,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _dragRecorded = true;
         if (_drag == DragMode.Marker)
         {
-            Timeline.SetMarkerTime((BossVictoryMarker)_selMarker, Snap(mt));
+            Timeline.SetMarkerTime((BossVictoryMarker)_selMarker, Snap(_dragMarkerOrig + (mt - _dragMouseT0)));   // 라벨을 잡아도 튀지 않게 이동량으로
             Repaint();
             return;
         }
@@ -794,6 +876,16 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         DebugBossVictoryLab.Instance.Paused = true;
     }
 
+    static string MarkerHelp(BossVictoryMarker marker) => marker switch
+    {
+        BossVictoryMarker.LobbyTransition =>
+            "실게임: 호스트 화면이 이 시각을 지나면 로비 결과 패널로 넘어간다(TV 꺼짐 클립이 없으면 검정 없이). " +
+            "디버그 씬: 이 시각이 한 바퀴 끝 — 로비로 가지 않고 랩 '반복' 대기(loopHoldSeconds) 뒤 처음부터.",
+        BossVictoryMarker.FocusKiller => "처치자가 아닌 피어의 카메라가 이 시각에 처치자로 즉시 넘어간다(처치자 화면 그대로).",
+        BossVictoryMarker.HideOthers => "이 시각에 처치자 외 플레이어 캐릭터를 모든 화면에서 숨긴다.",
+        _ => "",
+    };
+
     // 선택 클립·마커 수치 직접 입력
     void DrawInspector()
     {
@@ -806,6 +898,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             var marker = (BossVictoryMarker)_selMarker;
             EditorGUILayout.LabelField("마커", BossVictoryTimeline.MarkerLabel(marker), EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(MarkerHelp(marker), EditorStyles.wordWrappedMiniLabel);
             EditorGUI.BeginChangeCheck();
             float time = EditorGUILayout.FloatField("시각(초)", Timeline.MarkerTime(marker));
             if (EditorGUI.EndChangeCheck())
