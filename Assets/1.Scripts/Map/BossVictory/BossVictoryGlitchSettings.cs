@@ -24,7 +24,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public PlayerSkillSlot defaultFinisherSlot = PlayerSkillSlot.Ultimate;
 
     [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 편집)")]
-    [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·정지 유지·TV 꺼짐 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
+    [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
     public BossVictoryTimeline timeline = BossVictoryTimeline.CreateDefault();
 
     [Header("글리치 색·모양")]

@@ -18,7 +18,7 @@ using VeyTrace.Rendering.Occlusion;
 /// <para><b>4단계</b> — 글리치 시계로 카메라 컷(타임라인 '카메라 컷' 트랙, <see cref="BossVictoryCameraCuts"/>): 첫 컷부터 연출 vcam(블렌드 없음) · 컷마다 그 순간 위치로 구도 고정 ·
 /// 연출 동안 월드 UI·윤곽선·벽 가림·카메라 흔들림 끔 · 컷별 '벽 숨김'이 켜진 컷에서만 카메라를 향하지 않는 벽 숨김(끈 컷은 다시 보임, 255).</para>
 /// <para><b>처치자 순서</b> — 하던 동작(×0.5) → 백대쉬 → 처치 연출 스킬. 하던 동작은 클립 끝 또는 타임라인 '처치자 동작 끝 → 백대쉬' 마커 중 이른 쪽에서 끊는다(255, 마커 0 = 끔).</para>
-/// <para><b>타임라인</b>(설정 SO <see cref="BossVictoryTimeline"/> — 트랙별 클립·마커, 창 <c>Tools/Boss Victory/처치 연출 타임라인</c>): 화면 효과·HUD 숨김·정지 유지·TV 꺼짐·로비 전환은
+/// <para><b>타임라인</b>(설정 SO <see cref="BossVictoryTimeline"/> — 트랙별 클립·마커, 창 <c>Tools/Boss Victory/처치 연출 타임라인</c>): 화면 효과·HUD 숨김·카메라 컷·TV 꺼짐·로비 전환은
 /// 매 프레임 시각 t 의 상태로 맞춘다(되감아도 맞다). <b>마커</b>(기본 0.20 = 첫 찢김 최고점): 처치자가 아닌 피어의 게임 카메라가 처치자로 즉시 컷
 /// (<see cref="CameraTargetSwitcher.SetTemporaryFollow"/>) · 처치자 외 플레이어 캐릭터를 이 화면에서 숨김(렌더러·월드 캔버스·머리 위 체력바 끔 —
 /// 루트 SetActive 는 NGO·카메라 추적 목록이 깨져 쓰지 않는다). 정리(디버그 랩 F7 포함) 때 원상복구.</para>
@@ -431,11 +431,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         float t = _glitchTime;
         BossVictoryGlitchSettings s = _settings;
         BossVictoryTimeline tl = s.timeline;
-        float et = tl.EffectTime(t);   // 정지 유지 클립 안이면 그 시작에 고정
         TickCuts();
         TickCrtAndLobby(tl, t);
 
-        bool hide = tl.Evaluate(BossVictoryTrack.HudHide, et) > 0.5f;
+        bool hide = tl.Evaluate(BossVictoryTrack.HudHide, t) > 0.5f;
         if (hide != _hudHidden)
         {
             _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
@@ -444,7 +443,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             _hudHidden = hide;
         }
 
-        if (_renderOn) SetGlitchFrame(s, tl, et);
+        if (_renderOn) SetGlitchFrame(s, tl, t);
         TickMarkers(tl, t);   // 노이즈 UV 누적 뒤 — 카메라 컷이 다음 프레임 누적에서 빠지게
     }
 

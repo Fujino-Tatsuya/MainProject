@@ -234,7 +234,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             BossVictoryTimeline.TrackKind.Pulse => PulseColor,
             BossVictoryTimeline.TrackKind.Single => SingleColor,
             BossVictoryTimeline.TrackKind.Cut => CutColor,
-            _ => track == BossVictoryTrack.Hold ? SingleColor : RangeColor,
+            _ => RangeColor,
         };
         bool selected = IsSelected(track, index);
         EditorGUI.DrawRect(r, baseColor * (selected ? 1f : 0.75f));
@@ -807,7 +807,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         BossVictoryTimeline.TrackKind.Pulse => BossVictoryClip.Make(start, 0.2f, 0.1f, 0.1f),
         BossVictoryTimeline.TrackKind.Single or BossVictoryTimeline.TrackKind.Cut => BossVictoryClip.Make(start, 1f),
-        _ => track == BossVictoryTrack.Hold ? BossVictoryClip.Make(start, 1f) : BossVictoryClip.Make(start, 1f, 0.1f, 0.1f),
+        _ => BossVictoryClip.Make(start, 1f, 0.1f, 0.1f),
     };
 
     void AddClip(BossVictoryTrack track, float start)

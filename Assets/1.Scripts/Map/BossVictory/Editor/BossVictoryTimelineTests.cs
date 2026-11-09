@@ -3,7 +3,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 보스 처치 연출 타임라인(PLAN-boss-victory-glitch "타임라인 에디터 창") — 클립 평가·정지 유지·TV 꺼짐·마커,
+/// 보스 처치 연출 타임라인(PLAN-boss-victory-glitch "타임라인 에디터 창") — 클립 평가·TV 꺼짐·마커(정지 유지 트랙은 255 후속 2 삭제),
 /// 코드 기본 클립이 옛 기본 곡선 × 옛 전체 세기(교체 직전 에셋 값)와 같은 화면인지(전체 세기를 녹인 0.08~0.26초만 오차 0.06 허용). 에셋은 사용자 튜닝 값이라 구조만 본다.
 /// 실행 = <c>Tools/Tests/전투 EditMode 테스트 실행</c>(필터 ^BossVictoryTimeline).
 /// </summary>
@@ -56,7 +56,7 @@ public sealed class BossVictoryTimelineTests
             {
                 float expected = old.Evaluate(t) * (screenEffect ? master.Evaluate(t) : 1f);
                 float tol = screenEffect && t >= FoldStart && t < FoldEnd ? FoldTolerance : Tolerance;
-                Assert.AreEqual(expected, tl.Evaluate(track, tl.EffectTime(t)), tol, $"{label} {track} t={t:0.0000}");
+                Assert.AreEqual(expected, tl.Evaluate(track, t), tol, $"{label} {track} t={t:0.0000}");
             }
         }
     }
@@ -98,13 +98,10 @@ public sealed class BossVictoryTimelineTests
     }
 
     [Test]
-    public void 기본_정지_유지_TV_꺼짐_마커()
+    public void 기본_TV_꺼짐_마커()
     {
         BossVictoryTimeline tl = BossVictoryTimeline.CreateDefault();
-        Assert.AreEqual(3.5f, tl.EffectTime(3.5f), 1e-5f);
-        Assert.AreEqual(3.5f, tl.EffectTime(4.2f), 1e-5f, "정지 유지 안 = 시작에 고정");
-        Assert.AreEqual(4.5f, tl.EffectTime(4.5f), 1e-5f, "끝 뒤는 그대로");
-        Assert.AreEqual(1f, tl.EffectTime(1f), 1e-5f);
+        Assert.IsFalse(System.Enum.IsDefined(typeof(BossVictoryTrack), "Hold"), "정지 유지 트랙 삭제(255 후속 2)");
 
         Assert.IsTrue(tl.TryGetCrtOff(out BossVictoryClip crt));
         Assert.AreEqual(4.5f, crt.start, 1e-5f);

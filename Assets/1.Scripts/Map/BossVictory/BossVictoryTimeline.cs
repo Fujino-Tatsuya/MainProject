@@ -12,7 +12,6 @@ public enum BossVictoryTrack
     Tear,        // 가로 찢김(단발 펄스)
     Smear,       // 밝은 부분 끌림(단발 펄스)
     HudHide,     // HUD 숨김(0.5 초과)
-    Hold,        // 정지 유지 — 클립 동안 화면 효과 시각을 클립 시작에 고정
     CrtOff,      // TV 꺼짐 — 첫 클립만, 시작에 화면 캡처·길이 = 꺼짐 길이
     CameraCut,   // 카메라 컷 — 클립 시작 = 컷 시작, 다음 컷 시작까지 유지(길이는 자동). 컷 값 = cameraCutShots 같은 번호(255)
 }
@@ -74,7 +73,6 @@ public sealed class BossVictoryTimeline
     public List<BossVictoryClip> tear = new List<BossVictoryClip>();
     public List<BossVictoryClip> smear = new List<BossVictoryClip>();
     public List<BossVictoryClip> hudHide = new List<BossVictoryClip>();
-    public List<BossVictoryClip> hold = new List<BossVictoryClip>();
     public List<BossVictoryClip> crtOff = new List<BossVictoryClip>();
     /// <summary>카메라 컷 클립 — 시작만 의미(길이 = 다음 컷 시작까지, <see cref="FitCameraCutLengths"/> 가 맞춘다).</summary>
     public List<BossVictoryClip> cameraCut = new List<BossVictoryClip>();
@@ -99,7 +97,6 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.Tear => tear,
         BossVictoryTrack.Smear => smear,
         BossVictoryTrack.HudHide => hudHide,
-        BossVictoryTrack.Hold => hold,
         BossVictoryTrack.CrtOff => crtOff,
         BossVictoryTrack.CameraCut => cameraCut,
         _ => throw new ArgumentOutOfRangeException(nameof(track)),
@@ -134,9 +131,8 @@ public sealed class BossVictoryTimeline
         _ => TrackKind.Range,
     };
 
-    /// <summary>페이드·세기가 의미 있는 트랙인가(정지 유지·TV 꺼짐은 구간만 · 카메라 컷은 시작만).</summary>
-    public static bool HasFades(BossVictoryTrack track) =>
-        track != BossVictoryTrack.Hold && track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut;
+    /// <summary>페이드·세기가 의미 있는 트랙인가(TV 꺼짐은 구간만 · 카메라 컷은 시작만).</summary>
+    public static bool HasFades(BossVictoryTrack track) => track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut;
 
     public static string TrackLabel(BossVictoryTrack track) => track switch
     {
@@ -147,7 +143,6 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.Tear => "가로 찢김",
         BossVictoryTrack.Smear => "밝은 부분 끌림",
         BossVictoryTrack.HudHide => "HUD 숨김",
-        BossVictoryTrack.Hold => "정지 유지",
         BossVictoryTrack.CrtOff => "TV 꺼짐",
         BossVictoryTrack.CameraCut => "카메라 컷",
         _ => track.ToString(),
@@ -169,17 +164,6 @@ public sealed class BossVictoryTimeline
         float v = 0f;
         for (int i = 0; i < clips.Count; i++) v = Mathf.Max(v, clips[i].Evaluate(t));
         return v;
-    }
-
-    /// <summary>화면 효과를 평가할 시각 — 정지 유지 클립 안이면 그 클립 시작에 고정.</summary>
-    public float EffectTime(float t)
-    {
-        for (int i = 0; i < hold.Count; i++)
-        {
-            BossVictoryClip c = hold[i];
-            if (c.length > 0f && t >= c.start && t < c.End) return c.start;
-        }
-        return t;
     }
 
     /// <summary>TV 꺼짐 = 첫 클립. 없으면 false.</summary>
@@ -262,7 +246,7 @@ public sealed class BossVictoryTimeline
     /// 기본 타임라인 — 옛 기본 곡선(에셋 값)과 같은 화면(EditMode <c>BossVictoryTimelineTests</c>).
     /// 램프 곡선 → 끝(5.6)까지 가는 페이드 인 클립 · 펄스 곡선 → 키 사이 그대로의 페이드 인/아웃 클립 ·
     /// 옛 전체 세기(master 0.08~0.15 램프, 11-09 삭제)는 흑백·주사선·첫 찢김/끌림 클립의 시작·페이드 인으로 녹였다(곱한 값에 가장 가까운 0.005초 격자 — 오차 ≤ 0.05, 0.08~0.2초 몇 프레임) ·
-    /// 옛 glitchDuration 3.5 + holdSeconds 1 → 정지 유지 3.5~4.5 · crtOffSeconds 1.1 → TV 꺼짐 4.5~5.6.
+    /// 옛 crtOffSeconds 1.1 → TV 꺼짐 4.5~5.6(정지 유지 트랙은 255 후속 2 에서 삭제 — 끝의 정지 느낌은 처치자·보스 ×0.1 과 TV 꺼짐).
     /// </summary>
     public static BossVictoryTimeline CreateDefault()
     {
@@ -283,7 +267,6 @@ public sealed class BossVictoryTimeline
         tl.smear.Add(BossVictoryClip.Make(0.32f, 0.09f, 0.01f, 0.08f));
         tl.smear.Add(BossVictoryClip.Make(1.42f, 0.2f, 0.1f, 0.1f));
         tl.smear.Add(BossVictoryClip.Make(2.43f, 0.24f, 0.12f, 0.12f));
-        tl.hold.Add(BossVictoryClip.Make(3.5f, 1f));
         tl.crtOff.Add(BossVictoryClip.Make(4.5f, 1.1f));
         tl.focusKillerTime = 0.2f;
         tl.hideOthersTime = 0.2f;
