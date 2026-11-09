@@ -214,6 +214,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerStep = KillerStep.None;
 
         PlayerLifeInputPolicy.SetVictoryInputHeld(true);
+        // 벽 가림(반투명) = 연출 내내 끈다 — 컷 유무·되감기와 무관하게 여기(시작)와 Teardown(정리) 한 곳에서만.
+        WallOcclusionDriver.SuppressedByCinematic = true;
+        WallTransparencyGroup.SuppressedByCinematic = true;
 
         _boss = FindSpawned(v.BossNetworkObjectId);
         _killer = null;
@@ -665,15 +668,13 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         return s;
     }
 
-    // 컷 카메라에 들어갈 때 한 번 — 머리 위 UI·윤곽선·벽 가림·잔여 흔들림이 컷을 깬다(옛 연출과 같은 목록).
+    // 컷 카메라에 들어갈 때 한 번 — 머리 위 UI·윤곽선·잔여 흔들림이 컷을 깬다(옛 연출과 같은 목록). 벽 가림은 컷과 무관하게 Begin~Teardown.
     void SuppressForCuts(BossVictoryCameraCuts.Subjects subjects)
     {
         if (_cutSuppressed) return;
         _cutSuppressed = true;
         PlayerSilhouetteFeature.SuppressedByCinematic = true;
         EnemyOutlineFeature.SuppressedByCinematic = true;
-        WallOcclusionDriver.SuppressedByCinematic = true;
-        WallTransparencyGroup.SuppressedByCinematic = true;
 
         foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
@@ -765,8 +766,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _cutSuppressed = false;
         PlayerSilhouetteFeature.SuppressedByCinematic = false;
         EnemyOutlineFeature.SuppressedByCinematic = false;
-        WallOcclusionDriver.SuppressedByCinematic = false;
-        WallTransparencyGroup.SuppressedByCinematic = false;
     }
 
     // 보스 노이즈 UV 오프셋 — 이번 프레임 카메라 위치 변화를 카메라 right/up 축에 투영해 누적(화면 공간·보스 기준 같은 규칙).
@@ -940,6 +939,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _boss = null;
         _others.Clear();
         PlayerLifeInputPolicy.SetVictoryInputHeld(false);
+        WallOcclusionDriver.SuppressedByCinematic = false;
+        WallTransparencyGroup.SuppressedByCinematic = false;
     }
 
     static GameObject FindSpawned(ulong networkObjectId)
