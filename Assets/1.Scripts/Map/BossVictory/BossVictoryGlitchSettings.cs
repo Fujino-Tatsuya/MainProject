@@ -21,7 +21,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("캐릭터 Variant 에 PlayerVictoryFinisher 가 없을 때 쓰는 스킬 칸. 그 스킬의 애니·이펙트를 표시로만 재생하고 클립 End 이벤트에서 처치자·보스가 느려진다.")]
     public PlayerSkillSlot defaultFinisherSlot = PlayerSkillSlot.Ultimate;
 
-    [Header("글리치 타임라인(3단계 — t = 글리치 시작 = 처치 연출 스킬 End, 초)")]
+    [Header("글리치 타임라인(3단계 — t = 처치 판정 순간(복제 처치 시각) 뒤 초. 처치 연출 스킬은 이 속에서 재생)")]
     [Tooltip("타임라인 길이(초). 이 뒤로는 마지막 값으로 정지 화면(유지 시간은 5단계).")]
     [Min(0.1f)] public float glitchDuration = 3.5f;
     [Tooltip("전체 세기(0 = 원래 화면). 0 이면 렌더 패스를 아예 건너뛴다.")]

@@ -32,7 +32,7 @@ public static class BossVictoryGlitchRender
     public struct Frame
     {
         public float Master;        // 전체(0 = 꺼짐)
-        public float Time;          // 글리치 시작 뒤 초(노이즈·흔들림 시간)
+        public float Time;          // 처치 판정 뒤 초(노이즈·흔들림 시간)
         public float Desaturate;    // 화면 흑백
         public float Amber;         // 배경 호박색 틴트(플레이어 제외)
         public float Scanline;      // CRT 주사선

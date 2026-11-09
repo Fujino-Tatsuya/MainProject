@@ -11,8 +11,9 @@ using VeyTrace.Rendering.Occlusion;
 ///
 /// <para><b>2단계(지금)</b> — 처치 판정 즉시: 이 피어의 스킬 이펙트·장판 표시·투사체 소거(Q11) · 대상별 시간 배율(전역 timeScale 아님):
 /// 처치자 1 · 그 외 플레이어 0.05 · 보스 0. 처치자 캐릭터에 처치 연출 스킬(Q9, 칸 = <see cref="PlayerVictoryFinisher"/>)을 표시로만 재생하고,
-/// 그 클립 End 이벤트(이 피어 화면 기준, Q12)에서 처치자·보스 0.1 → <see cref="FinisherEnded"/>(글리치 시작).</para>
-/// <para><b>3단계</b> — End 순간부터 화면 글리치(<see cref="BossVictoryGlitchRender"/>, 세기 = 설정 SO 타임라인 곡선, 시계 <see cref="GlitchTime"/>) ·
+/// 그 클립 End 이벤트(이 피어 화면 기준, Q12)에서 처치자·보스 0.1 → <see cref="FinisherEnded"/>.</para>
+/// <para><b>3단계</b> — <b>처치 판정 순간부터</b>(11-09 사양 변경 — 처치 연출 스킬은 글리치 속에서 재생) 화면 글리치(<see cref="BossVictoryGlitchRender"/>,
+/// 세기 = 설정 SO 타임라인 곡선, 시계 <see cref="GlitchTime"/> = 복제 처치 시각 기준) ·
 /// 플레이어 흑백·보스 노이즈(렌더링 레이어 비트) · HUD 숨김.</para>
 /// <para><b>4단계</b> — 글리치 시계로 카메라 컷(설정 SO 목록, <see cref="BossVictoryCameraCuts"/>): 첫 컷부터 연출 vcam(블렌드 없음) · 컷마다 그 순간 위치로 구도 고정 ·
 /// 연출 동안 월드 UI·윤곽선·벽 가림·카메라 흔들림 끔 · 카메라를 향하지 않는 벽 숨김.</para>
@@ -33,7 +34,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 지금 연출(없으면 null).</summary>
     public static BossVictoryGlitchPresentation Instance { get; private set; }
 
-    /// <summary>[이 피어] 처치자 처치 연출 스킬이 End 에 닿았다 = 처치자 0.1 순간 = 글리치 시작(Q10).</summary>
+    /// <summary>[이 피어] 처치자 처치 연출 스킬이 End 에 닿았다 = 처치자·보스 0.1 순간(글리치 시작 신호는 아니다 — 글리치는 처치 판정 순간부터).</summary>
     public static event Action<BossEncounterDirector.VictoryState> FinisherEnded;
 
     BossEncounterDirector _director;
@@ -57,7 +58,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     readonly List<bool> _animatorOverridden = new List<bool>();
     readonly Dictionary<ParticleSystem, float> _particleSpeeds = new Dictionary<ParticleSystem, float>();
 
-    // 3단계 — 화면 글리치(처치 연출 스킬 End 부터)
+    // 3단계 — 화면 글리치(처치 판정 순간부터)
     bool _glitchOn;
     bool _renderOn;
     float _glitchTime;
@@ -79,7 +80,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 지금 카메라 컷 번호(설정 목록 — 게임 카메라면 -1).</summary>
     public int CutIndex => _cutIndex;
 
-    /// <summary>[이 피어] 글리치 시작 뒤 초(글리치 전엔 -1). 컷·글자(4·5단계)가 같은 시계를 읽는다.</summary>
+    /// <summary>[이 피어] 처치 판정 뒤 초(연출 없으면 -1). 컷·글자가 같은 시계를 읽는다.</summary>
     public float GlitchTime => _glitchOn ? _glitchTime : -1f;
 
     public Phase CurrentPhase => _phase;
@@ -162,6 +163,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_boss != null) CollectAnimators(_boss, Role.Boss);
         ApplyEffectRates();
 
+        // 글리치 = 처치 판정 순간부터(복제 처치 시각 기준 — 늦게 받은 피어는 그만큼 앞에서 시작). 이후는 게임 시간(랩 배속·일시정지에 같이 멈춤).
+        double serverNow = _director.NetworkManager != null ? _director.NetworkManager.ServerTime.Time : v.StartServerTime;
+        StartGlitch(Mathf.Max(0f, v.Elapsed(serverNow)));
+
         if (_killer == null)
             Edit.LogWarning($"[BossVictory] 막타 client {v.KillerClientId} 의 플레이어가 이 피어에 없다 — 처치 연출 스킬을 못 튼다.", this);
         Edit.Log($"[BossVictory] 글리치 연출 시작 — 회차 {v.Sequence} · 막타 client {v.KillerClientId} · 팀원 {_others.Count} · " +
@@ -223,7 +228,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (clip != null && AnimationEventRequirements.HasEvent(clip, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)SkillAnimationEventType.End))
             return;
         _finisherWarned = true;
-        Edit.LogError($"[BossVictory] 처치 연출 스킬 {skill.name}(상태 {skill.Data.AnimatorStateName}) 클립에 Skill End 이벤트가 없다 — 글리치가 시작되지 않는다.", this);
+        Edit.LogError($"[BossVictory] 처치 연출 스킬 {skill.name}(상태 {skill.Data.AnimatorStateName}) 클립에 Skill End 이벤트가 없다 — 처치자·보스가 0.1 로 느려지지 않는다.", this);
     }
 
     void OnFinisherEnded(PlayerSkillBase skill)
@@ -232,17 +237,16 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (!_running || _phase != Phase.Finisher) return;
         _phase = Phase.Slow;
         ApplyEffectRates();
-        Edit.Log($"[BossVictory] 처치 연출 스킬 End — 처치자 ×{_settings.killerAfterFinisherScale} · 보스 ×{_settings.bossAfterFinisherScale} · 글리치 시작", this);
-        StartGlitch();
+        Edit.Log($"[BossVictory] 처치 연출 스킬 End — 처치자 ×{_settings.killerAfterFinisherScale} · 보스 ×{_settings.bossAfterFinisherScale} (글리치 t {_glitchTime:0.00})", this);
         FinisherEnded?.Invoke(_state);
     }
 
     // ── 화면 글리치(3단계) ─────────────────────────────────────────────────
 
-    void StartGlitch()
+    void StartGlitch(float startTime)
     {
         _glitchOn = true;
-        _glitchTime = 0f;
+        _glitchTime = startTime;
         _renderOn = BossVictoryGlitchRender.Enable(_settings);
         if (!_renderOn)
         {

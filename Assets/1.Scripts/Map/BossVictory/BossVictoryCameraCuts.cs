@@ -22,7 +22,7 @@ public static class BossVictoryCameraCuts
     [Serializable]
     public struct Cut
     {
-        [Tooltip("시작 시각(글리치 시작 뒤 초). 다음 컷 시작까지 유지.")]
+        [Tooltip("시작 시각(처치 판정 뒤 초 — 글리치 시계). 다음 컷 시작까지 유지.")]
         [Min(0f)] public float startTime;
         public Kind kind;
         [Tooltip("초점에서 카메라까지 거리(m).")]
