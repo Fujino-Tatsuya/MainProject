@@ -11,13 +11,12 @@ using UnityEngine;
 /// 23호 B(<c>TwentyThree_Raid</c>, 웰즈 포함 — 디렉터의 실제 스폰 경로) · Dev Boot 가 띄운 내 플레이어(= 막타).
 /// 처치 = 막타 준비(<see cref="TwentyThreeBoss.DevPrepareFinalBlowServer"/>, F11 과 같음) + 내 플레이어가 준 피해 한 대(<see cref="Unit.ReceiveAttack"/>)
 /// → Died → <c>HandleBossDefeated</c> → <c>TryStartVictoryServer</c> → 사망 표현·결과 대기 — 전부 실게임 코드.
-/// 랩이 더하는 것: 등장 연출 없이 보스 세우기 · 표시용 팀원(몸뿐인 복제본) · 결과 화면 전환 차단 → 원상복구 → 처음부터 · 연출 시계 배속/일시정지/점프.
+/// 랩이 더하는 것: 등장 연출 없이 보스 세우기 · 표시용 팀원(몸뿐인 복제본) · 결과 화면 전환 차단 → 원상복구 → 처음부터 · 배속/일시정지.
 ///
 /// <list type="bullet">
-/// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · 패널 = 자동 반복·배속·점프(그 시각까지 빨리 감은 뒤 멈춤)·막타 각도/거리/방향·팀원 수.</item>
-/// <item>연출 수치 = <c>Resources/BossVictory/BossVictoryConfig.asset</c> 인스펙터. 다음 재생에 반영된다(몇 칸은 바로). 🔴 SO 라 Play 를 끝내도 값이 남는다.</item>
-/// <item>패널 아래 = 발밑 회색 원(246) 반경·커지는 시간·부드러움·밝기 슬라이더(Config 직접, 바로 반영) · 구도 프리셋(244 후속 A, <see cref="BossVictoryCameraPresets"/> — 저장·불러오기·삭제, 불러오면 다음 재생부터).</item>
-/// <item>배속·점프는 Time.timeScale 과 승리 연출 복제 시계(처치 시각)를 같이 민다 — 카메라·색·단계와 애니·사망 대기가 같은 시계로 흐른다.</item>
+/// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · 패널 = 자동 반복·배속·막타 각도/거리/방향·팀원 수.</item>
+/// <item>처치 연출 = ZZZ 글리치(PLAN-boss-victory-glitch, 교체 중). 옛 카메라 무빙·프리셋·슬라이더·주황·회색 원은 Legacy(연결 끊음).</item>
+/// <item>배속은 Time.timeScale 만 바꾼다 — 새 연출은 각 피어 로컬 게임 시간·애니 이벤트로 흐른다.</item>
 /// <item>호스트 1인 전용. 게이트 = <c>UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS</c>.</item>
 /// </list>
 /// </summary>
@@ -71,10 +70,6 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     [SerializeField] Vector2 panelPosition = new Vector2(10f, 10f);
     [SerializeField, Min(240f)] float panelWidth = 380f;
 
-    [Header("구도 프리셋(244 후속 A)")]
-    [Tooltip("Config 구도 규칙 값 묶음 목록(git 추적). 패널에서 저장·불러오기·삭제 — 불러오면 Config 에 덮어써 다음 재생부터.")]
-    [SerializeField] BossVictoryCameraPresets cameraPresets;
-
     BossEncounterDirector _director;
     GameObject _room;
     Transform _landing;
@@ -86,18 +81,12 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     int _playedSequence = -1;
     float _speed = 1f;
     bool _paused;
-    float? _seekTarget;
-    float _scrub;
     bool _ownsTimeScale;
     float _endedAt = -1f;
-    float _pastEndSince = -1f;
+    float _startedAt = -1f;
     string _status = "호스트 대기";
     bool _folded;
     Vector2 _scroll;
-    string _presetName = "";
-    string _presetNote = "";
-    bool _liveCamera;
-    BossVictoryConfig _cfgDefaults;   // 코드 기본값(기본값 버튼용) — Config 에셋이 아니다
 
     // ── 수명 ────────────────────────────────────────────────────────────────
 
@@ -112,7 +101,6 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         BossEncounterDirector.DevHoldVictoryResult = false;
         ClearMates();
         if (_ownsTimeScale) Time.timeScale = 1f;
-        if (_cfgDefaults != null) Destroy(_cfgDefaults);
     }
 
     void BuildRoom()
@@ -151,7 +139,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         }
         if (!EnsureDirector()) return;
 
-        if (Input.GetKeyDown(ReplayKey)) Replay(null);
+        if (Input.GetKeyDown(ReplayKey)) Replay();
         if (Input.GetKeyDown(PauseKey)) _paused = !_paused;
 
         TickClock();
@@ -178,18 +166,17 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         if (_director == null || !_director.IsSpawned) return false;
 
         if (autoPlayOnStart && _playedSequence < 0 && !_cycleRunning)
-            Replay(null);
+            Replay();
         return true;
     }
 
     // ── 한 바퀴 ─────────────────────────────────────────────────────────────
 
-    /// <summary>처음부터 다시. <paramref name="seekTo"/> = 그 단계 시각까지 빨리 감은 뒤 멈춘다(null = 그냥 재생).</summary>
-    void Replay(float? seekTo)
+    /// <summary>처음부터 다시.</summary>
+    void Replay()
     {
         if (_director == null || !_director.IsSpawned) return;
         if (_cycle != null) StopCoroutine(_cycle);
-        _seekTarget = seekTo;
         _paused = false;
         _cycle = StartCoroutine(Cycle());
     }
@@ -198,7 +185,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     {
         _cycleRunning = true;
         _endedAt = -1f;
-        _pastEndSince = -1f;
+        _startedAt = -1f;
         ReleaseTimeScale();
 
         // 1) 원상복구 — 시체 보스·복제 상태·잠금. 표시는 비활성을 보고 스스로 걷는다.
@@ -263,8 +250,8 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             yield break;
         }
         _playedSequence = v.Sequence;
-        _status = _seekTarget.HasValue ? $"{_seekTarget.Value:0.00}초로 점프 중" : "재생 중";
-        Debug.Log($"{Tag} 재생 — 회차 {v.Sequence} · 막타 각도 {killerAngle:0}° 거리 {killerDistance:0.0}m · 팀원 {ActiveMateCount()}명 · 추가 연출 구간 {v.PreludeSeconds:0.00}초 · {prepared}", this);
+        _status = "재생 중";
+        Debug.Log($"{Tag} 재생 — 회차 {v.Sequence} · 막타 각도 {killerAngle:0}° 거리 {killerDistance:0.0}m · 팀원 {ActiveMateCount()}명 · {prepared}", this);
         _cycleRunning = false;
     }
 
@@ -353,7 +340,8 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
     static int Mod(int a, int n) => n <= 0 ? 0 : ((a % n) + n) % n;
 
-    // ── 시계(배속·일시정지·점프) ─────────────────────────────────────────────
+    // ── 시계(배속·일시정지) ─────────────────────────────────────────────────
+    // 새 처치 연출(ZZZ 글리치)은 각 피어 로컬 게임 시간 + 애니 이벤트로 흐른다 — Time.timeScale 만 바꾸면 같이 느려진다.
 
     void TickClock()
     {
@@ -363,28 +351,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             ReleaseTimeScale();
             return;
         }
-
-        // 서버 시각은 실제 시간으로 흐른다 — 이번 프레임 게임 시간과의 차이만큼 처치 시각을 밀어 단계 시각을 게임 시간에 묶는다.
-        if (_ownsTimeScale)
-            _director.DevShiftVictoryClockServer(BossVictoryLabRules.ClockShift(Time.unscaledDeltaTime, Time.deltaTime));
-
-        float t = StageTime(v);
-        float rate;
-        if (_seekTarget.HasValue)
-        {
-            rate = BossVictoryLabRules.SeekRate(_seekTarget.Value, t, Time.unscaledDeltaTime);
-            if (rate <= 0f)
-            {
-                _seekTarget = null;
-                _paused = true;
-                _status = $"{t:0.00}초에서 멈춤 — F8 로 재개";
-            }
-        }
-        else
-        {
-            rate = _paused ? 0f : _speed;
-        }
-        Time.timeScale = rate;
+        Time.timeScale = _paused ? 0f : _speed;
         _ownsTimeScale = true;
     }
 
@@ -395,32 +362,26 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         Time.timeScale = 1f;
     }
 
-    float StageTime(BossEncounterDirector.VictoryState v) =>
-        v.Active ? v.StageTime(_director.NetworkManager.ServerTime.Time) : 0f;
-
     void TickLoop()
     {
         BossEncounterDirector.VictoryState v = _director.Victory;
         if (!v.Active || _cycleRunning || v.Sequence != _playedSequence) return;
 
-        float t = StageTime(v);
-        if (t < BossVictoryRules.End) return;
-
         bool reached = _director.DevVictoryResultReached;
         if (!reached && !_paused)
         {
-            if (_pastEndSince < 0f) _pastEndSince = Time.unscaledTime;
-            if (Time.unscaledTime - _pastEndSince >= endFallbackSeconds)
+            if (_startedAt < 0f) _startedAt = Time.unscaledTime;
+            if (Time.unscaledTime - _startedAt >= endFallbackSeconds)
             {
-                Debug.LogWarning($"{Tag} 단계 끝 뒤 {endFallbackSeconds:0}초 동안 결과 차단 신호가 없다 — 끝난 것으로 본다(사망 완료가 안 왔을 수 있음).", this);
+                Debug.LogWarning($"{Tag} 처치 뒤 {endFallbackSeconds:0}초 동안 결과 차단 신호가 없다 — 끝난 것으로 본다.", this);
                 reached = true;
             }
         }
         if (!reached) return;
 
         if (_endedAt < 0f) _endedAt = Time.unscaledTime;
-        if (!autoLoop || _paused || _seekTarget.HasValue) return;
-        if (Time.unscaledTime - _endedAt >= loopHoldSeconds) Replay(null);
+        if (!autoLoop || _paused) return;
+        if (Time.unscaledTime - _endedAt >= loopHoldSeconds) Replay();
     }
 
     // ── 패널 ────────────────────────────────────────────────────────────────
@@ -438,15 +399,14 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
         bool ready = _director != null && _director.IsSpawned;
         BossEncounterDirector.VictoryState v = ready ? _director.Victory : default;
-        float t = ready ? StageTime(v) : 0f;
         bool reached = ready && _director.DevVictoryResultReached;
 
         GUILayout.Label($"상태: {_status}");
         if (v.Active)
         {
-            GUILayout.Label($"<size=16><b>단계 시각 {t:0.00}초</b></size>  (경과 {t + v.PreludeSeconds:0.00}초 · 추가 연출 {v.PreludeSeconds:0.00}초)", Rich());
-            GUILayout.Label($"<b>{BossVictoryLabRules.StageName(t, reached)}</b>", Rich());
-            GUILayout.Label($"배속 {Time.timeScale:0.00}{(_paused ? " · 일시정지" : "")}{(_seekTarget.HasValue ? $" · 점프 → {_seekTarget.Value:0.00}" : "")}");
+            float elapsed = v.Elapsed(_director.NetworkManager.ServerTime.Time);
+            GUILayout.Label($"<b>처치 뒤 {elapsed:0.00}초</b>(실제 시간) · 막타 client {v.KillerClientId}{(reached ? " · 끝 — 결과 전환 차단" : "")}", Rich());
+            GUILayout.Label($"배속 {Time.timeScale:0.00}{(_paused ? " · 일시정지" : "")}");
         }
         else
         {
@@ -455,7 +415,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
         GUI.enabled = ready;
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("처음부터 (F7)")) Replay(null);
+        if (GUILayout.Button("처음부터 (F7)")) Replay();
         if (GUILayout.Button(_paused ? "재개 (F8)" : "일시정지 (F8)")) _paused = !_paused;
         GUILayout.EndHorizontal();
         autoLoop = GUILayout.Toggle(autoLoop, " 자동 반복(끝나면 원상복구 → 처음부터)");
@@ -467,16 +427,6 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             bool on = Mathf.Approximately(_speed, SpeedPresets[i]);
             if (GUILayout.Toggle(on, $"×{SpeedPresets[i]:0.##}", GUI.skin.button) && !on) _speed = SpeedPresets[i];
         }
-        GUILayout.EndHorizontal();
-
-        float span = Mathf.Max(0f, (ready ? BossVictoryConfig.Load().preludeSeconds : 0f));
-        GUILayout.Label($"점프 시각(단계 시각) {_scrub:0.00}초 — 처음부터 그 시각까지 빨리 감고 멈춘다");
-        _scrub = GUILayout.HorizontalSlider(_scrub, -span, BossVictoryRules.End + 1f);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("이 시각으로 점프")) Replay(_scrub);
-        if (GUILayout.Button("0.72")) Replay(BossVictoryRules.DescendEnd);
-        if (GUILayout.Button("2.00")) Replay(BossVictoryRules.FreezeEnd);
-        if (GUILayout.Button("3.20")) Replay(BossVictoryRules.End);
         GUILayout.EndHorizontal();
 
         GUILayout.Space(4f);
@@ -501,198 +451,9 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         }
         bossFacesKiller = GUILayout.Toggle(bossFacesKiller, " 보스가 막타를 본다");
 
-        GUILayout.Space(4f);
-        BossVictoryConfig cfg = BossVictoryConfig.Load();
-        GUILayout.Label($"<b>BossVictoryConfig</b> — 추가 연출 {cfg.preludeSeconds:0.00}s · 슬로 ×{cfg.slowMotionScale:0.00} · 배경 틴트 {cfg.backgroundTint:0.00} · 노출 {cfg.characterExposure:0.00} · 벽 기준 {cfg.wallFacingThreshold:0.00}", Rich());
-        GUILayout.Label("값은 인스펙터에서 — 다음 재생에 반영. Play 를 끝내도 남는다(SO).");
-#if UNITY_EDITOR
-        if (GUILayout.Button("설정 SO 선택(인스펙터)"))
-        {
-            UnityEditor.Selection.activeObject = cfg;
-            UnityEditor.EditorGUIUtility.PingObject(cfg);
-        }
-#endif
-
-        GUILayout.Space(4f);
-        GUI.enabled = true;   // 아래 두 묶음은 연출이 없어도 고칠 수 있다
-        DrawGroundCircle(cfg);
-        GUILayout.Space(4f);
-        DrawCameraPresets(cfg);
-
         GUI.enabled = true;
         GUILayout.EndScrollView();
         GUILayout.EndArea();
-    }
-
-    // 발밑 회색 원(할 일 246) — Config 칸을 직접 고친다. 매 프레임 읽으므로 재생 중에도 바로 보인다(반경·부드러움·밝기 — 커지는 시간은 0.72초 뒤 구간에서).
-    void DrawGroundCircle(BossVictoryConfig cfg)
-    {
-        GUILayout.Label("<b>발밑 회색 원 (246)</b> — 바로 반영 · Config 에 남는다(SO)", Rich());
-        GUI.changed = false;
-        cfg.groundCircleRadius = LabeledSlider($"반경 {cfg.groundCircleRadius:0.0}m (0 = 끔)", cfg.groundCircleRadius, 0f, 20f);
-        cfg.groundCircleGrowSeconds = LabeledSlider($"커지는 시간 {cfg.groundCircleGrowSeconds:0.00}초 (0.72초부터)", cfg.groundCircleGrowSeconds, 0f, 3f);
-        cfg.groundCircleSoftness = LabeledSlider($"가장자리 부드러움 {cfg.groundCircleSoftness:0.0}m", cfg.groundCircleSoftness, 0f, 5f);
-        cfg.groundCircleBrightness = LabeledSlider($"흑백 밝기 ×{cfg.groundCircleBrightness:0.00}", cfg.groundCircleBrightness, 0f, 2f);
-        if (GUI.changed) MarkDirty(cfg, save: false);   // 드래그 중 매번 디스크에 쓰지 않는다 — 프로젝트 저장(Ctrl+S) 때 남는다
-        GUILayout.Label("커지는 모습 = 위 '0.72' 점프 → 재개(F8), 느리게 보려면 배속 ×0.25.");
-    }
-
-    // 카메라 구도 슬라이더(244 추가) — Config 구도 규칙 칸을 직접 고친다. 구도는 처치 순간 서버가 고르므로 다음 재생부터,
-    // 라이브 모드면 진행 중 연출도 지금 값으로 다시 계산(랩 전용 훅 DevRecomposeVictoryServer — 실게임 경로 없음).
-    void DrawCameraSliders(BossVictoryConfig cfg)
-    {
-        _cfgDefaults ??= ScriptableObject.CreateInstance<BossVictoryConfig>();
-        BossVictoryConfig d = _cfgDefaults;
-        GUILayout.Label("<b>카메라 구도</b> — 처치 순간 서버가 계산 → <b>다음 재생부터</b> 반영", Rich());
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("바로 다시 재생 (F7)")) Replay(null);
-        _liveCamera = GUILayout.Toggle(_liveCamera, " 라이브(재생 중 구도도 다시 계산)", GUI.skin.button);
-        GUILayout.EndHorizontal();
-
-        bool changed = false;
-        cfg.finalPitch = DefaultSlider("정지 구도 부감", "°", cfg.finalPitch, 0f, 89f, d.finalPitch, ref changed);
-        cfg.endPitch = DefaultSlider("끝 구도 부감", "°", cfg.endPitch, 0f, 89f, d.endPitch, ref changed);
-        cfg.fov = DefaultSlider("FOV", "°", cfg.fov, 10f, 90f, d.fov, ref changed);
-        cfg.referenceAspect = DefaultSlider("기준 화면비", "", cfg.referenceAspect, 1f, 2.5f, d.referenceAspect, ref changed);
-        cfg.minDistance = DefaultSlider("최소 거리", "m", cfg.minDistance, 1f, 40f, d.minDistance, ref changed);
-        cfg.maxDistance = DefaultSlider("최대 거리", "m", cfg.maxDistance, 1f, 60f, d.maxDistance, ref changed);
-        if (cfg.maxDistance < cfg.minDistance) cfg.maxDistance = cfg.minDistance;
-        cfg.distanceStep = DefaultSlider("거리 간격", "m", cfg.distanceStep, 0.1f, 5f, d.distanceStep, ref changed);
-        cfg.endDistanceScale = DefaultSlider("끝 구도 거리 배수", "×", cfg.endDistanceScale, 0.5f, 3f, d.endDistanceScale, ref changed);
-        cfg.characterHeight = DefaultSlider("플레이어 몸 높이", "m", cfg.characterHeight, 0.5f, 4f, d.characterHeight, ref changed);
-
-        // 방위각 후보 — 앞일수록 먼저 본다(같은 점수면 먼저 것). 음수 = 막타가 화면 왼쪽.
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("방위각 후보(앞일수록 우선)");
-        if (GUILayout.Button("+", GUILayout.Width(28f)))
-        {
-            var list = new List<float>(cfg.yawCandidates ?? System.Array.Empty<float>()) { 0f };
-            cfg.yawCandidates = list.ToArray();
-            changed = true;
-        }
-        if (GUILayout.Button("기본값", GUILayout.Width(60f)))
-        {
-            cfg.yawCandidates = (float[])d.yawCandidates.Clone();
-            changed = true;
-        }
-        GUILayout.EndHorizontal();
-        if (cfg.yawCandidates != null)
-        {
-            for (int i = 0; i < cfg.yawCandidates.Length; i++)
-            {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label($"{i + 1}. {cfg.yawCandidates[i]:0}°", GUILayout.Width(70f));
-                float yaw = GUILayout.HorizontalSlider(cfg.yawCandidates[i], -180f, 180f);
-                if (!Mathf.Approximately(yaw, cfg.yawCandidates[i])) { cfg.yawCandidates[i] = Mathf.Round(yaw); changed = true; }
-                if (GUILayout.Button("−", GUILayout.Width(28f)))
-                {
-                    var list = new List<float>(cfg.yawCandidates);
-                    list.RemoveAt(i);
-                    cfg.yawCandidates = list.ToArray();
-                    changed = true;
-                    GUILayout.EndHorizontal();
-                    break;
-                }
-                GUILayout.EndHorizontal();
-            }
-        }
-        if (GUILayout.Button("구도 전부 기본값으로"))
-        {
-            BossVictoryCameraPresets.Entry.Capture("", d).ApplyTo(cfg);
-            changed = true;
-        }
-
-        if (changed)
-        {
-            MarkDirty(cfg, save: false);   // 드래그 중 매번 디스크에 쓰지 않는다 — 프로젝트 저장(Ctrl+S) 때 남는다
-            if (_liveCamera) Recompose(cfg);
-        }
-    }
-
-    void Recompose(BossVictoryConfig cfg)
-    {
-        if (_director != null && _director.IsSpawned) _director.DevRecomposeVictoryServer(cfg);
-    }
-
-    // 이름·값·단위 + 슬라이더 + [기본값]. 값이 바뀌면 changed = true.
-    static float DefaultSlider(string label, string unit, float value, float min, float max, float defaultValue, ref bool changed)
-    {
-        GUILayout.BeginHorizontal();
-        GUILayout.Label($"{label} {value:0.##}{unit}");
-        if (GUILayout.Button($"기본 {defaultValue:0.##}", GUILayout.Width(80f)) && !Mathf.Approximately(value, defaultValue))
-        {
-            changed = true;
-            GUILayout.EndHorizontal();
-            GUILayout.HorizontalSlider(defaultValue, min, max);
-            return defaultValue;
-        }
-        GUILayout.EndHorizontal();
-        float next = GUILayout.HorizontalSlider(value, min, max);
-        if (!Mathf.Approximately(next, value)) changed = true;
-        return next;
-    }
-
-    // 구도 프리셋(244 후속 A) — Config 구도 규칙 값 묶음 저장·불러오기·삭제. 불러오면 Config 에 덮어써 다음 재생부터.
-    void DrawCameraPresets(BossVictoryConfig cfg)
-    {
-        DrawCameraSliders(cfg);
-        GUILayout.Space(4f);
-        GUILayout.Label("<b>구도 프리셋</b> — 불러오면 Config 에 덮어써 다음 재생부터", Rich());
-        if (cameraPresets == null)
-        {
-            GUILayout.Label("프리셋 목록 SO 가 비어 있다(랩 cameraPresets 칸).");
-            return;
-        }
-        GUILayout.Label($"지금 Config: 부감 {cfg.finalPitch:0.#}°→{cfg.endPitch:0.#}° · FOV {cfg.fov:0.#} · 거리 {cfg.minDistance:0.#}–{cfg.maxDistance:0.#}m · 방위 {(cfg.yawCandidates != null ? cfg.yawCandidates.Length : 0)}개", Rich());
-        GUILayout.BeginHorizontal();
-        _presetName = GUILayout.TextField(_presetName ?? "", GUILayout.Width(panelWidth - 150f));
-        if (GUILayout.Button("현재 값 저장"))
-        {
-            bool overwrite = cameraPresets.IndexOf(_presetName?.Trim()) >= 0;
-            if (cameraPresets.Save(_presetName, cfg))
-            {
-                MarkDirty(cameraPresets);
-                _presetNote = $"'{_presetName.Trim()}' {(overwrite ? "덮어씀" : "저장")}";
-            }
-            else _presetNote = "이름을 적어야 저장된다";
-        }
-        GUILayout.EndHorizontal();
-        if (!string.IsNullOrEmpty(_presetNote)) GUILayout.Label(_presetNote);
-
-        for (int i = 0; i < cameraPresets.entries.Count; i++)
-        {
-            BossVictoryCameraPresets.Entry e = cameraPresets.entries[i];
-            if (e == null) continue;
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"{e.name}  ({e.finalPitch:0.#}°/{e.endPitch:0.#}° · FOV {e.fov:0.#})", GUILayout.Width(panelWidth - 150f));
-            if (GUILayout.Button("불러오기"))
-            {
-                e.ApplyTo(cfg);
-                MarkDirty(cfg);
-                if (_liveCamera) Recompose(cfg);
-                _presetName = e.name;
-                _presetNote = $"'{e.name}' 불러옴 — 다음 재생부터";
-            }
-            if (GUILayout.Button("삭제"))
-            {
-                cameraPresets.entries.RemoveAt(i);
-                MarkDirty(cameraPresets);
-                _presetNote = $"'{e.name}' 삭제";
-                GUILayout.EndHorizontal();
-                break;
-            }
-            GUILayout.EndHorizontal();
-        }
-    }
-
-    // 에디터에선 디스크까지 저장한다(SO 는 Play 를 끝내도 남는다 — 프리셋 목록은 git 추적). 빌드에선 메모리만.
-    static void MarkDirty(Object asset, bool save = true)
-    {
-#if UNITY_EDITOR
-        if (asset == null) return;
-        UnityEditor.EditorUtility.SetDirty(asset);
-        if (save) UnityEditor.AssetDatabase.SaveAssetIfDirty(asset);
-#endif
     }
 
     void SetCharacterIndex(int slot, int value)

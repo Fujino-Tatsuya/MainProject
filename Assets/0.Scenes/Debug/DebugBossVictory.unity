@@ -449,7 +449,6 @@ MonoBehaviour:
   bossFacesKiller: 1
   panelPosition: {x: 10, y: 10}
   panelWidth: 380
-  cameraPresets: {fileID: 11400000, guid: 1fa3a31cf23ff622646058fa739f5a03, type: 2}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

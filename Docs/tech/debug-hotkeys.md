@@ -32,7 +32,7 @@
 | F4 | 살아 있는 보스(23호·웰즈) 체력 최대치의 10% 깎기(호스트) — 정상 피해 경로라 페이즈 전환이 실제처럼 난다 | `Dev/DevBossHpCut.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F5 | 보스방 진입 패드로 파티 워프 | `Dev/DevBossEntranceWarp.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F6 | 보스 전투 중(Phase = Combat) 누른 사람만 보스방 지정 지점으로 이동(호스트·클라, 오너 권한) — 지점 = `bossroom.prefab` 의 빈 오브젝트 `[Dev] BossWarpPoint`(옮기면 위치·y축 회전이 바뀜). 연출·낙하 복구 중엔 안 함 | `Dev/DevBossPointWarp.cs` (자동 생성) | DEV_HOTKEYS | — (신규) | |
-| F7 | 보스 처치 연출 처음부터 다시(원상복구 → 처치) — **DebugBossVictory 씬 전용**(호스트). [PLAN-boss-victory-cinematic.md §10.4](../../PLAN-boss-victory-cinematic.md) | `Dev/BossVictoryLab/DebugBossVictoryLab.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 244) | |
+| F7 | 보스 처치 연출 처음부터 다시(원상복구 → 처치) — **DebugBossVictory 씬 전용**(호스트). [PLAN-boss-victory-glitch.md](../../PLAN-boss-victory-glitch.md) | `Dev/BossVictoryLab/DebugBossVictoryLab.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 244) | |
 | F8 | 보스 처치 연출 일시정지/재개 — **DebugBossVictory 씬 전용**(호스트) | `Dev/BossVictoryLab/DebugBossVictoryLab.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 244) | |
 | F9 / Shift+F9 | 가장 가까운 몬스터 / 전부 즉사 (호스트) | `Utility/DevMonsterKill.cs` (자동 생성) | DEV_HOTKEYS | ✗ |  |
 | F10 | 디버그 부활(로컬 오너, 소울 상태일 때) | `Player/Life/PlayerReviveController.cs` (Player 프리팹) | 없음 | ✓ | |

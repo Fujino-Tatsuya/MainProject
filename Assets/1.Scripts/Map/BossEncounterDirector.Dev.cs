@@ -30,11 +30,11 @@ public sealed partial class BossEncounterDirector
 
     // ── 보스 처치 연출 반복 디버그 랩(할 일 244) ──────────────────────────────
     // 실게임 경로(처치 → HandleBossDefeated → TryStartVictoryServer → 사망 표현 → 결과 대기)를 그대로 타고,
-    // 랩이 하는 일은 ① 보스를 등장 연출 없이 세우기 ② 표시용 팀원 끼우기 ③ 결과 화면 전환 막기 ④ 원상복구 ⑤ 연출 시계 밀기 뿐이다.
+    // 랩이 하는 일은 ① 보스를 등장 연출 없이 세우기 ② 표시용 팀원 끼우기 ③ 결과 화면 전환 막기 ④ 원상복구 뿐이다.
 
     /// <summary>
     /// [모든 피어·랩 전용] 플레이어가 아닌 표시용 팀원 복제본(<c>CharacterSelectPreviewPool</c> 로 만든 몸뿐인 오브젝트).
-    /// 서버 구도 계산의 팀원 위치(<see cref="DevAppendVictoryTeammates"/>)와 표시의 팀원 단색 마스크(<see cref="BossVictoryPresentation"/>)가 읽는다.
+    /// 처치 연출 표시(대상별 시간 배율·캐릭터 흑백)가 팀원으로 다룬다.
     /// 비어 있으면 실게임과 같다.
     /// </summary>
     public static readonly List<GameObject> DevVictoryExtraTeammates = new List<GameObject>();
@@ -42,7 +42,7 @@ public sealed partial class BossEncounterDirector
     /// <summary>[서버·랩 전용] true 면 결과 화면 전환을 막는다(결과 씬으로 넘어갈 순간에 <see cref="DevVictoryResultHeld"/> 를 한 번 올린다).</summary>
     public static bool DevHoldVictoryResult;
 
-    /// <summary>[서버·랩 전용] 결과 화면으로 넘어갔을 순간(사망 연출 끝 + 대기 · 3.20초 하한 이후) — 랩이 이걸 "한 바퀴 끝"으로 본다.</summary>
+    /// <summary>[서버·랩 전용] 결과 화면으로 넘어갔을 순간(승리 연출 끝 이후) — 랩이 이걸 "한 바퀴 끝"으로 본다.</summary>
     public static event Action DevVictoryResultHeld;
 
     private bool _devResultHeldRaised;
@@ -55,16 +55,6 @@ public sealed partial class BossEncounterDirector
 
     /// <summary>[서버] 결과 화면 전환을 막고 있는가(한 바퀴 끝).</summary>
     public bool DevVictoryResultReached => _devResultHeldRaised;
-
-    partial void DevAppendVictoryTeammates(List<Vector3> teammates)
-    {
-        for (int i = 0; i < DevVictoryExtraTeammates.Count; i++)
-        {
-            GameObject go = DevVictoryExtraTeammates[i];
-            if (go != null && go.activeInHierarchy)
-                teammates.Add(go.transform.position);
-        }
-    }
 
     partial void DevBlockResultTransition(ref bool block)
     {
@@ -113,7 +103,7 @@ public sealed partial class BossEncounterDirector
 
     /// <summary>
     /// [서버] 승리 연출 원상복구 — 시체 보스 디스폰 · 복제 상태 비활성(회차 번호는 유지 → 다음 시작은 새 회차) · 처치/결과 예약 지움 ·
-    /// 연출 잠금(입력·무적) 해제 · 페이즈 Idle. 표시(<see cref="BossVictoryPresentation"/>)는 비활성을 보고 스스로 정리한다.
+    /// 연출 잠금(입력·무적) 해제 · 페이즈 Idle. 표시는 비활성을 보고 스스로 정리한다.
     /// </summary>
     public void DevResetVictoryServer()
     {
@@ -130,7 +120,6 @@ public sealed partial class BossEncounterDirector
         _defeatHandled = false;
         _resultTransitionAt = 0d;
         _victoryMinResultAt = 0d;
-        _victoryLockApplied = false;
         _devResultHeldRaised = false;
 
         foreach (KeyValuePair<ulong, NetworkClient> pair in NetworkManager.ConnectedClients)
@@ -144,49 +133,6 @@ public sealed partial class BossEncounterDirector
         }
 
         SetPhase(BossEncounterPhase.Idle);
-    }
-
-    /// <summary>
-    /// [서버] 승리 연출 시계를 민다 — 처치 시각(<see cref="VictoryState.StartServerTime"/>)에 <paramref name="seconds"/> 를 더한다(+ = 경과가 덜 흐른 것).
-    /// 랩의 배속·일시정지·점프가 이걸로 서버 시각 기준 표시(카메라·색·단계)를 Time.timeScale 과 맞춘다. 비활성이면 무시.
-    /// </summary>
-    public void DevShiftVictoryClockServer(double seconds)
-    {
-        if (!IsServer || !IsSpawned) return;
-        VictoryState v = _victory.Value;
-        if (!v.Active || Math.Abs(seconds) < 1e-7) return;
-        v.StartServerTime += seconds;
-        _victory.Value = v;
-        _victoryMinResultAt += seconds;
-    }
-
-    // 랩 라이브 구도(244) — 처치 순간 구도 입력(막타·타격점·보스·팀원 위치)을 기억해 둔다.
-    BossVictoryRules.Subjects _devVictorySubjects;
-    bool _devHasVictorySubjects;
-
-    partial void DevRememberVictorySubjects(BossVictoryRules.Subjects subjects)
-    {
-        _devVictorySubjects = subjects;
-        _devHasVictorySubjects = true;
-    }
-
-    /// <summary>
-    /// [서버] 진행 중인 승리 연출 구도를 지금 Config 로 다시 계산해 복제 상태(정지·끝 구도·FOV)에 덮어쓴다 — 디버그 랩 라이브 모드(244) 전용.
-    /// 입력은 처치 순간 기억해 둔 위치 그대로라 다음 재생에서 같은 배치로 나올 구도와 같다. 연출이 없으면 아무것도 안 한다.
-    /// </summary>
-    public bool DevRecomposeVictoryServer(BossVictoryConfig cfg)
-    {
-        if (!IsServer || !IsSpawned || cfg == null || !_devHasVictorySubjects) return false;
-        VictoryState v = _victory.Value;
-        if (!v.Active) return false;
-        BossVictoryRules.Composition comp = BossVictoryRules.Compose(_devVictorySubjects, cfg.ToFraming());
-        v.FinalPosition = comp.Final.Position;
-        v.FinalRotation = comp.Final.Rotation;
-        v.EndPosition = comp.EndPose.Position;
-        v.EndRotation = comp.EndPose.Rotation;
-        v.Fov = cfg.fov;
-        _victory.Value = v;
-        return true;
     }
 }
 #endif

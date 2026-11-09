@@ -308,9 +308,7 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         // 등장 시네마틱 로컬 표시(카메라·레터박스·비네팅·독백·스킵 UI·스킵 입력) — 모든 피어. 씬 무수정(런타임 부착).
         if (GetComponent<BossIntroPresentation>() == null)
             gameObject.AddComponent<BossIntroPresentation>();
-        // 보스 B 승리 연출 로컬 표시(PLAN-boss-victory-cinematic) — 모든 피어, 런타임 부착.
-        if (GetComponent<BossVictoryPresentation>() == null)
-            gameObject.AddComponent<BossVictoryPresentation>();
+        // 보스 처치 연출 표시는 ZZZ 글리치로 교체 중(PLAN-boss-victory-glitch) — 옛 BossVictoryPresentation 은 Legacy(연결 끊음).
 
         if (!IsServer)
             return;
