@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
+using VeyTrace.Rendering.Occlusion;
 
 /// <summary>
 /// 보스 처치 연출 — ZZZ 글리치(PLAN-boss-victory-glitch) 로컬 표시. <see cref="BossEncounterDirector"/> 가 런타임에 붙인다(모든 피어).
@@ -12,6 +14,8 @@ using UnityEngine;
 /// 그 클립 End 이벤트(이 피어 화면 기준, Q12)에서 처치자·보스 0.1 → <see cref="FinisherEnded"/>(글리치 시작).</para>
 /// <para><b>3단계</b> — End 순간부터 화면 글리치(<see cref="BossVictoryGlitchRender"/>, 세기 = 설정 SO 타임라인 곡선, 시계 <see cref="GlitchTime"/>) ·
 /// 플레이어 흑백·보스 노이즈(렌더링 레이어 비트) · HUD 숨김.</para>
+/// <para><b>4단계</b> — 글리치 시계로 카메라 컷(설정 SO 목록, <see cref="BossVictoryCameraCuts"/>): 첫 컷부터 연출 vcam(블렌드 없음) · 컷마다 그 순간 위치로 구도 고정 ·
+/// 연출 동안 월드 UI·윤곽선·벽 가림·카메라 흔들림 끔 · 카메라를 향하지 않는 벽 숨김.</para>
 /// </summary>
 [DefaultExecutionOrder(10001)]   // PlayerAttackSpeedAnimator(10000)가 Update 에서 쓰는 animator.speed 를 그 뒤에 덮는다
 [DisallowMultipleComponent]
@@ -60,6 +64,20 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     bool _hudHidden;
     CinematicOverlay _overlay;
     readonly List<Renderer> _tagged = new List<Renderer>();
+
+    // 4단계 — 카메라 컷
+    int _cutIndex = -1;
+    bool _cutSuppressed;
+    CinemachineExternalImpulseListener _impulseListener;
+    bool _impulseWasEnabled;
+    readonly List<Canvas> _hiddenWorldCanvases = new List<Canvas>();
+    readonly List<Renderer> _wallCandidates = new List<Renderer>();
+    readonly List<Vector3> _wallNormals = new List<Vector3>();
+    readonly List<Vector3> _wallCenters = new List<Vector3>();
+    readonly List<Renderer> _hiddenWalls = new List<Renderer>();
+
+    /// <summary>[이 피어] 지금 카메라 컷 번호(설정 목록 — 게임 카메라면 -1).</summary>
+    public int CutIndex => _cutIndex;
 
     /// <summary>[이 피어] 글리치 시작 뒤 초(글리치 전엔 -1). 컷·글자(4·5단계)가 같은 시계를 읽는다.</summary>
     public float GlitchTime => _glitchOn ? _glitchTime : -1f;
@@ -243,6 +261,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _glitchTime += Time.deltaTime;
         float t = Mathf.Min(_glitchTime, _settings.glitchDuration);
         BossVictoryGlitchSettings s = _settings;
+        TickCuts();
 
         bool hide = s.hudHide.Evaluate(t) > 0.5f;
         if (hide && !_hudHidden)
@@ -274,6 +293,158 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         };
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
         BossVictoryGlitchRender.SetFrame(frame);
+    }
+
+    // ── 카메라 컷(4단계) ───────────────────────────────────────────────────
+
+    // 컷 시계 = 글리치 시계(길이로 자르지 않는다 — 마지막 컷이 끝까지 유지). 구도는 컷이 바뀌는 순간 한 번 계산해 고정한다(흔들림 없음).
+    void TickCuts()
+    {
+        int index = BossVictoryCameraCuts.ActiveIndex(_settings.cuts, _glitchTime);
+        if (index == _cutIndex || index < 0) return;
+        _cutIndex = index;
+        BossVictoryCameraCuts.Cut cut = _settings.cuts[index];
+        BossVictoryCameraCuts.Subjects subjects = CutSubjects();
+        BossVictoryCameraCuts.Pose(cut, subjects, out Vector3 pos, out Quaternion rot);
+
+        _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
+        if (!_overlay.IsCameraActive)
+        {
+            if (!_overlay.EnterCamera(pos, rot, cut.fov, 0f))
+                Edit.LogWarning("[BossVictory] CameraTargetSwitcher 가 없어 컷 카메라를 못 켰다.", this);
+            SuppressForCuts(subjects);
+        }
+        else _overlay.PlaceCamera(pos, rot, cut.fov);
+        _overlay.SetDimFocus(BossVictoryCameraCuts.Focus(cut, subjects));
+        TickWalls(pos, rot * Vector3.forward);
+        Edit.Log($"[BossVictory] 컷 {index} {cut.kind} — t {_glitchTime:0.00}", this);
+    }
+
+    BossVictoryCameraCuts.Subjects CutSubjects()
+    {
+        var s = new BossVictoryCameraCuts.Subjects();
+        s.Killer = _killer != null ? _killer.transform.position : _state.HitPoint;
+        s.BossBase = _boss != null ? _boss.transform.position : _state.HitPoint;
+        s.BossCenter = s.BossBase + Vector3.up;
+        if (_boss != null && TryBossBounds(out Bounds b)) s.BossCenter = b.center;
+        return s;
+    }
+
+    bool TryBossBounds(out Bounds bounds)
+    {
+        bounds = default;
+        bool any = false;
+        foreach (Renderer r in _boss.GetComponentsInChildren<Renderer>())
+        {
+            if (r == null || !r.enabled || r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+            if (!any) { bounds = r.bounds; any = true; }
+            else bounds.Encapsulate(r.bounds);
+        }
+        return any;
+    }
+
+    // 컷 카메라에 들어갈 때 한 번 — 머리 위 UI·윤곽선·벽 가림·잔여 흔들림이 컷을 깬다(옛 연출과 같은 목록).
+    void SuppressForCuts(BossVictoryCameraCuts.Subjects subjects)
+    {
+        if (_cutSuppressed) return;
+        _cutSuppressed = true;
+        PlayerSilhouetteFeature.SuppressedByCinematic = true;
+        EnemyOutlineFeature.SuppressedByCinematic = true;
+        WallOcclusionDriver.SuppressedByCinematic = true;
+        WallTransparencyGroup.SuppressedByCinematic = true;
+
+        foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (c == null || !c.enabled || !c.isRootCanvas || c.renderMode != RenderMode.WorldSpace) continue;
+            c.enabled = false;
+            _hiddenWorldCanvases.Add(c);
+        }
+
+        Camera main = Camera.main;
+        _impulseListener = main != null ? main.GetComponent<CinemachineExternalImpulseListener>() : null;
+        if (_impulseListener != null)
+        {
+            _impulseWasEnabled = _impulseListener.enabled;
+            _impulseListener.enabled = false;
+        }
+
+        CollectWalls(Vector3.Lerp(subjects.Killer, subjects.BossBase, 0.5f));
+    }
+
+    // 벽 = Wall 레이어·Wall 태그, 또는 이름이 wall 로 시작하는 조상 아래(BossRoomAuthoring.LooksLikeWall 과 같은 기준).
+    static bool IsWall(Transform t, int wallLayer)
+    {
+        for (; t != null; t = t.parent)
+        {
+            GameObject go = t.gameObject;
+            if ((wallLayer >= 0 && go.layer == wallLayer) || go.CompareTag(GameLayers.Wall)) return true;
+            string n = t.name;
+            if (n.Length >= 4 && n.StartsWith("wall", StringComparison.OrdinalIgnoreCase) &&
+                n.IndexOf("walltransparency", StringComparison.OrdinalIgnoreCase) < 0)
+                return true;
+        }
+        return false;
+    }
+
+    void CollectWalls(Vector3 interior)
+    {
+        int wallLayer = LayerMask.NameToLayer(GameLayers.Wall);
+        float r2 = _settings.wallSearchRadius * _settings.wallSearchRadius;
+        foreach (Renderer r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        {
+            if (r == null || !r.enabled || r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+            if (_tagged.Contains(r)) continue;   // 인물·보스
+            Bounds b = r.bounds;
+            if (b.SqrDistance(interior) > r2) continue;
+            if (!IsWall(r.transform, wallLayer)) continue;
+            Vector3 n = BossVictoryCameraCuts.WallInwardNormal(b, interior);
+            if (n == Vector3.zero) continue;
+            _wallCandidates.Add(r);
+            _wallNormals.Add(n);
+            _wallCenters.Add(b.center);
+        }
+    }
+
+    // 지금 컷 카메라에서 앞면이 확실히 카메라를 향하지 않는 벽(뒷면·옆면)을 끈다 — 한 번 끄면 연출 끝까지.
+    void TickWalls(Vector3 camPos, Vector3 camForward)
+    {
+        for (int i = _wallCandidates.Count - 1; i >= 0; i--)
+        {
+            Renderer r = _wallCandidates[i];
+            bool remove = r == null;
+            if (!remove && BossVictoryCameraCuts.ShouldHideWall(_wallNormals[i], _wallCenters[i], camPos, camForward, _settings.wallFacingThreshold))
+            {
+                r.enabled = false;
+                _hiddenWalls.Add(r);
+                remove = true;
+            }
+            if (!remove) continue;
+            _wallCandidates.RemoveAt(i);
+            _wallNormals.RemoveAt(i);
+            _wallCenters.RemoveAt(i);
+        }
+    }
+
+    void RestoreCuts()
+    {
+        _cutIndex = -1;
+        for (int i = 0; i < _hiddenWalls.Count; i++)
+            if (_hiddenWalls[i] != null) _hiddenWalls[i].enabled = true;
+        _hiddenWalls.Clear();
+        _wallCandidates.Clear();
+        _wallNormals.Clear();
+        _wallCenters.Clear();
+        for (int i = 0; i < _hiddenWorldCanvases.Count; i++)
+            if (_hiddenWorldCanvases[i] != null) _hiddenWorldCanvases[i].enabled = true;
+        _hiddenWorldCanvases.Clear();
+        if (_impulseListener != null) _impulseListener.enabled = _impulseWasEnabled;
+        _impulseListener = null;
+        if (!_cutSuppressed) return;
+        _cutSuppressed = false;
+        PlayerSilhouetteFeature.SuppressedByCinematic = false;
+        EnemyOutlineFeature.SuppressedByCinematic = false;
+        WallOcclusionDriver.SuppressedByCinematic = false;
+        WallTransparencyGroup.SuppressedByCinematic = false;
     }
 
     // 보스 화면 위치·높이(뷰포트) — 노이즈 "보스 기준" 공간용. 못 구하면 화면 가운데·높이 1.
@@ -407,7 +578,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _glitchOn = false;
         BossVictoryGlitchRender.Untag(_tagged);
         if (_renderOn) { BossVictoryGlitchRender.Disable(); _renderOn = false; }
-        if (_hudHidden) { _overlay?.RestoreHud(); _hudHidden = false; }
+        _hudHidden = false;
+        RestoreCuts();
+        _overlay?.Dispose();   // HUD 복구 · 컷 카메라 나감(블렌드 없음) · 디밍 기준점 복구
+        _overlay = null;
 
         _killer = null;
         _killerSkills = null;

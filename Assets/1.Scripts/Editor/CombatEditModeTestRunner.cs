@@ -47,7 +47,8 @@ internal static class CombatEditModeTestRunner
         "^MonsterStatusEffectVfx", // MonsterStatusEffectVfxSetTests — 몬스터 머리 위 기절 이펙트 표(팔라딘 Q 경직)
         "^BossVictoryRules", // BossVictoryRulesTests(Legacy) — 옛 보스 B 승리 연출 타임라인·곡선·구도(PLAN-boss-victory-cinematic)
         "^BossVictoryLab", // BossVictoryLabRulesTests — 처치 연출 반복 디버그 랩 배치·씬 격리(할 일 244)
-        "^BossVictoryFinisher" // BossVictoryFinisherTests — 처치 연출 스킬 클립 End 이벤트(PLAN-boss-victory-glitch Q9)
+        "^BossVictoryFinisher", // BossVictoryFinisherTests — 처치 연출 스킬 클립 End 이벤트(PLAN-boss-victory-glitch Q9)
+        "^BossVictoryCameraCut" // BossVictoryCameraCutTests — 처치 연출 카메라 컷 고르기·구도(PLAN-boss-victory-glitch 4단계)
     };
 
     const string Tag = "[CombatTests]";
