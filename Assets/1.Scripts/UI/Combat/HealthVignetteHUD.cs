@@ -9,7 +9,10 @@ using UnityEngine.UI;
 /// - 피격(ClientDamagedAmount, amount>0) 순간 짧게 번쩍인다 — 시작 비율 이상이면 흰색, 아래일수록 붉게.
 /// - 사망·Soul·관전(Alive 가 아닌 모든 상태)에선 색에 검은색을 곱해 서서히 검게 바꾸고, 맥동·피격 플래시는 끈다.
 /// 계산은 <see cref="HealthVignetteModel"/>. 카메라의 URP HP 비네트(<see cref="CameraFeedback"/>)와는 별개다.
+/// 에디터 미리보기: Play 가 아닐 때 "에디터 미리보기" 를 켜면 저장 안 되는 자식으로 체력 비율·플래시 시점 슬라이더 값의 모습을 그린다
+/// (<see cref="VignetteEditorPreview"/>, 맥동 없음). 실제 Image·재질은 건드리지 않고, Play·빌드에선 미리보기 칸을 무시한다.
 /// </summary>
+[ExecuteAlways]
 public class HealthVignetteHUD : MonoBehaviour
 {
     [SerializeField] private Image image;
@@ -63,6 +66,17 @@ public class HealthVignetteHUD : MonoBehaviour
     [Tooltip("최종 알파가 이 값 이하이면 이미지를 꺼서 전체 화면 투명 드로우를 생략한다.")]
     [SerializeField, Range(0f, 0.1f)] private float visibleAlphaThreshold = 0.001f;
 
+    // 빌드에선 읽는 곳이 없다(에디터 전용 미리보기) — 직렬화 배치를 에디터·빌드 같게 두려고 #if 밖에 둔다.
+#pragma warning disable 0414, 0169
+    [Header("에디터 미리보기(Play·빌드에선 무시)")]
+    [Tooltip("켜면 Play 없이 Prefab Mode·씬뷰·게임뷰에서 아래 체력 비율·플래시 시점의 모습을 보여 준다(저장 안 되는 임시 자식, 맥동 없음). 실제 Image·재질 값은 바뀌지 않는다.")]
+    [SerializeField] private bool editorPreview;
+    [Tooltip("미리보기 체력 비율(1 = 만피 — 시작 비율 위면 평상시 비네팅 없음).")]
+    [SerializeField, Range(0f, 1f)] private float editorPreviewHealthRatio = 0.3f;
+    [Tooltip("미리보기 피격 플래시 시점 = Flash Curve 가로축(0 = 맞은 순간, 1 = 플래시 끝 — 플래시 없음).")]
+    [SerializeField, Range(0f, 1f)] private float editorPreviewFlashTime = 1f;
+#pragma warning restore 0414, 0169
+
     private Player player;
     private PlayerLifeCycleController lifeCycle;
 
@@ -96,6 +110,12 @@ public class HealthVignetteHUD : MonoBehaviour
 
     private void Awake()
     {
+        if (!Application.isPlaying)
+            return;   // [ExecuteAlways] — 에디터에선 실제 Image 를 건드리지 않는다(미리보기는 별도 자식)
+#if UNITY_EDITOR
+        VignetteEditorPreview.Clear(transform);   // 씬 리로드 없이 Play 에 들어와 남은 미리보기 자식
+#endif
+
         if (image == null)
             image = GetComponent<Image>();
 
@@ -127,15 +147,28 @@ public class HealthVignetteHUD : MonoBehaviour
             return;
 
         VignetteSpriteFactory.ApplySettings(innerRadius, outerRadius, out float inner, out float outer);
-        materialInstance.SetVector(VignetteShapeId, new Vector4(inner, outer, cornerSquareness, edgeStrength));
+        WriteShape(materialInstance, rectTransform, inner, outer);
+    }
 
-        Rect rect = rectTransform != null ? rectTransform.rect : default;
-        float aspect = rect.height > 0f ? rect.width / rect.height : 16f / 9f;
-        materialInstance.SetVector(VignetteAspectId, new Vector4(aspect, aspectCorrection, 0f, 0f));
+    // 모양 칸 → 셰이더 값(런타임 인스턴스·에디터 미리보기 인스턴스 공용).
+    private void WriteShape(Material material, RectTransform rect, float inner, float outer)
+    {
+        material.SetVector(VignetteShapeId, new Vector4(inner, outer, cornerSquareness, edgeStrength));
+
+        Rect r = rect != null ? rect.rect : default;
+        float aspect = r.height > 0f ? r.width / r.height : 16f / 9f;
+        material.SetVector(VignetteAspectId, new Vector4(aspect, aspectCorrection, 0f, 0f));
     }
 
     private void OnEnable()
     {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            RefreshPreview();
+            return;
+        }
+#endif
         if (player == null)
             return;
 
@@ -146,6 +179,10 @@ public class HealthVignetteHUD : MonoBehaviour
 
     private void OnDisable()
     {
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+            ClearPreview();
+#endif
         if (player != null)
             player.ClientDamagedAmount -= HandleDamaged;
     }
@@ -165,6 +202,9 @@ public class HealthVignetteHUD : MonoBehaviour
 
     private void Update()
     {
+        if (!Application.isPlaying)
+            return;
+
         // 게임 시간으로 돈다 — 인터럽트 슬로우(전역 timeScale) 동안 비네팅 연출도 같이 느려진다(PLAN-interrupt-slowmo D9).
         Apply(Time.deltaTime);
     }
@@ -211,6 +251,64 @@ public class HealthVignetteHUD : MonoBehaviour
             ApplyShape();   // 보일 때만 — 설정창 크기/경계·인스펙터 모양 값이 바로 반영된다
         }
     }
+
+#if UNITY_EDITOR
+    // ── 에디터 미리보기 ── 저장 안 되는 자식 1장(+ 저장 안 되는 재질 인스턴스)에 평상시 비네팅(맥동 없음) + 그 시점의 플래시를
+    // Play 와 같은 합성·같은 셰이더로 그린다. 반경은 저작값 그대로(설정창 크기/경계 배율은 Play 에서만).
+    private const string PreviewName = "__Preview_HealthVignette";
+    private Material previewMaterial;
+
+    private void OnValidate()
+    {
+        if (!Application.isPlaying)
+            VignetteEditorPreview.Defer(this, RefreshPreview);
+    }
+
+    // 크기가 바뀌면(게임뷰 해상도 등) 화면비 값을 다시 넣는다.
+    private void OnRectTransformDimensionsChange()
+    {
+        if (!Application.isPlaying && editorPreview)
+            VignetteEditorPreview.Defer(this, RefreshPreview);
+    }
+
+    private void RefreshPreview()
+    {
+        if (!isActiveAndEnabled || !editorPreview || vignetteMaterial == null)
+        {
+            ClearPreview();
+            return;
+        }
+
+        if (previewMaterial == null || previewMaterial.shader != vignetteMaterial.shader)
+        {
+            if (previewMaterial != null)
+                DestroyImmediate(previewMaterial);
+            previewMaterial = new Material(vignetteMaterial) { name = vignetteMaterial.name + " (Preview)", hideFlags = HideFlags.DontSave };
+        }
+
+        float ratio = editorPreviewHealthRatio;
+        float severity = HealthVignetteModel.Severity(ratio, startRatio);
+        float vignetteAlpha = HealthVignetteModel.VignetteAlpha(severity, maxAlpha, 0f, 0f);
+        float previewFlashAlpha = HealthVignetteModel.FlashAlpha(editorPreviewFlashTime * flashDuration, flashDuration, flashAlpha, flashCurve);
+        Color previewFlashColor = HealthVignetteModel.FlashColor(ratio, startRatio, flashSafeColor, flashDangerColor);
+
+        Image preview = VignetteEditorPreview.Ensure<Image>(transform, PreviewName);
+        preview.sprite = null;
+        preview.material = previewMaterial;
+        preview.color = HealthVignetteModel.Compose(vignetteColor, vignetteAlpha, previewFlashColor, previewFlashAlpha, 0f);
+        WriteShape(previewMaterial, preview.rectTransform, Mathf.Min(innerRadius, VignetteSpriteFactory.MaxInnerRadius), outerRadius);
+    }
+
+    private void ClearPreview()
+    {
+        VignetteEditorPreview.Clear(transform);
+        if (previewMaterial != null)
+        {
+            DestroyImmediate(previewMaterial);
+            previewMaterial = null;
+        }
+    }
+#endif
 
     private bool IsAlive()
     {
