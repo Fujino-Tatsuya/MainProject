@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using BaseNetCode;
 using Unity.Netcode;
@@ -11,7 +10,7 @@ using UnityEngine.AI;
 ///
 /// <list type="number">
 /// <item><b>장판</b>(<see cref="zoneEffect"/>, 루프): 레이저를 따라다닌다. 배율 = 반경 × 2(지름 1유닛 저작).
-///       레이저가 사라지면 <see cref="zoneOutroSeconds"/> 동안 줄어들며 퇴장한다.</item>
+///       레이저가 사라지면 해제(<see cref="EffectManager.Release"/>)한다 — 퇴장 모습은 장판 엔트리의 outro 설정을 따른다.</item>
 /// <item><b>대상별 조준</b>(<see cref="lockEffect"/>, 루프): 범위 안 적마다 하나 붙어 따라다닌다.
 ///       각 피어가 매 프레임 직접 찾는다(새로 들어온 적도 다음 발사 전에 예고가 뜬다).
 ///       원 진행도 = 마지막 피해 이후 시간 ÷ 피해 간격 → <see cref="TelegraphRing.SetProgress"/>. 0 이 되는 순간이 피해 순간이다.</item>
@@ -23,7 +22,7 @@ using UnityEngine.AI;
 /// 조준 표식은 예고일 뿐이라 각 피어 계산으로 충분하다.
 ///
 /// <b>왜 장판을 추종(follow)으로 걸지 않나.</b> <see cref="EffectManager"/> 는 추종 대상이 파괴되는 즉시 회수한다 —
-/// 디스폰과 함께 장판이 뚝 끊긴다. 그래서 위치 고정으로 띄우고 매 프레임 직접 옮기다가, 디스폰 때 떼어 내 줄인다.
+/// 디스폰과 함께 장판이 뚝 끊긴다. 그래서 위치 고정으로 띄우고 매 프레임 직접 옮기다가, 디스폰 때 해제한다.
 ///
 /// 반경·간격·적 레이어는 서버가 <see cref="ServerConfigure"/> 로 NetworkVariable 에 써 둔다 — 늦게 들어온 클라도 맞다.
 /// 네트워크 없이(테스트 씬) 돌면 같은 값을 로컬에 들고 같은 연출을 낸다.
@@ -38,10 +37,6 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
     [SerializeField] private EffectEntry lockEffect;
     [Tooltip("위성 레이저 + 땅 파문(원샷). FX_GunnerUlt_Strike_Entry")]
     [SerializeField] private EffectEntry strikeEffect;
-
-    [Header("장판")]
-    [Tooltip("레이저가 사라질 때 장판이 줄어드는 시간(초)")]
-    [SerializeField, Min(0f)] private float zoneOutroSeconds = 0.3f;
 
     [Header("조준 표식 크기")]
     [Tooltip("배율 = 대상 몸 반경 × 이 값(아래 상·하한)")]
@@ -340,7 +335,10 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
         return Mathf.Clamp(radius * lockScalePerRadius, lockScaleMin, lockScaleMax);
     }
 
-    /// <summary>표식은 바로 거두고, 장판은 떼어 내 줄이다가 반납한다. 여러 번 불려도 한 번만 한다.</summary>
+    /// <summary>
+    /// 표식과 장판을 해제한다(장판은 위치 고정 재생이라 레이저가 파괴돼도 엔트리 outro 설정대로 퇴장한다).
+    /// 여러 번 불려도 한 번만 한다.
+    /// </summary>
     private void TearDown()
     {
         if (tornDown) return;
@@ -353,31 +351,7 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
         locks.Clear();
 
         if (!zone.IsSet) return;
-        if (zoneOutroSeconds > 0f && effects.isActiveAndEnabled)
-            effects.StartCoroutine(ShrinkThenRecycle(effects, zone, zoneOutroSeconds));
-        else
-            effects.ReleaseImmediate(zone);
+        effects.Release(zone);
         zone = EffectHandle.None;
-    }
-
-    // 이 레이저는 곧 파괴되므로 EffectManager 위에서 돈다. 매 프레임 핸들이 아직 살아 있는지 확인한다 —
-    // 그 사이 다른 경로로 회수돼 재대출된 인스턴스를 줄이면 안 된다.
-    private static IEnumerator ShrinkThenRecycle(EffectManager effects, EffectHandle handle, float seconds)
-    {
-        var buffer = new List<GameObject>();
-        if (effects.GetInstances(handle, buffer) == 0) yield break;
-
-        var from = new Vector3[buffer.Count];
-        for (int i = 0; i < buffer.Count; i++) from[i] = buffer[i].transform.localScale;
-
-        for (float t = 0f; t < seconds; t += Time.deltaTime)
-        {
-            if (effects.GetInstances(handle, buffer) != from.Length) yield break;
-            float k = 1f - t / seconds;
-            for (int i = 0; i < buffer.Count; i++) buffer[i].transform.localScale = from[i] * k;
-            yield return null;
-        }
-
-        effects.ReleaseImmediate(handle);
     }
 }

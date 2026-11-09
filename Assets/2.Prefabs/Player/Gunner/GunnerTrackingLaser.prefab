@@ -79,7 +79,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4090968237
+  GlobalObjectIdHash: 453348781
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -168,7 +168,6 @@ MonoBehaviour:
   zoneEffect: {fileID: 11400000, guid: 60e49b7edb0b496495a0742bdb1a8414, type: 2}
   lockEffect: {fileID: 11400000, guid: e271ef022f104452a88fe7e53e7dccc1, type: 2}
   strikeEffect: {fileID: 11400000, guid: cf886c3930344214963ed0f67ae4900d, type: 2}
-  zoneOutroSeconds: 0.3
   lockScalePerRadius: 2
   lockScaleMin: 0.8
   lockScaleMax: 3
@@ -179,15 +178,7 @@ MonoBehaviour:
   - material: {fileID: 2100000, guid: 9871abe7fa290fb489b97165f9016101, type: 2}
     property: _TintColor
     channel: 0
-    multiplier: 0.4
-  - material: {fileID: 2100000, guid: 0000f6afd2e29ae4284c42957fcb510f, type: 2}
-    property: _Color
-    channel: 1
     multiplier: 0.2
-  - material: {fileID: 2100000, guid: 0000f6afd2e29ae4284c42957fcb510f, type: 2}
-    property: _Opacity
-    channel: 0
-    multiplier: 0.1
   - material: {fileID: 2100000, guid: bcb990f6ea85b644e98f1f80dd07fb17, type: 2}
     property: "_TintColor\t"
     channel: 0
