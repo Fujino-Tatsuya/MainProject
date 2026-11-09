@@ -42,13 +42,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void OnEnable()
     {
         if (_settings == null) _settings = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(DefaultAssetPath);
-        Undo.undoRedoPerformed += Repaint;
+        Undo.undoRedoPerformed += OnUndoRedo;
         wantsMouseMove = false;
     }
 
     void OnDisable()
     {
-        Undo.undoRedoPerformed -= Repaint;
+        Undo.undoRedoPerformed -= OnUndoRedo;
     }
 
     BossVictoryTimeline Timeline => _settings != null ? _settings.timeline : null;
@@ -330,9 +330,61 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         EditorGUI.DrawRect(new Rect(xOut - HandleSize * 0.5f, r.y, HandleSize, HandleSize), Color.white);
     }
 
+    // 편집 한 번 = Undo 한 단계(새 묶음). 끌기는 시작~끝을 한 묶음(BeginDragUndo·RecordDrag·EndDragUndo).
     void Record(string label)
     {
+        Undo.IncrementCurrentGroup();
+        Undo.SetCurrentGroupName(label);
         Undo.RecordObject(_settings, label);
+    }
+
+    // 수치 칸 — 칸을 고치는 동안(슬라이더 끌기 포함)은 Unity 가 이벤트마다 묶음을 나눈다. 새 묶음을 억지로 만들지 않는다.
+    void RecordField(string label)
+    {
+        Undo.RecordObject(_settings, label);
+    }
+
+    int _dragUndoGroup = -1;
+
+    void RecordDrag()
+    {
+        if (_dragUndoGroup < 0)
+        {
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName("처치 연출 타임라인 끌기");
+            _dragUndoGroup = Undo.GetCurrentGroup();
+        }
+        Undo.RecordObject(_settings, "처치 연출 타임라인 끌기");
+    }
+
+    void EndDragUndo()
+    {
+        if (_dragUndoGroup >= 0) Undo.CollapseUndoOperations(_dragUndoGroup);
+        _dragUndoGroup = -1;
+    }
+
+    // Ctrl+Z / Ctrl+Y · Ctrl+Shift+Z — 창에 포커스가 있고 수치 칸 입력 중이 아닐 때(입력 중이면 칸이 글자 되돌리기를 쓴다).
+    static bool TryUndoRedoKey(Event e)
+    {
+        if (e.type != EventType.KeyDown || !(e.control || e.command) || GUIUtility.keyboardControl != 0) return false;
+        if (e.keyCode == KeyCode.Z && !e.shift) Undo.PerformUndo();
+        else if (e.keyCode == KeyCode.Y || (e.keyCode == KeyCode.Z && e.shift)) Undo.PerformRedo();
+        else return false;
+        return true;
+    }
+
+    // 되돌리기/다시 하기 뒤 — 선택 범위 보정 · 저장 · 다시 그림 · Play 중이면 연출이 바로 새 값으로 다시 평가되게 한 프레임 돌림.
+    void OnUndoRedo()
+    {
+        if (_settings == null) return;
+        if (_selTrack >= 0 && !HasClipSelection) Select(-1, -1, -1);
+        if (_selMarker >= BossVictoryTimeline.Markers.Length) Select(-1, -1, -1);
+        _drag = DragMode.None;
+        _dragRecorded = false;
+        _dragUndoGroup = -1;
+        Save();
+        if (EditorApplication.isPlaying) EditorApplication.QueuePlayerLoopUpdate();
+        Repaint();
     }
 
     // SO 에 바로 저장(Play 끝나도 유지 — Q5).
@@ -345,6 +397,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void HandleEdit(Rect lanes, Rect ruler)
     {
         Event e = Event.current;
+        if (TryUndoRedoKey(e))
+        {
+            e.Use();
+            return;
+        }
         switch (e.type)
         {
             case EventType.MouseDown when e.button == 0:
@@ -366,6 +423,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case EventType.MouseUp when e.button == 0 && _drag != DragMode.None:
                 if (_dragRecorded) Save();
+                EndDragUndo();
                 _drag = DragMode.None;
                 _dragRecorded = false;
                 e.Use();
@@ -467,11 +525,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             SetPlayhead(mt);
             return;
         }
-        if (!_dragRecorded)
-        {
-            Record("처치 연출 타임라인 끌기");
-            _dragRecorded = true;
-        }
+        RecordDrag();   // 매 끌기 이벤트 기록 — 손을 떼면 한 묶음으로 합친다
+        _dragRecorded = true;
         if (_drag == DragMode.Marker)
         {
             Timeline.SetMarkerTime((BossVictoryMarker)_selMarker, Snap(mt));
@@ -664,7 +719,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         using (new EditorGUILayout.HorizontalScope())
         {
             _snap = EditorGUILayout.ToggleLeft("0.01초 스냅", _snap, GUILayout.Width(100f));
-            GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V/D", EditorStyles.miniLabel);
+            GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V/D · Ctrl+Z 되돌리기 · Ctrl+Y·Ctrl+Shift+Z 다시 하기", EditorStyles.miniLabel);
         }
         if (_selMarker >= 0)
         {
@@ -674,7 +729,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             float time = EditorGUILayout.FloatField("시각(초)", Timeline.MarkerTime(marker));
             if (EditorGUI.EndChangeCheck())
             {
-                Record("처치 연출 타임라인 마커 수치");
+                RecordField("처치 연출 타임라인 마커 수치");
                 Timeline.SetMarkerTime(marker, time);
                 Save();
             }
@@ -700,7 +755,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
         if (EditorGUI.EndChangeCheck())
         {
-            Record("처치 연출 타임라인 클립 수치");
+            RecordField("처치 연출 타임라인 클립 수치");
             Timeline.Clips(track)[_selIndex] = Clamp(c);
             Save();
         }
