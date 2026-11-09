@@ -95,7 +95,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             _pixelsPerSecond = GUILayout.HorizontalSlider(_pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond, GUILayout.Width(140f));
             if (GUILayout.Button("전체 보기", EditorStyles.toolbarButton, GUILayout.Width(64f))) FitAll();
             GUILayout.FlexibleSpace();
-            GUILayout.Label($"재생 헤드 {_playhead:0.00}초", EditorStyles.miniLabel);
+            DrawPreviewControls();
+            GUILayout.Label($"재생 헤드 {_playhead:0.00}초", EditorStyles.miniLabel, GUILayout.Width(90f));
         }
     }
 
@@ -614,7 +615,47 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void SetPlayhead(float t)
     {
         _playhead = Mathf.Max(0f, Snap(t));
+        PreviewScrub();
         Repaint();
+    }
+
+    // ── 스크럽 미리보기(Q5 — Play 중 디버그 씬) ───────────────────────────
+    // 재생 헤드를 끌면 랩 일시정지(Time.timeScale 0) + 연출 시계를 그 시각으로 → 그 시각 화면으로 고정. ▶ = 이어서 재생 · ⏮ = 랩 처음부터(F7).
+    // 움직이는 것 = 타임라인이 정하는 것(화면 효과·HUD·마커·TV 꺼짐). 처치자 순서·애니 배율은 애니 이벤트라 대상 아님.
+
+    static bool PreviewAvailable => EditorApplication.isPlaying && DebugBossVictoryLab.Instance != null;
+
+    void Update()
+    {
+        if (!EditorApplication.isPlaying) return;
+        BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
+        if (p != null && _drag != DragMode.Playhead && p.GlitchTime >= 0f) _playhead = p.GlitchTime;
+        Repaint();
+    }
+
+    void DrawPreviewControls()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            GUILayout.Label("미리보기 = Play 중 디버그 씬(DebugBossVictory)", EditorStyles.miniLabel);
+            return;
+        }
+        DebugBossVictoryLab lab = DebugBossVictoryLab.Instance;
+        using (new EditorGUI.DisabledScope(lab == null))
+        {
+            if (GUILayout.Button("⏮ 처음부터", EditorStyles.toolbarButton, GUILayout.Width(72f))) lab.Replay();
+            bool paused = lab != null && lab.Paused;
+            if (GUILayout.Button(paused ? "▶ 재생" : "❚❚ 일시정지", EditorStyles.toolbarButton, GUILayout.Width(72f))) lab.Paused = !paused;
+        }
+        if (lab == null) GUILayout.Label("랩 없음 — 디버그 씬에서 Play", EditorStyles.miniLabel);
+    }
+
+    void PreviewScrub()
+    {
+        if (!PreviewAvailable) return;
+        BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
+        if (p == null || !p.PreviewSeek(_playhead)) return;
+        DebugBossVictoryLab.Instance.Paused = true;
     }
 
     // 선택 클립·마커 수치 직접 입력

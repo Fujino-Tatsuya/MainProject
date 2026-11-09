@@ -16,7 +16,8 @@ using UnityEngine;
 /// <list type="bullet">
 /// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · 패널 = 자동 반복·배속·막타 각도/거리/방향·팀원 수.</item>
 /// <item>처치 연출 = ZZZ 글리치(PLAN-boss-victory-glitch — 처치 판정 즉시 글리치·처치자 하던 동작 ×0.5 → 백대쉬 → 처치 연출 스킬 → 유지 → CRT 꺼짐). 옛 카메라 무빙·프리셋·슬라이더·주황·회색 원은 Legacy(연결 끊음).</item>
-/// <item>끝 = 호스트 화면 CRT 꺼짐이 끝나 결과 전환 순간 → 랩이 차단하고 원상복구 → 처음부터. 패널은 재생 중 접힌다(CRT 꺼짐 캡처에 안 찍히게 — "패널 숨김" 끄면 계속 보임).</item>
+/// <item>타임라인 창(<c>Tools/Boss Victory/처치 연출 타임라인</c>) — 재생 헤드를 끌면 일시정지 + 그 시각 화면 고정, ▶·⏮(= F7). 고친 클립·마커는 SO 에 바로 저장.</item>
+/// <item>끝 = 호스트 화면이 타임라인 로비 전환 마커(기본 = CRT 꺼짐 끝)를 지나 결과 전환 순간 → 랩이 차단하고 원상복구 → 처음부터. 패널은 재생 중 접힌다(CRT 꺼짐 캡처에 안 찍히게 — "패널 숨김" 끄면 계속 보임).</item>
 /// <item>배속은 Time.timeScale 만 바꾼다 — 새 연출은 각 피어 로컬 게임 시간·애니 이벤트로 흐른다.</item>
 /// <item>호스트 1인 전용. 게이트 = <c>UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS</c>.</item>
 /// </list>
@@ -84,6 +85,16 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     int _playedSequence = -1;
     float _speed = 1f;
     bool _paused;
+
+    /// <summary>씬의 랩(타임라인 창 미리보기가 쓴다 — 처음부터·일시정지).</summary>
+    public static DebugBossVictoryLab Instance { get; private set; }
+
+    /// <summary>일시정지(F8 과 같음 — 연출 중 Time.timeScale 0).</summary>
+    public bool Paused
+    {
+        get => _paused;
+        set => _paused = value;
+    }
     bool _ownsTimeScale;
     float _endedAt = -1f;
     float _startedAt = -1f;
@@ -93,6 +104,8 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
     // ── 수명 ────────────────────────────────────────────────────────────────
 
+    void Awake() => Instance = this;
+
     void Start()
     {
         BuildRoom();   // 플레이어 스폰 전에 바닥이 있어야 한다
@@ -101,6 +114,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         BossEncounterDirector.DevHoldVictoryResult = false;
         ClearMates();
         if (_ownsTimeScale) Time.timeScale = 1f;
@@ -176,7 +190,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     // ── 한 바퀴 ─────────────────────────────────────────────────────────────
 
     /// <summary>처음부터 다시.</summary>
-    void Replay()
+    public void Replay()
     {
         if (_director == null || !_director.IsSpawned) return;
         if (_cycle != null) StopCoroutine(_cycle);

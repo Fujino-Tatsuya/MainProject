@@ -132,6 +132,17 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     public Phase CurrentPhase => _phase;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+    /// <summary>[이 피어] 타임라인 창 스크럽 미리보기 — 글리치 시계를 t 로 옮긴다(다음 Update 에 화면 효과·HUD·마커·TV 꺼짐을 t 상태로 맞춘다).
+    /// 처치자 순서·애니 배율은 애니 이벤트로 흘러 옮기지 않는다. 연출 중이 아니면 false.</summary>
+    public bool PreviewSeek(float t)
+    {
+        if (!_running || !_glitchOn) return false;
+        _glitchTime = Mathf.Max(0f, t);
+        return true;
+    }
+#endif
+
     /// <summary>[이 피어] 보스 시간 배율 — 서버(호스트)의 사망 표현 대기도 이 값으로 흐른다(<see cref="BossEncounterDirector.VictoryDeathTimeScaleFor"/>).</summary>
     public float BossTimeScale => _phase switch
     {
