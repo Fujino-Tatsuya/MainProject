@@ -135,7 +135,12 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
         // 한계 돌파 과열 색(2026-11-03 민경) — 스폰 전에 써서 스폰 메시지에 같이 실린다(첫 피해·낙뢰가 스폰과 같은 프레임이라).
         GunnerTrackingLaserView laserView = instance.GetComponent<GunnerTrackingLaserView>();
         if (laserView != null)
+        {
             laserView.ServerSetOverdriveStage(pendingOverdriveStage);
+            // 다른 클라 화면 알파(2026-11-06 민경) — 시전자 본인 화면만 원래대로. 같은 이유로 스폰 전에 쓴다. 연출 전용.
+            if (owner.IsSpawned)
+                laserView.ServerSetCaster(owner.OwnerClientId);
+        }
 
         if (owner.IsSpawned)
             networkObject.Spawn(true); // destroyWithScene — 씬 전환 시 함께 제거(§9.6)

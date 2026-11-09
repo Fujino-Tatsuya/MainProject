@@ -162,6 +162,9 @@ public static class TraitLabAttackShapes
             float length = player.TryGetComponent(out GunnerBeamAttack beam)
                 ? beam.CastLength(origin, facing, data.Range, radius, data.BlockingLayers)
                 : data.Range;
+            // CastLength = 접촉 거리(구 표면이 벽에 닿은 곳). 캡슐은 구가 쓸고 간 부피라 벽에 막혔으면 끝 구 중심 = 접촉 − 반경.
+            if (length < data.Range - 0.01f)
+                length = Mathf.Max(0f, length - radius);
             shapes.Add(TraitLabGizmoShape.Capsule(B, $"평타 레이저 {length:0.#}m", origin, origin + facing * length, radius));
 
             if (traitEffects != null &&

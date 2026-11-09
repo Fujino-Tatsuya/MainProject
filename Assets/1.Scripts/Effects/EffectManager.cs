@@ -63,36 +63,11 @@ public class EffectManager : MonoBehaviour
         return true;
     }
 
-    // 피격 이펙트 디버그 오버라이드. null = 해제(각 대상의 원래 hitVFXType을 쓴다).
-    //
-    // ⚠️ EffectCatalog(ScriptableObject)가 아니라 여기에 둔다. SO는 씬 오브젝트와 달리 플레이 모드
-    // 중의 변경이 에셋에 그대로 눌러앉는다 — 플레이를 멈춰도 안 돌아오고, .asset 변경으로 git에
-    // 잡히고, 최악은 그대로 커밋돼 팀 전체의 기본 피격 이펙트가 바뀐다. 씬 오브젝트인 이 매니저의
-    // 런타임 필드는 플레이 종료와 함께 확실히 사라진다.
-    //
-    // 쓰는 쪽은 개발 빌드 전용 HUD(HitVFXDebugHUD) 하나뿐이다 — 릴리스 빌드엔 그 클래스가 아예
-    // 없으므로 이 필드는 항상 null로 남는다. 프로덕션 코드는 GetHitEffect로 읽기만 한다.
-    private EffectCatalog.HitVFXType? _hitVFXOverride;
-
     /// <summary>
-    /// 피격 이펙트 디버그 오버라이드(개발 빌드 전용 HUD가 쓴다). null을 넣으면 해제된다.
+    /// 피격 이펙트 — 일반 몹·보스 공통 하나(<see cref="EffectCatalog.HitEffect"/>, 2026-11-06).
+    /// 예전의 몹별 슬롯(hitVFXType)과 F1 런타임 교체 오버라이드는 삭제했다.
     /// </summary>
-    public EffectCatalog.HitVFXType? HitVFXOverride
-    {
-        get => _hitVFXOverride;
-        set => _hitVFXOverride = value;
-    }
-
-    /// <summary>
-    /// 피격 이펙트 조회. 오버라이드가 걸려 있으면 그것을, 없으면 인자로 받은 종류를 돌려준다.
-    ///
-    /// 피격 시점마다 부른다(호출부에서 캐시 금지) — 그래야 런타임 교체가 다음 피격부터 바로 반영된다.
-    /// </summary>
-    public EffectEntry GetHitEffect(EffectCatalog.HitVFXType hitVFXType)
-    {
-        if (catalog == null) return null;
-        return catalog.GetHitEffect(_hitVFXOverride ?? hitVFXType);
-    }
+    public EffectEntry HitEffect => catalog != null ? catalog.HitEffect : null;
 
     [Header("피격 타격점 계산 방식")]
     [Tooltip("전 유닛 공통. 예전에는 몬스터 프리팹마다 들고 있었지만 9개가 전부 같은 값이라 " +
@@ -100,11 +75,11 @@ public class EffectManager : MonoBehaviour
     [SerializeField] private EffectHitPoint.HitPointMode hitPointMode = EffectHitPoint.HitPointMode.ColliderHit;
 
     /// <summary>
-    /// 타격점 계산 방식(전 유닛 공통). <see cref="_hitVFXOverride"/>와 달리 "해제" 상태가 없다 —
+    /// 타격점 계산 방식(전 유닛 공통). "해제" 상태가 없다 —
     /// 프리팹이 각자 들고 있던 값을 여기로 올렸으므로 이 값 자체가 진실이다.
     ///
     /// 이 매니저는 <b>씬 오브젝트</b>라 런타임 변경이 플레이 종료와 함께 사라진다.
-    /// (ScriptableObject였다면 에셋에 눌러앉아 커밋됐을 것이다 — 오버라이드를 카탈로그에 두지 않은 이유와 같다.)
+    /// (ScriptableObject였다면 Play 중 변경이 에셋에 눌러앉아 커밋됐을 것이다 — 그래서 카탈로그에 두지 않는다.)
     /// </summary>
     public EffectHitPoint.HitPointMode HitPointMode
     {
@@ -383,7 +358,29 @@ public class EffectManager : MonoBehaviour
 
         active.tint = tint;
         for (int i = 0; i < active.instances.Count; i++)
-            EffectRecolor.Apply(active.instances[i].go, tint);
+        {
+            GameObject go = active.instances[i].go;
+            // 색 지정은 렌더러의 원래 머티리얼 색을 처음 칠할 때 기억한다 — 알파 복사본이 꽂혀 있으면 잠깐 원래로 돌려 칠하고 다시 건다.
+            if (active.alphaRules != null) EffectMaterialAlpha.Apply(go, null);
+            EffectRecolor.Apply(go, tint);
+            if (active.alphaRules != null) EffectMaterialAlpha.Apply(go, active.alphaRules);
+        }
+    }
+
+    /// <summary>
+    /// <b>머티리얼 알파 재생</b> — 규칙의 머티리얼을 쓰는 렌더러 슬롯을 알파를 곱한 복사본으로 바꾼다(2026-11-06 민경, 거너 R 다른 클라 화면).
+    /// 이미 나온 파트는 지금, 이후 터지는 파트(delay·outro)도 같은 규칙으로 나온다. null·빈 목록이면 원래 머티리얼로 되돌린다.
+    /// 반납 때 원래 머티리얼로 자동 복구된다(풀 오염 없음). 색 지정(<see cref="SetTint"/>)과 함께 써도 서로 덮어쓰지 않는다
+    /// (색 = 파티클 색·블록, 알파 = 머티리얼). 규칙 목록은 참조로 들고 있으므로 재생 중에 바꾸지 말 것.
+    /// 핸들이 필요하다 — 원샷도 <see cref="PlayRecallable"/> 로 재생한다. 반납된 핸들이면 조용한 no-op.
+    /// </summary>
+    public void SetMaterialAlpha(EffectHandle handle, IReadOnlyList<EffectMaterialAlphaRule> rules)
+    {
+        if (!TryResolve(handle, out ActiveEffect active)) return;
+
+        active.alphaRules = rules != null && rules.Count > 0 ? rules : null;
+        for (int i = 0; i < active.instances.Count; i++)
+            EffectMaterialAlpha.Apply(active.instances[i].go, active.alphaRules);
     }
 
     #endregion
@@ -620,6 +617,8 @@ public class EffectManager : MonoBehaviour
             instance.transform.SetPositionAndRotation(worldPosition, active.rotation);
             // 켜기 전에 칠한다 — 입자는 켜진 뒤 첫 시뮬레이션에서 방출되며 그때의 시작색을 읽는다.
             if (active.tint.IsSet) EffectRecolor.Apply(instance, active.tint);
+            // 알파는 색 다음 — 색 지정이 원래 머티리얼 색을 기억한 뒤에 복사본을 꽂는다.
+            if (active.alphaRules != null) EffectMaterialAlpha.Apply(instance, active.alphaRules);
             instance.SetActive(true);
 
             IEffectSystem driver = DriverOf(instance);
@@ -652,6 +651,9 @@ public class EffectManager : MonoBehaviour
             // 색 지정 재생으로 칠한 색을 저작 색으로 — 풀 키가 프리팹이라 다음 대출자(다른 플레이어·색 없는 재생)가 그대로 물려받는다.
             EffectRecolor recolor = instance.GetComponent<EffectRecolor>();
             if (recolor != null) recolor.Restore();
+            // 머티리얼 알파 재생으로 꽂은 복사본을 원래 머티리얼로 — 같은 이유(다음 대출자가 물려받음).
+            EffectMaterialAlpha alpha = instance.GetComponent<EffectMaterialAlpha>();
+            if (alpha != null) alpha.Restore();
             _pool.Return(instance);
         }
 
@@ -667,6 +669,7 @@ public class EffectManager : MonoBehaviour
         active.scale = 1f;
         active.axisScale = Vector3.one;
         active.tint = EffectTint.None;
+        active.alphaRules = null;
         active.driverDuration = 0f;
         active.inUse = false;      // 세대는 다음 대출에서 새로 발급된다 → stale 핸들은 여기서 죽는다
 
@@ -873,6 +876,7 @@ public class EffectManager : MonoBehaviour
         public float scale = 1f;   // 프리팹 크기에 곱해지는 배율. 파트 offset에도 곱해진다
         public Vector3 axisScale = Vector3.one;   // 축별 배율(원샷 오버로드 전용). localScale 에만 곱한다
         public EffectTint tint;                   // 색 지정 재생(SetTint). None = 원래 색. 이후 터지는 파트(delay·outro)에도 같이 칠한다
+        public IReadOnlyList<EffectMaterialAlphaRule> alphaRules;   // 머티리얼 알파 재생(SetMaterialAlpha). null = 원래 머티리얼. 이후 파트에도 같이
 
         // 드라이버에게 넘길 시간(초). 루프 전용이다 — 원샷은 남은 수명(life)을 그대로 쓴다.
         // 루프는 수명이 외부 이벤트(Release)로 정해지므로 "얼마나 살지"와 "파트가 얼마 동안 움직일지"가

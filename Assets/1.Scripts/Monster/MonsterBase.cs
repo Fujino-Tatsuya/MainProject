@@ -35,10 +35,9 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     [SerializeField] protected LayerMask playerMask;         // 인지 대상(플레이어) 레이어
     [DataTableIgnore] [SerializeField] protected int maxDetectionResults = 16;
 
-    // hitPointMode는 여기 없다 — 전 유닛 공통이라 EffectManager로 올렸다(런타임 교체도 거기서).
+    // 이펙트 종류·hitPointMode는 여기 없다 — 전 유닛 공통이라 EffectManager 가 든다(2026-11-06 몹별 hitVFXType 삭제).
     [Header("피격 이펙트 제어")]
     [SerializeField] Collider hitVFXCollider;
-    [SerializeField] HitVFXType hitVFXType;
 
     /// <summary>
     /// 몸 표면에서 터지는 연출(카운터 성공 섬광 등)이 쓸 콜라이더. 피격 이펙트 콜라이더가 비어 있으면
@@ -1689,7 +1688,7 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     void PlayHitVFXRpc(Vector3 sourcePosition)
     {
-        HitVFXPlayback.Play(this, hitVFXCollider, hitVFXType, sourcePosition);
+        HitVFXPlayback.Play(this, hitVFXCollider, sourcePosition);
     }
 
     // 휴면 = 무적 — ReceiveAttack 을 거치지 않는 직접·비율 피해(ApplyDirectHealthDamage 등)도 막는다.
