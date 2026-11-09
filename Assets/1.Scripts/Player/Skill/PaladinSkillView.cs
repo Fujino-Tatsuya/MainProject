@@ -93,9 +93,6 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     [SerializeField] private EffectSocketPlayer interruptWave;
 
     [Header("최후의 심판(R)")]
-    [Tooltip("슈퍼아머 구간 동안 몸에 덮을 오버레이. 'Paladin_Armature/tripo_part_0' 의 DissolveOverlay 를 물린다. 비워두면 연출만 빠진다")]
-    [SerializeField] private DissolveOverlay superArmorOverlay;
-
     [Tooltip("클립 이벤트 PlayEffect(\"Stick\") 가 부르는 칼 꽂기 소켓('VFX/UltimateSkill/SwordStick', id Stick). 데이터의 이펙트 배율을 여기 넣는다.\n" +
              "비워두면 Stick 만 저작 속도로 나온다")]
     [SerializeField] private EffectSocketPlayer stickVfx;
@@ -397,12 +394,6 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         _targetFloorHandle = EffectManager.Instance.PlayLooping(
             targetFloor, _targetPosition, Quaternion.identity, targetFloorScale, 0f, playRate);
     }
-
-    /// <summary>[전 피어] R 시전 창(OnClientPlay~OnEnd) 동안 슈퍼아머 오버레이. 슈퍼아머 구간 = 스킬 활성 구간이라 RPC 가 필요 없다.</summary>
-    public void ShowSuperArmor() => superArmorOverlay?.Show();
-
-    /// <summary>[전 피어] 종료 사유를 가리지 않고 부른다 — 오버레이가 남지 않는다.</summary>
-    public void HideSuperArmor() => superArmorOverlay?.Hide();
 
     /// <summary>[전 피어] 칼 꽂기(Stick)는 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.</summary>
     public void SetStickPlayRate(float playRate) => stickVfx?.SetPlayRate(playRate);
