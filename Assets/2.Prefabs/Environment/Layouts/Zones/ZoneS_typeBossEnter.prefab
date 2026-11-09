@@ -2175,6 +2175,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 9085813489699901319}
     m_Modifications:
+    - target: {fileID: 1081082913810636686, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
+    - target: {fileID: 2840032888709044615, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
+    - target: {fileID: 2933828743767798862, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
+    - target: {fileID: 3491635830379263216, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
     - target: {fileID: 3791598568108746362, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
       propertyPath: m_LocalPosition.y
       value: 8.6
@@ -2186,6 +2202,14 @@ PrefabInstance:
     - target: {fileID: 3907592954658071575, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
       propertyPath: m_Name
       value: Elevator
+      objectReference: {fileID: 0}
+    - target: {fileID: 3982711856920003567, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
+    - target: {fileID: 4833765523066480739, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
       objectReference: {fileID: 0}
     - target: {fileID: 5100180471567933783, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2227,6 +2251,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6223727172019645148, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
     - target: {fileID: 7088136036000263933, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
       propertyPath: '_frontPoints.Array.data[0]'
       value: 
@@ -2267,6 +2295,14 @@ PrefabInstance:
       propertyPath: '_walkWaypoints.Array.data[3].points.Array.data[0]'
       value: 
       objectReference: {fileID: 4196244445489781791}
+    - target: {fileID: 7126847812953137059, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
+    - target: {fileID: 8444429693428057577, guid: c62a7f5a7ea61ff4c882ba63d3f425e1, type: 3}
+      propertyPath: m_RenderingLayerMask
+      value: 257
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
