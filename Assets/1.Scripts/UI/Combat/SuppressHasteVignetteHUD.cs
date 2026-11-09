@@ -7,7 +7,7 @@ using UnityEngine.UI;
 /// - 표시 여부는 <see cref="StatusEffectController.EffectsChanged"/> 때만 다시 읽는다(매 프레임 탐색 없음). Update 는 페이드 중일 때만 알파를 옮긴다.
 /// - 로컬 플레이어는 <see cref="Player.LocalPlayerChanged"/> 로 직접 받는다 — CombatHUD 코드는 건드리지 않고 프리팹 인스턴스만 둔다.
 /// - 이미지 교체 = <see cref="vignetteSprite"/> 만 바꾼다(지금은 흰색 임시 텍스처 에셋). 페이드 시간은 xlsx <c>SuppressHaste</c> 시트(<see cref="SuppressHasteData"/>).
-/// 페이드 계산은 실드 비네팅과 같은 <see cref="ShieldVignetteModel.StepAlpha"/>.
+/// 페이드 계산은 <see cref="SuppressHasteVignetteModel.StepAlpha"/>.
 /// </summary>
 public class SuppressHasteVignetteHUD : MonoBehaviour
 {
@@ -91,7 +91,7 @@ public class SuppressHasteVignetteHUD : MonoBehaviour
         // 게임 시간으로 돈다 — 실드 비네팅과 같이 인터럽트 슬로우 동안 느려진다.
         float fadeIn = data != null ? data.VignetteFadeIn : 0.2f;
         float fadeOut = data != null ? data.VignetteFadeOut : 0.3f;
-        alpha = ShieldVignetteModel.StepAlpha(alpha, show, maxAlpha, fadeIn, fadeOut, Time.deltaTime);
+        alpha = SuppressHasteVignetteModel.StepAlpha(alpha, show, maxAlpha, fadeIn, fadeOut, Time.deltaTime);
         Apply();
     }
 

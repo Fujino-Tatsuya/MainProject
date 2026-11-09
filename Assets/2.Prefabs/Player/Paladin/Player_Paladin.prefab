@@ -2703,8 +2703,8 @@ MonoBehaviour:
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720127, type: 2}
   speedLines: {fileID: 7301928374650192902}
-  spawnInterval: 0.05
-  ghostLifetime: 0.3
+  spawnInterval: 0.01
+  ghostLifetime: 0.08
   fadeCurve:
     serializedVersion: 2
     m_Curve:
@@ -2738,7 +2738,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  maxGhosts: 40
+  maxGhosts: 100
   logDiagnostics: 0
   safetyTimeout: 2
 --- !u!114 &7301928374650192902
@@ -2748,7 +2748,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7876615519038055782}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720131, type: 3}
   m_Name: 
@@ -2767,7 +2767,7 @@ MonoBehaviour:
   - neck
   - spine
   autoPickLimit: 6
-  lineMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720130, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 83bcb02ba2efae840b7a035667592f16, type: 2}
   lineTime: 0.2
   startWidth: 0.05
   endWidth: 0
@@ -2840,7 +2840,6 @@ MonoBehaviour:
   interruptGlowLoop: {fileID: 3678982283790920023}
   interruptChargeLoop: {fileID: 4103582282502557237}
   interruptWave: {fileID: 1856814881585661691}
-  superArmorOverlay: {fileID: 949514895202568280}
   stickVfx: {fileID: 2581342685191034331}
   swordLightning: {fileID: 637245590219463161}
   swordElectric: {fileID: 211863627403201684}
@@ -3218,17 +3217,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5668903939015267363, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
   m_PrefabInstance: {fileID: 5683368051277706446}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &949514895202568280 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 4896041602680355990, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
-  m_PrefabInstance: {fileID: 5683368051277706446}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
 --- !u!4 &1992480276934339905 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6159190776356182415, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}

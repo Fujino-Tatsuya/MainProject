@@ -42,13 +42,13 @@
 | 코드 | `Assets/1.Scripts/UI/Combat/SuppressHasteVignetteHUD.cs` |
 | 프리팹 | `Assets/2.Prefabs/UI/SuppressHasteVignette.prefab` — 풀스크린 `Image`(raycastTarget 끔) |
 | 임시 스프라이트 | `Assets/2.Prefabs/UI/Textures/SuppressHasteVignette_Temp.png` — 흰색, 가장자리 불투명·중앙 투명(에셋 1장, 런타임 생성 없음) |
-| 배치 | `CombatHUD.prefab` › `Layer_Persistent` 아래 `ShieldVignette` 바로 다음 형제 인스턴스 1개(다른 요소는 그대로) |
+| 배치 | `CombatHUD.prefab` › `Layer_Persistent` 아래 인스턴스 1개(다른 요소는 그대로. 옛 `ShieldVignette` 형제는 실드 비네팅 삭제로 없어짐) |
 
 - **표시 조건**: 로컬 플레이어(`Player.LocalPlayerChanged` 로 직접 받음 — `CombatHUD.cs` 무변경)에게 `CooldownRateModifier` 가 있으면 페이드 인, 없어지면 페이드 아웃.
   `StatusEffectController.EffectsChanged` 때만 다시 읽는다(매 프레임 탐색 없음). 바인딩 순간 한 번 직접 읽는다(첫 동기화엔 이벤트가 안 난다).
 - 쓰러지면 서버가 버프를 빼므로 비네팅도 같이 사라진다 — 생명 상태를 따로 보지 않는다.
 - 다른 플레이어의 버프는 안 보인다(로컬 플레이어 것만).
-- 페이드는 게임 시간(`Time.deltaTime`) — 실드 비네팅과 같이 인터럽트 슬로우 동안 느려진다. 계산은 `ShieldVignetteModel.StepAlpha` 재사용.
+- 페이드는 게임 시간(`Time.deltaTime`) — 인터럽트 슬로우 동안 느려진다. 계산은 `SuppressHasteVignetteModel.StepAlpha`(옛 실드 비네팅 모델에서 옮김).
 
 ### 2.1 인스펙터 필드 (프리팹)
 | 필드 | 기본 | 뜻 |
