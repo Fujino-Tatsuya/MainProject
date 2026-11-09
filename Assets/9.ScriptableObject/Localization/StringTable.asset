@@ -19,11 +19,11 @@ MonoBehaviour:
   - key: FirstMeleePassive/tooltip.description
     ko: "{cooldownTime}\uCD08\uB9C8\uB2E4 \uB2E4\uC74C \uACF5\uACA9\uC774 {dmg}\uC758
       \uCD94\uAC00 \uD53C\uD574\uB97C \uC785\uD788\uACE0 \uCD5C\uB300 \uCCB4\uB825\uC758
-      {healPercent}%\uB97C <style=heal>\uD68C\uBCF5</style>\uD569\uB2C8\uB2E4. \uC801\uC911
+      {healPercent}%\uB97C <style=heal>\uD68C\uBCF5</style>\uD569\uB2C8\uB2E4. \uD53C\uACA9
       \uC2DC \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {hitCooldownReduction}\uCD08
       \uAC10\uC18C\uD569\uB2C8\uB2E4."
     en: Every {cooldownTime}s, your next attack deals {dmg} bonus damage and <style=heal>restores</style>
-      {healPercent}% of max HP. On hit, the cooldown is reduced by {hitCooldownReduction}s.
+      {healPercent}% of max HP. When hit, the cooldown is reduced by {hitCooldownReduction}s.
   - key: FirstMeleeMainSkillData/tooltip.displayName
     ko: "\uC9C4\uACA9\uC758 \uBC29\uD328"
     en: Advancing Shield
@@ -68,8 +68,11 @@ MonoBehaviour:
     ko: "\uAD81\uADF9\uAE30"
     en: Ultimate
   - key: FirstMeleeUltimateSkillData/tooltip.description
-    ko: "\uC801 \uD558\uB098\uB97C \uC9C0\uC815\uD574 \uC2EC\uD310\uC758 \uC77C\uACA9\uC744 \uB0B4\uB824\uCCD0 {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uC2DC\uC804 \uC911\uC5D0\uB294 \uBC00\uB824\uB098\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
-    en: Target a single enemy and bring down a strike of judgment, dealing {dmg} damage. You can't be knocked back while casting.
+    ko: "\uC801 \uD558\uB098\uB97C \uC9C0\uC815\uD574 \uC2EC\uD310\uC758 \uC77C\uACA9\uC744
+      \uB0B4\uB824\uCCD0 {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4.
+      \uC2DC\uC804 \uC911\uC5D0\uB294 \uBC00\uB824\uB098\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Target a single enemy and bring down a strike of judgment, dealing {dmg}
+      damage. You can't be knocked back while casting.
   - key: GunnerHeatData/tooltip.displayName
     ko: "\uC784\uACC4 \uCD9C\uB825"
     en: Critical Output
@@ -825,8 +828,7 @@ MonoBehaviour:
     en: While aiming R (Ultimate), left-click to confirm. Press R again or right-click
       to cancel.
   - key: Tutorial.Guide.TUT_TIMER_EXPIRED
-    ko: "\uC2DC\uAC04\uC774 \uB2E4 \uB418\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uC6D0\uD749\uC774
-      \uAE30\uB2E4\uB9BD\uB2C8\uB2E4."
+    ko: Test
     en: "Time's up \u2014 the culprit is waiting."
   - key: Tutorial.Guide.TUT_WAIT_PARTY
     ko: "\uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911 ({n}/{total}) \xB7 {mm:ss}
@@ -945,17 +947,11 @@ MonoBehaviour:
     ko: "[\uC2A4\uD53C\uB108\uBD07] \uC744 \uCC98\uCE58\uD558\uC138\uC694"
     en: 'Defeat [Spinner Bot]'
   - key: Tutorial.Guide.TUT_Z4_LORE
-    ko: "[\uACBD\uACE0] \uC624\uB978\uCABD \uC544\uB798 \uAC8C\uC774\uC9C0\uAC00
-      \uAC00\uB4DD \uCC28\uBA74, \uC784\uBB34\uC758 \uC131\uD328\uC640 \uAD00\uACC4\uC5C6\uC774
-      <b>\uC138\uACC4\uC120\uC744 \uC5C9\uB9DD\uC73C\uB85C \uB9CC\uB4E0 \uC6D0\uD749</b>\uACFC
-      \uC2F8\uC6B0\uAC8C \uB429\uB2C8\uB2E4."
+    ko: Test
     en: '[Warning] When the gauge at the bottom right fills up, you will face <b>the
       culprit who wrecked the world line</b>, whether the mission succeeded or not.'
   - key: Tutorial.Guide.TUT_Z4_TIMER_HINT
-    ko: "\uAC8C\uC774\uC9C0\uAC00 \uB2E4 \uCC28\uAE30 \uC804\uC5D0 \uBCF4\uC2A4\uBC29
-      \uC5D8\uB9AC\uBCA0\uC774\uD130\uC5D0 \uC624\uB974\uBA74 \uAC8C\uC774\uC9C0\uAC00
-      \uBA48\uCDA5\uB2C8\uB2E4. \uBCF4\uC2A4\uBC29\uC73C\uB85C \uAC00\uB294 \uAE38\uC740
-      \uC911\uAC04\uBCF4\uC2A4\uB97C \uC4F0\uB7EC\uB728\uB9AC\uBA74 \uC5F4\uB9BD\uB2C8\uB2E4."
+    ko: Test
     en: Board the boss room elevator before the gauge fills to stop it. The path
       to the boss room opens when you defeat the mid-boss.
   - key: Tutorial.Guide.TUT_Z4_START
@@ -1007,13 +1003,10 @@ MonoBehaviour:
     en: When <b>the whole party</b> gathers on the elevator pad, you move to the
       boss room after 5 seconds.
   - key: Tutorial.Guide.TUT_B_PAD_COUNT
-    ko: "\uBCF4\uC2A4\uBC29\uC73C\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4 \u2014 \uBC1C\uD310\uC744
-      \uBC97\uC5B4\uB098\uAC70\uB098 \uC4F0\uB7EC\uC9C0\uBA74 \uCDE8\uC18C\uB429\uB2C8\uB2E4."
+    ko: Test
     en: "Moving to the boss room \u2014 leaving the pad or going down cancels it."
   - key: Tutorial.Guide.TUT_B_BOSS_FRONT_TIP
-    ko: "\uC6D0\uD749(23\uD638)\uC740 <b>\uC815\uBA74</b>\uC5D0\uC11C\uB9CC \uAC04\uD30C\uB429\uB2C8\uB2E4
-      \u2014 \uBCF4\uB77C\uBE5B\uC774 \uBCF4\uC774\uBA74 \uC55E\uC73C\uB85C \uB3CC\uC544\uAC00
-      \uC6B0\uD074\uB9AD\uD558\uC138\uC694."
+    ko: Test
     en: "The culprit (No.23) can only be interrupted from the <b>front</b> \u2014
       when you see the purple glow, get in front and right-click."
   - key: Tutorial.Guide.TUT_Z1_ATTACK_HEAT
@@ -1299,9 +1292,9 @@ MonoBehaviour:
     ko: "\uBC29\uC5B4 \uC2A4\uD0AC: \uB204\uB974\uB294 \uB3D9\uC548 \uC720\uC9C0"
     en: 'Guard Skill: Hold'
   - key: Tutorial.Guide.TUT_Z4_INTRO_DEVICES
-    ko: "\uC7A5\uCE58\uAC00 \uB124 \uAD70\uB370\uB098 \uC788\uB124.|\uC800\uAC78
-      \uC804\uBD80 \uCF1C\uBA74\u2026 \uB2E4\uB9AC\uB97C \uC5F0\uACB0\uD560 \uC218
-      \uC788\uC744 \uAC83 \uAC19\uC544."
+    ko: "\uC7A5\uCE58\uAC00 \uC5EC\uB7EC \uAC1C \uBCF4\uC774\uB294\uB370\u2026|\uC800\uAC78
+      \uC804\uBD80 \uAC00\uB3D9\uD558\uBA74, \uB2E4\uB9AC\uB97C \uC5F0\uACB0\uD560
+      \uC218 \uC788\uC744 \uAC83 \uAC19\uC544."
     en: "There are four devices here.|If we turn them all on\u2026 I think we can
       connect the bridge."
   - key: Tutorial.Guide.TUT_Z4_INTRO_BRIDGE
@@ -1482,10 +1475,13 @@ MonoBehaviour:
     en: "Normal E Upgrade \xB7 Knockback"
   - key: Trait.ASN_4_NORMAL_E_PUSH.Desc
     ko: "\uC77C\uBC18 E\uB85C \uAC15\uD654\uD55C \uAE30\uBCF8 \uACF5\uACA9\uC774
-      \uC801\uC744 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4. \uBCC0\uC2E0 E\uC5D0\uB294 \uC801\uC6A9\uB418\uC9C0
-      \uC54A\uC2B5\uB2C8\uB2E4."
-    en: Basic attacks empowered by normal E knock enemies back. Does not apply to
-      Transformed E.
+      \uC801\uC744 \uBC00\uCCD0\uB0B4\uACE0, \uBC00\uCE58\uAE30\uAC00 \uB05D\uB09C
+      \uB4A4 {concussionDuration}\uCD08 \uB3D9\uC548 <style=stun>\uAE30\uC808</style>\uC2DC\uD0B5\uB2C8\uB2E4.
+      \uBCC0\uC2E0 E\uC640 \uC81C\uC5B4 \uBA74\uC5ED \uB300\uC0C1\uC5D0\uAC8C\uB294
+      \uC801\uC6A9\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Basic attacks empowered by normal E knock enemies back, then <style=stun>stun</style>
+      them for {concussionDuration}s after the knockback. Does not apply to Transformed
+      E or crowd-control-immune targets.
   - key: Trait.ASN_4_Q_TRAIL.Name
     ko: "\uCD94\uACA9\uC758 \uADA4\uC801"
     en: Pursuit Trail
@@ -1585,8 +1581,13 @@ MonoBehaviour:
     en: "Q Boost \xB7 Push"
   - key: Trait.GUN_3_Q_PUSH.Desc
     ko: "Q\uC5D0 \uB9DE\uC740 \uC801\uC744 \uB808\uC774\uC800\uAC00 \uB098\uC544\uAC00\uB294
-      \uBC29\uD5A5\uC73C\uB85C \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
-    en: Enemies hit by Q are pushed in the direction the laser travels.
+      \uBC29\uD5A5\uC73C\uB85C \uBC00\uCCD0\uB0B4\uACE0, \uBC00\uCE58\uAE30\uAC00
+      \uB05D\uB09C \uB4A4 {concussionDuration}\uCD08 \uB3D9\uC548 <style=stun>\uAE30\uC808</style>\uC2DC\uD0B5\uB2C8\uB2E4.
+      \uC81C\uC5B4 \uBA74\uC5ED \uB300\uC0C1\uC5D0\uAC8C\uB294 \uC801\uC6A9\uB418\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Enemies hit by Q are pushed in the direction the laser travels, then <style=stun>stunned</style>
+      for {concussionDuration}s after the knockback. Does not affect crowd-control-immune
+      targets.
   - key: Trait.GUN_3_VOLLEY.Name
     ko: "\uC9D1\uC18D \uC5F0\uC0AC"
     en: Focused Volley
@@ -1695,11 +1696,12 @@ MonoBehaviour:
     ko: "\uD328\uC2DC\uBE0C \uBCC0\uACBD \xB7 \uC544\uAD70 \uD68C\uBCF5"
     en: "Passive Change \xB7 Ally Heal"
   - key: Trait.PAL_2_SHARE_HEAL.Desc
-    ko: "\uD328\uC2DC\uBE0C\uB85C \uD68C\uBCF5\uD558\uACE0 \uB0A8\uC740 \uC591\uC73C\uB85C
+    ko: "\uD328\uC2DC\uBE0C \uD68C\uBCF5\uB7C9\uC774 {healIncrease:%} \uC99D\uAC00\uD569\uB2C8\uB2E4.
+      \uD328\uC2DC\uBE0C\uB85C \uD68C\uBCF5\uD558\uACE0 \uB0A8\uC740 \uC591\uC73C\uB85C
       {allyRange}m \uC548\uC5D0\uC11C \uB0A8\uC740 \uCCB4\uB825 \uBE44\uC728\uC774
       \uAC00\uC7A5 \uB0AE\uC740 \uC544\uAD70 \uD55C \uBA85\uC744 <style=heal>\uD68C\uBCF5</style>\uD569\uB2C8\uB2E4."
-    en: Excess passive healing <style=heal>heals</style> the ally within {allyRange}m
-      with the lowest health ratio.
+    en: Passive healing increases by {healIncrease:%}. Excess passive healing <style=heal>heals</style>
+      the ally within {allyRange}m with the lowest health ratio.
   - key: Trait.PAL_3_E_SHIELD.Name
     ko: "\uC218\uD638\uC758 \uC794\uAD11"
     en: Guard Afterglow
@@ -1744,8 +1746,13 @@ MonoBehaviour:
     en: "E Upgrade \xB7 Knockback"
   - key: Trait.PAL_4_E_PUSH.Desc
     ko: "E\uB85C \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uBC18\uACA9\uACFC \uD568\uAED8
-      \uC8FC\uBCC0 {radius}m\uC758 \uC801\uC744 \uBC00\uCCD0\uB0C5\uB2C8\uB2E4."
-    en: Blocking with E knocks back enemies within {radius}m along with the counterattack.
+      \uC8FC\uBCC0 {radius}m\uC758 \uC801\uC744 \uBC00\uCCD0\uB0B4\uACE0, \uBC00\uCE58\uAE30\uAC00
+      \uB05D\uB09C \uB4A4 {concussionDuration}\uCD08 \uB3D9\uC548 <style=stun>\uAE30\uC808</style>\uC2DC\uD0B5\uB2C8\uB2E4.
+      \uC81C\uC5B4 \uBA74\uC5ED \uB300\uC0C1\uC5D0\uAC8C\uB294 \uC801\uC6A9\uB418\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    en: Blocking with E knocks back enemies within {radius}m along with the counterattack,
+      then <style=stun>stuns</style> them for {concussionDuration}s after the knockback.
+      Does not affect crowd-control-immune targets.
   - key: Trait.PAL_4_HEAL_SHIELD.Name
     ko: "\uBD88\uAD74\uC758 \uAC00\uD638"
     en: Unyielding Aegis
@@ -1896,13 +1903,13 @@ MonoBehaviour:
     ko: "\uAC10\uB3C5\uAD00"
     en: Supervisor
   - key: Tutorial.Guide.LOBBY_DLG_INTRO
-    ko: "\uC774\uBC88\uC5D0 \uC0C8\uB85C \uC628 \uC2E0\uC785\uB4E4\uC778\uAC00? \uC88B\uC544.
-      \uC2E4\uB825 \uC880 \uBCFC\uAE4C. \uD6C8\uB828\uC7A5\uC73C\uB85C \uC640."
+    ko: "\uC790\uB124\uB4E4\uC774 \uC774\uBC88\uC5D0 \uB4E4\uC5B4\uC628 \uC2E0\uC785\uB4E4\uC778\uAC00?
+      \uC2E4\uB825\uC774 \uC5B4\uB290 \uC815\uB3C4\uC778\uC9C0 \uBD10\uC57C\uACA0\uAD70.
+      \uD6C8\uB828\uC7A5\uC73C\uB85C \uC640."
     en: So you're the new recruits? Good. Let's see what you've got. Come to the
       training hall.
   - key: Tutorial.Guide.LOBBY_DLG_TRAINING
-    ko: "\uB2E4 \uBAA8\uC600\uAD70. \uAE30\uBCF8\uAE30\uB294 \uAC16\uCDC4\uB294\uC9C0\uBD80\uD130
-      \uBCFC\uAE4C."
+    ko: "\uB2E4 \uBAA8\uC600\uAD70. \uC900\uBE44\uB410\uC73C\uBA74 \uC2DC\uC791\uD558\uC9C0."
     en: Everyone's here. Let's start with your fundamentals.
   - key: Tutorial.Guide.LOBBY_BRIEF_EVAL
     ko: "\uC2E0\uC785\uCE58\uACE0\uB294 \uC81C\uBC95\uC774\uAD70. \uC88B\uC544. \uC774\uC81C
@@ -1910,14 +1917,15 @@ MonoBehaviour:
     en: Not bad for rookies. Good. Now let me explain your assignment.
   - key: Tutorial.Guide.LOBBY_BRIEF_FACTORY
     ko: "\uC774\uBC88 \uBAA9\uC801\uC9C0\uB294 \uC6F0\uC988\uC758 \uC5F0\uAD6C \uC2DC\uC124\uC774\uB2E4.
-      \uC800\uACF3\uC5D0\uC11C \uC2DC\uC791\uB41C \uC5F0\uAD6C\uAC00 \uD6D7\uB0A0
-      \uB300\uADDC\uBAA8 \uAE30\uACC4 \uBC18\uB780\uC73C\uB85C \uC774\uC5B4\uC9C0\uC9C0."
+      \uD6D7\uB0A0 \uAE30\uACC4 \uBC18\uB780\uC744 \uC77C\uC73C\uD0A8 \uBCD1\uAE30\uB4E4\uC774
+      \uBC14\uB85C \uADF8\uACF3\uC5D0\uC11C \uB9CC\uB4E4\uC5B4\uC84C\uC9C0."
     en: Our destination is Wells's research facility. The research that began there
       will one day lead to a full-scale machine uprising.
   - key: Tutorial.Guide.LOBBY_BRIEF_REBELLION
     ko: "\uC6B0\uB9AC\uB294 \uADF8 \uC77C\uC774 \uBC8C\uC5B4\uC9C0\uAE30 \uC804\uC73C\uB85C
-      \uB4E4\uC5B4\uAC04\uB2E4. \uC774\uBC88\uC5D0\uB294 \uADF8 \uC2DC\uC791\uC744
-      \uB9C9\uB294 \uAC70\uC57C."
+      \uB4E4\uC5B4\uAC04\uB2E4. \uC790\uB124\uB4E4\uC758 \uC784\uBB34\uB294 \uADF8
+      \uBCD1\uAE30\uB4E4\uC774 \uC644\uC131\uB418\uAE30 \uC804\uC5D0 \uC0DD\uC0B0\uC744
+      \uC800\uC9C0\uD558\uB294 \uAC70\uB2E4."
     en: We're going back to before it happens. This time, we stop it before it starts.
   - key: Tutorial.Guide.LOBBY_BRIEF_SORTIE
     ko: "\uC124\uBA85\uC740 \uC5EC\uAE30\uAE4C\uC9C0\uB2E4. \uCD9C\uACA9 \uC9C0\uC810\uC73C\uB85C
@@ -1939,22 +1947,22 @@ MonoBehaviour:
     ko: "{flat} + \uACF5\uACA9\uB825\uC758 {percent}"
     en: '{flat} + {percent} of ATK'
   - key: Tutorial.Guide.TUT_MAIN_Z01_ENTER
-    ko: "\uB4E4\uB824? \uC88B\uC544, \uBB34\uC0AC\uD788 \uB3C4\uCC29\uD588\uB124.|\uC5EC\uAE30\uAC00
-      \uADF8 \uC2DC\uC124\uC774\uC57C."
+    ko: "\uB4E4\uB824? \uC88B\uC544, \uBB34\uC0AC\uD788 \uB3C4\uCC29\uD588\uB124.|\uAC70\uAE30\uAC00
+      \uC6F0\uC988\uC758 \uC5F0\uAD6C \uC2DC\uC124\uC774\uC57C."
     en: Can you hear me? Good, you made it in one piece.|This is the facility.
   - key: Tutorial.Guide.TUT_MAIN_Z02_ENTER
     ko: "\uC7A0\uAE50, \uC800 \uB140\uC11D\uB4E4 \uC6B0\uB9AC\uB97C \uBC1C\uACAC\uD588\uC5B4.|\uC870\uC2EC\uD574."
     en: Wait, they've spotted us.|Be careful.
   - key: Tutorial.Guide.TUT_MAIN_Z02_CLEAR
-    ko: "\uAD1C\uCC2E\uC544? \uC544\uC9C1 \uC548\uCABD\uC740 \uD655\uC778\uC774 \uC548
-      \uB3FC.|\uC870\uAE08\uB9CC \uB354 \uC2E0\uC911\uD558\uAC8C \uAC00\uC790."
+    ko: "\uB2E4\uB4E4 \uBB34\uC0AC\uD55C\uAC00? \uC548\uCABD\uC5D0\uB3C4 \uB354 \uC788\uC744\uC9C0
+      \uBAB0\uB77C.|\uACBD\uACC4\uD558\uBA74\uC11C \uC774\uB3D9\uD574."
     en: You okay? We still can't see what's deeper in.|Let's go a little more carefully.
   - key: Tutorial.Guide.TUT_MAIN_Z03_ENEMY
     ko: "\uC800 \uB140\uC11D\uC740 \uB2E4\uB978 \uB188\uB4E4\uBCF4\uB2E4 \uC880 \uAC15\uD574
       \uBCF4\uC774\uB294\uB370."
     en: That one looks tougher than the others.
   - key: Tutorial.Guide.TUT_MAIN_Z03_CLEAR
-    ko: "\uC7A0\uAE50. \uB2E4\uC74C \uAD6C\uC5ED\uC740 \uC880 \uC0B4\uD3B4\uBD10\uC57C\uACA0\uC5B4."
+    ko: "\uC7A0\uAE50. \uB2E4\uC74C \uAD6C\uC5ED \uC0C1\uD669\uBD80\uD130 \uD655\uC778\uD560\uAC8C."
     en: Hold on. We should take a look at the next area.
   - key: Tutorial.Guide.TUT_Z4_BRIDGE_OPEN
     ko: "\uC911\uC559\uC73C\uB85C \uAC00\uB294 \uB2E4\uB9AC\uAC00 \uC5F0\uACB0\uB410\uC5B4.|\uC5B4\uC11C
