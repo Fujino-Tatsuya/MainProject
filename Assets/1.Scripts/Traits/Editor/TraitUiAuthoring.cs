@@ -57,21 +57,22 @@ public static class TraitUiAuthoring
             root.AddComponent<GraphicRaycaster>();
             TraitSelectionView view = root.AddComponent<TraitSelectionView>();
 
-            // ── 획득 특성 다시 보기(좌상단) ──
+            // ── 획득 특성 다시 보기(왼쪽 가운데, 벌집 2열 — 할 일 253) ──
+            // 상자 왼쪽 아래가 벌집 원점(TraitIconHoneycomb) — 칸 배치는 TraitSelectionView 가 하고, 상자 위치는 이 RectTransform 이 정한다.
             RectTransform list = NewUi("AcquiredList", root.transform);
-            Anchor(list, new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(0f, 56f));
-            HorizontalLayoutGroup listLayout = list.gameObject.AddComponent<HorizontalLayoutGroup>();
-            listLayout.spacing = 8f;
-            listLayout.childControlWidth = listLayout.childControlHeight = false;
-            listLayout.childForceExpandWidth = listLayout.childForceExpandHeight = false;
-            list.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            Anchor(list, new Vector2(0f, 0.5f), new Vector2(24f, -90f), new Vector2(112f, 180f));
+            list.pivot = Vector2.zero;
 
             RectTransform iconTemplate = NewUi("IconTemplate", list);
-            iconTemplate.sizeDelta = new Vector2(56f, 56f);
-            Image iconFrame = AddPanel(iconTemplate.gameObject);
-            iconFrame.raycastTarget = true; // 호버 판정
+            iconTemplate.anchorMin = iconTemplate.anchorMax = Vector2.zero;
+            iconTemplate.sizeDelta = new Vector2(64f, 57.2f); // 육각형 칸(TraitIcon png 안 육각형 94×84 비율)
+            // 아이콘 아트가 이미 육각형(TraitIcon) — 테두리·마스크 없이 그림만. 투명 Image 는 호버 판정 칸(육각형 크기).
+            Image hitArea = iconTemplate.gameObject.AddComponent<Image>();
+            hitArea.color = new Color(0f, 0f, 0f, 0f);
+            hitArea.raycastTarget = true;
             RectTransform iconImageRect = NewUi("Icon", iconTemplate);
-            Stretch(iconImageRect, 6f);
+            iconImageRect.anchorMin = iconImageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconImageRect.sizeDelta = new Vector2(64f * 136f / 94f, 64f * 136f / 94f); // TraitSelectionView.iconSizePerCellWidth 와 같은 비율
             Image iconImage = iconImageRect.gameObject.AddComponent<Image>();
             iconImage.raycastTarget = false;
             iconImage.preserveAspect = true;
@@ -79,7 +80,8 @@ public static class TraitUiAuthoring
             SetRef(iconView, "icon", iconImage);
 
             RectTransform tooltip = NewUi("AcquiredTooltip", root.transform);
-            Anchor(tooltip, new Vector2(0f, 1f), new Vector2(24f, -90f), new Vector2(380f, 0f));
+            // 벌집 오른쪽 — 높이는 호버한 칸에 맞춘다(TraitSelectionView.HandleIconHover).
+            Anchor(tooltip, new Vector2(0f, 0.5f), new Vector2(156f, 0f), new Vector2(380f, 0f));
             AddPanel(tooltip.gameObject);
             VerticalLayoutGroup tooltipLayout = AddVertical(tooltip.gameObject, 14, 6f);
             tooltipLayout.childAlignment = TextAnchor.UpperLeft;

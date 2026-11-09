@@ -53,8 +53,15 @@ public sealed class TraitSelectionView : MonoBehaviour
     [SerializeField, Min(0.5f)] private float toastSeconds = 4f;
 
     [Header("획득 특성 다시 보기")]
+    [Tooltip("아이콘을 담는 상자. 화면 위치는 이 RectTransform(씬·프리팹)으로 정한다 — 코드는 안쪽 칸 배치만 한다(할 일 253, 기본 왼쪽 가운데).")]
     [SerializeField] private RectTransform acquiredContainer;
     [SerializeField] private TraitIconView iconTemplate;
+    [Tooltip("벌집 칸 = 화면에 보일 육각형 크기(아이콘 png 안 육각형 94×84px 비율). 획득 순서대로 2열 지그재그, 아래에서 위로(TraitIconHoneycomb).")]
+    [SerializeField] private Vector2 honeycombCellSize = new Vector2(64f, 57.2f);
+    [Tooltip("벌집 칸 사이 간격(px). 0 = 육각형 변끼리 맞물림.")]
+    [SerializeField, Min(0f)] private float honeycombGap = 0f;
+    [Tooltip("아이콘 이미지 한 변 ÷ 그 안 육각형 폭 — TraitIcon png 136px 안 육각형 폭 94px = 1.447. 투명 여백을 빼고 육각형이 칸에 맞게 키운다.")]
+    [SerializeField, Min(1f)] private float iconSizePerCellWidth = 136f / 94f;
     [SerializeField] private GameObject tooltip;
     [SerializeField] private TMP_Text tooltipName;
     [SerializeField] private TMP_Text tooltipDescription;
@@ -634,6 +641,12 @@ public sealed class TraitSelectionView : MonoBehaviour
         for (int i = 0; i < shownAcquired.Count; i++)
         {
             TraitIconView view = Instantiate(iconTemplate, acquiredContainer);
+            var rect = (RectTransform)view.transform;
+            rect.anchorMin = rect.anchorMax = Vector2.zero; // 상자 왼쪽 아래 기준
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = honeycombCellSize;
+            rect.anchoredPosition = TraitIconHoneycomb.CellCenter(i, honeycombCellSize, honeycombGap);
+            view.SetIconSide(honeycombCellSize.x * iconSizePerCellWidth); // 칸(호버 판정) = 육각형, 그림 = 투명 여백 포함 정사각형
             view.gameObject.SetActive(true);
             view.Bind(director.GetTrait(shownAcquired[i]), placeholderIcon, HandleIconHover);
             icons.Add(view);
@@ -658,6 +671,12 @@ public sealed class TraitSelectionView : MonoBehaviour
         if (tooltipName != null)
             tooltipName.text = trait.DisplayName;
         RefreshTooltipDescription(TraitTooltip.IsValueHeld());
+        // 벌집이 세로로 쌓이므로 툴팁 높이를 호버한 칸에 맞춘다(가로 위치는 프리팹 — 벌집 오른쪽).
+        if (tooltip != null && view != null)
+        {
+            Vector3 position = tooltip.transform.position;
+            tooltip.transform.position = new Vector3(position.x, view.transform.position.y, position.z);
+        }
         SetActive(tooltip, true);
     }
 
