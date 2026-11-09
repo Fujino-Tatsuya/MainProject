@@ -135,7 +135,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     }
     public bool IsSkillActive => activeSkill != null;
     // 전 피어 — 실행 중(관찰자는 PlaySkillClientRpc~EndSkillClientRpc) 스킬이 공격속도를 타면 Animator.speed = 배율(할 일 91 T5).
-    public bool ScalesAnimatorWithAttackSpeed => activeSkill != null && activeSkill.ScalesWithAttackSpeed;
+    // 표시 전용 재생(보스 처치 연출 스킬)도 같은 규칙 — 실제 시전과 같은 재생 속도(PLAN-boss-victory-glitch, 11-09 사용자).
+    public bool ScalesAnimatorWithAttackSpeed => activeSkill != null
+        ? activeSkill.ScalesWithAttackSpeed
+        : presentationSkill != null && presentationSkill.ScalesWithAttackSpeed;
     /// <summary>[오너] 스킬 실행 중이거나 시전 요청 응답을 기다리는 중 — 이때 못 쓴 입력은 선입력 버퍼에 남긴다(할 일 44).</summary>
     public bool IsBusy => IsSkillActive || isRequestingSkill;
     public event Action<PlayerSkillSlot> SlotBindingChanged;
