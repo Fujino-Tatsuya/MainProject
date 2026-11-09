@@ -261,10 +261,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             EditorGUI.DrawRect(new Rect(r.x, r.y, 2f, r.height), Color.white);   // 컷 = 시작 순간
             BossVictoryCameraCuts.Cut shot = Timeline.CameraCutShot(index);
             GUI.Label(new Rect(r.x + 4f, r.y + 4f, Mathf.Max(0f, r.width - 6f), r.height - 4f),
-                $"#{index + 1} {AnchorLabel(shot.anchor)}{(shot.hasEnd ? " → 이동" : " 고정")}{(shot.hideWalls ? "" : " · 벽 숨김 끔")}", EditorStyles.miniLabel);
+                $"#{index + 1} {AnchorLabel(shot.anchor)}{(shot.Moves ? " → 이동" : " 고정")}{(shot.hideWalls ? "" : " · 벽 숨김 끔")}", EditorStyles.miniLabel);
         }
         if (selected) DrawOutline(r, Color.white);
-        DrawClipDecorations(r, track, clip, selected);
+        if (IsKeyed(track)) DrawKeys(r, track, index, selected);
     }
 
     // 클립 값 모양(페이드·세기) — 아래 = 0, 위 = 1
@@ -316,7 +316,6 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             : $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
 
     static readonly string[] AnchorLabels = { "가운데", "처치자", "보스" };
-    static readonly string[] EaseLabels = { "선형", "ease in/out", "ease in", "ease out" };
 
     static string AnchorLabel(BossVictoryCameraCuts.Anchor anchor) =>
         (int)anchor >= 0 && (int)anchor < AnchorLabels.Length ? AnchorLabels[(int)anchor] : anchor.ToString();
@@ -407,9 +406,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     }
 
     // ── 선택·편집 ────────────────────────────────────────────────────────
-    // 끌기 = 이동 · 양 끝(좌우 화살표 커서 — 왼쪽 = 시작 이동·끝 고정, 오른쪽 = 길이) · 선택 클립 위쪽 작은 네모 = 페이드 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V · 0.01초 스냅 · Undo.
+    // 끌기 = 이동 · 양 끝(좌우 화살표 커서 — 왼쪽 = 시작 이동·끝 고정, 오른쪽 = 길이) · 클립 위 마름모 = 키(중간 키 끌기 = 시각, 더블클릭 = 키 추가, 255 후속 6) ·
+    // 우클릭 = 추가/복사/붙여넣기/삭제 · Del(키 선택 중이면 그 키) · Ctrl+C/V · 0.01초 스냅 · Undo.
 
-    enum DragMode { None, Move, ResizeLeft, ResizeRight, FadeIn, FadeOut, Marker, Playhead }
+    enum DragMode { None, Move, ResizeLeft, ResizeRight, Key, Marker, Playhead }
 
     const float MinLength = 0.01f;
     const float HandleSize = 7f;
@@ -418,6 +418,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     int _selTrack = -1;
     int _selIndex = -1;
     int _selMarker = -1;
+    int _selKey = -1;   // 선택 클립 안 키 번호(효과 세기·카메라 컷 — 255 후속 6)
     DragMode _drag;
     BossVictoryClip _dragOrig;
     float _dragMouseT0;
@@ -441,17 +442,241 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _selTrack = track;
         _selIndex = index;
         _selMarker = marker;
+        _selKey = -1;
         _selFinisher = false;
         GUI.FocusControl(null);
     }
 
-    void DrawClipDecorations(Rect r, BossVictoryTrack track, BossVictoryClip clip, bool selected)
+    // ── 키(255 후속 6) — 효과 세기 트랙 = 클립 세기 키 · 카메라 컷 = 화면 키. 시각 = 클립 비율(클립을 옮기거나 늘이면 비율대로 따라감) ──
+
+    static readonly Color KeyColor = new Color(1f, 0.85f, 0.35f);
+    static readonly string[] KeyCurveLabels = { "선형", "ease in/out", "ease in", "ease out", "계단" };
+    const float KeySize = 4f;
+
+    static bool IsKeyed(BossVictoryTrack track) => BossVictoryTimeline.HasFades(track) || track == BossVictoryTrack.CameraCut;
+
+    int KeyCount(BossVictoryTrack track, int clip)
     {
-        if (!selected || !BossVictoryTimeline.HasFades(track)) return;
-        float xIn = FadeInX(r, clip);
-        float xOut = FadeOutX(r, clip);
-        EditorGUI.DrawRect(new Rect(xIn - HandleSize * 0.5f, r.y, HandleSize, HandleSize), Color.white);
-        EditorGUI.DrawRect(new Rect(xOut - HandleSize * 0.5f, r.y, HandleSize, HandleSize), Color.white);
+        if (track == BossVictoryTrack.CameraCut)
+        {
+            BossVictoryCameraCuts.Cut shot = Timeline.CameraCutShot(clip);
+            return shot.HasKeys ? shot.keys.Count : 0;
+        }
+        BossVictoryClip c = Timeline.Clips(track)[clip];
+        return c.HasKeys ? c.keys.Count : 0;
+    }
+
+    float KeyU(BossVictoryTrack track, int clip, int key) => track == BossVictoryTrack.CameraCut
+        ? Timeline.CameraCutShot(clip).keys[key].u
+        : Timeline.Clips(track)[clip].keys[key].u;
+
+    // 키 마름모 높이(0 = 아래, 1 = 위) — 세기 키 = 세기 · 컷 키 = 가운데.
+    float KeyHeight(BossVictoryTrack track, int clip, int key) => track == BossVictoryTrack.CameraCut ? 0.5f : Timeline.Clips(track)[clip].keys[key].value;
+
+    // 키 시각의 기준 구간(초) — 컷 = 다음 컷 시작까지(런타임 진행과 같은 식).
+    float KeySpanStart(BossVictoryTrack track, int clip) => Timeline.Clips(track)[clip].start;
+
+    float KeySpanLength(BossVictoryTrack track, int clip) => track == BossVictoryTrack.CameraCut
+        ? Mathf.Max(MinLength, Timeline.CameraCutEnd(clip) - Timeline.cameraCut[clip].start)
+        : Mathf.Max(MinLength, Timeline.Clips(track)[clip].length);
+
+    Vector2 KeyPoint(Rect r, BossVictoryTrack track, int clip, int key)
+    {
+        float x = r.x + KeyU(track, clip, key) * r.width;
+        float y = r.yMax - 2f - KeyHeight(track, clip, key) * (r.height - 4f);
+        return new Vector2(x, y);
+    }
+
+    void DrawKeys(Rect r, BossVictoryTrack track, int clip, bool selected)
+    {
+        int n = KeyCount(track, clip);
+        for (int k = 0; k < n; k++)
+        {
+            Vector2 p = KeyPoint(r, track, clip, k);
+            bool on = selected && _selKey == k;
+            float s = on ? KeySize + 2f : KeySize;
+            Handles.color = on ? Color.white : (selected ? KeyColor : KeyColor * 0.8f);
+            Handles.DrawAAConvexPolygon(new Vector3(p.x, p.y - s), new Vector3(p.x + s, p.y), new Vector3(p.x, p.y + s), new Vector3(p.x - s, p.y));
+        }
+    }
+
+    bool PickKey(Rect lanes, BossVictoryTrack track, Vector2 mouse, out int clip, out int key)
+    {
+        clip = key = -1;
+        if (!IsKeyed(track)) return false;
+        float best = HandleSize;
+        List<BossVictoryClip> clips = Timeline.Clips(track);
+        for (int i = 0; i < clips.Count; i++)
+        {
+            Rect r = ClipRect(lanes, TrackRow(track), clips[i]);
+            int n = KeyCount(track, i);
+            for (int k = 0; k < n; k++)
+            {
+                float d = Vector2.Distance(mouse, KeyPoint(r, track, i, k));
+                if (d > best) continue;
+                best = d;
+                clip = i;
+                key = k;
+            }
+        }
+        return clip >= 0;
+    }
+
+    // 더블클릭 = 그 시각에 중간 키(지금 곡선 값으로 — 모양이 안 바뀐다).
+    bool TryAddKeyAt(Rect lanes, Vector2 mouse)
+    {
+        foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
+        {
+            if (!IsKeyed(track) || !RowRect(lanes, TrackRow(track)).Contains(mouse)) continue;
+            List<BossVictoryClip> clips = Timeline.Clips(track);
+            for (int i = clips.Count - 1; i >= 0; i--)
+            {
+                Rect r = ClipRect(lanes, TrackRow(track), clips[i]);
+                if (!r.Contains(mouse)) continue;
+                AddKey(track, i, (mouse.x - r.x) / Mathf.Max(1f, r.width));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void AddKey(BossVictoryTrack track, int clip, float u)
+    {
+        u = Mathf.Clamp01(u);
+        Record("처치 연출 타임라인 키 추가");
+        int added;
+        if (track == BossVictoryTrack.CameraCut)
+        {
+            Timeline.SyncCameraCutShots();
+            BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[clip];
+            shot.MigrateToKeys();
+            if (shot.keys.Count == 1)   // 고정 컷 → 끝 키(같은 화면)부터 — 중간 키는 그 사이
+            {
+                BossVictoryCameraCuts.CutKey end = shot.keys[0];
+                end.u = 1f;
+                shot.keys.Add(end);
+            }
+            BossVictoryCameraCuts.LocalPose(shot.keys, shot.smoothPath, u, out Vector3 p, out Quaternion q, out float fov);
+            BossVictoryKeys.Segment(shot.keys, u, out int seg, out _);
+            added = BossVictoryKeys.Insert(shot.keys, BossVictoryCameraCuts.CutKey.Make(u, p, q, fov, shot.keys[seg].curve));
+            Timeline.cameraCutShots[clip] = shot;
+        }
+        else
+        {
+            List<BossVictoryClip> clips = Timeline.Clips(track);
+            BossVictoryClip c = clips[clip];
+            c.MigrateFadesToKeys();
+            BossVictoryKeys.Segment(c.keys, u, out int seg, out _);
+            added = BossVictoryKeys.Insert(c.keys, BossVictoryKey.Make(u, BossVictoryKeys.Value(c.keys, u), c.keys[seg].curve));
+            clips[clip] = c;
+        }
+        Select((int)track, clip, -1);
+        _selKey = added;
+        Save();
+        Repaint();
+    }
+
+    void DragKey(BossVictoryTrack track, int clip, int key, float mouseTime)
+    {
+        float u = (Snap(mouseTime) - KeySpanStart(track, clip)) / KeySpanLength(track, clip);
+        if (track == BossVictoryTrack.CameraCut)
+        {
+            BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[clip];
+            BossVictoryCameraCuts.CutKey k = shot.keys[key];
+            k.u = BossVictoryKeys.ClampMiddleU(shot.keys, key, u);
+            shot.keys[key] = k;
+            return;
+        }
+        BossVictoryClip c = Timeline.Clips(track)[clip];
+        BossVictoryKey sk = c.keys[key];
+        sk.u = BossVictoryKeys.ClampMiddleU(c.keys, key, u);
+        c.keys[key] = sk;
+    }
+
+    void DeleteSelectedKey()
+    {
+        var track = (BossVictoryTrack)_selTrack;
+        int n = KeyCount(track, _selIndex);
+        if (_selKey <= 0 || _selKey >= n - 1) return;   // 시작·끝 키는 클립 양 끝 — 지우지 않는다
+        Record("처치 연출 타임라인 키 삭제");
+        if (track == BossVictoryTrack.CameraCut) Timeline.cameraCutShots[_selIndex].keys.RemoveAt(_selKey);
+        else Timeline.Clips(track)[_selIndex].keys.RemoveAt(_selKey);
+        _selKey = -1;
+        Save();
+        Repaint();
+    }
+
+    void DrawKeyListButtons(BossVictoryTrack track)
+    {
+        int n = KeyCount(track, _selIndex);
+        float u = (_playhead - KeySpanStart(track, _selIndex)) / KeySpanLength(track, _selIndex);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField($"키 {n}개", GUILayout.Width(60f));
+            using (new EditorGUI.DisabledScope(u <= 0f || u >= 1f))
+                if (GUILayout.Button($"재생 헤드에 중간 키 ({_playhead:0.00}초)")) AddKey(track, _selIndex, u);
+            using (new EditorGUI.DisabledScope(_selKey <= 0 || _selKey >= n - 1))
+                if (GUILayout.Button("선택 키 삭제", GUILayout.Width(90f))) DeleteSelectedKey();
+        }
+        EditorGUILayout.LabelField("클립 위 마름모 = 키 · 더블클릭 = 중간 키 추가 · 중간 키 끌기 = 시각 · Del = 선택 키 삭제(시작·끝 키는 고정). 키 시각은 클립 비율이라 클립을 옮기거나 늘이면 따라간다.", EditorStyles.wordWrappedMiniLabel);
+    }
+
+    void DrawIntensityKeyInspector(BossVictoryTrack track)
+    {
+        BossVictoryClip c = Timeline.Clips(track)[_selIndex];
+        if (!c.HasKeys) return;
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("세기 키", EditorStyles.miniBoldLabel);
+        DrawKeyListButtons(track);
+        if (_selKey < 0 || _selKey >= c.keys.Count) return;
+        BossVictoryKey k = c.keys[_selKey];
+        bool middle = _selKey > 0 && _selKey < c.keys.Count - 1;
+        EditorGUI.BeginChangeCheck();
+        using (new EditorGUI.DisabledScope(!middle))
+        {
+            float t = EditorGUILayout.FloatField($"키 #{_selKey + 1} 시각(초)", c.start + k.u * c.length);
+            k.u = BossVictoryKeys.ClampMiddleU(c.keys, _selKey, (t - c.start) / Mathf.Max(MinLength, c.length));
+        }
+        k.value = EditorGUILayout.Slider("세기", k.value, 0f, 1f);
+        using (new EditorGUI.DisabledScope(_selKey >= c.keys.Count - 1))
+            k.curve = (BossVictoryKeyCurve)EditorGUILayout.Popup("다음 키까지 곡선", (int)k.curve, KeyCurveLabels);
+        if (EditorGUI.EndChangeCheck())
+        {
+            RecordField("처치 연출 타임라인 세기 키");
+            c.keys[_selKey] = k;
+            Save();
+        }
+    }
+
+    void DrawCutKeyInspector()
+    {
+        BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[_selIndex];
+        if (!shot.HasKeys) return;
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("화면 키", EditorStyles.miniBoldLabel);
+        DrawKeyListButtons(BossVictoryTrack.CameraCut);
+        int key = _selKey >= 0 && _selKey < shot.keys.Count ? _selKey : 0;
+        BossVictoryCameraCuts.CutKey k = shot.keys[key];
+        bool middle = key > 0 && key < shot.keys.Count - 1;
+        float start = Timeline.cameraCut[_selIndex].start, span = KeySpanLength(BossVictoryTrack.CameraCut, _selIndex);
+        EditorGUILayout.LabelField($"키 #{key + 1}{(key == 0 ? " (시작)" : key == shot.keys.Count - 1 ? " (끝)" : "")}{(shot.keys.Count == 1 ? " — 고정 컷" : "")}", EditorStyles.miniBoldLabel);
+        EditorGUI.BeginChangeCheck();
+        using (new EditorGUI.DisabledScope(!middle))
+        {
+            float t = EditorGUILayout.FloatField("시각(초)", start + k.u * span);
+            k.u = BossVictoryKeys.ClampMiddleU(shot.keys, key, (t - start) / span);
+        }
+        k.position = EditorGUILayout.Vector3Field("위치(기준 m)", k.position);
+        k.rotation = Quaternion.Euler(EditorGUILayout.Vector3Field("회전(기준 °)", k.rotation.eulerAngles));
+        k.fov = EditorGUILayout.Slider("FOV", k.fov, 10f, 90f);
+        using (new EditorGUI.DisabledScope(key >= shot.keys.Count - 1))
+            k.curve = (BossVictoryKeyCurve)EditorGUILayout.Popup("다음 키까지 곡선", (int)k.curve, KeyCurveLabels);
+        if (EditorGUI.EndChangeCheck())
+        {
+            RecordField("처치 연출 타임라인 화면 키");
+            shot.keys[key] = k;
+            Save();
+        }
     }
 
     // 편집 한 번 = Undo 한 단계(새 묶음). 끌기는 시작~끝을 한 묶음(BeginDragUndo·RecordDrag·EndDragUndo).
@@ -541,6 +766,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 }
                 else if (lanes.Contains(e.mousePosition))
                 {
+                    if (e.clickCount == 2 && TryAddKeyAt(lanes, e.mousePosition))
+                    {
+                        e.Use();
+                        break;
+                    }
                     BeginDrag(lanes, e.mousePosition);
                     if (_drag != DragMode.None) GUIUtility.hotControl = controlId;   // 창 밖으로 끌어도 놓칠 때까지 이 창이 받는다
                     e.Use();
@@ -615,6 +845,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             if (!RowRect(lanes, TrackRow(track)).Contains(mouse)) continue;
+            if (PickKey(lanes, track, mouse, out int keyClip, out int key))
+            {
+                Select((int)track, keyClip, -1);
+                _selKey = key;
+                _drag = key > 0 && key < KeyCount(track, keyClip) - 1 ? DragMode.Key : DragMode.None;   // 시작·끝 키는 클립 끝에 고정
+                return;
+            }
             if (PickClip(lanes, track, mouse, out int index, out DragMode mode))
             {
                 Select((int)track, index, -1);
@@ -628,28 +865,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _drag = DragMode.None;
     }
 
-    // 클립 손잡이 고르기 — 순서 = ① 선택 클립 위쪽 띠의 페이드 네모 ② 가장 가까운 끝(몸통보다 먼저, 이웃 클립 포함) ③ 몸통.
+    // 클립 손잡이 고르기(키 마름모는 먼저 PickKey) — 순서 = ① 가장 가까운 끝(몸통보다 먼저, 이웃 클립 포함) ② 몸통.
     // 끝 잡는 폭 = 클립 밖 EdgeOuter + 안쪽 클립 폭의 30%(EdgeInnerMin~EdgeInnerMax) — 짧은 클립·줌 아웃에서도 잡힌다.
-    // 페이드 네모는 선택한 클립의 위쪽 띠에서만(띠 아래는 끝이 이긴다) — 페이드 0 이라 네모가 끝에 붙어 있어도 서로 안 막는다.
     bool PickClip(Rect lanes, BossVictoryTrack track, Vector2 mouse, out int index, out DragMode mode)
     {
         List<BossVictoryClip> clips = Timeline.Clips(track);
         int row = TrackRow(track);
         index = -1;
         mode = DragMode.None;
-
-        if (IsFadeStrip(track, mouse, lanes, out Rect sr))
-        {
-            BossVictoryClip sel = clips[_selIndex];
-            float dIn = Mathf.Abs(mouse.x - FadeInX(sr, sel));
-            float dOut = Mathf.Abs(mouse.x - FadeOutX(sr, sel));
-            if (Mathf.Min(dIn, dOut) <= HandleSize)
-            {
-                index = _selIndex;
-                mode = dIn <= dOut ? DragMode.FadeIn : DragMode.FadeOut;
-                return true;
-            }
-        }
 
         float best = float.MaxValue;
         bool resizable = BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Cut;   // 컷 길이 = 다음 컷 시작까지(자동)
@@ -678,19 +901,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     const float EdgeInnerMax = 10f;
 
     static float EdgeInner(Rect r) => Mathf.Clamp(r.width * 0.3f, EdgeInnerMin, EdgeInnerMax);
-    static float FadeInX(Rect r, BossVictoryClip c) => r.x + c.fadeIn / Mathf.Max(MinLength, c.length) * r.width;
-    static float FadeOutX(Rect r, BossVictoryClip c) => r.xMax - c.fadeOut / Mathf.Max(MinLength, c.length) * r.width;
-
-    // 선택한 페이드 있는 클립의 위쪽 띠(페이드 네모 줄) 안인가.
-    bool IsFadeStrip(BossVictoryTrack track, Vector2 mouse, Rect lanes, out Rect clipRect)
-    {
-        clipRect = default;
-        if (_selTrack != (int)track || !HasClipSelection || !BossVictoryTimeline.HasFades(track)) return false;
-        clipRect = ClipRect(lanes, TrackRow(track), Timeline.Clips(track)[_selIndex]);
-        return mouse.y <= clipRect.y + HandleSize + 1f && mouse.x >= clipRect.x - HandleSize && mouse.x <= clipRect.xMax + HandleSize;
-    }
-
-    // 마우스 커서 — 끝 = 좌우 화살표 · 몸통 = 이동 · 페이드 네모 = 밀기.
+    // 마우스 커서 — 끝 = 좌우 화살표 · 몸통 = 이동 · 중간 키 = 밀기.
     void AddCursorRects(Rect lanes)
     {
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
@@ -702,7 +913,6 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             List<BossVictoryClip> clips = Timeline.Clips(track);
-            bool fadeStripRow = _selTrack == (int)track && HasClipSelection && BossVictoryTimeline.HasFades(track);
             bool resizable = BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Cut;
             for (int i = 0; i < clips.Count; i++)
             {
@@ -714,14 +924,6 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 }
                 float inner = EdgeInner(r);
                 float top = r.y, height = r.height;
-                if (fadeStripRow && i == _selIndex)
-                {
-                    float strip = HandleSize + 1f;
-                    AddCursor(lanes, new Rect(FadeInX(r, clips[i]) - HandleSize, r.y, HandleSize * 2f, strip), MouseCursor.SlideArrow);
-                    AddCursor(lanes, new Rect(FadeOutX(r, clips[i]) - HandleSize, r.y, HandleSize * 2f, strip), MouseCursor.SlideArrow);
-                    top += strip;
-                    height -= strip;
-                }
                 AddCursor(lanes, new Rect(r.x + inner, r.y, Mathf.Max(0f, r.width - inner * 2f), r.height), MouseCursor.MoveArrow);
                 AddCursor(lanes, new Rect(r.x - EdgeOuter, top, EdgeOuter + inner, height), MouseCursor.ResizeHorizontal);
                 AddCursor(lanes, new Rect(r.xMax - inner, top, EdgeOuter + inner, height), MouseCursor.ResizeHorizontal);
@@ -753,6 +955,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             return;
         }
         if (!HasClipSelection) return;
+        if (_drag == DragMode.Key)
+        {
+            DragKey((BossVictoryTrack)_selTrack, _selIndex, _selKey, mt);
+            Repaint();
+            return;
+        }
         BossVictoryClip o = _dragOrig, c = o;
         float d = mt - _dragMouseT0;
         switch (_drag)
@@ -766,12 +974,6 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case DragMode.ResizeRight:
                 c.length = Mathf.Max(MinLength, Snap(o.End + d) - o.start);
-                break;
-            case DragMode.FadeIn:
-                c.fadeIn = Mathf.Clamp(Snap(mt - o.start), 0f, o.length);
-                break;
-            case DragMode.FadeOut:
-                c.fadeOut = Mathf.Clamp(Snap(o.End - mt), 0f, o.length);
                 break;
         }
         Timeline.Clips((BossVictoryTrack)_selTrack)[_selIndex] = Clamp((BossVictoryTrack)_selTrack, c);
@@ -855,7 +1057,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (!CanAdd(track)) return;
         Record("처치 연출 타임라인 클립 추가");
         List<BossVictoryClip> clips = Timeline.Clips(track);
-        clips.Add(NewClip(track, start));
+        BossVictoryClip added = NewClip(track, start);
+        if (BossVictoryTimeline.HasFades(track)) added.MigrateFadesToKeys();   // 효과 세기 = 키(255 후속 6)
+        clips.Add(added);
         if (track == BossVictoryTrack.CameraCut) Timeline.cameraCutShots.Add(BossVictoryCameraCuts.Cut.Default);
         Select((int)track, clips.Count - 1, -1);
         Save();
@@ -875,8 +1079,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         if (!HasClipSelection) return;
         s_clipboardTrack = (BossVictoryTrack)_selTrack;
-        s_clipboard = Timeline.Clips(s_clipboardTrack)[_selIndex];
-        s_clipboardShot = s_clipboardTrack == BossVictoryTrack.CameraCut ? Timeline.CameraCutShot(_selIndex) : BossVictoryCameraCuts.Cut.Default;
+        s_clipboard = Timeline.Clips(s_clipboardTrack)[_selIndex].WithCopiedKeys();
+        s_clipboardShot = s_clipboardTrack == BossVictoryTrack.CameraCut ? Timeline.CameraCutShot(_selIndex).WithCopiedKeys() : BossVictoryCameraCuts.Cut.Default;
         s_hasClipboard = true;
     }
 
@@ -884,14 +1088,16 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         if (!s_hasClipboard || !CanAdd(track)) return;
         Record("처치 연출 타임라인 붙여넣기");
-        BossVictoryClip c = s_clipboard;
+        BossVictoryClip c = s_clipboard.WithCopiedKeys();   // 키 목록은 클립마다 따로
+        if (BossVictoryTimeline.HasFades(track)) c.MigrateFadesToKeys();
+        else c.keys = null;
         c.start = Mathf.Max(0f, Snap(start));
         List<BossVictoryClip> clips = Timeline.Clips(track);
         clips.Add(Clamp(track, c));
         if (track == BossVictoryTrack.CameraCut)
         {
             Timeline.SyncCameraCutShots();   // 모자란 앞 번호 보정 뒤 이 클립 값
-            Timeline.cameraCutShots[clips.Count - 1] = s_clipboardTrack == BossVictoryTrack.CameraCut ? s_clipboardShot : BossVictoryCameraCuts.Cut.Default;
+            Timeline.cameraCutShots[clips.Count - 1] = s_clipboardTrack == BossVictoryTrack.CameraCut ? s_clipboardShot.WithCopiedKeys() : BossVictoryCameraCuts.Cut.Default;
         }
         Select((int)track, clips.Count - 1, -1);
         Save();
@@ -901,6 +1107,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void DeleteSelected()
     {
         if (!HasClipSelection) return;
+        if (_selKey >= 0)   // 키 선택 중 = 그 키(시작·끝 키는 지우지 않는다)
+        {
+            DeleteSelectedKey();
+            return;
+        }
         Record("처치 연출 타임라인 클립 삭제");
         Timeline.Clips((BossVictoryTrack)_selTrack).RemoveAt(_selIndex);
         if (_selTrack == (int)BossVictoryTrack.CameraCut && _selIndex < Timeline.cameraCutShots.Count) Timeline.cameraCutShots.RemoveAt(_selIndex);
@@ -1057,18 +1268,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             c.length = EditorGUILayout.FloatField("길이(초)", c.length);
             EditorGUILayout.LabelField("끝(초)", c.End.ToString("0.00"));
         }
-        if (BossVictoryTimeline.HasFades(track))
-        {
-            c.fadeIn = EditorGUILayout.FloatField("페이드 인(초)", c.fadeIn);
-            c.fadeOut = EditorGUILayout.FloatField("페이드 아웃(초)", c.fadeOut);
-            c.weight = EditorGUILayout.Slider("세기", c.weight, 0f, 1f);
-        }
         if (EditorGUI.EndChangeCheck())
         {
             RecordField("처치 연출 타임라인 클립 수치");
             Timeline.Clips(track)[_selIndex] = Clamp(track, c);
             Save();
         }
+        if (BossVictoryTimeline.HasFades(track)) DrawIntensityKeyInspector(track);
         DrawTrackShape(track);
     }
 
@@ -1087,18 +1293,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         shot.anchor = (BossVictoryCameraCuts.Anchor)EditorGUILayout.Popup(new GUIContent("기준",
                 "화면을 이 점 + 처치자→보스 수평 축 좌표계로 저장 — 어디서 죽든 같은 구도. 바꾸면 저장된 화면은 새 기준으로 다시 읽힌다(Scene 뷰로 다시 찍기 권장)."),
             (int)shot.anchor, AnchorLabels);
-        EditorGUILayout.LabelField("시작 화면", EditorStyles.miniBoldLabel);
-        shot.startPosition = EditorGUILayout.Vector3Field("위치(기준 m)", shot.startPosition);
-        shot.startRotation = Quaternion.Euler(EditorGUILayout.Vector3Field("회전(기준 °)", shot.startRotation.eulerAngles));
-        shot.startFov = EditorGUILayout.Slider("FOV", shot.startFov, 10f, 90f);
-        shot.hasEnd = EditorGUILayout.Toggle(new GUIContent("끝 화면 (이동)", "켜면 컷 구간 동안 시작 → 끝 화면으로 이동. 끄면 고정 컷."), shot.hasEnd);
-        using (new EditorGUI.DisabledScope(!shot.hasEnd))
-        {
-            shot.endPosition = EditorGUILayout.Vector3Field("위치(기준 m)", shot.endPosition);
-            shot.endRotation = Quaternion.Euler(EditorGUILayout.Vector3Field("회전(기준 °)", shot.endRotation.eulerAngles));
-            shot.endFov = EditorGUILayout.Slider("FOV", shot.endFov, 10f, 90f);
-            shot.ease = (BossVictoryCameraCuts.Ease)EditorGUILayout.Popup("이동 곡선", (int)shot.ease, EaseLabels);
-        }
+        shot.smoothPath = EditorGUILayout.Toggle(new GUIContent("부드러운 경로",
+            "키 3개 이상이면 위치를 Catmull-Rom 곡선으로 잇는다(키를 지나며 꺾이지 않음). 끄면 키 사이 직선."), shot.smoothPath);
         shot.hideWalls = EditorGUILayout.Toggle(new GUIContent("벽 숨김",
             "켜면 이 컷 카메라를 가리는 벽을 끈다(이동 중이면 매 프레임 그 위치로). 끄면 이 컷 동안 벽 숨김 없음 — 앞 컷에서 숨겼던 벽도 다시 보인다."), shot.hideWalls);
         if (EditorGUI.EndChangeCheck())
@@ -1108,6 +1304,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             Timeline.cameraCutShots[_selIndex] = shot;
             Save();
         }
+        DrawCutKeyInspector();
     }
 
     // ── 'Scene 뷰로' — 지금 보고 있는 Scene 뷰 화면을 컷 화면으로(255 후속 2) ──
@@ -1167,33 +1364,35 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         using (new EditorGUILayout.HorizontalScope())
         using (new EditorGUI.DisabledScope(reason != null))
         {
-            if (GUILayout.Button("지금 Scene 뷰로 시작 화면")) CaptureSceneView(s, end: false);
-            if (GUILayout.Button("지금 Scene 뷰로 끝 화면")) CaptureSceneView(s, end: true);
+            int key = _selKey >= 0 ? _selKey : 0;
+            if (GUILayout.Button($"지금 Scene 뷰로 이 키 (#{key + 1})")) CaptureSceneView(s, key);
+            if (GUILayout.Button("지금 Scene 뷰로 끝 화면")) CaptureSceneView(s, -1);
         }
         EditorGUILayout.LabelField(reason ?? $"기준 = {source} 처치자·보스 위치 · 컷 기준 '{AnchorLabel(shot.anchor)}'", EditorStyles.wordWrappedMiniLabel);
     }
 
-    void CaptureSceneView(BossVictoryCameraCuts.Subjects s, bool end)
+    // key = 그 키 화면을 지금 Scene 뷰로 · -1 = 끝 화면(키 1개면 끝 키를 만들어 이동 컷으로).
+    void CaptureSceneView(BossVictoryCameraCuts.Subjects s, int key)
     {
         if (!HasClipSelection || _selTrack != (int)BossVictoryTrack.CameraCut || !TryGetSceneView(out Vector3 pos, out Quaternion rot, out float fov)) return;
-        Record(end ? "처치 연출 타임라인 컷 끝 화면 = Scene 뷰" : "처치 연출 타임라인 컷 시작 화면 = Scene 뷰");
+        Record(key < 0 ? "처치 연출 타임라인 컷 끝 화면 = Scene 뷰" : "처치 연출 타임라인 컷 키 = Scene 뷰");
         Timeline.SyncCameraCutShots();
         BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[_selIndex];
+        shot.MigrateToKeys();
         BossVictoryCameraCuts.ToLocal(shot.anchor, s, pos, rot, out Vector3 lp, out Quaternion lr);
-        if (end)
+        if (key < 0)
         {
-            shot.hasEnd = true;
-            shot.endPosition = lp;
-            shot.endRotation = lr;
-            shot.endFov = fov;
+            if (shot.keys.Count == 1) shot.keys.Add(BossVictoryCameraCuts.CutKey.Make(1f, lp, lr, fov));
+            key = shot.keys.Count - 1;
         }
-        else
-        {
-            shot.startPosition = lp;
-            shot.startRotation = lr;
-            shot.startFov = fov;
-        }
+        key = Mathf.Clamp(key, 0, shot.keys.Count - 1);
+        BossVictoryCameraCuts.CutKey k = shot.keys[key];
+        k.position = lp;
+        k.rotation = lr;
+        k.fov = fov;
+        shot.keys[key] = k;
         Timeline.cameraCutShots[_selIndex] = shot;
+        _selKey = key;
         Save();
         Repaint();
     }
@@ -1206,9 +1405,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Timeline.SyncCameraCutShots();
         BossVictoryCameraCuts.Cut shot = BossVictoryCameraCuts.Cut.Default;
         BossVictoryCameraCuts.ToLocal(shot.anchor, s, pos, rot, out Vector3 lp, out Quaternion lr);
-        shot.startPosition = shot.endPosition = lp;
-        shot.startRotation = shot.endRotation = lr;
-        shot.startFov = shot.endFov = fov;
+        shot.keys = new List<BossVictoryCameraCuts.CutKey> { BossVictoryCameraCuts.CutKey.Make(0f, lp, lr, fov) };
         Timeline.cameraCut.Add(BossVictoryClip.Make(Mathf.Max(0f, Snap(_playhead)), 1f));
         Timeline.cameraCutShots.Add(shot);
         Select((int)BossVictoryTrack.CameraCut, Timeline.cameraCut.Count - 1, -1);
