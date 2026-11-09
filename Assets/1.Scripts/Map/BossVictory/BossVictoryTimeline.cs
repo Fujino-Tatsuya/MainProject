@@ -24,7 +24,7 @@ public enum BossVictoryMarker
     HideOthers,       // 처치자 외 플레이어 캐릭터 숨김(모든 피어)
     LobbyTransition,  // 로비 전환 — 호스트 화면이 지나면 서버가 결과로 넘긴다
     BackDashStart,    // 백대쉬 시작 — 하던 동작이 남아 있으면 끊고 백대쉬(255 후속 4 — 옛 '처치자 동작 끝 → 백대쉬' 마커는 처치자 평타 클립 끝으로)
-    FinisherStart,    // 스킬 연출 시작 — 처치 연출 스킬을 표시용으로 바로(백대쉬가 덜 끝났으면 끊음, 이전 스킬을 기다리지 않음)
+    FinisherStart,    // 스킬 연출 시작 — 처치 연출 스킬을 표시용으로 바로(백대쉬가 덜 끝났으면 끊음, 이전 스킬을 기다리지 않음). 창은 '처치 연출 스킬' 클립(시작 = 이 값, 끝 = 클립 끝·자르기 finisherTrimSeconds — 255 후속 7)
     SlowStart,        // 느려짐 시작 — 처치자 End 후 배율(0 = 끔, 스킬 End 이벤트). 보스는 보스 슬로우가 꺼졌을 때만 따른다(255 후속 5)
     BossHitAnim,      // 보스 피격 애니 시작 — 설정 SO 상태(23호 getowned = Boss_23_ParryHit_InPlace)를 처음부터, 보스 ×1(상태 이름이 비면 없음 — 255 후속 5)
     BossFreeze,       // 보스 정지 — 보스 배율 0(그 자세로). 0 = 끔
@@ -121,6 +121,8 @@ public sealed class BossVictoryTimeline
     [Min(0f)] public float backDashStartTime = DefaultActionEnd;
     [Tooltip("스킬 연출 시작(초). 처치 연출 스킬을 표시용으로 바로 튼다 — 백대쉬가 덜 끝났으면 끊고, 이전 스킬을 기다리지 않는다.")]
     [Min(0f)] public float finisherStartTime = DefaultFinisherStart;
+    [Tooltip("처치 연출 스킬 클립 끝 자르기(클립 시간 초, 공속 100% 기준 — 프레임 단위). 0 = 안 자름(클립 끝까지). 그 프레임에서 처치자 애니가 멈춘다(배율 0, 255 후속 7).")]
+    [Min(0f)] public float finisherTrimSeconds;
     [Tooltip("느려짐 시작(초). 처치자·보스 End 후 배율. 0 = 끔 — 처치 연출 스킬 End 이벤트에서.")]
     [Min(0f)] public float slowStartTime;
     [Tooltip("보스 피격 애니 시작(초) — 0 = 처치 순간. 상태 이름(설정 SO bossHitStateName)이 비면 쓰지 않는다.")]
