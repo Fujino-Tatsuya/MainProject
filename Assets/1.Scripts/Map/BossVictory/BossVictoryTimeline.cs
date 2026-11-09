@@ -14,6 +14,7 @@ public enum BossVictoryTrack
     HudHide,     // HUD 숨김(0.5 초과)
     Hold,        // 정지 유지 — 클립 동안 화면 효과 시각을 클립 시작에 고정
     CrtOff,      // TV 꺼짐 — 첫 클립만, 시작에 화면 캡처·길이 = 꺼짐 길이
+    CameraCut,   // 카메라 컷 — 클립 시작 = 컷 시작, 다음 컷 시작까지 유지(길이는 자동). 컷 값 = cameraCutShots 같은 번호(255)
 }
 
 /// <summary>보스 처치 연출 타임라인 순간 마커.</summary>
@@ -22,6 +23,7 @@ public enum BossVictoryMarker
     FocusKiller,      // 처치자가 아닌 피어 카메라 → 처치자(즉시 컷)
     HideOthers,       // 처치자 외 플레이어 캐릭터 숨김(모든 피어)
     LobbyTransition,  // 로비 전환 — 호스트 화면이 지나면 서버가 결과로 넘긴다
+    KillerActionEnd,  // 처치자 동작 끝 → 백대쉬 — 처치 순간 하던 동작(평타 등)을 이 시각에 끊고 백대쉬(0 = 끔, 클립 끝까지 — 255)
 }
 
 /// <summary>클립 한 개 — 시작·길이·페이드 인/아웃·세기(초, 처치 판정 뒤).</summary>
@@ -63,7 +65,7 @@ public struct BossVictoryClip
 [Serializable]
 public sealed class BossVictoryTimeline
 {
-    public enum TrackKind { Range, Pulse, Single }
+    public enum TrackKind { Range, Pulse, Single, Cut }
 
     public List<BossVictoryClip> desaturate = new List<BossVictoryClip>();
     public List<BossVictoryClip> amber = new List<BossVictoryClip>();
@@ -74,10 +76,16 @@ public sealed class BossVictoryTimeline
     public List<BossVictoryClip> hudHide = new List<BossVictoryClip>();
     public List<BossVictoryClip> hold = new List<BossVictoryClip>();
     public List<BossVictoryClip> crtOff = new List<BossVictoryClip>();
+    /// <summary>카메라 컷 클립 — 시작만 의미(길이 = 다음 컷 시작까지, <see cref="FitCameraCutLengths"/> 가 맞춘다).</summary>
+    public List<BossVictoryClip> cameraCut = new List<BossVictoryClip>();
+    /// <summary>카메라 컷 값 — <see cref="cameraCut"/> 와 같은 번호(창이 추가·삭제·붙여넣기를 함께 한다, 개수 어긋나면 <see cref="SyncCameraCutShots"/>).</summary>
+    public List<BossVictoryCameraCuts.Cut> cameraCutShots = new List<BossVictoryCameraCuts.Cut>();
 
     [Min(0f)] public float focusKillerTime = 0.2f;
     [Min(0f)] public float hideOthersTime = 0.2f;
     [Min(0f)] public float lobbyTransitionTime = 5.6f;
+    [Tooltip("처치자 동작 끝 → 백대쉬(초). 0 = 끔 — 하던 동작 클립 끝까지 재생 뒤 백대쉬(255 전과 같음).")]
+    [Min(0f)] public float killerActionEndTime;
 
     public static readonly BossVictoryTrack[] Tracks = (BossVictoryTrack[])Enum.GetValues(typeof(BossVictoryTrack));
     public static readonly BossVictoryMarker[] Markers = (BossVictoryMarker[])Enum.GetValues(typeof(BossVictoryMarker));
@@ -93,6 +101,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.HudHide => hudHide,
         BossVictoryTrack.Hold => hold,
         BossVictoryTrack.CrtOff => crtOff,
+        BossVictoryTrack.CameraCut => cameraCut,
         _ => throw new ArgumentOutOfRangeException(nameof(track)),
     };
 
@@ -101,6 +110,7 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.FocusKiller => focusKillerTime,
         BossVictoryMarker.HideOthers => hideOthersTime,
         BossVictoryMarker.LobbyTransition => lobbyTransitionTime,
+        BossVictoryMarker.KillerActionEnd => killerActionEndTime,
         _ => throw new ArgumentOutOfRangeException(nameof(marker)),
     };
 
@@ -112,6 +122,7 @@ public sealed class BossVictoryTimeline
             case BossVictoryMarker.FocusKiller: focusKillerTime = time; break;
             case BossVictoryMarker.HideOthers: hideOthersTime = time; break;
             case BossVictoryMarker.LobbyTransition: lobbyTransitionTime = time; break;
+            case BossVictoryMarker.KillerActionEnd: killerActionEndTime = time; break;
         }
     }
 
@@ -119,11 +130,13 @@ public sealed class BossVictoryTimeline
     {
         BossVictoryTrack.Tear or BossVictoryTrack.Smear => TrackKind.Pulse,
         BossVictoryTrack.CrtOff => TrackKind.Single,
+        BossVictoryTrack.CameraCut => TrackKind.Cut,
         _ => TrackKind.Range,
     };
 
-    /// <summary>페이드·세기가 의미 있는 트랙인가(정지 유지·TV 꺼짐은 구간만).</summary>
-    public static bool HasFades(BossVictoryTrack track) => track != BossVictoryTrack.Hold && track != BossVictoryTrack.CrtOff;
+    /// <summary>페이드·세기가 의미 있는 트랙인가(정지 유지·TV 꺼짐은 구간만 · 카메라 컷은 시작만).</summary>
+    public static bool HasFades(BossVictoryTrack track) =>
+        track != BossVictoryTrack.Hold && track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut;
 
     public static string TrackLabel(BossVictoryTrack track) => track switch
     {
@@ -136,6 +149,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.HudHide => "HUD 숨김",
         BossVictoryTrack.Hold => "정지 유지",
         BossVictoryTrack.CrtOff => "TV 꺼짐",
+        BossVictoryTrack.CameraCut => "카메라 컷",
         _ => track.ToString(),
     };
 
@@ -144,6 +158,7 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.FocusKiller => "카메라 → 처치자",
         BossVictoryMarker.HideOthers => "처치자 외 숨김",
         BossVictoryMarker.LobbyTransition => "로비 전환",
+        BossVictoryMarker.KillerActionEnd => "처치자 동작 끝 → 백대쉬",
         _ => marker.ToString(),
     };
 
@@ -179,6 +194,51 @@ public sealed class BossVictoryTimeline
         clip = default;
         return false;
     }
+
+    // ── 카메라 컷(255) ──
+
+    /// <summary>시각 t 에 켜진 카메라 컷 번호(없으면 -1) — 클립 시작이 t 이하인 것 중 가장 늦은 것.</summary>
+    public int ActiveCameraCut(float t) => BossVictoryCameraCuts.ActiveIndex(cameraCut, t);
+
+    /// <summary>컷 <paramref name="index"/> 의 값(값 목록이 모자라면 기본값).</summary>
+    public BossVictoryCameraCuts.Cut CameraCutShot(int index) =>
+        index >= 0 && index < cameraCutShots.Count ? cameraCutShots[index] : BossVictoryCameraCuts.Cut.Default;
+
+    /// <summary>컷 값 개수를 클립 개수에 맞춘다(모자라면 기본값, 넘치면 버림). 바꿨으면 true.</summary>
+    public bool SyncCameraCutShots()
+    {
+        bool changed = false;
+        while (cameraCutShots.Count < cameraCut.Count) { cameraCutShots.Add(BossVictoryCameraCuts.Cut.Default); changed = true; }
+        if (cameraCutShots.Count > cameraCut.Count) { cameraCutShots.RemoveRange(cameraCut.Count, cameraCutShots.Count - cameraCut.Count); changed = true; }
+        return changed;
+    }
+
+    public const float MinCutLength = 0.1f;
+
+    /// <summary>카메라 컷 클립 길이 = 다음(시작이 더 늦은) 컷 시작까지 · 마지막 컷 = 로비 전환 마커까지(최소 <see cref="MinCutLength"/>). 표시용 — 판정은 시작만 본다.</summary>
+    public void FitCameraCutLengths()
+    {
+        for (int i = 0; i < cameraCut.Count; i++)
+        {
+            BossVictoryClip c = cameraCut[i];
+            float next = float.PositiveInfinity;
+            for (int j = 0; j < cameraCut.Count; j++)
+            {
+                float s = cameraCut[j].start;
+                if (j != i && (s > c.start || (s == c.start && j > i)) && s < next) next = s;
+            }
+            float end = float.IsPositiveInfinity(next) ? lobbyTransitionTime : next;
+            c.length = Mathf.Max(MinCutLength, end - c.start);
+            c.fadeIn = c.fadeOut = 0f;
+            c.weight = 1f;
+            cameraCut[i] = c;
+        }
+    }
+
+    // ── 처치자 동작 끝 → 백대쉬(255) ──
+
+    /// <summary>처치자의 하던 동작을 지금 끊고 백대쉬로 넘어가는가 — 마커가 켜져 있고(&gt; 0) 시각이 지났다. 클립 끝은 호출부가 따로 본다(둘 중 이른 쪽).</summary>
+    public static bool ShouldEndKillerAction(float markerTime, float t) => markerTime > 0f && t >= markerTime;
 
     /// <summary>모든 클립 끝·마커 중 가장 늦은 시각(창 시간축 길이).</summary>
     public float Duration

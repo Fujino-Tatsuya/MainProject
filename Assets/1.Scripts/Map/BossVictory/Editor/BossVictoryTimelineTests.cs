@@ -91,6 +91,7 @@ public sealed class BossVictoryTimelineTests
             }
         }
         Assert.LessOrEqual(tl.crtOff.Count, 1, "TV 꺼짐은 1개만(창이 막는다)");
+        Assert.AreEqual(tl.cameraCut.Count, tl.cameraCutShots.Count, "카메라 컷 값 개수 = 컷 클립 개수");
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
             Assert.GreaterOrEqual(tl.MarkerTime(marker), 0f, marker.ToString());
         Assert.Greater(tl.lobbyTransitionTime, 0f, "로비 전환 마커가 0 이면 처치 순간 바로 끝난다");
@@ -143,5 +144,38 @@ public sealed class BossVictoryTimelineTests
         Assert.AreEqual(0f, tl.MarkerTime(BossVictoryMarker.LobbyTransition));
         tl.SetMarkerTime(BossVictoryMarker.FocusKiller, 1.23f);
         Assert.AreEqual(1.23f, tl.focusKillerTime, 1e-6f);
+    }
+
+    // ── 255: 처치자 동작 끝 → 백대쉬 마커 ──
+
+    [Test]
+    public void 처치자_동작_끝_마커는_0이면_끔_기본도_끔()
+    {
+        Assert.AreEqual(0f, BossVictoryTimeline.CreateDefault().killerActionEndTime, "기본 = 끔(255 전과 같음 — 클립 끝까지)");
+        Assert.AreEqual(0f, new BossVictoryTimeline().killerActionEndTime);
+        Assert.IsFalse(BossVictoryTimeline.ShouldEndKillerAction(0f, 0f));
+        Assert.IsFalse(BossVictoryTimeline.ShouldEndKillerAction(0f, 10f), "끔이면 언제든 클립 끝까지");
+        Assert.IsFalse(BossVictoryTimeline.ShouldEndKillerAction(-1f, 10f));
+    }
+
+    [Test]
+    public void 처치자_동작_끝_마커는_시각이_지나면_끊는다()
+    {
+        Assert.IsFalse(BossVictoryTimeline.ShouldEndKillerAction(0.4f, 0.39f));
+        Assert.IsTrue(BossVictoryTimeline.ShouldEndKillerAction(0.4f, 0.4f), "마커 순간부터");
+        Assert.IsTrue(BossVictoryTimeline.ShouldEndKillerAction(0.4f, 2f));
+    }
+
+    [Test]
+    public void 처치자_동작_끝_마커_이름_시각_설정()
+    {
+        var tl = new BossVictoryTimeline();
+        CollectionAssert.Contains(BossVictoryTimeline.Markers, BossVictoryMarker.KillerActionEnd);
+        Assert.AreEqual("처치자 동작 끝 → 백대쉬", BossVictoryTimeline.MarkerLabel(BossVictoryMarker.KillerActionEnd));
+        tl.SetMarkerTime(BossVictoryMarker.KillerActionEnd, 0.35f);
+        Assert.AreEqual(0.35f, tl.killerActionEndTime, 1e-6f);
+        Assert.AreEqual(0.35f, tl.MarkerTime(BossVictoryMarker.KillerActionEnd), 1e-6f);
+        tl.SetMarkerTime(BossVictoryMarker.KillerActionEnd, -2f);
+        Assert.AreEqual(0f, tl.killerActionEndTime, "음수 = 0(끔)");
     }
 }

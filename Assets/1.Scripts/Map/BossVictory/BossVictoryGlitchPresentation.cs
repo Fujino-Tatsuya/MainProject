@@ -15,8 +15,9 @@ using VeyTrace.Rendering.Occlusion;
 /// <para><b>3단계</b> — <b>처치 판정 순간부터</b>(11-09 사양 변경 — 처치 연출 스킬은 글리치 속에서 재생) 화면 글리치(<see cref="BossVictoryGlitchRender"/>,
 /// 세기 = 설정 SO 타임라인 곡선, 시계 <see cref="GlitchTime"/> = 복제 처치 시각 기준) ·
 /// 플레이어 흑백·보스 노이즈(렌더링 레이어 비트) · HUD 숨김.</para>
-/// <para><b>4단계</b> — 글리치 시계로 카메라 컷(설정 SO 목록, <see cref="BossVictoryCameraCuts"/>): 첫 컷부터 연출 vcam(블렌드 없음) · 컷마다 그 순간 위치로 구도 고정 ·
-/// 연출 동안 월드 UI·윤곽선·벽 가림·카메라 흔들림 끔 · 카메라를 향하지 않는 벽 숨김.</para>
+/// <para><b>4단계</b> — 글리치 시계로 카메라 컷(타임라인 '카메라 컷' 트랙, <see cref="BossVictoryCameraCuts"/>): 첫 컷부터 연출 vcam(블렌드 없음) · 컷마다 그 순간 위치로 구도 고정 ·
+/// 연출 동안 월드 UI·윤곽선·벽 가림·카메라 흔들림 끔 · 컷별 '벽 숨김'이 켜진 컷에서만 카메라를 향하지 않는 벽 숨김(끈 컷은 다시 보임, 255).</para>
+/// <para><b>처치자 순서</b> — 하던 동작(×0.5) → 백대쉬 → 처치 연출 스킬. 하던 동작은 클립 끝 또는 타임라인 '처치자 동작 끝 → 백대쉬' 마커 중 이른 쪽에서 끊는다(255, 마커 0 = 끔).</para>
 /// <para><b>타임라인</b>(설정 SO <see cref="BossVictoryTimeline"/> — 트랙별 클립·마커, 창 <c>Tools/Boss Victory/처치 연출 타임라인</c>): 화면 효과·HUD 숨김·정지 유지·TV 꺼짐·로비 전환은
 /// 매 프레임 시각 t 의 상태로 맞춘다(되감아도 맞다). <b>마커</b>(기본 0.20 = 첫 찢김 최고점): 처치자가 아닌 피어의 게임 카메라가 처치자로 즉시 컷
 /// (<see cref="CameraTargetSwitcher.SetTemporaryFollow"/>) · 처치자 외 플레이어 캐릭터를 이 화면에서 숨김(렌더러·월드 캔버스·머리 위 체력바 끔 —
@@ -68,6 +69,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 처치자 순서 단계(디버그 표시용).</summary>
     public string KillerStepName => _killerStep.ToString();
     bool _finisherWarned;
+    float _finisherEndedAt = -1f;
+
+    /// <summary>[이 피어] 이번 회차 처치 연출 스킬 End 가 온 글리치 시각(아직이면 -1). 타임라인 창 'End 시각' 표시용(255 — 판정엔 안 씀).</summary>
+    public float FinisherEndedAt => _running ? _finisherEndedAt : -1f;
 
     readonly List<GameObject> _others = new List<GameObject>();
 
@@ -119,12 +124,16 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     CinemachineExternalImpulseListener _impulseListener;
     bool _impulseWasEnabled;
     readonly List<Canvas> _hiddenWorldCanvases = new List<Canvas>();
-    readonly List<Renderer> _wallCandidates = new List<Renderer>();
-    readonly List<Vector3> _wallNormals = new List<Vector3>();
-    readonly List<Vector3> _wallCenters = new List<Vector3>();
-    readonly List<Renderer> _hiddenWalls = new List<Renderer>();
+    struct WallEntry
+    {
+        public Renderer Renderer;
+        public Vector3 Normal;
+        public Vector3 Center;
+        public bool Hidden;
+    }
+    readonly List<WallEntry> _walls = new List<WallEntry>();
 
-    /// <summary>[이 피어] 지금 카메라 컷 번호(설정 목록 — 게임 카메라면 -1).</summary>
+    /// <summary>[이 피어] 지금 카메라 컷 번호(타임라인 카메라 컷 트랙 — 게임 카메라면 -1).</summary>
     public int CutIndex => _cutIndex;
 
     /// <summary>[이 피어] 처치 판정 뒤 초(연출 없으면 -1). 컷·CRT 꺼짐이 같은 시계를 읽는다.</summary>
@@ -140,6 +149,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (!_running || !_glitchOn) return false;
         _glitchTime = Mathf.Max(0f, t);
         return true;
+    }
+
+    /// <summary>[이 피어] 타임라인 창에서 컷 값을 고쳤다 — 지금 컷을 다음 Update 에 새 값으로 다시 잡는다(구도·벽 숨김).</summary>
+    public void PreviewRecut()
+    {
+        if (_running && _cutIndex >= 0) _cutIndex = -1;
     }
 #endif
 
@@ -180,7 +195,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             Begin(v);
         }
         if (!_running) return;
-        if (_killerStep == KillerStep.CurrentAction && ReachedClipEnd(_killerAnimator, _killerActionState)) BeginBackDash();
+        // 하던 동작 → 백대쉬 = 클립 끝 또는 타임라인 '처치자 동작 끝' 마커 중 이른 쪽(255 — 마커 0 = 끔, 클립 끝까지).
+        if (_killerStep == KillerStep.CurrentAction &&
+            (ReachedClipEnd(_killerAnimator, _killerActionState) ||
+             BossVictoryTimeline.ShouldEndKillerAction(_settings.timeline.killerActionEndTime, _glitchTime)))
+            BeginBackDash();
         if (_finisherPending) TryStartFinisher();
         TickAnimators();
         if (_glitchOn) TickGlitch();
@@ -194,6 +213,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _state = v;
         _running = true;
         _phase = Phase.Finisher;
+        _finisherEndedAt = -1f;
         _finisherPending = false;
         _finisherWarned = false;
         _killerStep = KillerStep.None;
@@ -375,6 +395,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_killerSkills != null) _killerSkills.PresentationSkillEnded -= OnFinisherEnded;
         if (!_running || _phase != Phase.Finisher) return;
         _phase = Phase.Slow;
+        _finisherEndedAt = _glitchTime;
         ApplyEffectRates();
         Edit.Log($"[BossVictory] 처치 연출 스킬 End — 처치자 ×{_settings.killerAfterFinisherScale} · 보스 ×{_settings.bossAfterFinisherScale} (글리치 t {_glitchTime:0.00})", this);
         FinisherEnded?.Invoke(_state);
@@ -592,13 +613,25 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // ── 카메라 컷(4단계) ───────────────────────────────────────────────────
 
     // 컷 시계 = 글리치 시계(길이로 자르지 않는다 — 마지막 컷이 끝까지 유지). 구도는 컷이 바뀌는 순간 한 번 계산해 고정한다(흔들림 없음).
+    // 컷마다 벽 숨김 켜기/끄기(255): 켠 컷 = 이 컷 카메라에서 가리는 벽을 더 끈다(이어지는 켠 컷끼리 누적 — 255 전과 같음) · 끈 컷 = 숨겼던 벽을 모두 다시 켠다.
+    // 되감기(스크럽)로 앞 컷으로 가면 벽을 모두 켠 뒤 그 컷 기준으로 다시 끈다 · 첫 컷 전으로 가면 게임 카메라로 돌아간다.
     void TickCuts()
     {
-        int index = BossVictoryCameraCuts.ActiveIndex(_settings.cuts, _glitchTime);
-        if (index == _cutIndex || index < 0) return;
+        BossVictoryTimeline tl = _settings.timeline;
+        int index = tl.ActiveCameraCut(_glitchTime);
+        if (index == _cutIndex) return;
+        if (index < 0)
+        {
+            RestoreCuts();
+            _overlay?.ExitCamera(0f);
+            _overlay?.SetDimFocus(null);
+            _cutJumped = true;
+            return;
+        }
+        bool rewound = _cutIndex >= 0 && tl.cameraCut[index].start < tl.cameraCut[_cutIndex].start;
         _cutIndex = index;
         _cutJumped = true;
-        BossVictoryCameraCuts.Cut cut = _settings.cuts[index];
+        BossVictoryCameraCuts.Cut cut = tl.CameraCutShot(index);
         BossVictoryCameraCuts.Subjects subjects = CutSubjects();
         BossVictoryCameraCuts.Pose(cut, subjects, out Vector3 pos, out Quaternion rot);
 
@@ -611,8 +644,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
         else _overlay.PlaceCamera(pos, rot, cut.fov);
         _overlay.SetDimFocus(BossVictoryCameraCuts.Focus(cut, subjects));
-        TickWalls(pos, rot * Vector3.forward);
-        Edit.Log($"[BossVictory] 컷 {index} {cut.kind} — t {_glitchTime:0.00}", this);
+        if (!cut.hideWalls || rewound) ShowWalls();
+        if (cut.hideWalls) HideWalls(pos, rot * Vector3.forward);
+        Edit.Log($"[BossVictory] 컷 {index} {cut.kind}{(cut.hideWalls ? "" : " · 벽 숨김 끔")} — t {_glitchTime:0.00}", this);
     }
 
     BossVictoryCameraCuts.Subjects CutSubjects()
@@ -694,41 +728,41 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (!IsWall(r.transform, wallLayer)) continue;
             Vector3 n = BossVictoryCameraCuts.WallInwardNormal(b, interior);
             if (n == Vector3.zero) continue;
-            _wallCandidates.Add(r);
-            _wallNormals.Add(n);
-            _wallCenters.Add(b.center);
+            _walls.Add(new WallEntry { Renderer = r, Normal = n, Center = b.center });
         }
     }
 
-    // 지금 컷 카메라에서 앞면이 확실히 카메라를 향하지 않는 벽(뒷면·옆면)을 끈다 — 한 번 끄면 연출 끝까지.
-    void TickWalls(Vector3 camPos, Vector3 camForward)
+    // 지금 컷 카메라에서 앞면이 확실히 카메라를 향하지 않는 벽(뒷면·옆면)을 끈다 — 다시 켜는 건 벽 숨김 끈 컷·되감기·정리뿐.
+    void HideWalls(Vector3 camPos, Vector3 camForward)
     {
-        for (int i = _wallCandidates.Count - 1; i >= 0; i--)
+        for (int i = 0; i < _walls.Count; i++)
         {
-            Renderer r = _wallCandidates[i];
-            bool remove = r == null;
-            if (!remove && BossVictoryCameraCuts.ShouldHideWall(_wallNormals[i], _wallCenters[i], camPos, camForward, _settings.wallFacingThreshold))
-            {
-                r.enabled = false;
-                _hiddenWalls.Add(r);
-                remove = true;
-            }
-            if (!remove) continue;
-            _wallCandidates.RemoveAt(i);
-            _wallNormals.RemoveAt(i);
-            _wallCenters.RemoveAt(i);
+            WallEntry w = _walls[i];
+            if (w.Hidden || w.Renderer == null) continue;
+            if (!BossVictoryCameraCuts.ShouldHideWall(w.Normal, w.Center, camPos, camForward, _settings.wallFacingThreshold)) continue;
+            w.Renderer.enabled = false;
+            w.Hidden = true;
+            _walls[i] = w;
+        }
+    }
+
+    void ShowWalls()
+    {
+        for (int i = 0; i < _walls.Count; i++)
+        {
+            WallEntry w = _walls[i];
+            if (!w.Hidden) continue;
+            if (w.Renderer != null) w.Renderer.enabled = true;
+            w.Hidden = false;
+            _walls[i] = w;
         }
     }
 
     void RestoreCuts()
     {
         _cutIndex = -1;
-        for (int i = 0; i < _hiddenWalls.Count; i++)
-            if (_hiddenWalls[i] != null) _hiddenWalls[i].enabled = true;
-        _hiddenWalls.Clear();
-        _wallCandidates.Clear();
-        _wallNormals.Clear();
-        _wallCenters.Clear();
+        ShowWalls();
+        _walls.Clear();
         for (int i = 0; i < _hiddenWorldCanvases.Count; i++)
             if (_hiddenWorldCanvases[i] != null) _hiddenWorldCanvases[i].enabled = true;
         _hiddenWorldCanvases.Clear();

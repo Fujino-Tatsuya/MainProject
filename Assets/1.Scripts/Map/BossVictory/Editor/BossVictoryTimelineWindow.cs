@@ -11,7 +11,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     const string MenuPath = "Tools/Boss Victory/처치 연출 타임라인";
     const string DefaultAssetPath = "Assets/Resources/BossVictory/BossVictoryGlitchSettings.asset";
 
-    const float LabelWidth = 130f;
+    const float LabelWidth = 160f;
     const float RulerHeight = 22f;
     const float RowHeight = 24f;
     const float MinPixelsPerSecond = 30f;
@@ -22,6 +22,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     static readonly Color RangeColor = new Color(0.30f, 0.55f, 0.85f);
     static readonly Color PulseColor = new Color(0.90f, 0.55f, 0.25f);
     static readonly Color SingleColor = new Color(0.55f, 0.45f, 0.80f);
+    static readonly Color CutColor = new Color(0.30f, 0.65f, 0.50f);
     static readonly Color MarkerColor = new Color(0.95f, 0.85f, 0.30f);
     static readonly Color EnvelopeColor = new Color(1f, 1f, 1f, 0.85f);
 
@@ -63,6 +64,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             return;
         }
         _settings.timeline ??= BossVictoryTimeline.CreateDefault();
+        if (Event.current.type == EventType.Layout && Timeline.SyncCameraCutShots()) Save();   // 컷 값 개수 = 컷 클립 개수(손으로 고친 에셋 보정)
         if (!_initialFit && Event.current.type == EventType.Layout)
         {
             _initialFit = true;   // 처음 열 때 전체 보기 — 로비 전환 마커(끝)까지 한 화면에
@@ -172,6 +174,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             {
                 BossVictoryTimeline.TrackKind.Pulse => " ·펄스",
                 BossVictoryTimeline.TrackKind.Single => " ·1개",
+                BossVictoryTimeline.TrackKind.Cut => " ·다음 컷까지",
                 _ => "",
             };
             GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight),
@@ -230,11 +233,19 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             BossVictoryTimeline.TrackKind.Pulse => PulseColor,
             BossVictoryTimeline.TrackKind.Single => SingleColor,
+            BossVictoryTimeline.TrackKind.Cut => CutColor,
             _ => track == BossVictoryTrack.Hold ? SingleColor : RangeColor,
         };
         bool selected = IsSelected(track, index);
         EditorGUI.DrawRect(r, baseColor * (selected ? 1f : 0.75f));
         if (BossVictoryTimeline.HasFades(track)) DrawEnvelope(r, clip);
+        if (track == BossVictoryTrack.CameraCut)
+        {
+            EditorGUI.DrawRect(new Rect(r.x, r.y, 2f, r.height), Color.white);   // 컷 = 시작 순간
+            BossVictoryCameraCuts.Cut shot = Timeline.CameraCutShot(index);
+            GUI.Label(new Rect(r.x + 4f, r.y + 4f, Mathf.Max(0f, r.width - 6f), r.height - 4f),
+                $"#{index + 1} {CutKindLabel(shot.kind)}{(shot.hideWalls ? "" : " · 벽 숨김 끔")}", EditorStyles.miniLabel);
+        }
         if (selected) DrawOutline(r, Color.white);
         DrawClipDecorations(r, track, clip, selected);
     }
@@ -276,7 +287,17 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     }
 
     static string MarkerText(BossVictoryTimeline tl, BossVictoryMarker marker) =>
-        $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
+        marker == BossVictoryMarker.KillerActionEnd && tl.MarkerTime(marker) <= 0f
+            ? $"{BossVictoryTimeline.MarkerLabel(marker)} (끔 — 클립 끝까지)"
+            : $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
+
+    static string CutKindLabel(BossVictoryCameraCuts.Kind kind) => kind switch
+    {
+        BossVictoryCameraCuts.Kind.Wide => "와이드",
+        BossVictoryCameraCuts.Kind.BossCloseup => "보스 클로즈업",
+        BossVictoryCameraCuts.Kind.KillerFront => "처치자 정면",
+        _ => kind.ToString(),
+    };
 
     // 마커 = 줄 전체를 지나는 세로선 + 큰 마름모 + "이름 시각s" 라벨(상시). 화면 밖이면 그 줄 끝에 ◀/▶ 라벨을 붙여 둔다(누르면 그쪽으로 이동).
     void DrawMarkers(Rect lanes)
@@ -383,6 +404,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     static bool s_hasClipboard;
     static BossVictoryClip s_clipboard;
     static BossVictoryTrack s_clipboardTrack;
+    static BossVictoryCameraCuts.Cut s_clipboardShot;
 
     float Snap(float t) => _snap ? Mathf.Round(t * 100f) / 100f : t;
 
@@ -467,6 +489,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // SO 에 바로 저장(Play 끝나도 유지 — Q5).
     void Save()
     {
+        Timeline.SyncCameraCutShots();
+        Timeline.FitCameraCutLengths();   // 컷 길이 = 다음 컷 시작까지(표시용 — 판정은 시작만)
         EditorUtility.SetDirty(_settings);
         AssetDatabase.SaveAssetIfDirty(_settings);
     }
@@ -603,7 +627,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
 
         float best = float.MaxValue;
-        for (int i = 0; i < clips.Count; i++)
+        bool resizable = BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Cut;   // 컷 길이 = 다음 컷 시작까지(자동)
+        for (int i = 0; resizable && i < clips.Count; i++)
         {
             Rect r = ClipRect(lanes, row, clips[i]);
             float inner = EdgeInner(r);
@@ -653,9 +678,15 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             List<BossVictoryClip> clips = Timeline.Clips(track);
             bool fadeStripRow = _selTrack == (int)track && HasClipSelection && BossVictoryTimeline.HasFades(track);
+            bool resizable = BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Cut;
             for (int i = 0; i < clips.Count; i++)
             {
                 Rect r = ClipRect(lanes, TrackRow(track), clips[i]);
+                if (!resizable)
+                {
+                    AddCursor(lanes, r, MouseCursor.MoveArrow);
+                    continue;
+                }
                 float inner = EdgeInner(r);
                 float top = r.y, height = r.height;
                 if (fadeStripRow && i == _selIndex)
@@ -775,7 +806,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.KindOf(track) switch
     {
         BossVictoryTimeline.TrackKind.Pulse => BossVictoryClip.Make(start, 0.2f, 0.1f, 0.1f),
-        BossVictoryTimeline.TrackKind.Single => BossVictoryClip.Make(start, 1f),
+        BossVictoryTimeline.TrackKind.Single or BossVictoryTimeline.TrackKind.Cut => BossVictoryClip.Make(start, 1f),
         _ => track == BossVictoryTrack.Hold ? BossVictoryClip.Make(start, 1f) : BossVictoryClip.Make(start, 1f, 0.1f, 0.1f),
     };
 
@@ -785,6 +816,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Record("처치 연출 타임라인 클립 추가");
         List<BossVictoryClip> clips = Timeline.Clips(track);
         clips.Add(NewClip(track, start));
+        if (track == BossVictoryTrack.CameraCut) Timeline.cameraCutShots.Add(BossVictoryCameraCuts.Cut.Default);
         Select((int)track, clips.Count - 1, -1);
         Save();
         Repaint();
@@ -804,6 +836,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (!HasClipSelection) return;
         s_clipboardTrack = (BossVictoryTrack)_selTrack;
         s_clipboard = Timeline.Clips(s_clipboardTrack)[_selIndex];
+        s_clipboardShot = s_clipboardTrack == BossVictoryTrack.CameraCut ? Timeline.CameraCutShot(_selIndex) : BossVictoryCameraCuts.Cut.Default;
         s_hasClipboard = true;
     }
 
@@ -815,6 +848,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         c.start = Mathf.Max(0f, Snap(start));
         List<BossVictoryClip> clips = Timeline.Clips(track);
         clips.Add(Clamp(c));
+        if (track == BossVictoryTrack.CameraCut)
+        {
+            Timeline.SyncCameraCutShots();   // 모자란 앞 번호 보정 뒤 이 클립 값
+            Timeline.cameraCutShots[clips.Count - 1] = s_clipboardTrack == BossVictoryTrack.CameraCut ? s_clipboardShot : BossVictoryCameraCuts.Cut.Default;
+        }
         Select((int)track, clips.Count - 1, -1);
         Save();
         Repaint();
@@ -825,6 +863,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (!HasClipSelection) return;
         Record("처치 연출 타임라인 클립 삭제");
         Timeline.Clips((BossVictoryTrack)_selTrack).RemoveAt(_selIndex);
+        if (_selTrack == (int)BossVictoryTrack.CameraCut && _selIndex < Timeline.cameraCutShots.Count) Timeline.cameraCutShots.RemoveAt(_selIndex);
         Select(-1, -1, -1);
         Save();
         Repaint();
@@ -883,6 +922,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             "디버그 씬: 이 시각이 한 바퀴 끝 — 로비로 가지 않고 랩 '반복' 대기(loopHoldSeconds) 뒤 처음부터.",
         BossVictoryMarker.FocusKiller => "처치자가 아닌 피어의 카메라가 이 시각에 처치자로 즉시 넘어간다(처치자 화면 그대로).",
         BossVictoryMarker.HideOthers => "이 시각에 처치자 외 플레이어 캐릭터를 모든 화면에서 숨긴다.",
+        BossVictoryMarker.KillerActionEnd =>
+            "처치 순간 처치자가 하던 동작(평타 등, ×0.5)을 이 시각에 끊고 바로 백대쉬로 넘어간다. 클립이 먼저 끝나면 클립 끝에서(둘 중 이른 쪽). " +
+            "하던 동작이 없으면(대기·이동) 처음부터 백대쉬. 0 = 끔(클립 끝까지). 각 피어가 자기 화면 시계로 판정 — 스크럽으로 되돌아가지 않는다(다시 보려면 ⏮).",
         _ => "",
     };
 
@@ -894,6 +936,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             _snap = EditorGUILayout.ToggleLeft("0.01초 스냅", _snap, GUILayout.Width(100f));
             GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 클립 양 끝 끌기 = 길이 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V/D · Ctrl+Z 되돌리기 · Ctrl+Y·Ctrl+Shift+Z 다시 하기", EditorStyles.miniLabel);
         }
+        DrawFinisherEnd();
         if (_selMarker >= 0)
         {
             var marker = (BossVictoryMarker)_selMarker;
@@ -907,6 +950,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 Timeline.SetMarkerTime(marker, time);
                 Save();
             }
+            if (marker == BossVictoryMarker.KillerActionEnd && Timeline.MarkerTime(marker) > 0f && GUILayout.Button("끄기 (0 = 클립 끝까지)", GUILayout.Width(160f)))
+            {
+                Record("처치 연출 타임라인 마커 끄기");
+                Timeline.SetMarkerTime(marker, 0f);
+                Save();
+            }
             return;
         }
         if (!HasClipSelection)
@@ -915,6 +964,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             return;
         }
         var track = (BossVictoryTrack)_selTrack;
+        if (track == BossVictoryTrack.CameraCut)
+        {
+            DrawCutInspector();
+            return;
+        }
         BossVictoryClip c = Timeline.Clips(track)[_selIndex];
         EditorGUILayout.LabelField("클립", $"{BossVictoryTimeline.TrackLabel(track)} #{_selIndex + 1}", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();
@@ -933,5 +987,94 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             Timeline.Clips(track)[_selIndex] = Clamp(c);
             Save();
         }
+    }
+
+    // 카메라 컷 클립 — 시작(= 컷 시작)과 컷 값. 길이는 다음 컷 시작까지 자동.
+    void DrawCutInspector()
+    {
+        BossVictoryClip c = Timeline.cameraCut[_selIndex];
+        Timeline.SyncCameraCutShots();
+        BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[_selIndex];
+        EditorGUILayout.LabelField("클립", $"카메라 컷 #{_selIndex + 1}", EditorStyles.boldLabel);
+        EditorGUI.BeginChangeCheck();
+        c.start = Mathf.Max(0f, EditorGUILayout.FloatField("시작(초)", c.start));
+        EditorGUILayout.LabelField("유지 끝(초)", $"{c.End:0.00} — 다음 컷 시작(마지막 컷 = 로비 전환)까지 자동");
+        shot.kind = (BossVictoryCameraCuts.Kind)EditorGUILayout.Popup("종류", (int)shot.kind, new[] { "와이드(처치자·보스 가운데)", "보스 클로즈업(몸 중심)", "처치자 정면" });
+        shot.distance = Mathf.Max(0.1f, EditorGUILayout.FloatField("거리(m)", shot.distance));
+        shot.pitch = EditorGUILayout.Slider("내려다보는 각(도)", shot.pitch, -30f, 89f);
+        shot.yaw = EditorGUILayout.Slider(new GUIContent("방위(도)", "0 = 처치자 쪽에서 보스를 봄 · 180 = 반대편에서 처치자를 봄 · + = 시계 방향"), shot.yaw, -180f, 180f);
+        shot.lookHeight = EditorGUILayout.FloatField(new GUIContent("초점 높이(m)", "와이드·처치자 = 발밑 기준, 보스 클로즈업 = 몸 중심 기준"), shot.lookHeight);
+        shot.fov = EditorGUILayout.Slider("FOV", shot.fov, 10f, 90f);
+        shot.hideWalls = EditorGUILayout.Toggle(new GUIContent("벽 숨김", "켜면 이 컷 카메라를 가리는 벽을 끈다. 끄면 이 컷 동안 벽 숨김 없음 — 앞 컷에서 숨겼던 벽도 다시 보인다."), shot.hideWalls);
+        if (EditorGUI.EndChangeCheck())
+        {
+            RecordField("처치 연출 타임라인 카메라 컷 수치");
+            Timeline.cameraCut[_selIndex] = c;
+            Timeline.cameraCutShots[_selIndex] = shot;
+            Save();
+            if (EditorApplication.isPlaying) BossVictoryGlitchPresentation.Instance?.PreviewRecut();
+        }
+    }
+
+    // ── 처치 연출 스킬 End 시각(읽기 전용, 255) ──────────────────────────
+    // 처치자 순서·시간 배율은 애니 이벤트가 정한다(타임라인 값 아님). 랩 재생 중이면 이번 회차 실제 시각, 아니면 캐릭터별 클립으로 추정.
+
+    string _finisherEstimate;
+
+    void DrawFinisherEnd()
+    {
+        BossVictoryGlitchPresentation p = EditorApplication.isPlaying ? BossVictoryGlitchPresentation.Instance : null;
+        if (p != null && p.GlitchTime >= 0f)
+        {
+            float at = p.FinisherEndedAt;
+            EditorGUILayout.LabelField("처치 연출 스킬 End", at >= 0f ? $"실제 {at:0.00}s (이번 회차 — 이 시각부터 처치자·보스 ×0.1)" : "실제 — 아직 안 옴(백대쉬·스킬 재생 중)", EditorStyles.miniBoldLabel);
+            return;
+        }
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            _finisherEstimate ??= EstimateFinisherEnd();
+            EditorGUILayout.LabelField("처치 연출 스킬 End 예상", _finisherEstimate, EditorStyles.miniLabel);
+            if (GUILayout.Button("다시 계산", EditorStyles.miniButton, GUILayout.Width(64f))) _finisherEstimate = null;
+        }
+    }
+
+    static readonly string[] FinisherVariantPaths =
+    {
+        "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab",
+        "Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab",
+        "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab",
+    };
+
+    // 추정 = 백대쉬 길이(열린 씬 BossEncounterDirector) + 처치 연출 스킬 클립의 End 이벤트 시각. 가정: 처치 순간 하던 동작 없음(대기)·공격 속도 100%.
+    string EstimateFinisherEnd()
+    {
+        BossEncounterDirector director = Object.FindAnyObjectByType<BossEncounterDirector>(FindObjectsInactive.Include);
+        float dash = director != null ? director.IntroSkidDuration : 0f;
+        var parts = new List<string>();
+        foreach (string path in FinisherVariantPaths)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null) continue;
+            string name = prefab.name.Replace("Player_", "");
+            float end = FinisherEndEventTime(prefab);
+            parts.Add(end >= 0f ? $"{name} {dash + end:0.00}s" : $"{name} ?(End 없음)");
+        }
+        string basis = director != null ? $"백대쉬 {dash:0.00}s + 클립 End" : "백대쉬 길이 모름(씬에 BossEncounterDirector 없음) + 클립 End";
+        return parts.Count == 0 ? "프리팹 없음" : $"{string.Join(" · ", parts)}  ({basis} · 하던 동작 없음·공속 100% 가정)";
+    }
+
+    float FinisherEndEventTime(GameObject prefab)
+    {
+        PlayerSkillSlot slot = PlayerVictoryFinisher.ResolveSlot(prefab, _settings);
+        PlayerSkillController controller = prefab.GetComponentInChildren<PlayerSkillController>(true);
+        PlayerSkillBase skill = controller != null ? controller.GetSkill(slot) : null;
+        Animator animator = prefab.GetComponentInChildren<Animator>(true);
+        if (skill == null || skill.Data == null || animator == null || animator.runtimeAnimatorController == null) return -1f;
+        AnimationClip clip = AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.Data.AnimatorStateName);
+        if (clip == null) return -1f;
+        foreach (AnimationEvent ev in AnimationUtility.GetAnimationEvents(clip))
+            if (ev.functionName == nameof(PlayerAnimationEventRelay.HandleSkillEvent) && ev.intParameter == (int)SkillAnimationEventType.End)
+                return ev.time;
+        return -1f;
     }
 }

@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 — ZZZ 글리치 4단계 카메라 컷(PLAN-boss-victory-glitch). 순수 계산만(테스트 대상 — <c>BossVictoryCameraCutTests</c>).
-/// 컷 목록은 설정 SO(<see cref="BossVictoryGlitchSettings.cuts"/>), 시계는 글리치 시각(<see cref="BossVictoryGlitchPresentation.GlitchTime"/>).
+/// 컷 목록 = 타임라인 '카메라 컷' 트랙(<see cref="BossVictoryTimeline.cameraCut"/> 클립 = 시작 시각 · <see cref="BossVictoryTimeline.cameraCutShots"/> = 같은 순서의 컷 값, 255),
+/// 시계는 글리치 시각(<see cref="BossVictoryGlitchPresentation.GlitchTime"/>).
 /// 첫 컷 전까지는 게임 카메라 그대로. 컷은 블렌드 없이 끊는다(전환은 글리치 블록 펄스가 가린다).
 /// </summary>
 public static class BossVictoryCameraCuts
@@ -17,13 +19,11 @@ public static class BossVictoryCameraCuts
 
     /// <summary>
     /// 컷 하나. 방위(yaw)는 <b>처치자 → 보스 수평 방향 기준</b>: 0 = 처치자 쪽에서 보스 쪽을 봄 · 180 = 반대편에서 처치자 쪽을 봄.
-    /// 카메라 = 초점에서 시선 반대 방향으로 거리만큼, 초점을 바라본다.
+    /// 카메라 = 초점에서 시선 반대 방향으로 거리만큼, 초점을 바라본다. 시작 시각은 타임라인 클립 시작(다음 컷 시작까지 유지).
     /// </summary>
     [Serializable]
     public struct Cut
     {
-        [Tooltip("시작 시각(처치 판정 뒤 초 — 글리치 시계). 다음 컷 시작까지 유지.")]
-        [Min(0f)] public float startTime;
         public Kind kind;
         [Tooltip("초점에서 카메라까지 거리(m).")]
         [Min(0.1f)] public float distance;
@@ -34,6 +34,11 @@ public static class BossVictoryCameraCuts
         [Tooltip("초점 높이 보정(m). 와이드·처치자 = 발밑 기준, 보스 클로즈업 = 보스 몸 중심 기준.")]
         public float lookHeight;
         [Range(10f, 90f)] public float fov;
+        [Tooltip("이 컷 동안 카메라를 가리는 벽(앞면이 카메라를 향하지 않는 벽)을 끈다. 끄면 이 컷 동안 벽 숨김 없음 — 숨겼던 벽도 다시 보인다.")]
+        public bool hideWalls;
+
+        /// <summary>새 컷 기본값 — 와이드(옛 기본 목록 첫 컷과 같은 구도) · 벽 숨김 켬.</summary>
+        public static Cut Default => new Cut { kind = Kind.Wide, distance = 16f, pitch = 22f, yaw = 50f, lookHeight = 1.5f, fov = 40f, hideWalls = true };
     }
 
     /// <summary>카메라 위치 계산 입력 — 이 피어가 컷 시작 순간 본 위치(복제 위치라 피어 간 미세 차이 허용).</summary>
@@ -46,15 +51,15 @@ public static class BossVictoryCameraCuts
         public Vector3 BossCenter;
     }
 
-    /// <summary>시각 <paramref name="t"/> 에 켜진 컷 번호 — 시작 시각이 t 이하인 것 중 가장 늦은 것. 없으면 -1(게임 카메라). 목록 순서와 무관.</summary>
-    public static int ActiveIndex(Cut[] cuts, float t)
+    /// <summary>시각 <paramref name="t"/> 에 켜진 컷 번호 — 클립 시작이 t 이하인 것 중 가장 늦은 것(클립 길이와 무관 — 다음 컷 시작까지 유지). 없으면 -1(게임 카메라). 목록 순서와 무관.</summary>
+    public static int ActiveIndex(IReadOnlyList<BossVictoryClip> cuts, float t)
     {
         if (cuts == null || t < 0f) return -1;
         int best = -1;
         float bestStart = float.NegativeInfinity;
-        for (int i = 0; i < cuts.Length; i++)
+        for (int i = 0; i < cuts.Count; i++)
         {
-            float s = cuts[i].startTime;
+            float s = cuts[i].start;
             if (s <= t && s >= bestStart) { best = i; bestStart = s; }
         }
         return best;

@@ -62,10 +62,8 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Min(0f)] public float bossNoiseBrightIntensity = 1.6f;
     public Color bossNoiseDarkColor = new Color32(0x3A, 0x17, 0x12, 0xFF);
 
-    [Header("카메라 컷(4단계 — 첫 컷 전엔 게임 카메라, 컷은 블렌드 없이 끊는다)")]
-    [Tooltip("컷 목록(시작 시각 순서 무관 — 시각 t 에 시작이 t 이하인 것 중 가장 늦은 컷). 방위 0 = 처치자 쪽에서 보스를 봄, 180 = 반대편에서 처치자 쪽을 봄.\n" +
-             "기본 = 빈 목록(게임 카메라만 — 11-09 사용자 결정, 처치자 애니를 보여 주는 카메라 이동과 함께 다시 짠다). 예: 와이드(0.33·거리 16·각 22·방위 50) → 보스 클로즈업(1.67·7·6·−160) → 와이드(2.6).")]
-    public BossVictoryCameraCuts.Cut[] cuts = new BossVictoryCameraCuts.Cut[0];
+    // 카메라 컷 목록은 타임라인 '카메라 컷' 트랙(timeline.cameraCut·cameraCutShots — 255, 옛 cuts 배열 삭제). 예: 와이드(0.33·거리 16·각 22·방위 50) → 보스 클로즈업(1.67·7·6·−160) → 와이드(2.6).
+    [Header("카메라 컷 벽 숨김(컷·컷별 켜기/끄기 = 타임라인 '카메라 컷' 트랙)")]
     [Tooltip("연출 카메라에서 앞면이 확실히 카메라를 향하지 않는 벽을 끈다 — 법선·시선 내적 문턱(옛 연출과 같은 기준).")]
     [Range(-1f, 1f)] public float wallFacingThreshold = 0.3f;
     [Tooltip("벽 숨김 후보 반경(m, 처치자·보스 가운데 기준).")]
