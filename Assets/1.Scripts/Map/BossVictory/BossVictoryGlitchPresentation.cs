@@ -80,7 +80,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     bool _hudHidden;
     CinematicOverlay _overlay;
     readonly List<Renderer> _tagged = new List<Renderer>();
-    BossVictoryRectifyText _text;   // 5단계
 
     // 보스 노이즈 UV — 카메라 이동으로만 누적(11-09 사용자)
     Vector2 _noiseOffset;
@@ -117,7 +116,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 지금 카메라 컷 번호(설정 목록 — 게임 카메라면 -1).</summary>
     public int CutIndex => _cutIndex;
 
-    /// <summary>[이 피어] 처치 판정 뒤 초(연출 없으면 -1). 컷·글자가 같은 시계를 읽는다.</summary>
+    /// <summary>[이 피어] 처치 판정 뒤 초(연출 없으면 -1). 컷·CRT 꺼짐이 같은 시계를 읽는다.</summary>
     public float GlitchTime => _glitchOn ? _glitchTime : -1f;
 
     public Phase CurrentPhase => _phase;
@@ -368,8 +367,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _noiseOffset = Vector2.zero;
         _noiseCamValid = false;
         _cutJumped = false;
-        _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
-        _text = new BossVictoryRectifyText(_overlay.Root, _settings, _director != null ? _director.IntroFont : null);
         _renderOn = BossVictoryGlitchRender.Enable(_settings);
         if (!_renderOn)
         {
@@ -389,7 +386,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         float t = Mathf.Min(_glitchTime, _settings.glitchDuration);
         BossVictoryGlitchSettings s = _settings;
         TickCuts();
-        _text?.Tick(t, _glitchTime, s);
         TickEnd(s);
 
         bool hide = s.hudHide.Evaluate(t) > 0.5f;
@@ -770,8 +766,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         BossVictoryGlitchRender.Untag(_tagged);
         if (_renderOn) { BossVictoryGlitchRender.Disable(); _renderOn = false; }
         _hudHidden = false;
-        _text?.Dispose();
-        _text = null;
         if (_crtRoutine != null) { StopCoroutine(_crtRoutine); _crtRoutine = null; }
         _crt?.Dispose();
         _crt = null;

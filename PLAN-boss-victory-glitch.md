@@ -1,15 +1,14 @@
 # PLAN — 보스 처치 연출 교체: ZZZ "WIPEOUT" 글리치 (2026-11-09 사용자 확정)
 
 > **원본 문서**(브랜치 `feature/BossVictoryDebugScene`). 옛 처치 연출 문서 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) 는 Legacy 기록.
-> 진행(11-09): 1 Legacy 이동 ✅ · 2 시간 배율·소거·처치 연출 스킬 ✅ · 3 글리치 렌더·흑백·보스 노이즈·SO 타임라인 ✅ · 4 카메라 컷 구조 ✅(기본 목록 비움 — 게임 카메라만) · 사양 변경: 글리치 = 처치 판정 즉시 ✅ · 5 Rectify 글자 ✅ · 6 유지 → CRT 꺼짐 → 로비 결과 ✅ · 7 디버그 랩·문서 ✅ — 아래 "진행 기록". ⏳ Unity 컴파일·셰이더·EditMode·Play(이 레인은 Unity 없음).
+> 진행(11-09): 1 Legacy 이동 ✅ · 2 시간 배율·소거·처치 연출 스킬 ✅ · 3 글리치 렌더·흑백·보스 노이즈·SO 타임라인 ✅ · 4 카메라 컷 구조 ✅(기본 목록 비움 — 게임 카메라만) · 사양 변경: 글리치 = 처치 판정 즉시 ✅ · 5 Rectify 글자 ✅ → **11-09 제거**(사용자) · 6 유지 → CRT 꺼짐 → 로비 결과 ✅ · 7 디버그 랩·문서 ✅ — 아래 "진행 기록". ⏳ Unity 컴파일·셰이더·EditMode·Play(이 레인은 Unity 없음).
 
 ## 지금 흐름 한눈에 (최종 — 아래 진행 기록이 근거)
 | 처치 판정 뒤(초, 게임 시간) | 일 | 어디서 |
 |---|---|---|
 | 0 | 서버: 막타·보스·시각 복제 · 무적 · 연출 잠금(스킬 취소·입력 차단) · 장판·투사체 디스폰. 각 피어: 이펙트 소거 · 그 외 플레이어 0.05 · 보스 0 · **글리치 시계 시작** | `TryStartVictoryServer` · `BossVictoryGlitchPresentation.Begin` |
-| 0 ~ 스킬 End | 처치자가 처치 연출 스킬(기본 R)을 표시로만 재생(×1) → End 에서 처치자·보스 ×0.1 | `PlayPresentationOnly` · `OnFinisherEnded` |
+| 0 ~ 스킬 End | 처치자: 하던 동작 ×0.5 그 클립 끝까지 → 백대쉬(등장 연출 밀림, ×1) → 처치 연출 스킬(기본 R, 표시 전용, ×1) → End 에서 처치자·보스 ×0.1 | `StartKillerSequence` · `BossEncounterDirector.StepSkid` · `PlayPresentationOnly` · `OnFinisherEnded` |
 | 0.08 ~ 3.5 | 글리치 곡선 16개(흑백·호박색·주사선·물결·블록·슬라이스·RGB·플래시·보스 노이즈·HUD 숨김) | `BossVictoryGlitchRender` + 셰이더 2개 |
-| 0.15 ~ | "Rectify" 외곽선 → 0.3~0.6 왼쪽부터 다색 채움 → 0.67 흰 섬광 → 노랑 | `BossVictoryRectifyText` |
 | (컷) | 기본 없음(게임 카메라) — 목록에 넣으면 끊어 붙임 | `BossVictoryCameraCuts` |
 | 3.5 ~ 4.5 | 정지 화면 유지(`holdSeconds`) | |
 | 4.5 ~ 5.6 | CRT 꺼짐(`Title/CRTOff`) → 검정 | `BossVictoryCrtOff` |
@@ -186,3 +185,7 @@
 - 백대쉬 = **보스 등장 연출 밀림 재사용**: `BossEncounterDirector.TickSkid` 의 본체를 공용 정적 `StepSkid` 로 뽑아 등장 연출·처치 연출이 같이 씀(등장 연출 동작 불변). 리액션 상태 `SkidReactionStates`(SubSkillGuardIdle / Gunner_E_Backstep / Dodge 중 있는 것) · 거리 `impactSkidDistance` 1.5m · 시간 `impactSkidDuration` 0.35초 · `BossIntroFormation.SkidEase` · 끝 + `ReactionIdleDelay` 0.35초에 Idle → 다음 단계(처치 연출 스킬). 방향 = 보스 반대쪽. 이동은 **처치자 오너 피어만**(motor, 오너 권위 복제), 다른 피어는 리액션 애니만 틀고 위치는 복제로 본다. 시계 = 게임 시간(랩 배속·일시정지 같이).
 - 랩 패널에 처치자 단계 표시.
 - 알려진 위험: 처치자가 누르고 있어야 끝나는 스킬(방어 유지 등) 중이었다면 입력이 막혀 스킬이 안 끝나 처치 연출 스킬이 시작되지 않을 수 있다(글리치·결과 전환은 독립이라 진행된다) — Play 에서 보이면 처치자 스킬만 백대쉬 시작 때 끊는 처리를 더한다.
+
+### 변경 — "Rectify" 배경 글자 제거 (11-09 사용자 "일단 백그라운드 글자 제거해")
+- 5단계 글자를 연출에서 **완전히 뺐다**(끄기 토글 없음 — 되살리려면 git 기록 `d42f2688`). 삭제: `BossVictoryRectifyText`(+meta) · 표시의 생성·갱신·정리 · 설정 SO 글자 칸(글꼴·위치·크기·색·팔레트·곡선 4개) · 에셋 `textFont` 참조 · Strings 코드 키 `UiStrings.BossVictoryRectify`(`UI.BossVictory.Rectify`, 시트 행은 아직 Export 전이라 없음).
+- 위 5단계 기록은 이력으로 남긴다. 흐름표에서 글자 줄을 뺐다.
