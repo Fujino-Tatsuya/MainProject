@@ -1,8 +1,9 @@
+using TMPro;
 using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 — ZZZ 글리치(PLAN-boss-victory-glitch) 수치. 정본 에셋: <c>Resources/BossVictory/BossVictoryGlitchSettings.asset</c>
-/// (없으면 코드 기본값). 단계가 늘 때마다 칸을 더한다 — 2단계 = 대상별 시간 배율·처치 연출 스킬 · 3단계 = 글리치 타임라인 · 4단계 = 카메라 컷.
+/// (없으면 코드 기본값). 단계가 늘 때마다 칸을 더한다 — 2단계 = 대상별 시간 배율·처치 연출 스킬 · 3단계 = 글리치 타임라인 · 4단계 = 카메라 컷 · 5단계 = Rectify 글자.
 /// </summary>
 [CreateAssetMenu(menuName = "MainProject/Boss Victory Glitch Settings", fileName = "BossVictoryGlitchSettings")]
 public sealed class BossVictoryGlitchSettings : ScriptableObject
@@ -90,6 +91,37 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Range(-1f, 1f)] public float wallFacingThreshold = 0.3f;
     [Tooltip("벽 숨김 후보 반경(m, 처치자·보스 가운데 기준).")]
     [Min(1f)] public float wallSearchRadius = 40f;
+
+    [Header("Rectify 글자(5단계 — 문구 = Strings UI.BossVictory.Rectify, 시계 = 글리치 시각)")]
+    [Tooltip("글꼴 — 서울알림 Heavy SDF. 비우면 디렉터 연출 글꼴(introFont).")]
+    public TMP_FontAsset textFont;
+    [Tooltip("글자 가운데 위치(화면 비율 0~1).")]
+    public Vector2 textViewportPosition = new Vector2(0.5f, 0.5f);
+    [Min(1f)] public float textSize = 220f;
+    public float textCharacterSpacing = 6f;
+    [Tooltip("다 찬 글자 색(노랑).")]
+    public Color textColor = new Color32(0xFF, 0xD2, 0x3A, 0xFF);
+    public Color textOutlineColor = new Color32(0xFF, 0xD2, 0x3A, 0xFF);
+    [Range(0f, 1f)] public float textOutlineWidth = 0.18f;
+    [Tooltip("채움 앞머리가 지나는 동안 깜빡이는 색(왼쪽부터 다색).")]
+    public Color[] textFillPalette =
+    {
+        new Color32(0x3D, 0xF5, 0xFF, 0xFF),
+        new Color32(0xFF, 0x3D, 0x9A, 0xFF),
+        new Color32(0xFF, 0xFF, 0xFF, 0xFF),
+        new Color32(0x8C, 0xFF, 0x5A, 0xFF),
+    };
+    [Tooltip("채움 앞머리 띠 너비(글자 줄 길이 비율) — 이 안의 글자가 다색으로 깜빡인다.")]
+    [Range(0.05f, 1f)] public float textFillBand = 0.35f;
+    [Tooltip("외곽선 글자 세기(0~1).")]
+    public AnimationCurve textOutline = Ramp(0.15f, 0.2f);
+    [Tooltip("채움 진행(0 = 없음 → 1 = 끝 글자까지 노랑). 왼쪽부터.")]
+    public AnimationCurve textFill = Ramp(0.3f, 0.6f);
+    [Tooltip("흰 섬광(0~1).")]
+    public AnimationCurve textFlash = Pulses(0.67f, 0.07f);
+    [Tooltip("가로 흔들림 세기(0~1) — 글리치 펄스와 맞춘다.")]
+    public AnimationCurve textJitter = Pulses(0.33f, 0.06f, 1.52f, 0.08f, 2.55f, 0.1f);
+    [Min(0f)] public float textJitterPixels = 24f;
 
     [Header("셰이더(빌드 포함용 참조 — 비우면 Shader.Find)")]
     public Shader maskShader;

@@ -65,6 +65,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     bool _hudHidden;
     CinematicOverlay _overlay;
     readonly List<Renderer> _tagged = new List<Renderer>();
+    BossVictoryRectifyText _text;   // 5단계
 
     // 4단계 — 카메라 컷
     int _cutIndex = -1;
@@ -247,6 +248,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         _glitchOn = true;
         _glitchTime = startTime;
+        _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
+        _text = new BossVictoryRectifyText(_overlay.Root, _settings, _director != null ? _director.IntroFont : null);
         _renderOn = BossVictoryGlitchRender.Enable(_settings);
         if (!_renderOn)
         {
@@ -266,6 +269,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         float t = Mathf.Min(_glitchTime, _settings.glitchDuration);
         BossVictoryGlitchSettings s = _settings;
         TickCuts();
+        _text?.Tick(t, _glitchTime, s);
 
         bool hide = s.hudHide.Evaluate(t) > 0.5f;
         if (hide && !_hudHidden)
@@ -583,6 +587,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         BossVictoryGlitchRender.Untag(_tagged);
         if (_renderOn) { BossVictoryGlitchRender.Disable(); _renderOn = false; }
         _hudHidden = false;
+        _text?.Dispose();
+        _text = null;
         RestoreCuts();
         _overlay?.Dispose();   // HUD 복구 · 컷 카메라 나감(블렌드 없음) · 디밍 기준점 복구
         _overlay = null;

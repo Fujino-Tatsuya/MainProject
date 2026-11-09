@@ -141,3 +141,9 @@
 - 이 문서 위쪽 표·3·4단계 기록의 "t = 글리치 시작 = End" 는 "t = 처치 판정 순간"으로 읽는다. 기본 곡선·컷 시각 숫자는 바꾸지 않았다(처치 연출 스킬 길이만큼 앞당겨진 셈 — Play 에서 조정).
 - 나중 계획: 카메라가 움직이며 처치자 애니를 보여 준다(아직 안 함). 4단계 고정 컷(0.33 와이드부터)과 겹치는 문제 → 보고·질문 중.
 - **결정(11-09 사용자 2번)**: 기본 컷 목록 = **빈 목록**(게임 카메라만). 컷 구조·종류·테스트는 남겨 두고 처치자 애니를 보여 주는 카메라 이동과 함께 다시 짠다(옛 기본값은 `cuts` 툴팁에 예시로). 시간 배율 해석(처치자 1 → End 0.1 · 그 외 0.05 · 보스 0 → End 0.1)은 사용자 원래 사양과 같다고 확인.
+
+### 5단계 — "Rectify" 글자 (11-09)
+- `Map/BossVictory/BossVictoryRectifyText`(로컬 표시, 연출 오버레이 캔버스 위 런타임 생성 — 글리치 렌더 패스는 카메라 화면에만 걸려 글자는 깨끗). 처치 판정 순간(글리치 시작)에 만들고 정리 때 지운다.
+- 문구 = 코드 키 `UiStrings.BossVictoryRectify`(`UI.BossVictory.Rectify`, ko 폴백 "Rectify") — 시트 행은 다음 Export 때 붙는다(그 전엔 폴백). 글꼴 = 설정 `textFont` = **서울알림 Heavy SDF**(`Assets/50.Art/UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset`, 정적 아틀라스에 R·e·c·t·i·f·y 있음), 비면 디렉터 `introFont`.
+- 두 겹: 외곽선 글자(면 투명·노란 외곽선 `textOutlineWidth` 0.18, 세기 곡선 `textOutline` 0.15~0.2) + 채움 글자(글자마다 꼭짓점 색 — 앞머리 `textFill` 0.3→0.6 이 왼쪽부터 지나며 띠 `textFillBand` 0.35 안 글자는 `textFillPalette` 4색으로 24fps 깜빡, 다 지나면 `textColor` 노랑) · 흰 섬광 `textFlash`(0.67, 크기 +5%) · 가로 흔들림 `textJitter`(블록·슬라이스 펄스와 같은 시각, ±24px).
+- 위치·크기 = `textViewportPosition`(0.5, 0.5)·`textSize` 220·자간 6.
