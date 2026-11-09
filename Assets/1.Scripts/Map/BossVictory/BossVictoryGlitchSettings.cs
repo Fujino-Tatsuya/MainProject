@@ -34,28 +34,14 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public AnimationCurve amber = Ramp(0.3f, 0.45f);
     [Tooltip("CRT 주사선(끝까지 유지).")]
     public AnimationCurve scanline = Ramp(0.1f, 0.2f);
-    [Tooltip("가로줄 물결 왜곡.")]
-    public AnimationCurve wave = Pulses(0.17f, 0.12f, 2.5f, 0.12f);
-    [Tooltip("계단식 세로 어긋남.")]
-    public AnimationCurve stepShift = Pulses(0.22f, 0.12f, 2.52f, 0.1f);
-    [Tooltip("가로 늘어남.")]
-    public AnimationCurve stretch = Pulses(0.22f, 0.1f);
-    [Tooltip("블록 모자이크 — 컷 전환을 가린다(0.33 · 1.67 · 2.6).")]
-    public AnimationCurve block = Pulses(0.33f, 0.08f, 1.67f, 0.06f, 2.58f, 0.1f);
-    [Tooltip("가로 스미어.")]
-    public AnimationCurve smear = Pulses(0.24f, 0.08f);
-    [Tooltip("슬라이스.")]
-    public AnimationCurve slice = Pulses(1.52f, 0.08f, 2.55f, 0.1f);
-    [Tooltip("RGB 분리.")]
-    public AnimationCurve rgbSplit = Pulses(1.52f, 0.08f, 2.55f, 0.1f);
-    [Tooltip("흑백 플래시.")]
+    [Tooltip("가로줄 좌우 찢김 세기(0~1) — 글리치는 이것 하나(사용자 11-09: 사각형·블록 노이즈 금지). 켜지는 줄 비율·밀림 거리에 곱한다.")]
+    public AnimationCurve tear = Pulses(0.2f, 0.12f, 0.33f, 0.08f, 1.52f, 0.1f, 1.67f, 0.06f, 2.55f, 0.12f);
+    [Tooltip("찢긴 줄의 밝은 부분 가로 끌림(스미어) 세기(0~1) — 찢긴 줄에만 걸린다.")]
+    public AnimationCurve smear = Pulses(0.2f, 0.12f, 0.33f, 0.08f, 1.52f, 0.1f, 2.55f, 0.12f);
+    [Tooltip("흑백 플래시(밝기 — 모양 글리치 아님).")]
     public AnimationCurve flash = Pulses(1.34f, 0.06f);
-    [Tooltip("플레이어 실루엣 가로 흔들림(캐릭터 글리치 1회).")]
-    public AnimationCurve characterGlitch = Pulses(0.95f, 0.05f);
     [Tooltip("보스 노이즈 세기(보스 실루엣 안).")]
     public AnimationCurve bossNoise = Ramp(0.12f, 0.17f);
-    [Tooltip("보스 외곽 가로 지글.")]
-    public AnimationCurve bossJiggle = Ramp(0.12f, 0.17f, 0.5f);
     [Tooltip("HUD 숨김(0.5 넘으면 숨김).")]
     public AnimationCurve hudHide = Ramp(0.08f, 0.12f);
 
@@ -63,11 +49,20 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("배경 호박색(sRGB).")]
     public Color amberColor = new Color32(0xD2, 0xA6, 0x4E, 0xFF);
     [Min(1f)] public float scanlineCount = 360f;
-    [Min(0f)] public float waveFrequency = 60f;
-    [Tooltip("블록 모자이크 블록 크기(px).")]
-    [Min(1f)] public float blockPixelSize = 48f;
-    [Tooltip("슬라이스 가로 띠 수.")]
-    [Min(1f)] public float sliceCount = 40f;
+
+    [Header("가로줄 찢김 모양")]
+    [Tooltip("찢김 줄 기본 굵기(px, 화면 해상도 기준).")]
+    [Min(1f)] public float tearLinePixels = 3f;
+    [Tooltip("줄 굵기 최대 배수 — 줄마다 기본 굵기 × 1~이 값(가는 줄·조금 굵은 줄이 섞인다).")]
+    [Min(1f)] public float tearLineMaxMultiplier = 3f;
+    [Tooltip("최대 밀림 거리(화면 너비 비율) — 줄마다 0~이 값(짧은 밀림이 많고 긴 밀림은 드물다), 좌우 무작위.")]
+    [Range(0f, 1f)] public float tearMaxShift = 0.12f;
+    [Tooltip("찢김 세기 1 일 때 켜지는 줄 비율(빈도).")]
+    [Range(0f, 1f)] public float tearDensity = 0.35f;
+    [Tooltip("찢김 무늬가 바뀌는 횟수(초당).")]
+    [Min(1f)] public float tearRefreshRate = 24f;
+    [Tooltip("밝은 부분 끌림 길이(화면 너비 비율).")]
+    [Range(0f, 0.5f)] public float tearStreakLength = 0.08f;
 
     public enum NoiseSpace { Screen, Boss }
 

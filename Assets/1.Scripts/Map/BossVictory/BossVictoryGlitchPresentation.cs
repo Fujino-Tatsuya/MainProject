@@ -404,17 +404,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             Desaturate = s.desaturate.Evaluate(t),
             Amber = s.amber.Evaluate(t),
             Scanline = s.scanline.Evaluate(t),
-            Wave = s.wave.Evaluate(t),
-            Step = s.stepShift.Evaluate(t),
-            Stretch = s.stretch.Evaluate(t),
-            Block = s.block.Evaluate(t),
+            Tear = s.tear.Evaluate(t),
             Smear = s.smear.Evaluate(t),
-            Slice = s.slice.Evaluate(t),
-            RgbSplit = s.rgbSplit.Evaluate(t),
             Flash = s.flash.Evaluate(t),
-            CharGlitch = s.characterGlitch.Evaluate(t),
             BossNoise = s.bossNoise.Evaluate(t),
-            BossJiggle = s.bossJiggle.Evaluate(t),
         };
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
         frame.NoiseOffset = TickNoiseOffset(s);

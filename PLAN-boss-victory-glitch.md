@@ -8,7 +8,7 @@
 |---|---|---|
 | 0 | 서버: 막타·보스·시각 복제 · 무적 · 연출 잠금(스킬 취소·입력 차단) · 장판·투사체 디스폰. 각 피어: 이펙트 소거 · 그 외 플레이어 0.05 · 보스 0 · **글리치 시계 시작** | `TryStartVictoryServer` · `BossVictoryGlitchPresentation.Begin` |
 | 0 ~ 스킬 End | 처치자: 하던 동작 ×0.5 그 클립 끝까지 → 백대쉬(등장 연출 밀림, ×1) → 처치 연출 스킬(기본 R, 표시 전용, ×1) → End 에서 처치자·보스 ×0.1 | `StartKillerSequence` · `BossEncounterDirector.StepSkid` · `PlayPresentationOnly` · `OnFinisherEnded` |
-| 0.08 ~ 3.5 | 글리치 곡선 16개(흑백·호박색·주사선·물결·블록·슬라이스·RGB·플래시·보스 노이즈·HUD 숨김) | `BossVictoryGlitchRender` + 셰이더 2개 |
+| 0.08 ~ 3.5 | 글리치 = **가로줄 좌우 찢김 + 찢긴 줄 밝은 부분 끌림만**(11-09) · 색: 흑백·호박색·주사선·흑백 플래시·보스 노이즈(카메라 이동 UV) · HUD 숨김 | `BossVictoryGlitchRender` + 셰이더 2개 |
 | (컷) | 기본 없음(게임 카메라) — 목록에 넣으면 끊어 붙임 | `BossVictoryCameraCuts` |
 | 3.5 ~ 4.5 | 정지 화면 유지(`holdSeconds`) | |
 | 4.5 ~ 5.6 | CRT 꺼짐(`Title/CRTOff`) → 검정 | `BossVictoryCrtOff` |
@@ -189,3 +189,10 @@
 ### 변경 — "Rectify" 배경 글자 제거 (11-09 사용자 "일단 백그라운드 글자 제거해")
 - 5단계 글자를 연출에서 **완전히 뺐다**(끄기 토글 없음 — 되살리려면 git 기록 `d42f2688`). 삭제: `BossVictoryRectifyText`(+meta) · 표시의 생성·갱신·정리 · 설정 SO 글자 칸(글꼴·위치·크기·색·팔레트·곡선 4개) · 에셋 `textFont` 참조 · Strings 코드 키 `UiStrings.BossVictoryRectify`(`UI.BossVictory.Rectify`, 시트 행은 아직 Export 전이라 없음).
 - 위 5단계 기록은 이력으로 남긴다. 흐름표에서 글자 줄을 뺐다.
+
+### 변경 — 글리치는 가로줄 좌우 찢김만 · 보스 외곽 떨림 삭제 (11-09 사용자)
+- 사용자: "글리치 효과는 양 옆으로 찢어지는 효과만 넣어, 사각형 노이즈 절대 넣지 마." (레퍼런스 `_lane-artifacts/Work2/glitch_ref_tear.png` — 가는 가로줄마다 다른 길이로 좌우 밀림·밝은 부분 가로 끌림 / 싫은 것 `glitch_current_bad_blocks.png` — 네모 블록·모자이크) + "보스 자체의 노이즈도 제거해"(보스 실루엣 가장자리 들쭉날쭉·조각 튐).
+- **삭제(토글 없음)**: 블록 모자이크 · 계단식 세로 어긋남 · 가로 늘어남 · 물결 · 굵은 띠 슬라이스 · RGB 분리 · 플레이어 실루엣 띠 흔들림 · **보스 외곽 가로 지글** — 셰이더 코드·곡선(`wave`·`stepShift`·`stretch`·`block`·`slice`·`rgbSplit`·`characterGlitch`·`bossJiggle`)·칸(`waveFrequency`·`blockPixelSize`·`sliceCount`)·Frame 칸 전부.
+- **남김 = 가로줄 찢김**: 줄 굵기 `tearLinePixels` 3px × 1~`tearLineMaxMultiplier` 3(4줄 묶음마다 섞임, 픽셀 기준) · 켜지는 줄 비율 `tearDensity` 0.35 × 곡선 `tear` · 밀림 = 좌우 무작위 × r² × `tearMaxShift` 0.12(화면 너비 — 짧은 밀림이 많고 긴 것은 드묾) · 무늬 갱신 `tearRefreshRate` 24/초 · 끌림 = 찢긴 줄에서만 밀린 방향 뒤 6탭 중 밝은 값(`smear` 곡선 · 길이 `tearStreakLength` 0.08). 마스크도 같은 찢김 UV 라 인물·보스는 찢긴 줄에서만 같이 밀린다.
+- 기본 곡선: `tear` 펄스 0.2·0.33·1.52·1.67·2.55 · `smear` 0.2·0.33·1.52·2.55.
+- **유지(글리치 아님)**: 흑백 · 호박색 틴트 · CRT 주사선 · 흑백 플래시(밝기) · 보스 내부 노이즈 텍스처(카메라 이동 UV — 사용자 확인 중이라 손대지 않음).

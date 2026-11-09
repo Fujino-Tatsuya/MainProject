@@ -1,11 +1,11 @@
 // ----------------------------------------------------------------------------
-//  BossVictoryGlitch.shader — 보스 처치 연출 ZZZ 글리치(PLAN-boss-victory-glitch 3단계) 전체 화면 합성
+//  BossVictoryGlitch.shader — 보스 처치 연출 ZZZ 글리치(PLAN-boss-victory-glitch) 전체 화면 합성
 //  반투명(이펙트) 렌더 뒤, 후처리 전. 입력 = _BlitTexture(씬색) + _GlitchIdTex(R 플레이어 · B 보스 마스크).
 //  세기는 C#(BossVictoryGlitchRender.SetFrame)이 설정 SO 타임라인 곡선으로 매 프레임 넣는다.
-//    UV 왜곡: 가로 늘어남 → 가로줄 물결 → 계단식 세로 어긋남 → 슬라이스 → 블록 모자이크(같은 UV 로 마스크도 읽는다 — 실루엣이 같이 어긋난다)
-//    색: RGB 분리 · 가로 스미어 → 흑백(Desat) → 배경만 호박색(Amber, 플레이어 제외, 플레이어는 흑백) → 보스 = 흑백 노이즈 텍스처(UV 는 카메라 이동으로만 움직임)
-//        (흰 = 과노출 밝은 색, 검 = 어두운 적갈색 · 화면 공간 기본 / 보스 기준 공간 토글) → 흑백 플래시 → CRT 주사선.
-//  흰 링(충격파)은 없다(사용자 결정).
+//    글리치 = **가로줄 좌우 찢김만**(사용자 11-09 — 사각형·블록 노이즈 금지): 가는 가로줄(굵기 = 기본 px × 1~배수)마다 무작위로 켜져
+//      좌우로 다른 길이만큼 밀린다(마스크도 같은 UV — 인물·보스 실루엣도 같이 찢긴다) + 찢긴 줄의 밝은 부분이 밀린 방향 뒤로 끌린다(스미어).
+//    색(글리치 아님): 흑백(Desat) → 배경만 호박색(플레이어 제외) → 보스 = 흑백 노이즈 텍스처(UV 는 카메라 이동으로만)
+//      → 흑백 플래시 → CRT 주사선.
 // ----------------------------------------------------------------------------
 Shader "Hidden/Rendering/BossVictoryGlitch"
 {
@@ -34,10 +34,10 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             SAMPLER(sampler_NoiseTex);
 
             float4 _GlitchA;      // x master, y time, z desat, w amber
-            float4 _GlitchB;      // x scanline, y wave, z step, w stretch
-            float4 _GlitchC;      // x block, y smear, z slice, w rgb
-            float4 _GlitchD;      // x flash, y charGlitch, z bossNoise, w bossJiggle
-            float4 _GlitchLook;   // x 주사선 줄 수, y 물결 주파수, z 블록 크기(px), w 슬라이스 줄 수
+            float4 _GlitchB;      // x scanline, y tear, z smear, w flash
+            float4 _GlitchC;      // x bossNoise
+            float4 _GlitchLook;   // x 주사선 줄 수, y 찢김 줄 기본 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
+            float4 _GlitchTear;   // x 최대 밀림(화면 너비 비율), y 켜지는 줄 비율(세기 1 기준), z 끌림 길이(화면 너비 비율)
             float4 _BossScreen;   // xy 보스 중심(뷰포트), z 보스 화면 높이, w 공간(0 화면 · 1 보스 기준)
             float4 _AmberColor;
             float4 _NoiseST;      // xy 타일링, zw UV 오프셋(카메라 이동 누적 — 시간 흐름 없음)
@@ -72,54 +72,42 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                     return half4(SceneAt(uv0), 1.0h);
 
                 float t = _GlitchA.y;
-                float tick = floor(t * 24.0);            // 글리치 난수는 24fps 로 바뀐다(계단·슬라이스·블록)
                 float2 res = _ScreenParams.xy;
                 float aspect = res.x / res.y;
-                float2 uv = uv0;
+                float tick = floor(t * max(1.0, _GlitchLook.w));   // 찢김 난수 갱신
 
-                // 가로 늘어남(화면 가운데 기준)
-                uv.x = 0.5 + (uv.x - 0.5) / (1.0 + _GlitchB.w * 0.35);
+                // ── 가로줄 좌우 찢김 ─────────────────────────────────────────
+                // 줄 굵기: 4줄 묶음마다 1~배수 중 하나(가는 줄·조금 굵은 줄이 섞인다). 픽셀 기준이라 해상도와 무관하게 가늘다.
+                float ypx = uv0.y * res.y;
+                float baseH = max(1.0, _GlitchLook.y);
+                float group = floor(ypx / (baseH * 4.0 * max(1.0, _GlitchLook.z)));
+                float rowH = baseH * (1.0 + floor(Hash(float2(group, tick + 17.0)) * max(1.0, _GlitchLook.z)));
+                float row = floor(ypx / rowH) + group * 131.0;
+                float tear = _GlitchB.y;
+                float on = step(1.0 - saturate(_GlitchTear.y * tear), Hash(float2(row, tick)));
+                float r = Hash(float2(row, tick + 3.0));
+                float dir = Hash(float2(row, tick + 9.0)) < 0.5 ? -1.0 : 1.0;
+                float shift = dir * r * r * _GlitchTear.x * tear * on;   // 줄마다 다른 길이 — 짧은 밀림이 많고 긴 밀림은 드물다
+                float2 uv = uv0 + float2(shift, 0.0);
 
-                // 가로줄 물결
-                uv.x += sin(uv.y * _GlitchLook.y + t * 18.0) * 0.012 * _GlitchB.y;
-
-                // 계단식 세로 어긋남 — 가로 띠마다 위아래로
-                float band = floor(uv.y * 14.0);
-                uv.y += (Hash(float2(band, tick)) - 0.5) * 0.06 * _GlitchB.z;
-
-                // 슬라이스 — 가는 띠 일부가 옆으로 크게 밀린다
-                float slice = floor(uv.y * _GlitchLook.w);
-                float sliceOn = step(0.7, Hash(float2(slice, tick + 7.0)));
-                uv.x += (Hash(float2(slice, tick + 3.0)) - 0.5) * 0.25 * _GlitchC.z * sliceOn;
-
-                // 블록 모자이크 — 무작위 블록이 덩어리째 옮겨진다
-                float2 blockSize = _GlitchLook.z / res;
-                float2 blockId = floor(uv / blockSize);
-                float blockOn = step(1.0 - 0.35 * _GlitchC.x, Hash(blockId + tick)) * step(0.001, _GlitchC.x);
-                float2 blockUV = (blockId + 0.5) * blockSize + (float2(Hash(blockId + 11.0), Hash(blockId + 23.0)) - 0.5) * blockSize * 4.0;
-                uv = lerp(uv, blockUV, blockOn);
-
-                // 마스크(같은 왜곡 UV). 보스 외곽 지글 = 줄마다 가로로 흔든 UV 로 보스만 다시 읽는다.
+                // 마스크(같은 찢김 UV — 찢긴 줄에서만 실루엣이 같이 밀린다. 보스 외곽 지글은 11-09 사용자 요청으로 삭제).
                 half4 id = MaskAt(uv);
-                float jig = (Hash(float2(floor(uv0.y * res.y / 3.0), tick)) - 0.5) * 0.02 * _GlitchD.w;
-                half boss = max(id.b, MaskAt(uv + float2(jig, 0)).b);
-                // 플레이어 실루엣 흔들림 — 플레이어 픽셀만 줄마다 가로로
-                float charJ = (Hash(float2(floor(uv0.y * 40.0), tick + 5.0)) - 0.5) * 0.03 * _GlitchD.y;
-                half player = max(id.r, MaskAt(uv + float2(charJ, 0)).r);
-                float2 uvColor = uv + float2(charJ * id.r, 0);
+                half boss = id.b;
+                half player = id.r;
 
-                // RGB 분리 · 가로 스미어
-                float rgb = 0.006 * _GlitchC.w;
-                half3 col;
-                col.r = SceneAt(uvColor + float2(rgb, 0)).r;
-                col.g = SceneAt(uvColor).g;
-                col.b = SceneAt(uvColor - float2(rgb, 0)).b;
-                if (_GlitchC.y > 0.001)
+                half3 col = SceneAt(uv);
+
+                // 끌림(스미어) — 찢긴 줄에서 밀린 방향 뒤쪽 픽셀 중 밝은 것을 끌어온다(밝은 부분이 가로로 늘어진다).
+                float smear = _GlitchB.z * on;
+                if (smear > 0.001)
                 {
-                    half3 acc = col;
+                    float len = _GlitchTear.z;
                     [unroll] for (int i = 1; i <= 6; i++)
-                        acc += SceneAt(uvColor - float2(0.008 * i * _GlitchC.y, 0));
-                    col = lerp(col, acc / 7.0h, (half)_GlitchC.y);
+                    {
+                        half3 s = SceneAt(uv - float2(dir * len * (i / 6.0), 0.0));
+                        half fade = (half)(1.0 - i / 7.0);
+                        col = max(col, s * fade * (half)smear + col * (half)(1.0 - smear));
+                    }
                 }
 
                 // 흑백 → 배경만 호박색. 플레이어(캐릭터)는 흑백 유지.
@@ -129,17 +117,17 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half3 graded = lerp(gray, amber, (half)_GlitchA.w);
                 graded = lerp(graded, lerp(col, lum.xxx, (half)max(_GlitchA.z, _GlitchA.w)), player);
 
-                // 보스 — 흑백 노이즈 UV 애니메이션(흰 = 밝은 색, 검 = 어두운 적갈색)
+                // 보스 — 흑백 노이즈(흰 = 밝은 색, 검 = 어두운 적갈색)
                 float2 nUV = _BossScreen.w > 0.5
                     ? (uv - _BossScreen.xy) * float2(aspect, 1.0) / _BossScreen.z   // 보스 기준(보스 화면 높이 = 1)
                     : uv * float2(aspect, 1.0);                                      // 화면 공간(세로 = 1)
                 nUV = nUV * _NoiseST.xy + _NoiseST.zw;
                 half n = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, nUV).r;
                 half3 noiseCol = lerp(_NoiseDark.rgb, _NoiseBright.rgb, n);
-                graded = lerp(graded, noiseCol, boss * (half)_GlitchD.z);
+                graded = lerp(graded, noiseCol, boss * (half)_GlitchC.x);
 
                 // 흑백 플래시
-                graded = lerp(graded, (Luma(graded) * 1.8h).xxx, (half)_GlitchD.x);
+                graded = lerp(graded, (Luma(graded) * 1.8h).xxx, (half)_GlitchB.w);
 
                 // CRT 주사선
                 half scan = 0.5h + 0.5h * sin(uv0.y * _GlitchLook.x * 6.28318h);

@@ -36,17 +36,10 @@ public static class BossVictoryGlitchRender
         public float Desaturate;    // 화면 흑백
         public float Amber;         // 배경 호박색 틴트(플레이어 제외)
         public float Scanline;      // CRT 주사선
-        public float Wave;          // 가로줄 물결
-        public float Step;          // 계단식 세로 어긋남
-        public float Stretch;       // 가로 늘어남
-        public float Block;         // 블록 모자이크
-        public float Smear;         // 가로 스미어
-        public float Slice;         // 슬라이스
-        public float RgbSplit;      // RGB 분리
+        public float Tear;          // 가로줄 좌우 찢김(유일한 모양 글리치)
+        public float Smear;         // 찢긴 줄 밝은 부분 가로 끌림
         public float Flash;         // 흑백 플래시
-        public float CharGlitch;    // 플레이어 실루엣 가로 흔들림
         public float BossNoise;     // 보스 노이즈 세기
-        public float BossJiggle;    // 보스 외곽 가로 지글
         public Vector2 BossScreenCenter;   // 보스 중심(뷰포트 0~1) — 노이즈 보스 기준 공간
         public float BossScreenSize;       // 보스 화면 높이(뷰포트) — 노이즈 보스 기준 공간 배율
         public Vector2 NoiseOffset;        // 노이즈 UV 오프셋 — 카메라 이동으로만 누적(시간 흐름 없음)
@@ -55,16 +48,16 @@ public static class BossVictoryGlitchRender
     static readonly int IdId = Shader.PropertyToID("_GlitchId");
     static readonly int IdIdTex = Shader.PropertyToID("_GlitchIdTex");
     static readonly int IdA = Shader.PropertyToID("_GlitchA");        // x master, y time, z desat, w amber
-    static readonly int IdB = Shader.PropertyToID("_GlitchB");        // x scanline, y wave, z step, w stretch
-    static readonly int IdC = Shader.PropertyToID("_GlitchC");        // x block, y smear, z slice, w rgb
-    static readonly int IdD = Shader.PropertyToID("_GlitchD");        // x flash, y charGlitch, z bossNoise, w bossJiggle
+    static readonly int IdB = Shader.PropertyToID("_GlitchB");        // x scanline, y tear, z smear, w flash
+    static readonly int IdC = Shader.PropertyToID("_GlitchC");        // x bossNoise
+    static readonly int IdTear = Shader.PropertyToID("_GlitchTear");  // x 최대 밀림, y 켜지는 줄 비율, z 끌림 길이
     static readonly int IdBossScreen = Shader.PropertyToID("_BossScreen");   // xy 중심, z 화면 높이, w 공간(0 화면 · 1 보스 기준)
     static readonly int IdAmberColor = Shader.PropertyToID("_AmberColor");
     static readonly int IdNoiseTex = Shader.PropertyToID("_NoiseTex");
     static readonly int IdNoiseST = Shader.PropertyToID("_NoiseST");          // xy 타일링, zw UV 오프셋(카메라 이동 누적)
     static readonly int IdNoiseBright = Shader.PropertyToID("_NoiseBright");
     static readonly int IdNoiseDark = Shader.PropertyToID("_NoiseDark");
-    static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 물결 주파수, z 블록 크기(px), w 슬라이스 줄 수
+    static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 찢김 줄 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
 
     static Material _maskPlayer, _maskBoss, _composite;
     static MaskPass _maskPass;
@@ -127,8 +120,9 @@ public static class BossVictoryGlitchRender
         _noiseTiling = s.bossNoiseTiling;
         _composite.SetColor(IdNoiseBright, s.bossNoiseBrightColor.linear * Mathf.Max(0f, s.bossNoiseBrightIntensity));
         _composite.SetColor(IdNoiseDark, s.bossNoiseDarkColor.linear);
-        _composite.SetVector(IdLook, new Vector4(Mathf.Max(1f, s.scanlineCount), Mathf.Max(0f, s.waveFrequency),
-            Mathf.Max(1f, s.blockPixelSize), Mathf.Max(1f, s.sliceCount)));
+        _composite.SetVector(IdLook, new Vector4(Mathf.Max(1f, s.scanlineCount), Mathf.Max(1f, s.tearLinePixels),
+            Mathf.Max(1f, s.tearLineMaxMultiplier), Mathf.Max(1f, s.tearRefreshRate)));
+        _composite.SetVector(IdTear, new Vector4(Mathf.Max(0f, s.tearMaxShift), Mathf.Clamp01(s.tearDensity), Mathf.Max(0f, s.tearStreakLength), 0f));
         _noiseSpace = s.bossNoiseSpace == BossVictoryGlitchSettings.NoiseSpace.Boss ? 1f : 0f;
     }
 
@@ -141,9 +135,8 @@ public static class BossVictoryGlitchRender
         _master = Mathf.Clamp01(f.Master);
         if (_composite == null) return;
         _composite.SetVector(IdA, new Vector4(_master, f.Time, f.Desaturate, f.Amber));
-        _composite.SetVector(IdB, new Vector4(f.Scanline, f.Wave, f.Step, f.Stretch));
-        _composite.SetVector(IdC, new Vector4(f.Block, f.Smear, f.Slice, f.RgbSplit));
-        _composite.SetVector(IdD, new Vector4(f.Flash, f.CharGlitch, f.BossNoise, f.BossJiggle));
+        _composite.SetVector(IdB, new Vector4(f.Scanline, f.Tear, f.Smear, f.Flash));
+        _composite.SetVector(IdC, new Vector4(f.BossNoise, 0f, 0f, 0f));
         _composite.SetVector(IdBossScreen, new Vector4(f.BossScreenCenter.x, f.BossScreenCenter.y, Mathf.Max(0.01f, f.BossScreenSize), _noiseSpace));
         _composite.SetVector(IdNoiseST, new Vector4(_noiseTiling.x, _noiseTiling.y, f.NoiseOffset.x, f.NoiseOffset.y));
     }
