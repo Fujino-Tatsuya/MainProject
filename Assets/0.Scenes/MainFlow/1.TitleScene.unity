@@ -2795,6 +2795,18 @@ MonoBehaviour:
   _glitchSlip: 0.04
   _kickDecay: 0.35
   _glitchDecay: 0.12
+  _videoScreens:
+  - {fileID: 1084121995}
+  - {fileID: 1908013132}
+  - {fileID: 1908013124}
+  _videoClips:
+  - {fileID: 32900000, guid: 321a5c231c1430c809a87b0abaf342b9, type: 3}
+  - {fileID: 32900000, guid: 855c3d7b5ef7b509926400fd5527e591, type: 3}
+  - {fileID: 32900000, guid: 53d518e0cc864e7aeda8c3b95563c0b7, type: 3}
+  - {fileID: 32900000, guid: 987a40ea30fe1d33e4fa7837770a9636, type: 3}
+  - {fileID: 32900000, guid: f768c5f18dd476c8f5be9d576ad7bc26, type: 3}
+  _videoSize: {x: 640, y: 360}
+  _videoUv: {x: 1, y: 1, z: 0, w: 0}
 --- !u!4 &2137555596
 Transform:
   m_ObjectHideFlags: 0

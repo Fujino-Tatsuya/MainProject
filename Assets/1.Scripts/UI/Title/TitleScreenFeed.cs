@@ -4,6 +4,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.RenderGraphModule.Util;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.Video;
 
 /// <summary>
 /// 벽 모니터 13대. 기본은 **원래 벽 이미지 + CRT 룩 + TV 롤링**(팀장 09-28).
@@ -18,6 +19,8 @@ using UnityEngine.Rendering.Universal;
 ///    구조상 안 들어간다(의도와 일치, Codex 검토 09-23).
 /// 🔴 백화 방지: 벽 머티리얼은 밝기 계수를 1 미만으로(재귀마다 곱해진다).
 /// 벽 모니터 대상은 **원본 머티리얼 참조**(glitch/non)로 고른다 — 중앙 화면은 이름이 같아서 이름으로 가르면 섞인다.
+/// 존 투어 영상(할 일 254): 원래 이미지 모드에서 <see cref="_videoScreens"/> 만 영상 RT 를 비춘다 — 모니터마다 VideoPlayer 1개·
+/// RT 1장·벽 머티리얼 인스턴스 1장(CRT·지직 그대로, 세로 흐름 0). 같은 순간 서로 다른 영상(<see cref="TitleWallVideoPlaylist"/>).
 /// </remarks>
 [DisallowMultipleComponent]
 public sealed class TitleScreenFeed : MonoBehaviour
@@ -54,6 +57,16 @@ public sealed class TitleScreenFeed : MonoBehaviour
     [SerializeField, Min(0.01f)] private float _kickDecay = 0.35f;
     [SerializeField, Min(0.01f)] private float _glitchDecay = 0.12f;
 
+    [Header("존 투어 영상 (할 일 254) — 원래 이미지 모드에서만. 같은 순간 모니터끼리 다른 영상")]
+    [Tooltip("영상을 비출 모니터 화면 Renderer. 기본 = TitleOffice 의 monitor (4)·(8)·(11) 의 monitor_screen. _wallScreens 에 있든 없든 된다. 비우면 영상 끔.")]
+    [SerializeField] private Renderer[] _videoScreens;
+    [Tooltip("재생 목록. 끝나면 다른 모니터가 지금 틀지 않는 다음 영상으로 넘어간다(순환). 모니터 수보다 많아야 안 겹친다.")]
+    [SerializeField] private VideoClip[] _videoClips;
+    [Tooltip("영상 렌더 텍스처 크기(모니터마다 1장).")]
+    [SerializeField] private Vector2Int _videoSize = new(640, 360);
+    [Tooltip("영상 UV 배율(xy)·오프셋(zw). 화면이 16:9 가 아니어서 늘어나 보이면 가운데 자르기 — 예) 4:3 화면 = (0.75, 1, 0.125, 0).")]
+    [SerializeField] private Vector4 _videoUv = new(1f, 1f, 0f, 0f);
+
     private struct TvState { public float roll, speed, kick, glitch; }
     private TvState[] _tv;
     private MaterialPropertyBlock _mpb;
@@ -67,6 +80,25 @@ public sealed class TitleScreenFeed : MonoBehaviour
     private readonly List<Material[]> _originals = new();
     private FeedPass _pass;
     private readonly List<Material> _imageMaterials = new();
+
+    private static readonly int IdRoll = Shader.PropertyToID("_Roll");
+    private static readonly int IdSeamBlend = Shader.PropertyToID("_SeamBlend");
+
+    private sealed class VideoScreen
+    {
+        public Renderer renderer;
+        public Material[] original;
+        public Material material;
+        public RenderTexture rt;
+        public VideoPlayer player;
+        public int clip = -1;
+        public float glitch;
+    }
+
+    private readonly List<VideoScreen> _videos = new();
+    private readonly List<VideoClip> _clips = new();
+    private readonly HashSet<Renderer> _videoSet = new();
+    private readonly List<int> _playingScratch = new();
 
     private void OnEnable()
     {
@@ -120,6 +152,7 @@ public sealed class TitleScreenFeed : MonoBehaviour
         if (TitleCrtFx.Active == null) return;
         if (_wallMaterial != null) TitleCrtFx.Active.Register(_wallMaterial);
         foreach (Material m in _imageMaterials) TitleCrtFx.Active.Register(m);
+        foreach (VideoScreen v in _videos) TitleCrtFx.Active.Register(v.material);
     }
 
     /// <summary>원래 머티리얼마다 인스턴스 1장(이미지만 다르다) — 13대가 2장을 공유한다. 흐름·지직은 셰이더가 위치 해시로 모니터별 위상을 준다.</summary>
@@ -161,6 +194,123 @@ public sealed class TitleScreenFeed : MonoBehaviour
             float sign = Random.value < 0.5f ? -1f : 1f;
             _tv[i] = new TvState { roll = Random.value, speed = sign * Random.Range(_rollSpeed.x, _rollSpeed.y) };
         }
+
+        EnableVideos();
+    }
+
+    /// <summary>
+    /// 영상 모니터마다 RT·벽 머티리얼 인스턴스·VideoPlayer 를 만든다. 원래 이미지로 바꾼 <b>뒤</b>에 덮으므로
+    /// 끌 때는 <see cref="DisableVideos"/> 를 먼저 불러 그 상태(원래 이미지 인스턴스)로 되돌린 다음 벽 정리를 한다.
+    /// </summary>
+    private void EnableVideos()
+    {
+        _clips.Clear();
+        if (_videoClips != null) foreach (VideoClip c in _videoClips) if (c != null) _clips.Add(c);
+        if (_videoScreens == null || _videoScreens.Length == 0 || _clips.Count == 0) return;
+
+        int[] initial = TitleWallVideoPlaylist.Initial(_videoScreens.Length, _clips.Count, Random.Range(0, _clips.Count));
+        for (int i = 0; i < _videoScreens.Length; i++)
+        {
+            Renderer r = _videoScreens[i];
+            if (r == null || !_videoSet.Add(r)) continue;
+
+            var rt = new RenderTexture(Mathf.Max(16, _videoSize.x), Mathf.Max(16, _videoSize.y), 0, RenderTextureFormat.ARGB32)
+            {
+                name = $"TitleWallVideo{i}", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp
+            };
+            rt.Create();
+            ClearBlack(rt);
+
+            // 세로 흐름(동기 띠·감기)만 끈다 — _Flicker(지직 표현)는 머티리얼 값 그대로라 지직은 남는다.
+            // 셰이더가 지직이 있으면 위아래 이음새를 섞는데, 그 폭을 최소로 줄여 영상 위아래 끝만 살짝 닿게 한다.
+            var m = new Material(_wallMaterialSource) { name = $"TitleWallVideo{i} (Instance)", mainTexture = rt };
+            m.SetFloat(IdRoll, 0f);
+            m.SetFloat(IdSeamBlend, 0.05f);
+            m.mainTextureScale = new Vector2(_videoUv.x, _videoUv.y);
+            m.mainTextureOffset = new Vector2(_videoUv.z, _videoUv.w);
+
+            Material[] original = r.sharedMaterials;
+            var mats = new Material[original.Length];
+            for (int k = 0; k < mats.Length; k++) mats[k] = m;
+            r.sharedMaterials = mats;
+
+            var go = new GameObject($"TitleWallVideo{i}");
+            go.transform.SetParent(transform, false);
+            VideoPlayer vp = go.AddComponent<VideoPlayer>();
+            vp.playOnAwake = false;
+            vp.isLooping = false;
+            vp.source = VideoSource.VideoClip;
+            vp.renderMode = VideoRenderMode.RenderTexture;
+            vp.targetTexture = rt;
+            vp.aspectRatio = VideoAspectRatio.Stretch;
+            vp.audioOutputMode = VideoAudioOutputMode.None;
+            vp.timeUpdateMode = VideoTimeUpdateMode.UnscaledGameTime;
+            vp.skipOnDrop = true;
+
+            var v = new VideoScreen { renderer = r, original = original, material = m, rt = rt, player = vp };
+            vp.loopPointReached += _ => OnVideoEnded(v);
+            vp.errorReceived += (_, msg) => Debug.LogWarning($"[TitleFeed] 벽 영상 재생 오류({r.name}): {msg}", this);
+            _videos.Add(v);
+
+            if (TitleCrtFx.Active != null) TitleCrtFx.Active.Register(m);
+            Play(v, initial[i]);
+        }
+    }
+
+    private void Play(VideoScreen v, int clip)
+    {
+        if (clip < 0 || clip >= _clips.Count) return;
+        v.clip = clip;
+        v.player.clip = _clips[clip];
+        v.player.Play();
+    }
+
+    private void OnVideoEnded(VideoScreen v)
+    {
+        if (!_videos.Contains(v)) return; // 정리 뒤 늦게 온 콜백
+        _playingScratch.Clear();
+        foreach (VideoScreen o in _videos) if (o != v) _playingScratch.Add(o.clip);
+        Play(v, TitleWallVideoPlaylist.Next(v.clip, _playingScratch, _clips.Count));
+    }
+
+    /// <summary>영상 모니터는 흐름 0, 지직만 평소 빈도로(동기 띠가 없으니 띠 가속·미끄러짐도 없다).</summary>
+    private void UpdateVideoGlitch(float dt, float glitchFade)
+    {
+        foreach (VideoScreen v in _videos)
+        {
+            if (v.renderer == null) continue;
+            if (Random.value < _glitchRate * dt) v.glitch = Random.Range(0.55f, 1f);
+            v.glitch *= glitchFade;
+
+            v.renderer.GetPropertyBlock(_mpb);
+            _mpb.SetFloat(IdWallRoll, 0f);
+            _mpb.SetFloat(IdWallGlitch, v.glitch);
+            v.renderer.SetPropertyBlock(_mpb);
+        }
+    }
+
+    private void DisableVideos()
+    {
+        foreach (VideoScreen v in _videos)
+        {
+            if (v.player != null)
+            {
+                v.player.Stop();
+                v.player.targetTexture = null;
+                Destroy(v.player.gameObject);
+            }
+            if (v.renderer != null)
+            {
+                v.renderer.SetPropertyBlock(null);
+                v.renderer.sharedMaterials = v.original;
+            }
+            if (TitleCrtFx.Active != null) TitleCrtFx.Active.Unregister(v.material);
+            if (v.material != null) Destroy(v.material);
+            if (v.rt != null) { v.rt.Release(); Destroy(v.rt); }
+        }
+        _videos.Clear();
+        _videoSet.Clear();
+        _clips.Clear();
     }
 
     private void Update()
@@ -173,7 +323,7 @@ public sealed class TitleScreenFeed : MonoBehaviour
         for (int i = 0; i < _tv.Length; i++)
         {
             Renderer r = _wallScreens[i];
-            if (r == null) continue;
+            if (r == null || _videoSet.Contains(r)) continue; // 영상 모니터는 UpdateVideoGlitch
             ref TvState t = ref _tv[i];
 
             // 흐름 → 지직: 동기 띠(이음새)가 화면 가운데 근처면 더 자주 터진다
@@ -196,10 +346,13 @@ public sealed class TitleScreenFeed : MonoBehaviour
             _mpb.SetFloat(IdWallGlitch, t.glitch);
             r.SetPropertyBlock(_mpb);
         }
+
+        UpdateVideoGlitch(dt, glitchFade);
     }
 
     private void DisableStillImages()
     {
+        DisableVideos(); // 영상이 원래 이미지 위에 덮였으므로 먼저 걷는다
         _tv = null;
         foreach (Renderer r in _wallScreens) if (r != null) r.SetPropertyBlock(null);
         for (int i = 0; i < _wallScreens.Length && i < _originals.Count; i++)
