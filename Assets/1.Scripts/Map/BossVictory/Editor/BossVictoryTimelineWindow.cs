@@ -304,8 +304,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     }
 
     static string MarkerText(BossVictoryTimeline tl, BossVictoryMarker marker) =>
-        marker == BossVictoryMarker.KillerActionEnd && tl.MarkerTime(marker) <= 0f
-            ? $"{BossVictoryTimeline.MarkerLabel(marker)} (끔 — 클립 끝까지)"
+        marker == BossVictoryMarker.SlowStart && tl.MarkerTime(marker) <= 0f
+            ? $"{BossVictoryTimeline.MarkerLabel(marker)} (끔 — 스킬 End)"
             : $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
 
     static readonly string[] AnchorLabels = { "가운데", "처치자", "보스" };
@@ -767,8 +767,21 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 c.fadeOut = Mathf.Clamp(Snap(o.End - mt), 0f, o.length);
                 break;
         }
-        Timeline.Clips((BossVictoryTrack)_selTrack)[_selIndex] = Clamp(c);
+        Timeline.Clips((BossVictoryTrack)_selTrack)[_selIndex] = Clamp((BossVictoryTrack)_selTrack, c);
         Repaint();
+    }
+
+    // 처치자 평타 = 시작 0 고정(끝만 의미) — 옮기기·왼쪽 끝 끌기·입력 모두 끝을 남기고 시작을 0 으로.
+    static BossVictoryClip Clamp(BossVictoryTrack track, BossVictoryClip c)
+    {
+        c = Clamp(c);
+        if (!BossVictoryTimeline.StartFixed(track)) return c;
+        float end = c.End;
+        c.start = 0f;
+        c.length = Mathf.Max(MinLength, end);
+        c.fadeIn = c.fadeOut = 0f;
+        c.weight = 1f;
+        return c;
     }
 
     static BossVictoryClip Clamp(BossVictoryClip c)
@@ -810,7 +823,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 menu.AddSeparator("");
             }
             if (CanAdd(track)) menu.AddItem(new GUIContent($"클립 추가 ({t:0.00}초)"), false, () => AddClip(tr, t));
-            else menu.AddDisabledItem(new GUIContent("클립 추가 (TV 꺼짐은 1개만)"));
+            else menu.AddDisabledItem(new GUIContent("클립 추가 (이 트랙은 1개만)"));
             if (s_hasClipboard && CanAdd(track)) menu.AddItem(new GUIContent($"붙여넣기 ({t:0.00}초)"), false, () => PasteAt(tr, t));
             else menu.AddDisabledItem(new GUIContent("붙여넣기"));
             menu.ShowAsContext();
@@ -821,7 +834,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     bool CanAdd(BossVictoryTrack track) =>
         BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Single || Timeline.Clips(track).Count == 0;
 
-    static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.KindOf(track) switch
+    static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.StartFixed(track)
+        ? BossVictoryClip.Make(0f, Mathf.Max(MinLength, start))   // 처치자 평타 — 누른 시각 = 끝
+        : BossVictoryTimeline.KindOf(track) switch
     {
         BossVictoryTimeline.TrackKind.Pulse => BossVictoryClip.Make(start, 0.2f, 0.1f, 0.1f),
         BossVictoryTimeline.TrackKind.Single or BossVictoryTimeline.TrackKind.Cut => BossVictoryClip.Make(start, 1f),
@@ -865,7 +880,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryClip c = s_clipboard;
         c.start = Mathf.Max(0f, Snap(start));
         List<BossVictoryClip> clips = Timeline.Clips(track);
-        clips.Add(Clamp(c));
+        clips.Add(Clamp(track, c));
         if (track == BossVictoryTrack.CameraCut)
         {
             Timeline.SyncCameraCutShots();   // 모자란 앞 번호 보정 뒤 이 클립 값
@@ -941,9 +956,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             "디버그 씬: 이 시각이 한 바퀴 끝 — 로비로 가지 않고 랩 '반복' 대기(loopHoldSeconds) 뒤 처음부터.",
         BossVictoryMarker.FocusKiller => "처치자가 아닌 피어의 카메라가 이 시각에 처치자로 즉시 넘어간다(처치자 화면 그대로).",
         BossVictoryMarker.HideOthers => "이 시각에 처치자 외 플레이어 캐릭터를 모든 화면에서 숨긴다.",
-        BossVictoryMarker.KillerActionEnd =>
-            "처치 순간 처치자가 하던 동작(평타 등, ×0.5)을 이 시각에 끊고 바로 백대쉬로 넘어간다. 클립이 먼저 끝나면 클립 끝에서(둘 중 이른 쪽). " +
-            "하던 동작이 없으면(대기·이동) 처음부터 백대쉬. 0 = 끔(클립 끝까지). 각 피어가 자기 화면 시계로 판정 — 스크럽으로 되돌아가지 않는다(다시 보려면 ⏮).",
+        BossVictoryMarker.BackDashStart =>
+            "이 시각에 처치자가 백대쉬한다 — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다. " +
+            "처치자 순서 노드는 각 피어가 자기 화면 시계로 앞으로만 판정 — 스크럽으로 되돌아가지 않는다(다시 보려면 ⏮).",
+        BossVictoryMarker.FinisherStart =>
+            "이 시각에 처치 연출 스킬을 표시용으로 바로 튼다 — 백대쉬가 덜 끝났으면 끊고, 처치 순간 쓰던 스킬이 남아 있어도 기다리지 않는다. " +
+            "기본 = 백대쉬 시작 + 백대쉬 시간 + 백대쉬 후 대기. 앞으로만(⏮ 로 다시 보기).",
+        BossVictoryMarker.SlowStart =>
+            "이 시각부터 처치자·보스가 End 후 배율(아래 칸)로 느려진다. 0 = 끔 — 처치 연출 스킬 클립의 End 이벤트에서(255 후속 3 까지와 같음). 앞으로만(⏮ 로 다시 보기).",
         _ => "",
     };
 
@@ -976,7 +996,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 Timeline.SetMarkerTime(marker, time);
                 Save();
             }
-            if (marker == BossVictoryMarker.KillerActionEnd && Timeline.MarkerTime(marker) > 0f && GUILayout.Button("끄기 (0 = 클립 끝까지)", GUILayout.Width(160f)))
+            if (marker == BossVictoryMarker.SlowStart && Timeline.MarkerTime(marker) > 0f && GUILayout.Button("끄기 (0 = 스킬 End)", GUILayout.Width(160f)))
             {
                 Record("처치 연출 타임라인 마커 끄기");
                 Timeline.SetMarkerTime(marker, 0f);
@@ -1012,9 +1032,17 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryClip c = Timeline.Clips(track)[_selIndex];
         EditorGUILayout.LabelField("클립", $"{BossVictoryTimeline.TrackLabel(track)} #{_selIndex + 1}", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();
-        c.start = EditorGUILayout.FloatField("시작(초)", c.start);
-        c.length = EditorGUILayout.FloatField("길이(초)", c.length);
-        EditorGUILayout.LabelField("끝(초)", c.End.ToString("0.00"));
+        if (BossVictoryTimeline.StartFixed(track))
+        {
+            EditorGUILayout.LabelField("시작(초)", "0 고정(처치 순간)");
+            c.length = EditorGUILayout.FloatField("끝(초) = 동작 끊는 시각", c.length);
+        }
+        else
+        {
+            c.start = EditorGUILayout.FloatField("시작(초)", c.start);
+            c.length = EditorGUILayout.FloatField("길이(초)", c.length);
+            EditorGUILayout.LabelField("끝(초)", c.End.ToString("0.00"));
+        }
         if (BossVictoryTimeline.HasFades(track))
         {
             c.fadeIn = EditorGUILayout.FloatField("페이드 인(초)", c.fadeIn);
@@ -1024,7 +1052,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (EditorGUI.EndChangeCheck())
         {
             RecordField("처치 연출 타임라인 클립 수치");
-            Timeline.Clips(track)[_selIndex] = Clamp(c);
+            Timeline.Clips(track)[_selIndex] = Clamp(track, c);
             Save();
         }
         DrawTrackShape(track);
@@ -1208,11 +1236,25 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         switch (marker)
         {
-            case BossVictoryMarker.KillerActionEnd:
-                DrawSettingsFields("백대쉬(처치 연출 전용 — 마커가 꺼져 있어도 적용: 하던 동작이 없으면 처음부터 백대쉬)",
+            case BossVictoryMarker.BackDashStart:
+                DrawSettingsFields("백대쉬(처치 연출 전용)",
                     nameof(BossVictoryGlitchSettings.backDashDistance), nameof(BossVictoryGlitchSettings.backDashDuration),
-                    nameof(BossVictoryGlitchSettings.backDashEase), nameof(BossVictoryGlitchSettings.backDashAngle));
-                EditorGUILayout.LabelField("방향 = 보스 반대쪽을 보정 각만큼 돌림(+ = 시계 방향). 리액션 애니는 보스 등장 밀림과 같다. 기본값 = 보스 등장 밀림 값.", EditorStyles.wordWrappedMiniLabel);
+                    nameof(BossVictoryGlitchSettings.backDashEase), nameof(BossVictoryGlitchSettings.backDashAngle),
+                    nameof(BossVictoryGlitchSettings.backDashIdleDelay));
+                EditorGUILayout.LabelField("방향 = 보스 반대쪽을 보정 각만큼 돌림(+ = 시계 방향). 후 대기 = 백대쉬 끝 ~ Idle 복귀. 리액션 애니는 보스 등장 밀림과 같다(등장 연출 값은 그대로). 기본값 = 보스 등장 밀림 값.", EditorStyles.wordWrappedMiniLabel);
+                if (GUILayout.Button("스킬 연출 시작 = 백대쉬 시작 + 시간 + 후 대기", GUILayout.Width(300f)))
+                {
+                    Record("처치 연출 타임라인 스킬 연출 시작 맞추기");
+                    Timeline.SetMarkerTime(BossVictoryMarker.FinisherStart, Snap(BossVictoryKillerSequence.DefaultFinisherStart(
+                        Timeline.backDashStartTime, _settings.backDashDuration, _settings.backDashIdleDelay)));
+                    Save();
+                }
+                break;
+            case BossVictoryMarker.FinisherStart:
+                DrawSettingsFields("처치 연출 스킬 칸", nameof(BossVictoryGlitchSettings.defaultFinisherSlot));
+                break;
+            case BossVictoryMarker.SlowStart:
+                DrawSettingsFields("End 후 배율", nameof(BossVictoryGlitchSettings.killerAfterFinisherScale), nameof(BossVictoryGlitchSettings.bossAfterFinisherScale));
                 break;
             case BossVictoryMarker.FocusKiller:
             {
@@ -1260,6 +1302,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             case BossVictoryTrack.Smear:
                 DrawSettingsFields("밝은 부분 끌림 모양(줄 = 가로 찢김 값)", nameof(BossVictoryGlitchSettings.tearStreakLength));
                 break;
+            case BossVictoryTrack.KillerAction:
+                EditorGUILayout.LabelField("처치 순간 하던 동작(평타·스킬 등 루프 아닌 클립)을 이 배율로 이어 가다 클립 끝에서 끊는다(먼저 끝나면 대기 · 대기·이동 중이었으면 빈 구간). 클립이 없으면 자기 클립 끝까지.", EditorStyles.wordWrappedMiniLabel);
+                DrawSettingsFields("하던 동작 배율", nameof(BossVictoryGlitchSettings.killerCurrentActionScale));
+                break;
             case BossVictoryTrack.CrtOff:
                 DrawSettingsFields("TV 꺼짐 모양", nameof(BossVictoryGlitchSettings.crtOffGlowColor));
                 break;
@@ -1276,7 +1322,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void DrawTimeScales()
     {
         EditorGUILayout.LabelField("처치 연출 스킬 · 시간 배율", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("처치자: 하던 동작 ×배율 → 백대쉬·처치 연출 스킬 ×1 → 스킬 End 이벤트부터 ×End 후 배율 · 팀원: 처치 즉시 · 보스: End 전 0, End 후 배율.", EditorStyles.wordWrappedMiniLabel);
+        EditorGUILayout.LabelField("처치자: 하던 동작 ×배율(처치자 평타 클립) → 백대쉬·처치 연출 스킬 ×1 → 느려짐 시작 마커(꺼짐이면 스킬 End)부터 ×End 후 배율 · 팀원: 처치 즉시 · 보스: 느려짐 전 0, 뒤 End 후 배율.", EditorStyles.wordWrappedMiniLabel);
         DrawSettingsFields("배율·스킬 칸",
             nameof(BossVictoryGlitchSettings.killerCurrentActionScale), nameof(BossVictoryGlitchSettings.killerAfterFinisherScale),
             nameof(BossVictoryGlitchSettings.otherPlayersScale), nameof(BossVictoryGlitchSettings.bossAfterFinisherScale),
@@ -1318,11 +1364,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab",
     };
 
-    // 추정 = 백대쉬 길이(열린 씬 BossEncounterDirector) + 처치 연출 스킬 클립의 End 이벤트 시각. 가정: 처치 순간 하던 동작 없음(대기)·공격 속도 100%.
+    // 추정 = 스킬 연출 시작 마커 + 처치 연출 스킬 클립의 End 이벤트 시각(255 후속 4 — 이전 스킬을 기다리지 않아 마커 그대로). 가정: 공격 속도 100%.
     string EstimateFinisherEnd()
     {
-        BossEncounterDirector director = Object.FindAnyObjectByType<BossEncounterDirector>(FindObjectsInactive.Include);
-        float dash = director != null ? director.IntroSkidDuration : 0f;
+        float dash = Timeline.finisherStartTime;
         var parts = new List<string>();
         foreach (string path in FinisherVariantPaths)
         {
@@ -1332,8 +1377,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             float end = FinisherEndEventTime(prefab);
             parts.Add(end >= 0f ? $"{name} {dash + end:0.00}s" : $"{name} ?(End 없음)");
         }
-        string basis = director != null ? $"백대쉬 {dash:0.00}s + 클립 End" : "백대쉬 길이 모름(씬에 BossEncounterDirector 없음) + 클립 End";
-        return parts.Count == 0 ? "프리팹 없음" : $"{string.Join(" · ", parts)}  ({basis} · 하던 동작 없음·공속 100% 가정)";
+        string slow = Timeline.slowStartTime > 0f ? $" · 느려짐은 마커 {Timeline.slowStartTime:0.00}s" : "";
+        return parts.Count == 0 ? "프리팹 없음" : $"{string.Join(" · ", parts)}  (스킬 연출 시작 {dash:0.00}s + 클립 End · 공속 100% 가정{slow})";
     }
 
     float FinisherEndEventTime(GameObject prefab)
