@@ -17,6 +17,12 @@ MonoBehaviour:
   otherPlayersScale: 0.05
   bossAfterFinisherScale: 0.1
   defaultFinisherSlot: 3
+  backDashDistance: 4
+  backDashDuration: 0.5
+  backDashEase: 3
+  backDashAngle: -30
+  focusKillerBlendSeconds: 0
+  hideOthersTarget: 0
   timeline:
     desaturate:
     - start: 0.105
@@ -70,16 +76,13 @@ MonoBehaviour:
       fadeIn: 0.04
       fadeOut: 0
       weight: 1
-    hold:
-    - start: 3.49
-      length: 1
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
     crtOff: []
+    cameraCut: []
+    cameraCutShots: []
     focusKillerTime: 0.2
     hideOthersTime: 0.2
     lobbyTransitionTime: 5.6
+    killerActionEndTime: 0.2
   amberColor: {r: 0.8235294, g: 0.6509804, b: 0.30588236, a: 1}
   scanlineCount: 360
   tearLinePixels: 3
@@ -95,7 +98,6 @@ MonoBehaviour:
   bossNoiseBrightColor: {r: 1, g: 0.9647059, b: 0.91764706, a: 1}
   bossNoiseBrightIntensity: 1.6
   bossNoiseDarkColor: {r: 0.22745098, g: 0.09019608, b: 0.07058824, a: 1}
-  cuts: []
   wallFacingThreshold: 0.3
   wallSearchRadius: 40
   crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}
