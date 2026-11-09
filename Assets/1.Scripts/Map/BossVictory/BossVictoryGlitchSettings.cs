@@ -11,6 +11,8 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public const string ResourcePath = "BossVictory/BossVictoryGlitchSettings";
 
     [Header("대상별 시간 배율(전역 timeScale 아님 — 각 피어 로컬 애니·이펙트)")]
+    [Tooltip("처치자 — 처치 순간 하던 동작(평타·스킬 등 루프 아닌 클립)을 이 배율로 그 클립 끝까지. 그 뒤 백대쉬·처치 연출 스킬은 1.")]
+    [Range(0.05f, 1f)] public float killerCurrentActionScale = 0.5f;
     [Tooltip("처치자 — 처치 연출 스킬이 End 에 닿은 뒤 배율(그 전엔 1).")]
     [Range(0f, 1f)] public float killerAfterFinisherScale = 0.1f;
     [Tooltip("처치자 외 플레이어 — 처치 판정 즉시 배율.")]

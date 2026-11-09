@@ -1007,28 +1007,51 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
 
     private void TickSkid(NetworkObject po, PlayerMotor motor, Player player, double now, double endAt)
     {
+        if (!StepSkid(player, motor, _motion.SkidDir, _motion.SkidDistance, _motion.StartAt, _motion.Duration, now,
+                      ref _motion.SkidDone, ref _motion.ReactionPlayed, ref _motion.IdleRestored))
+            return;
+        motor.PassThroughUnitsOverride = false;
+        _motion = default;
+    }
+
+    /// <summary>[등장 연출 밀림 설정] 밀림 거리(m) — 보스 처치 연출 백대쉬가 같은 값을 쓴다(PLAN-boss-victory-glitch).</summary>
+    public float IntroSkidDistance => impactSkidDistance;
+
+    /// <summary>[등장 연출 밀림 설정] 밀림 시간(초) — 보스 처치 연출 백대쉬가 같은 값을 쓴다.</summary>
+    public float IntroSkidDuration => impactSkidDuration;
+
+    /// <summary>밀림 끝 → Idle 복귀까지 더 기다리는 시간(초) — 등장 연출과 처치 연출 백대쉬 공용.</summary>
+    public static float SkidIdleDelay => ReactionIdleDelay;
+
+    /// <summary>
+    /// 등장 연출 밀림(백대쉬) 한 걸음 — 등장 연출(오너 FixedUpdate)과 보스 처치 연출 백대쉬가 같이 쓴다.
+    /// 처음 한 번 리액션 상태(<see cref="SkidReactionStates"/> 중 있는 것) → 시간 비율만큼 <paramref name="dir"/> 로 밀기(<paramref name="motor"/> 가 null 이면
+    /// 애니만 — 오너가 아닌 피어) → 밀림 끝 + <see cref="ReactionIdleDelay"/> 에 Idle. 반환 = 끝났다(Idle 복귀까지).
+    /// </summary>
+    public static bool StepSkid(Player player, PlayerMotor motor, Vector3 dir, float distance, double startAt, float duration, double now,
+                                ref float done, ref bool reactionPlayed, ref bool idleRestored)
+    {
         Animator animator = player != null ? player.CharacterAnimator : null;
-        if (!_motion.ReactionPlayed)
+        if (!reactionPlayed)
         {
-            _motion.ReactionPlayed = true;
+            reactionPlayed = true;
             if (player != null) player.SetAnimatorMoving(false);
             CrossFadeFirstExisting(animator, SkidReactionStates);
         }
 
-        float t = _motion.Duration > 0f ? (float)((now - _motion.StartAt) / _motion.Duration) : 1f;
+        float t = duration > 0f ? (float)((now - startAt) / duration) : 1f;
         float eased = BossIntroFormation.SkidEase(t);
-        float step = (eased - _motion.SkidDone) * _motion.SkidDistance;
-        _motion.SkidDone = eased;
-        if (step > 0f) motor.AddGroundedDisplacement(_motion.SkidDir * step);
+        float step = (eased - done) * distance;
+        done = eased;
+        if (step > 0f && motor != null) motor.AddGroundedDisplacement(dir * step);
 
-        if (now < endAt + ReactionIdleDelay) return;
-        if (!_motion.IdleRestored)
+        if (now < startAt + duration + ReactionIdleDelay) return false;
+        if (!idleRestored)
         {
-            _motion.IdleRestored = true;
+            idleRestored = true;
             CrossFadeFirstExisting(animator, IdleStates);
         }
-        motor.PassThroughUnitsOverride = false;
-        _motion = default;
+        return true;
     }
 
     private static void CrossFadeFirstExisting(Animator animator, string[] states)

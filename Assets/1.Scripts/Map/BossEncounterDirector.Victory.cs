@@ -148,12 +148,13 @@ public sealed partial class BossEncounterDirector
             HitPoint = hitPoint,
         };
 
-        // 처치 순간: 피해 무시(D3) · 전역 슬로모션 강제 해제(C11) · 전원 연출 잠금(실행 중 스킬·평타 취소 + 입력 차단 — 처치 연출 스킬은
-        // 각 피어가 표시로만 새로 튼다) · 서버 판정 장판·투사체 디스폰(Q11 — 표시 소거는 각 피어 BossVictoryGlitchPresentation).
+        // 처치 순간: 피해 무시(D3) · 전역 슬로모션 강제 해제(C11) · 전원 연출 잠금(입력 차단 + 처치자 외 실행 중 스킬·평타 취소 — 처치자는
+        // 하던 동작을 끝까지, 처치 연출 스킬은 각 피어가 표시로만 새로 튼다) · 서버 판정 장판·투사체 디스폰(Q11 — 표시 소거는 각 피어 BossVictoryGlitchPresentation).
         for (int i = 0; i < players.Count; i++)
         {
             players[i].GetComponent<PlayerInvulnerability>()?.AddServerToken(InvulnerabilityCause.BossVictory, 0.0);
-            players[i].GetComponent<PlayerEncounterLock>()?.SetCinematicInputLockServer(true);
+            // 처치자는 하던 동작(평타·스킬)을 끊지 않는다 — 각 피어가 0.5배속으로 그 클립 끝까지 보여 준 뒤 백대쉬 → 처치 연출 스킬.
+            players[i].GetComponent<PlayerEncounterLock>()?.SetCinematicInputLockServer(true, cancelCurrentAction: players[i] != killer);
         }
         GlobalTimeScale.Instance?.ServerForceReset();
         int despawned = DespawnCombatObjectsServer();

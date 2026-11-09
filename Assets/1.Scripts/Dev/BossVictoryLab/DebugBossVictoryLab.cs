@@ -413,7 +413,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             GUILayout.Label($"배속 {Time.timeScale:0.00}{(_paused ? " · 일시정지" : "")}");
             BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
             if (p != null && p.Sequence == v.Sequence)
-                GUILayout.Label($"표시: {p.CurrentPhase} · 글리치 {p.GlitchTime:0.00}초(게임 시간) · 컷 {(p.CutIndex < 0 ? "게임 카메라" : p.CutIndex.ToString())}{(p.Finished ? " · CRT 꺼짐 끝" : "")}");
+                GUILayout.Label($"표시: {p.CurrentPhase}·처치자 {p.KillerStepName} · 글리치 {p.GlitchTime:0.00}초(게임 시간) · 컷 {(p.CutIndex < 0 ? "게임 카메라" : p.CutIndex.ToString())}{(p.Finished ? " · CRT 꺼짐 끝" : "")}");
         }
         else
         {
