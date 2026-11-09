@@ -5,7 +5,6 @@ using UnityEngine;
 /// <summary>보스 처치 연출 타임라인 트랙(PLAN-boss-victory-glitch "타임라인 에디터 창"). 순서 = 창 위→아래.</summary>
 public enum BossVictoryTrack
 {
-    Master,      // 전체 세기(옛 master 곡선 — 모든 화면 효과에 곱한다)
     Desaturate,  // 흑백
     Amber,       // 노란 틴트(배경만)
     Scanline,    // CRT 주사선
@@ -66,7 +65,6 @@ public sealed class BossVictoryTimeline
 {
     public enum TrackKind { Range, Pulse, Single }
 
-    public List<BossVictoryClip> master = new List<BossVictoryClip>();
     public List<BossVictoryClip> desaturate = new List<BossVictoryClip>();
     public List<BossVictoryClip> amber = new List<BossVictoryClip>();
     public List<BossVictoryClip> scanline = new List<BossVictoryClip>();
@@ -86,7 +84,6 @@ public sealed class BossVictoryTimeline
 
     public List<BossVictoryClip> Clips(BossVictoryTrack track) => track switch
     {
-        BossVictoryTrack.Master => master,
         BossVictoryTrack.Desaturate => desaturate,
         BossVictoryTrack.Amber => amber,
         BossVictoryTrack.Scanline => scanline,
@@ -130,7 +127,6 @@ public sealed class BossVictoryTimeline
 
     public static string TrackLabel(BossVictoryTrack track) => track switch
     {
-        BossVictoryTrack.Master => "전체 세기",
         BossVictoryTrack.Desaturate => "흑백",
         BossVictoryTrack.Amber => "노란 틴트",
         BossVictoryTrack.Scanline => "주사선",
@@ -205,6 +201,7 @@ public sealed class BossVictoryTimeline
     /// <summary>
     /// 기본 타임라인 — 옛 기본 곡선(에셋 값)과 같은 화면(EditMode <c>BossVictoryTimelineTests</c>).
     /// 램프 곡선 → 끝(5.6)까지 가는 페이드 인 클립 · 펄스 곡선 → 키 사이 그대로의 페이드 인/아웃 클립 ·
+    /// 옛 전체 세기(master 0.08~0.15 램프, 11-09 삭제)는 흑백·주사선·첫 찢김/끌림 클립의 시작·페이드 인으로 녹였다(곱한 값에 가장 가까운 0.005초 격자 — 오차 ≤ 0.05, 0.08~0.2초 몇 프레임) ·
     /// 옛 glitchDuration 3.5 + holdSeconds 1 → 정지 유지 3.5~4.5 · crtOffSeconds 1.1 → TV 꺼짐 4.5~5.6.
     /// </summary>
     public static BossVictoryTimeline CreateDefault()
@@ -212,18 +209,17 @@ public sealed class BossVictoryTimeline
         const float end = DefaultEnd;
         static BossVictoryClip Ramp(float a, float b) => BossVictoryClip.Make(a, end - a, b - a);
         var tl = new BossVictoryTimeline();
-        tl.master.Add(Ramp(0.08f, 0.15f));
-        tl.desaturate.Add(Ramp(0.1f, 0.2f));
+        tl.desaturate.Add(Ramp(0.105f, 0.195f));
         tl.amber.Add(Ramp(0.3f, 0.45f));
-        tl.scanline.Add(Ramp(0.1f, 0.2f));
+        tl.scanline.Add(Ramp(0.105f, 0.195f));
         tl.bossNoise.Add(Ramp(0.12f, 0.17f));
         tl.hudHide.Add(Ramp(0.08f, 0.12f));
-        tl.tear.Add(BossVictoryClip.Make(0.08f, 0.17f, 0.12f, 0.05f));
+        tl.tear.Add(BossVictoryClip.Make(0.09f, 0.16f, 0.105f, 0.05f));
         tl.tear.Add(BossVictoryClip.Make(0.32f, 0.09f, 0.01f, 0.08f));
         tl.tear.Add(BossVictoryClip.Make(1.42f, 0.19f, 0.1f, 0.09f));
         tl.tear.Add(BossVictoryClip.Make(1.62f, 0.11f, 0.05f, 0.06f));
         tl.tear.Add(BossVictoryClip.Make(2.43f, 0.24f, 0.12f, 0.12f));
-        tl.smear.Add(BossVictoryClip.Make(0.08f, 0.17f, 0.12f, 0.05f));
+        tl.smear.Add(BossVictoryClip.Make(0.09f, 0.16f, 0.105f, 0.05f));
         tl.smear.Add(BossVictoryClip.Make(0.32f, 0.09f, 0.01f, 0.08f));
         tl.smear.Add(BossVictoryClip.Make(1.42f, 0.2f, 0.1f, 0.1f));
         tl.smear.Add(BossVictoryClip.Make(2.43f, 0.24f, 0.12f, 0.12f));

@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 타임라인(PLAN-boss-victory-glitch "타임라인 에디터 창") — 클립 평가·정지 유지·TV 꺼짐·마커,
-/// 기본 클립(코드·에셋)이 옛 기본 곡선(교체 직전 에셋 값)과 같은 화면인지.
+/// 기본 클립(코드·에셋)이 옛 기본 곡선 × 옛 전체 세기(교체 직전 에셋 값)와 같은 화면인지(전체 세기를 녹인 0.08~0.26초만 오차 0.06 허용).
 /// 실행 = <c>Tools/Tests/전투 EditMode 테스트 실행</c>(필터 ^BossVictoryTimeline).
 /// </summary>
 public sealed class BossVictoryTimelineTests
@@ -14,9 +14,13 @@ public sealed class BossVictoryTimelineTests
     const float Tolerance = 1e-3f;
 
     // 교체 직전 에셋 곡선 키(시각, 값) — 기울기 0(옛 Ramp/Pulses 기본값).
+    // 옛 전체 세기(master)는 화면 효과 전체에 곱해졌다(셰이더 마지막 lerp(원래 화면, 효과, master)) — 11-09 삭제, 각 클립 시작·페이드 인으로 녹임.
+    static readonly float[] OldMaster = { 0f, 0f, 0.08f, 0f, 0.15f, 1f, 10f, 1f };
+    const float FoldStart = 0.08f, FoldEnd = 0.26f;   // 녹인 구간(첫 찢김 끝까지) — 곱한 값과 최대 0.06 차이 허용
+    const float FoldTolerance = 0.06f;
+
     static readonly (BossVictoryTrack track, float[] keys)[] OldCurves =
     {
-        (BossVictoryTrack.Master, new[] { 0f, 0f, 0.08f, 0f, 0.15f, 1f, 10f, 1f }),
         (BossVictoryTrack.Desaturate, new[] { 0f, 0f, 0.1f, 0f, 0.2f, 1f, 10f, 1f }),
         (BossVictoryTrack.Amber, new[] { 0f, 0f, 0.3f, 0f, 0.45f, 1f, 10f, 1f }),
         (BossVictoryTrack.Scanline, new[] { 0f, 0f, 0.1f, 0f, 0.2f, 1f, 10f, 1f }),
@@ -46,8 +50,14 @@ public sealed class BossVictoryTimelineTests
         foreach ((BossVictoryTrack track, float[] keys) in OldCurves)
         {
             AnimationCurve old = Curve(keys);
+            AnimationCurve master = Curve(OldMaster);
+            bool screenEffect = track != BossVictoryTrack.HudHide;   // HUD 숨김은 master 와 무관했다
             for (float t = 0f; t <= SampleEnd + 1e-4f; t += 0.0025f)
-                Assert.AreEqual(old.Evaluate(t), tl.Evaluate(track, tl.EffectTime(t)), Tolerance, $"{label} {track} t={t:0.0000}");
+            {
+                float expected = old.Evaluate(t) * (screenEffect ? master.Evaluate(t) : 1f);
+                float tol = screenEffect && t >= FoldStart && t < FoldEnd ? FoldTolerance : Tolerance;
+                Assert.AreEqual(expected, tl.Evaluate(track, tl.EffectTime(t)), tol, $"{label} {track} t={t:0.0000}");
+            }
         }
     }
 

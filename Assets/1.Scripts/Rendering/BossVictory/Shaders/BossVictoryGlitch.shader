@@ -33,7 +33,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             TEXTURE2D(_NoiseTex);
             SAMPLER(sampler_NoiseTex);
 
-            float4 _GlitchA;      // x master, y time, z desat, w amber
+            float4 _GlitchA;      // x (미사용), y time, z desat, w amber
             float4 _GlitchB;      // x scanline, y tear, z smear, w (미사용)
             float4 _GlitchC;      // x bossNoise
             float4 _GlitchLook;   // x 주사선 줄 수, y 찢김 줄 기본 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
@@ -67,10 +67,6 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float2 uv0 = input.texcoord;
-                float master = _GlitchA.x;
-                if (master <= 0.0001)
-                    return half4(SceneAt(uv0), 1.0h);
-
                 float t = _GlitchA.y;
                 float2 res = _ScreenParams.xy;
                 float aspect = res.x / res.y;
@@ -130,8 +126,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half scan = 0.5h + 0.5h * sin(uv0.y * _GlitchLook.x * 6.28318h);
                 graded *= lerp(1.0h, 0.72h + 0.28h * scan, (half)_GlitchB.x);
 
-                half3 outCol = lerp(SceneAt(uv0), graded, (half)master);
-                return half4(outCol, 1.0h);
+                return half4(graded, 1.0h);
             }
             ENDHLSL
         }

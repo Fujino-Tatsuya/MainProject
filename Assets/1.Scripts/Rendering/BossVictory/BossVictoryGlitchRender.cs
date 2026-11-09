@@ -31,7 +31,6 @@ public static class BossVictoryGlitchRender
     /// <summary>합성 셰이더 칸 — 표시가 매 프레임 넣는 세기(0~1 대부분).</summary>
     public struct Frame
     {
-        public float Master;        // 전체(0 = 꺼짐)
         public float Time;          // 처치 판정 뒤 초(노이즈·흔들림 시간)
         public float Desaturate;    // 화면 흑백
         public float Amber;         // 배경 호박색 틴트(플레이어 제외)
@@ -46,7 +45,7 @@ public static class BossVictoryGlitchRender
 
     static readonly int IdId = Shader.PropertyToID("_GlitchId");
     static readonly int IdIdTex = Shader.PropertyToID("_GlitchIdTex");
-    static readonly int IdA = Shader.PropertyToID("_GlitchA");        // x master, y time, z desat, w amber
+    static readonly int IdA = Shader.PropertyToID("_GlitchA");        // x (미사용), y time, z desat, w amber
     static readonly int IdB = Shader.PropertyToID("_GlitchB");        // x scanline, y tear, z smear, w (미사용)
     static readonly int IdC = Shader.PropertyToID("_GlitchC");        // x bossNoise
     static readonly int IdTear = Shader.PropertyToID("_GlitchTear");  // x 최대 밀림, y 켜지는 줄 비율, z 끌림 길이
@@ -61,7 +60,7 @@ public static class BossVictoryGlitchRender
     static Material _maskPlayer, _maskBoss, _composite;
     static MaskPass _maskPass;
     static CompositePass _compositePass;
-    static float _master;
+    static bool _anyEffect;   // 이번 프레임 효과가 하나라도 켜졌나 — 다 0 이면 패스를 아예 건너뛴다
     static bool _hooked;
 
     public static bool Active => _hooked;
@@ -78,7 +77,7 @@ public static class BossVictoryGlitchRender
         _maskBoss = NewMask(mask, new Color(0f, 0f, 1f, 1f));
         _composite = CoreUtils.CreateEngineMaterial(comp);
         ApplyLook(settings);
-        _master = 0f;
+        _anyEffect = false;
 
         _maskPass = new MaskPass(_maskPlayer, _maskBoss)
         {
@@ -107,7 +106,7 @@ public static class BossVictoryGlitchRender
         CoreUtils.Destroy(_maskBoss);
         CoreUtils.Destroy(_composite);
         _maskPlayer = _maskBoss = _composite = null;
-        _master = 0f;
+        _anyEffect = false;
     }
 
     /// <summary>색·노이즈·모양 칸(설정 SO) — 켤 때 + 랩에서 값을 바꿨을 때.</summary>
@@ -131,9 +130,9 @@ public static class BossVictoryGlitchRender
     /// <summary>이번 프레임 세기(표시가 매 프레임).</summary>
     public static void SetFrame(in Frame f)
     {
-        _master = Mathf.Clamp01(f.Master);
+        _anyEffect = Mathf.Max(Mathf.Max(f.Desaturate, f.Amber), Mathf.Max(Mathf.Max(f.Scanline, f.Tear), Mathf.Max(f.Smear, f.BossNoise))) > 0.0001f;
         if (_composite == null) return;
-        _composite.SetVector(IdA, new Vector4(_master, f.Time, f.Desaturate, f.Amber));
+        _composite.SetVector(IdA, new Vector4(0f, f.Time, f.Desaturate, f.Amber));
         _composite.SetVector(IdB, new Vector4(f.Scanline, f.Tear, f.Smear, 0f));
         _composite.SetVector(IdC, new Vector4(f.BossNoise, 0f, 0f, 0f));
         _composite.SetVector(IdBossScreen, new Vector4(f.BossScreenCenter.x, f.BossScreenCenter.y, Mathf.Max(0.01f, f.BossScreenSize), _noiseSpace));
@@ -171,7 +170,7 @@ public static class BossVictoryGlitchRender
 
     static void OnBeginCamera(ScriptableRenderContext ctx, Camera cam)
     {
-        if (_maskPass == null || _master <= 0.0001f || cam == null || cam.cameraType != CameraType.Game) return;
+        if (_maskPass == null || !_anyEffect || cam == null || cam.cameraType != CameraType.Game) return;
         UniversalAdditionalCameraData data = cam.GetUniversalAdditionalCameraData();
         if (data == null || data.renderType != CameraRenderType.Base || data.scriptableRenderer == null) return;
         data.scriptableRenderer.EnqueuePass(_maskPass);

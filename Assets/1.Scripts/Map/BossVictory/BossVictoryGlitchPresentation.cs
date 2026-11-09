@@ -430,7 +430,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         var frame = new BossVictoryGlitchRender.Frame
         {
-            Master = tl.Evaluate(BossVictoryTrack.Master, t),
             Time = t,
             Desaturate = tl.Evaluate(BossVictoryTrack.Desaturate, t),
             Amber = tl.Evaluate(BossVictoryTrack.Amber, t),
