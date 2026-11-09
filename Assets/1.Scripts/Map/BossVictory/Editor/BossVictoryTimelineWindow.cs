@@ -1696,11 +1696,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (prefab == null) continue;
             string name = prefab.name.Replace("Player_", "");
-            float end = FinisherEndEventTime(prefab);
-            parts.Add(end >= 0f ? $"{name} {dash + end:0.00}s" : $"{name} ?(End 없음)");
+            AnimationClip clip = FinisherClipOf(prefab);
+            float end = clip != null ? EndEventTime(clip) : -1f;
+            IReadOnlyList<Vector2> timing = NodeTiming(BossVictoryMarker.FinisherStart, clip);
+            parts.Add(end >= 0f ? $"{name} {dash + BossVictoryClipTiming.ClipToTimeline(timing, end):0.00}s{(timing != null ? "(실측)" : "(배율 1 가정)")}" : $"{name} ?(End 없음)");
         }
         string slow = Timeline.slowStartTime > 0f ? $" · 느려짐은 마커 {Timeline.slowStartTime:0.00}s" : "";
-        return parts.Count == 0 ? "프리팹 없음" : $"{string.Join(" · ", parts)}  (스킬 연출 시작 {dash:0.00}s + 클립 End · 공속 100% 가정{slow})";
+        return parts.Count == 0 ? "프리팹 없음" : $"{string.Join(" · ", parts)}  (스킬 연출 시작 {dash:0.00}s + 클립 End — 실측 = 디버그 씬 마지막 재생{slow})";
     }
 
     float FinisherEndEventTime(GameObject prefab)
@@ -1872,6 +1874,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     float NodeFull(BossVictoryMarker m, out AnimationClip clip, out string who) =>
         m == BossVictoryMarker.FinisherStart ? FinisherFull(out clip, out who) : BossHitFull(out clip, out who);
 
+    // 클립 시간 → 타임라인 초(노드 시작 뒤) — 디버그 씬 마지막 재생 실측 표본(속도 파라미터·공속·연출 배율 포함). 없으면 배율 1 가정(BossVictoryClipTiming).
+    static IReadOnlyList<Vector2> NodeTiming(BossVictoryMarker m, AnimationClip clip) =>
+        clip != null && BossVictoryClipTiming.TryGet(BossVictoryClipTiming.Key(m == BossVictoryMarker.BossHitAnim, clip.name), out IReadOnlyList<Vector2> s) ? s : null;
+
+    static float NodeSeconds(BossVictoryMarker m, AnimationClip clip, float clipTime) => BossVictoryClipTiming.ClipToTimeline(NodeTiming(m, clip), clipTime);
+
     // 지금 보여 줄 처치 연출 스킬 클립과 원래 길이(초). 없으면 0.
     float FinisherFull(out AnimationClip clip, out string who)
     {
@@ -1911,9 +1919,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 클립 칸 — 원래 길이를 모르면(클립 없음) 시작 표시만 짧게.
     bool ClipNodeRect(Rect lanes, BossVictoryMarker m, out Rect r)
     {
-        float full = NodeFull(m, out _, out _);
+        float full = NodeFull(m, out AnimationClip clip, out _);
         float trim = NodeTrim(m);
-        float length = full > 0f ? BossVictoryAnimTrim.PlayedLength(trim, full) : Mathf.Max(0.1f, trim);
+        float length = full > 0f ? NodeSeconds(m, clip, BossVictoryAnimTrim.PlayedLength(trim, full)) : Mathf.Max(0.1f, trim);
         float start = Timeline.MarkerTime(m);
         Rect row = RowRect(lanes, MarkerRow(m));
         float x0 = TimeToX(lanes, start), x1 = TimeToX(lanes, start + length);
@@ -1938,7 +1946,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         bool trimmed = full > 0f && BossVictoryAnimTrim.IsTrimmed(trim, full);
         if (trimmed)   // 잘려 나간 뒤쪽 = 흐린 칸(원래 끝까지)
         {
-            float xFull = TimeToX(lanes, start + full);
+            float xFull = TimeToX(lanes, start + NodeSeconds(m, clip, full));
             EditorGUI.DrawRect(new Rect(r.xMax, r.y, Mathf.Max(0f, xFull - r.xMax), r.height), new Color(color.r, color.g, color.b, 0.18f));
         }
         EditorGUI.DrawRect(r, color * (selected ? 1f : 0.75f));
@@ -1946,23 +1954,24 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             float fps = BossVictoryAnimTrim.FrameRate(clip.frameRate);
             float played = BossVictoryAnimTrim.PlayedLength(trim, full);
-            float frameWidth = _pixelsPerSecond / fps;
+            int playedFrames = Mathf.RoundToInt(played * fps);
+            float frameWidth = r.width / Mathf.Max(1, playedFrames);   // 평균 — 실측이면 구간마다 다르다
             int step = frameWidth >= 4f ? 1 : frameWidth >= 0.8f ? 5 : 0;   // 프레임 눈금(너무 촘촘하면 5프레임마다, 그보다 촘촘하면 생략)
-            for (int k = step; step > 0 && k < Mathf.RoundToInt(played * fps); k += step)
+            for (int k = step; step > 0 && k < playedFrames; k += step)
             {
-                float x = r.x + k * frameWidth;
+                float x = TimeToX(lanes, start + NodeSeconds(m, clip, k / fps));
                 bool major = k % 10 == 0;
                 EditorGUI.DrawRect(new Rect(x, r.yMax - (major ? 7f : 4f), 1f, major ? 7f : 4f), new Color(1f, 1f, 1f, major ? 0.6f : 0.35f));
             }
             float end = NodeEndEvent(m, clip);
             if (end >= 0f && end <= played)
             {
-                float xe = r.x + end * _pixelsPerSecond;
+                float xe = TimeToX(lanes, start + NodeSeconds(m, clip, end));
                 EditorGUI.DrawRect(new Rect(xe - 0.5f, r.y, 1.5f, r.height), new Color(1f, 0.95f, 0.4f, 0.9f));   // End 이벤트(노란 선)
             }
         }
         string label = clip != null
-            ? $"{ClipNodeLabel(m)} {start:0.00}s · {who} {BossVictoryAnimTrim.FrameLabel(trim, full, clip.frameRate)}{(trimmed ? " 잘림" : "")}"
+            ? $"{ClipNodeLabel(m)} {start:0.00}s · {who} {BossVictoryAnimTrim.FrameLabel(trim, full, clip.frameRate)}{(trimmed ? " 잘림" : "")} · 끝 {start + NodeSeconds(m, clip, BossVictoryAnimTrim.PlayedLength(trim, full)):0.00}s{(NodeTiming(m, clip) != null ? " 실측" : " 배율 1 가정")}"
             : $"{ClipNodeLabel(m)} {start:0.00}s · {who}{(string.IsNullOrEmpty(who) || who.Contains("없음") ? "" : " 클립 없음")}";
         GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(r.width, 260f), r.height - 2f), label, EditorStyles.miniBoldLabel);
         if (selected) DrawOutline(r, Color.white);
@@ -2005,7 +2014,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         float full = NodeFull(m, out AnimationClip clip, out _);
         if (clip == null) return;
-        SetNodeTrimRaw(m, BossVictoryAnimTrim.ClampTrim(mouseTime - Timeline.MarkerTime(m), full, clip.frameRate));
+        float clipTime = BossVictoryClipTiming.TimelineToClip(NodeTiming(m, clip), mouseTime - Timeline.MarkerTime(m));   // 끈 자리(타임라인 초) → 그 순간 클립 시간
+        SetNodeTrimRaw(m, BossVictoryAnimTrim.ClampTrim(clipTime, full, clip.frameRate));
     }
 
     void SetNodeTrim(BossVictoryMarker m, float trim)
@@ -2047,6 +2057,15 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         string endText = m == BossVictoryMarker.FinisherStart ? (end >= 0f ? $" · End 이벤트 {BossVictoryAnimTrim.Frames(end, fps)}f" : " · End 이벤트 없음") : "";
         EditorGUILayout.LabelField("클립", $"{who} · {clip.name} · {full:0.00}초 = {fullFrames}f @ {fps:0}fps{(m == BossVictoryMarker.FinisherStart ? "(공속 100%)" : "")}{endText}", EditorStyles.wordWrappedMiniLabel);
         float trim = NodeTrim(m);
+        IReadOnlyList<Vector2> timing = NodeTiming(m, clip);
+        float nodeStart = Timeline.MarkerTime(m);
+        EditorGUILayout.LabelField("타임라인 초",
+            $"끝 {nodeStart + NodeSeconds(m, clip, BossVictoryAnimTrim.PlayedLength(trim, full)):0.00}s" +
+            (end >= 0f ? $" · End {nodeStart + NodeSeconds(m, clip, end):0.00}s" : "") +
+            (timing != null
+                ? $" — 실측(디버그 씬 마지막 재생, 끝 구간 배율 ×{BossVictoryClipTiming.LastRate(timing):0.##}). 속도·느려짐 값을 바꿨으면 다시 재생하면 맞춰진다."
+                : " — 배율 1 가정(재생 전). 실제는 스킬 속도 파라미터·공속·연출 배율로 달라진다 — 디버그 씬을 한 번 재생하면 실측으로 그린다."),
+            EditorStyles.wordWrappedMiniLabel);
         using (new EditorGUILayout.HorizontalScope())
         {
             EditorGUI.BeginChangeCheck();
