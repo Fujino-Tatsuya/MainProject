@@ -10,8 +10,7 @@
 | 0 ~ 스킬 End | 처치자: 하던 동작 ×0.5 그 클립 끝까지(또는 '처치자 동작 끝 → 백대쉬' 마커 중 이른 쪽, 255 — 기본 끔) → 백대쉬(등장 연출 밀림, ×1) → 처치 연출 스킬(기본 R, 표시 전용, ×1) → End 에서 처치자·보스 ×0.1 | `StartKillerSequence` · `BossEncounterDirector.StepSkid` · `PlayPresentationOnly` · `OnFinisherEnded` |
 | 0.08 ~ 3.5 (클립) | 글리치 = **가로줄 좌우 찢김 + 찢긴 줄 밝은 부분 끌림만**(11-09) · 색: 흑백·호박색·주사선·보스 노이즈(카메라 이동 UV) — 흑백 플래시 삭제(11-09) · HUD 숨김 | `BossVictoryGlitchRender` + 셰이더 2개 |
 | 0.20(마커 2개 — 첫 찢김 최고점) | 처치자 아닌 피어 카메라 → 처치자 즉시 컷 · 처치자 외 플레이어 모든 화면에서 숨김(렌더러·캔버스·머리 위 체력바) — 되감거나 정리 때 복구(11-09) | `TickMarkers` |
-| (컷) | 기본 없음(게임 카메라) — 타임라인 '카메라 컷' 트랙에 클립을 넣으면 그 시작에 끊어 붙이고 다음 컷 시작까지 유지 · 컷별 '벽 숨김'(기본 켬, 255) | `TickCuts` · `BossVictoryCameraCuts` |
-| 3.5 ~ 4.5 | 정지 유지 클립(화면 효과 시각을 클립 시작에 고정) | `BossVictoryTimeline.EffectTime` |
+| (컷) | 기본 없음(게임 카메라) — 타임라인 '카메라 컷' 트랙에 클립을 넣으면 그 시작에 끊어 붙이고 다음 컷 시작까지 시작 → 끝 화면으로 이동(끝 없으면 고정) · 기준 좌표계 저장 · 컷별 '벽 숨김'(기본 켬, 255·255 후속 2) | `TickCuts` · `BossVictoryCameraCuts` |
 | 4.5 ~ 5.6 | TV 꺼짐 클립(`Title/CRTOff`, 시작에 캡처·진행 = 클립 안 위치) → 검정 | `BossVictoryCrtOff` |
 | 5.6(로비 전환 마커) | 호스트 화면이 지나면 서버가 결과 전환 → 로비(결과 패널) | `TickCrtAndLobby` → `TickVictoryServer` |
 수치는 전부 `Resources/BossVictory/BossVictoryGlitchSettings.asset` — 시각·길이는 타임라인(`timeline`, 창 `Tools/Boss Victory/처치 연출 타임라인`). 디버그 = `0.Scenes/Debug/DebugBossVictory`(Dev Boot, 솔로 호스트, F7 처음부터·F8 일시정지·배속 · 창 재생 헤드 스크럽).
@@ -269,3 +268,14 @@
 - 원인: 마무리 낙뢰(`PaladinSkillView.targetStrike`, FX_Lightening_Strike_Entry)는 서버 전용 `OnAnimationEvent(Custom0)` → `ServerPlayTargetStrike` RPC 로만 나오고, 자리도 서버 `OnServerStart` 의 표식이 정한다. 표시 전용 재생은 둘 다 안 돌아(OnLocalAnimationEvent 만) 빠졌다. 칼 꽂기(Stick)는 클립 이벤트라 원래 나왔다.
 - 수정: `PlayPresentationOnly(skill, dir, target)` → `PlayerSkillBase.OnPresentationOnlyStart(target)`(기본 no-op). 팔라딘 R 만 대상(= 보스)을 받아 두고 Custom0 에서 같은 엔트리·`VfxPlayRate`·자리 규칙(대상 아래 바닥 — `LockTargetPosition`, 표식과 공유)으로 각 피어가 로컬 재생. 표식·판정·슈퍼아머 없음, 새 RPC 없음, 프리팹 수정 없음.
 - 소거·배율: 처치 순간 이펙트 소거(t=0)보다 뒤(Custom0)에 나와 안 지워진다. 월드 자리 원샷이라 처치자 이펙트 배율(`SetPlayRateForTarget` = 따라붙은 이펙트만)은 안 탄다 — 스킬 재생 중 처치자는 ×1 이라 같고, End(×0.1) 뒤까지 남는 꼬리는 ×1 로 흐른다(실전 R 과 같은 방식).
+
+### 255 후속 2 — 정지 유지 삭제 · 카메라 컷 = 지금 보는 화면 2점 (11-09 사용자 — grill 확정)
+- **A 정지 유지(Hold) 트랙 삭제**(`27ef940a`): enum·`hold` 목록·`EffectTime`·창 색/새 클립·테스트. 화면 효과·HUD 는 시각 t 그대로. 끝의 정지 느낌은 처치자·보스 ×0.1 과 TV 꺼짐. 에셋의 `hold` 칸은 Unity 가 다음 저장 때 버린다.
+- **B 카메라 컷 형식**(`012dec55`): 컷 = **기준**(가운데·처치자·보스 발밑) + **기준 좌표계**(원점 = 기준점, +Z = 처치자→보스 수평 축, +Y = 위 — 옛 yaw 0 과 같은 방향 정의)의 카메라 위치·회전·FOV.
+  시작 화면 + (선택) 끝 화면. 컷 구간 = 클립 시작 ~ 다음 컷 시작(마지막 = 로비 전환 — `CameraCutEnd`, 저장된 클립 길이와 무관) 동안 곡선(선형·ease in/out·ease in·ease out)으로 위치 Lerp·회전 Slerp·FOV Lerp. 끝 없으면 고정 컷. 컷 사이는 블렌드 없이 끊음(그대로).
+  - **옛 매개변수 형식과의 관계 = 새 형식으로 통일**: 종류(와이드/보스 클로즈업/처치자 정면)·거리·내려다보는 각·방위·초점 높이 칸 삭제. 에셋 컷이 0개(`cameraCutShots: []`)라 손실 0. 옛 기본 와이드(거리 16·각 22·방위 50·높이 1.5·FOV 40)는 새 컷 기본값으로 변환(`BossVictoryCameraCuts.Orbit`). 옛 '보스 클로즈업'의 몸 중심(렌더러 바운즈) 기준은 없어졌다 — 보스 기준 + 높이로 찍는다.
+  - 런타임(`TickCuts`): 컷이 바뀌는 순간 처치자·보스 위치를 잡아 컷 동안 고정, 매 프레임 `CameraCutProgress(t)` 로 자세 계산 → 스크럽·되감기도 t 그대로. 벽 숨김 켠 컷은 이동 중 매 프레임 지금 카메라 위치로 판정(누적), 끈 컷은 다시 켬. 창 수정은 매 프레임 배치라 바로 반영(`PreviewRecut` 삭제).
+  - 창: 컷 클립 선택 시 **[지금 Scene 뷰로 시작 화면] [지금 Scene 뷰로 끝 화면]**(끝을 찍으면 이동 켜짐) · 아래 **[Scene 뷰로 새 카메라 컷(재생 헤드)]**(기준 가운데·고정) · 기준·곡선·위치/회전(°)/FOV 칸 · Scene 뷰 FOV 도 기록. Undo(`Record`) + 에셋 저장.
+  - 'Scene 뷰로' 기준 위치: Play 중 연출이 돌면 **지금 회차**(컷이 켜져 있으면 그 컷이 잡은 위치, 아니면 지금 위치 — `TryGetCutSubjects`) · 아니면 이 에디터 세션의 **마지막 회차**(창이 Play 중 SessionState 에 기억). 없으면 버튼을 막고 이유("디버그 씬에서 Play 해 연출을 한 번 돌리면 생긴다"). 랩의 배치 값으로 미리 계산하는 기준은 넣지 않았다(보스방이 런타임 생성이라).
+  - 각 피어 로컬, 새 RPC·복제 값 없음. EditMode `^BossVictoryCameraCut`: 축 방향·상대 변환 왕복(+다른 자리에서 같은 구도)·끝 없으면 고정·보간·곡선·t 진행·퇴화 회전.
+- 에셋(`BossVictoryGlitchSettings.asset`)은 손대지 않았다 — 사용자 값(처치자 동작 끝 0.13 등) 결정 대기. Unity 가 다시 저장하면 사용자 값은 메모리 그대로 남고 `hold` 칸만 빠진다.
