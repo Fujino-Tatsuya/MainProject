@@ -368,7 +368,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         Vector3 dir = _boss != null ? _boss.transform.position - _killer.transform.position : _killer.transform.forward;
         dir.y = 0f;
         _killerSkills.PresentationSkillEnded += OnFinisherEnded;
-        if (!_killerSkills.PlayPresentationOnly(skill, dir))
+        // 대상 = 보스(대상 지정 스킬의 대상 자리 연출 — 팔라딘 R 하늘에서 떨어지는 칼. 판정 없음).
+        if (!_killerSkills.PlayPresentationOnly(skill, dir, _boss != null ? _boss.transform : null))
         {
             _killerSkills.PresentationSkillEnded -= OnFinisherEnded;
             Edit.LogError($"[BossVictory] 처치 연출 스킬 재생 실패 — {skill.name}", this);

@@ -933,8 +933,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     /// <summary>
     /// [이 피어·표시 전용] <paramref name="skill"/> 의 애니(<see cref="PlayerSkillData.AnimatorStateName"/>)와 이펙트(<see cref="PlayerSkillBase.OnClientPlay"/>)만 재생한다.
     /// 실행 중인 스킬이 있으면 false(먼저 끝나야 한다). 끝 = 그 클립의 Skill End 이벤트 → <see cref="PresentationSkillEnded"/>.
+    /// <paramref name="target"/> = 대상 지정 스킬의 표시용 대상(서버 OnServerStart 가 안 도니 스킬이 대상 자리 연출을 각자 그리게 — <see cref="PlayerSkillBase.OnPresentationOnlyStart"/>).
     /// </summary>
-    public bool PlayPresentationOnly(PlayerSkillBase skill, Vector3 direction)
+    public bool PlayPresentationOnly(PlayerSkillBase skill, Vector3 direction, Transform target = null)
     {
         if (skill == null || skill.Data == null || activeSkill != null) return false;
         presentationSkill = skill;
@@ -944,6 +945,7 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         if (animator != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName))
             animator.CrossFadeInFixedTime(Animator.StringToHash(skill.Data.AnimatorStateName), 0.05f);
         skill.OnClientPlay(direction);
+        skill.OnPresentationOnlyStart(target);
         return true;
     }
 

@@ -254,6 +254,11 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 서버에서는 같은 이벤트로 이것이 먼저, OnAnimationEvent 가 뒤에 불린다.
     public virtual void OnLocalAnimationEvent(SkillAnimationEventType eventType) { }
 
+    // 이 피어 전용: 표시 전용 재생(PlayerSkillController.PlayPresentationOnly — 보스 처치 연출)이 OnClientPlay 직후 부른다.
+    // 서버 경로(OnServerStart·OnAnimationEvent → RPC)가 안 도니, 거기서 켜던 대상 자리 연출을 이 피어가 직접 그려야 하는 스킬만 쓴다.
+    // 🔴 판정·피해·상태 변경 금지. 끝은 OnEnd(표시 전용도 부른다).
+    public virtual void OnPresentationOnlyStart(Transform target) { }
+
     // 서버 전용: 이벤트 방식(EndsOnClipEvent) 스킬의 상태 클립 실제 길이를 컨트롤러가 읽었다(시전 뒤 애니메이터 첫 갱신 후,
     // 그리고 원격 오너 동기로 상태가 다시 시작돼 안전망을 늦출 때마다).
     // remainingSeconds = 지금부터 클립 끝까지 실제 초. 안전망은 이 시각 + padding 에 끊는다. 클립 길이로 맞출 보호 지속(R 슈퍼아머)용.

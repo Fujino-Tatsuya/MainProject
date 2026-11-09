@@ -347,6 +347,16 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     [Rpc(SendTo.ClientsAndHost)]
     private void PlayTargetStrikeRpc(float playRate) => PlayTargetStrikeLocal(playRate);
 
+    /// <summary>
+    /// [이 피어] 표시 전용 재생(보스 처치 연출)의 마무리 낙뢰 — 서버 경로가 없어 표식도 안 깔렸으니 자리를 여기서 고정하고(표식과 같은 규칙: 대상 아래 바닥)
+    /// 같은 엔트리를 떨어뜨린다. 표식은 깔지 않는다. 각 피어 로컬, RPC 없음.
+    /// </summary>
+    public void PlayTargetStrikeAtLocal(Transform target, float playRate)
+    {
+        LockTargetPosition(target, target != null ? target.position : transform.position);
+        PlayTargetStrikeLocal(playRate);
+    }
+
     private void PlayTargetStrikeLocal(float playRate)
     {
         if (targetStrike == null || EffectManager.Instance == null) return;
@@ -373,18 +383,8 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     private void PlayTargetFloorLocal(Transform target, Vector3 fallbackPosition, float playRate)
     {
-        // 🔴 자리를 **딱 한 번** 뽑아 고정한다. 표식도 마무리 낙뢰도 여기만 본다.
-        //    대상 트랜스폼을 찾았으면 그걸 쓴다 — 서버가 실어 보낸 좌표보다
-        //    "이 피어가 지금 그리고 있는 위치"에 가깝다(보간 차이를 안 탄다).
-        _targetPosition = target != null ? target.position : fallbackPosition;
-
-        // 대상 아래 바닥으로 내린다 — 표식도 마무리 낙뢰도 바닥에 꽂힌다.
-        // 송전탑(BossChargingPylon)처럼 루트가 올라와 있는 대상도 바닥 기준이 된다.
-        // GroundProbe 는 Unit 계층 콜라이더를 건너뛰므로 대상 자신은 바닥으로 잡히지 않는다.
-        // 바닥에 서 있는 대상은 SurfaceOffset(0.05m)만큼만 달라진다. 못 찾으면 대상 위치 그대로.
         // 표식 엔트리가 비어 있어도 낙뢰가 이 자리를 쓰므로 아래 early return 보다 먼저 한다.
-        if (GroundProbe.TryFindGround(_targetPosition, 0, out RaycastHit ground, out _))
-            _targetPosition.y = GroundProbe.SurfaceY(ground);
+        LockTargetPosition(target, fallbackPosition);
 
         // 재시전으로 두 겹이 되지 않게 먼저 회수한다(EffectSocketPlayer.Play 와 같은 규칙).
         StopTargetFloorLocal();
@@ -396,6 +396,21 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         //    같이 돈다(2026-09-30 반려 사유). 회전만 빼는 옵션은 EffectManager 에 없다.
         _targetFloorHandle = EffectManager.Instance.PlayLooping(
             targetFloor, _targetPosition, Quaternion.identity, targetFloorScale, 0f, playRate);
+    }
+
+    private void LockTargetPosition(Transform target, Vector3 fallbackPosition)
+    {
+        // 🔴 자리를 **딱 한 번** 뽑아 고정한다. 표식도 마무리 낙뢰도 여기만 본다.
+        //    대상 트랜스폼을 찾았으면 그걸 쓴다 — 서버가 실어 보낸 좌표보다
+        //    "이 피어가 지금 그리고 있는 위치"에 가깝다(보간 차이를 안 탄다).
+        _targetPosition = target != null ? target.position : fallbackPosition;
+
+        // 대상 아래 바닥으로 내린다 — 표식도 마무리 낙뢰도 바닥에 꽂힌다.
+        // 송전탑(BossChargingPylon)처럼 루트가 올라와 있는 대상도 바닥 기준이 된다.
+        // GroundProbe 는 Unit 계층 콜라이더를 건너뛰므로 대상 자신은 바닥으로 잡히지 않는다.
+        // 바닥에 서 있는 대상은 SurfaceOffset(0.05m)만큼만 달라진다. 못 찾으면 대상 위치 그대로.
+        if (GroundProbe.TryFindGround(_targetPosition, 0, out RaycastHit ground, out _))
+            _targetPosition.y = GroundProbe.SurfaceY(ground);
     }
 
     /// <summary>[전 피어] R 시전 창(OnClientPlay~OnEnd) 동안 슈퍼아머 오버레이. 슈퍼아머 구간 = 스킬 활성 구간이라 RPC 가 필요 없다.</summary>
