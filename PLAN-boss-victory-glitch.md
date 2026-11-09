@@ -264,3 +264,8 @@
 - **처치 연출 스킬 End 시각(읽기 전용)**: 창 아래 수치 칸 위 한 줄. 랩 재생 중 = 이번 회차 실제 글리치 시각(`BossVictoryGlitchPresentation.FinisherEndedAt`, 아직이면 "아직 안 옴") · 아니면 캐릭터별 추정 = 열린 씬 `BossEncounterDirector.IntroSkidDuration`(백대쉬) + 처치 연출 스킬 상태 클립의 Skill End 이벤트 시각(가정: 하던 동작 없음·공속 100%, '다시 계산' 버튼). 새 타이머 칸 없음 — 처치자 순서·시간 배율은 애니 이벤트 그대로.
 - 그대로(3): 이펙트 소거(t=0)·입력 잠금(끝까지)은 코드.
 - EditMode: `^BossVictoryCameraCut`(트랙 구조·다음 컷까지 유지·컷 값 짝/보정·기본값 벽 숨김 켬·길이 자동·옛 cuts 이관) · `^BossVictoryTimeline`(에셋 구조에 컷 값 짝 · 동작 끝 마커 끔/지남/이름·음수). ⏳ Unity 컴파일·EditMode·Play 미검증(이 레인 Unity MCP 없음 — 오프라인 컴파일 3종 통과).
+
+### 255 후속 — 처치 연출 팔라딘 R '하늘에서 떨어지는 칼' (11-09 사용자)
+- 원인: 마무리 낙뢰(`PaladinSkillView.targetStrike`, FX_Lightening_Strike_Entry)는 서버 전용 `OnAnimationEvent(Custom0)` → `ServerPlayTargetStrike` RPC 로만 나오고, 자리도 서버 `OnServerStart` 의 표식이 정한다. 표시 전용 재생은 둘 다 안 돌아(OnLocalAnimationEvent 만) 빠졌다. 칼 꽂기(Stick)는 클립 이벤트라 원래 나왔다.
+- 수정: `PlayPresentationOnly(skill, dir, target)` → `PlayerSkillBase.OnPresentationOnlyStart(target)`(기본 no-op). 팔라딘 R 만 대상(= 보스)을 받아 두고 Custom0 에서 같은 엔트리·`VfxPlayRate`·자리 규칙(대상 아래 바닥 — `LockTargetPosition`, 표식과 공유)으로 각 피어가 로컬 재생. 표식·판정·슈퍼아머 없음, 새 RPC 없음, 프리팹 수정 없음.
+- 소거·배율: 처치 순간 이펙트 소거(t=0)보다 뒤(Custom0)에 나와 안 지워진다. 월드 자리 원샷이라 처치자 이펙트 배율(`SetPlayRateForTarget` = 따라붙은 이펙트만)은 안 탄다 — 스킬 재생 중 처치자는 ×1 이라 같고, End(×0.1) 뒤까지 남는 꼬리는 ×1 로 흐른다(실전 R 과 같은 방식).
