@@ -95,6 +95,23 @@ public class SceneBgmSwitcher : MonoBehaviour
         _currentBgm = bgm;
     }
 
+    /// <summary>
+    /// 씬 매핑 대신 키 BGM 으로 바꾼다(보스전 — PLAN-sound-mix 3단계). 캐시도 같이 바꿔야
+    /// <see cref="RestoreSceneBgm"/>·다음 씬 로드가 "이미 같은 BGM"으로 오판하지 않는다.
+    /// </summary>
+    public void PlayOverride(string key)
+    {
+        AudioManager audio = AudioManager.Instance;
+        if (audio == null || !audio.TryGetSound(key, out SoundID bgm)) return;
+        if (bgm.Equals(_currentBgm)) return;
+
+        audio.PlayBGM(key);
+        _currentBgm = bgm;
+    }
+
+    /// <summary>덮어쓴 BGM 을 지금 씬 매핑 BGM 으로 되돌린다(보스전이 대기로 돌아갔을 때).</summary>
+    public void RestoreSceneBgm() => PlayForScene(SceneManager.GetActiveScene().name);
+
     private bool TryGetBgm(string sceneName, out SoundID bgm)
     {
         foreach (SceneBgm e in sceneBgmTable)

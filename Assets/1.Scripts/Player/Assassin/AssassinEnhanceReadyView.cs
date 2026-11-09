@@ -91,7 +91,7 @@ public sealed class AssassinEnhanceReadyView : MonoBehaviour
     private void PlaySound(string key)
     {
         if (AudioManager.Instance != null)
-            AudioManager.Instance.Play(key, transform.position);
+            AudioManager.Instance.Play(key, transform.position, this);   // 남의 어쌔신 E = 30%(Q6)
     }
 
     private static void ForEach(EffectSocketPlayer[] players, System.Action<EffectSocketPlayer> action)

@@ -2037,7 +2037,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
   id: GuardianRelease
-  effect: {fileID: 11400000, guid: 8a93a9e96441457e8516903967c7dc04, type: 2}
+  effect: {fileID: 11400000, guid: c52013bc8b7e447989f50926a1e7a436, type: 2}
   socket: {fileID: 2457413198031000931}
   offset: {x: 0, y: 0, z: 0}
   scale: 1

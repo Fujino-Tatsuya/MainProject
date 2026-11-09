@@ -145,6 +145,15 @@ public class EffectManager : MonoBehaviour
     {
         if (Instance != this) return;
 
+        // 매니저가 사라지면 들고 있던 루프 사운드도 끈다(BroAudio 는 DontDestroyOnLoad 라 계속 울린다).
+        if (_slots != null)
+        {
+            for (int i = 0; i < _slots.Count; i++)
+            {
+                if (_slots[i].inUse) StopOwnedSounds(_slots[i], 0f);
+            }
+        }
+
         _pool?.Dispose();
         if (_poolRoot != null) Destroy(_poolRoot.gameObject);
         Instance = null;
@@ -406,6 +415,9 @@ public class EffectManager : MonoBehaviour
             if (!active.pending[i].isOutro) active.pending.RemoveAt(i);
         }
 
+        // 본편 루프 사운드를 먼저 끈다 → 그다음 outro(종료음) 발화. 짧은 페이드로 뚝 끊기는 소리를 피한다.
+        StopOwnedSounds(active, OwnedSoundFadeOut);
+
         // outro를 먼저 예약·발화하고, 그 전에 있던 인스턴스에만 StopEmitting을 건다.
         int beforeOutro = active.instances.Count;
         Schedule(active, active.entry.outroParts, true);
@@ -636,12 +648,36 @@ public class EffectManager : MonoBehaviour
         // AudioManager가 없어도 죽지 않는다 — VFXScene에서 사운드 없이 실험할 수 있어야 한다.
         if (part.sound.IsValid() && AudioManager.Instance != null)
         {
-            AudioManager.Instance.PlayOneShot(part.sound, worldPosition);
+            // 시트 설정(볼륨·동시 수·3D 거리·피치) + 소리 주인 판정(추종 대상 → 없으면 위치) — PLAN-sound-mix 1단계
+            IAudioPlayer sound = AudioManager.Instance.PlayOneShot(part.sound, worldPosition, active.follow);
+            // 루프 사운드는 이펙트 수명에 묶는다 — Release·Recycle 에서 끈다(2단계). 원샷은 들고 있지 않는다.
+            if (part.stopOnRelease && sound != null && sound.IsActive) active.ownedSounds.Add(sound);
         }
+    }
+
+    // 루프 사운드 해제 페이드(초). 청취 전 임시값 — Codex 교차검증 11-09 제안.
+    private const float OwnedSoundFadeOut = 0.05f;
+
+    /// <summary>
+    /// 이 이펙트가 들고 있는 루프 사운드(<see cref="EffectPart.stopOnRelease"/>)를 끈다.
+    /// BroAudio 가 재생기를 재활용하면 반환 핸들은 무효(IsActive=false)가 되므로 그대로 건너뛴다.
+    /// 동시 수 제한 반납은 Stop → OnEnd 가 한다 — 여기서 직접 반납하면 이중 반납이다.
+    /// </summary>
+    private static void StopOwnedSounds(ActiveEffect active, float fadeOut)
+    {
+        for (int i = 0; i < active.ownedSounds.Count; i++)
+        {
+            IAudioPlayer sound = active.ownedSounds[i];
+            if (sound != null && sound.IsActive) sound.Stop(fadeOut);
+        }
+        active.ownedSounds.Clear();
     }
 
     private void Recycle(ActiveEffect active)
     {
+        // 강제 회수(ReleaseImmediate·추종 대상 소멸·씬 정리)는 Release 를 안 거친다 — 여기서도 끈다.
+        StopOwnedSounds(active, 0f);
+
         for (int i = 0; i < active.instances.Count; i++)
         {
             GameObject instance = active.instances[i].go;
@@ -891,6 +927,7 @@ public class EffectManager : MonoBehaviour
 
         public readonly List<SpawnedPart> instances = new List<SpawnedPart>();
         public readonly List<PendingPart> pending = new List<PendingPart>();
+        public readonly List<IAudioPlayer> ownedSounds = new List<IAudioPlayer>();   // stopOnRelease 사운드 — Release·Recycle 에서 끈다
     }
 
     private struct SpawnedPart

@@ -99,6 +99,10 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
     // 🔴 예고 동안 몸을 돌리면 예고 박스가 따라 돌아 "피했는데 맞는" 공격이 된다 → 공격 중 회전 잠금.
     protected override bool FaceTargetWhileAttacking => false;
 
+    // 회전 이펙트(StartEffect "Spin")는 클립 이벤트로 켜는 루프 — 카운터로 공격이 끊기면 끄는 이벤트에 못 닿는다.
+    // 공격을 벗어날 때 회수한다(GauntletBot·23호와 같은 방식). 소리 파트도 stopOnRelease 로 같이 꺼진다(11-09 경석 Play).
+    protected override bool StopClipLoopsOnAttackExit => true;
+
     // 채찍 좌/우 오프셋(+ = 오른쪽). 예고와 판정이 같은 값을 쓴다.
     float WhipSideShift => _whipUseR ? sideLateralOffset : -sideLateralOffset;
 

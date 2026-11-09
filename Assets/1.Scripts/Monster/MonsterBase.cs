@@ -1514,6 +1514,9 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     [Rpc(SendTo.ClientsAndHost)]
     void SkyStrikeShowRpc(Vector3 point, float radius, double impactTime, float duration)
     {
+        // 박격포 발사 소리(PLAN-sound-mix 3단계) — 각 피어 연출 경로, 몹 위치에서.
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("S1_Mortar_Attack", transform.position);
+
         GameObject prefab = rangedAttack != null && rangedAttack.ProjectilePrefab != null
             ? rangedAttack.ProjectilePrefab
             : data != null ? data.projectilePrefab : null;

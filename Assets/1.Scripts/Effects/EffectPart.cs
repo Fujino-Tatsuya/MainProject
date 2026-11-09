@@ -24,6 +24,10 @@ public class EffectPart
     [Tooltip("재생 시작부터 이 파트가 발화하기까지의 지연(초). 3막을 데이터로 표현하는 값")]
     [Min(0f)] public float delay;
 
+    [Tooltip("켜면 이 파트의 사운드를 이펙트 해제(Release·강제 회수) 때 같이 끈다 — 루프 사운드용(팔라딘 Q·거너 Q 충전). " +
+             "끄면 이펙트와 무관하게 끝까지 재생된다(원샷 기본). PLAN-sound-mix 2단계")]
+    public bool stopOnRelease;
+
     /// <summary>이 파트가 실제로 무언가를 하는가. 둘 다 비어 있으면 발화해도 아무 일이 없다.</summary>
     public bool IsEmpty => prefab == null && !sound.IsValid();
 }

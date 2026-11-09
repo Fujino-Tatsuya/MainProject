@@ -25,6 +25,10 @@ public class PlayerFootstepSound : MonoBehaviour
 
     private void Awake() => _player = GetComponent<Player>();
 
+    // 소리 주인 판정 목록(PlayerSoundRegistry) — 모든 플레이어에 붙는 컴포넌트라 여기서 등록한다.
+    private void OnEnable() => PlayerSoundRegistry.Register(_player);
+    private void OnDisable() => PlayerSoundRegistry.Unregister(_player);
+
     private void Update()
     {
         Animator animator = _player != null ? _player.CharacterAnimator : null;
@@ -50,7 +54,7 @@ public class PlayerFootstepSound : MonoBehaviour
         }
 
         if (_lastStep != int.MinValue && step > _lastStep && AudioManager.Instance != null)
-            AudioManager.Instance.Play(SoundKey, transform.position);
+            AudioManager.Instance.Play(SoundKey, transform.position, this);   // 남의 발소리 = 30%(Q6)
         _lastStep = step;
     }
 }

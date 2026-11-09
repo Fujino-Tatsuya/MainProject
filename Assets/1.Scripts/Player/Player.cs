@@ -274,6 +274,12 @@ public class Player : Unit
         // 발소리(11-06) — 프리팹에 없으면 붙인다(전 캐릭터 공용, 걷기 애니 재생 위치 기준).
         if (!TryGetComponent<PlayerFootstepSound>(out _))
             gameObject.AddComponent<PlayerFootstepSound>();
+        // 피격 소리(11-09, PLAN-sound-mix) — 같은 방식.
+        if (!TryGetComponent<PlayerHitSound>(out _))
+            gameObject.AddComponent<PlayerHitSound>();
+        // 저체력 경고음·먹먹한 효과(11-09) — 내 캐릭터만 동작.
+        if (!TryGetComponent<PlayerLowHealthAudio>(out _))
+            gameObject.AddComponent<PlayerLowHealthAudio>();
 
         // StatusEffectController는 NetworkBehaviour라 런타임 추가가 불가 — 프리팹에 미리 부착돼 있어야 한다
         if (GetComponent<StatusEffectController>() == null)
