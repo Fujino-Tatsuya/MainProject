@@ -67,7 +67,7 @@ public sealed partial class BossEncounterDirector
 
     // [서버]
     private bool _spawnedVictoryVariant;    // 이번에 스폰한 보스가 B(raidBossPrefab) — 전역 선택값이 아니라 실제 인스턴스 기준(C13)
-    private bool _victoryResultReady;       // 서버(호스트) 화면의 처치 연출이 끝났다(CRT 꺼짐 끝) — 그 전엔 결과 전환을 붙잡는다
+    private bool _victoryResultReady;       // 서버(호스트) 화면의 처치 연출이 끝났다(타임라인 로비 전환 마커) — 그 전엔 결과 전환을 붙잡는다
 
     /// <summary>
     /// [서버] 이 보스의 사망 표현이 지금 흐르는 배율 — 승리 연출 대상이 아니면 1. 사망 연출 대기(<c>MonsterBase.DeathPresentationTimeScale</c>)가 읽는다.
@@ -183,7 +183,7 @@ public sealed partial class BossEncounterDirector
         return count;
     }
 
-    // [서버] Update — 서버(호스트) 피어의 처치 연출이 끝나는 순간(유지 → CRT 꺼짐 끝, 화면 검정) 결과 전환을 지금으로 당긴다(PLAN-boss-victory-glitch 6단계).
+    // [서버] Update — 서버(호스트) 피어의 처치 연출이 끝나는 순간(타임라인 로비 전환 마커 — TV 꺼짐 클립이 있으면 보통 그 끝·화면 검정, 없으면 검정 없이) 결과 전환을 지금으로 당긴다(PLAN-boss-victory-glitch 6단계).
     // 연출 시계는 처치 판정부터 게임 시간으로 흘러 처치 연출 스킬 End 와 무관하게 반드시 끝난다(스킬 End 가 빠져도 붙잡히지 않는다).
     private void TickVictoryServer()
     {

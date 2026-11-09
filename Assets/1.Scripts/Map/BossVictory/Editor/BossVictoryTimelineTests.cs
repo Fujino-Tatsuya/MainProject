@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 타임라인(PLAN-boss-victory-glitch "타임라인 에디터 창") — 클립 평가·정지 유지·TV 꺼짐·마커,
-/// 기본 클립(코드·에셋)이 옛 기본 곡선 × 옛 전체 세기(교체 직전 에셋 값)와 같은 화면인지(전체 세기를 녹인 0.08~0.26초만 오차 0.06 허용).
+/// 코드 기본 클립이 옛 기본 곡선 × 옛 전체 세기(교체 직전 에셋 값)와 같은 화면인지(전체 세기를 녹인 0.08~0.26초만 오차 0.06 허용). 에셋은 사용자 튜닝 값이라 구조만 본다.
 /// 실행 = <c>Tools/Tests/전투 EditMode 테스트 실행</c>(필터 ^BossVictoryTimeline).
 /// </summary>
 public sealed class BossVictoryTimelineTests
@@ -68,11 +68,32 @@ public sealed class BossVictoryTimelineTests
     }
 
     [Test]
-    public void 에셋_클립도_옛_기본_곡선과_같은_화면()
+    // 에셋 = 사용자가 창으로 튜닝하는 값(11-09) — 옛 곡선과 같은지는 보지 않고 구조만 본다.
+    public void 에셋_타임라인_구조가_유효하다()
     {
         var settings = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(AssetPath);
         Assert.IsNotNull(settings, AssetPath);
-        AssertSameAsOldCurves(settings.timeline, "에셋");
+        BossVictoryTimeline tl = settings.timeline;
+        Assert.IsNotNull(tl, "timeline");
+        foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
+        {
+            var clips = tl.Clips(track);
+            Assert.IsNotNull(clips, track.ToString());
+            for (int i = 0; i < clips.Count; i++)
+            {
+                BossVictoryClip c = clips[i];
+                string at = $"{track} #{i}";
+                Assert.GreaterOrEqual(c.start, 0f, at + " 시작");
+                Assert.Greater(c.length, 0f, at + " 길이");
+                Assert.That(c.fadeIn, Is.InRange(0f, c.length), at + " 페이드 인");
+                Assert.That(c.fadeOut, Is.InRange(0f, c.length), at + " 페이드 아웃");
+                Assert.That(c.weight, Is.InRange(0f, 1f), at + " 세기");
+            }
+        }
+        Assert.LessOrEqual(tl.crtOff.Count, 1, "TV 꺼짐은 1개만(창이 막는다)");
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+            Assert.GreaterOrEqual(tl.MarkerTime(marker), 0f, marker.ToString());
+        Assert.Greater(tl.lobbyTransitionTime, 0f, "로비 전환 마커가 0 이면 처치 순간 바로 끝난다");
     }
 
     [Test]

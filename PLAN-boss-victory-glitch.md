@@ -243,3 +243,8 @@
 - **창 끝 잡기**(`dc44d862`): 원인 = 안 보이는 페이드 손잡이 판정이 선택 안 한 클립에도 위쪽 8px 에서 돌아 끝(특히 페이드 0 인 오른쪽 끝)을 가로챘고, 끝 판정이 ±5px·첫 클립 순서라 이웃 펄스 클립에서 엉뚱한 것이 잡혔다. → 끝 = 몸통보다 먼저·행 안 가장 가까운 끝, 폭 = 밖 6px + 안 클립 폭 30%(4~10px) · 페이드 네모 = 선택 클립 위쪽 띠에서만 · 좌우 화살표/이동/밀기 커서 · 끌기 동안 hotControl. 왼쪽 끝 = 시작 이동(끝 고정) · 오른쪽 끝 = 길이 · 펄스·정지 유지·TV 꺼짐 클립 동일 · 0.01 스냅 · Undo 한 묶음.
 - **처치 연출 스킬 속도**: 실제 시전 경로의 속도 = ① 스킬 고유 상태 속도 파라미터(팔라딘 R `UltimateSpeed` = AnimationSpeed × Hit 전/후 배율 — `OnClientPlay`·`OnLocalAnimationEvent(Hit)`) ② 공격속도 `Animator.speed`(`PlayerAttackSpeedAnimator` ← `PlayerSkillController.ScalesAnimatorWithAttackSpeed`) ③ 상태 파라미터 `AttackSpeedRate`(항상 씀). 표시 전용 재생은 ①·③ 은 이미 같은 함수를 탔고 **②가 빠져 있었다** — 창구가 `activeSkill` 만 봐서 표시 전용(`presentationSkill`)이면 1. → 창구가 표시 전용 스킬도 같은 `ScalesWithAttackSpeed` 로 본다(값 복제 없음). 거너·어쌔신 R 도 같은 경로(거너 R 은 타이머 방식이라 원래 공속 안 탐 — 실제 전투와 같음). 히트스톱은 플레이어 스킬 재생 경로에 없다(전역 슬로우는 간파 전용).
 - **처치자 배율과의 관계**: 하던 동작 ×0.5 · 백대쉬 · **처치 연출 스킬 동안은 처치자 배율을 덮지 않는다(=1)** → 속도 = 실제 전투와 같음(공속 × 상태 파라미터). End 뒤 ×0.1 = 그 순간 `Animator.speed`(스킬이 끝나 공속 창구가 1 로 돌려 놓은 값) × 0.1, 상태 속도 파라미터(Hit 뒤 배율)는 상태 안에서 계속 곱해진다.
+
+### 변경 — 사용자 창 튜닝 값 채택 · 에셋 테스트 = 구조만 (11-09 사용자 "그대로 쓸 거임")
+- 에셋(`8d8c5a19`): 찢김 1.42·1.62·2.43 / 끌림 1.42·2.43 클립 삭제 · 정지 유지 시작 3.49 · **TV 꺼짐 클립 없음**. 코드 기본값(`CreateDefault`)은 옛 화면 그대로 둔다.
+- EditMode: 에셋 ↔ 옛 곡선 비교 삭제 → 에셋은 구조 유효성(시작 ≥ 0·길이 > 0·페이드 ≤ 길이·세기 0~1·TV 꺼짐 ≤ 1개·마커 ≥ 0·로비 전환 > 0). 코드 기본값 ↔ 옛 곡선 × 옛 master 비교는 유지.
+- **TV 꺼짐 없을 때 흐름(코드 확인)**: `TickCrtAndLobby` — `TryGetCrtOff` false → 꺼짐을 만들지 않음(코루틴 안 띄움, `_crt` null 그대로, 정리 `DisposeCrt` 는 null 안전) · 로비 전환 마커(5.6)를 지나면 `_finished` + `PresentationFinished` · 서버 `TickVictoryServer` 는 호스트 표시의 `Finished` 만 보고 결과 전환(TV 꺼짐 무관) → 검정 없이 글리치 정지 화면에서 바로 로비로. 디버그 랩도 같은 `DevVictoryResultReached` 로 반복.
