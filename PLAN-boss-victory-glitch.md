@@ -9,6 +9,7 @@
 | 0 | 서버: 막타·보스·시각 복제 · 무적 · 연출 잠금(스킬 취소·입력 차단) · 장판·투사체 디스폰. 각 피어: 이펙트 소거 · 그 외 플레이어 0.05 · 보스 0 · **글리치 시계 시작** | `TryStartVictoryServer` · `BossVictoryGlitchPresentation.Begin` |
 | 0 ~ 스킬 End | 처치자: 하던 동작 ×0.5 그 클립 끝까지 → 백대쉬(등장 연출 밀림, ×1) → 처치 연출 스킬(기본 R, 표시 전용, ×1) → End 에서 처치자·보스 ×0.1 | `StartKillerSequence` · `BossEncounterDirector.StepSkid` · `PlayPresentationOnly` · `OnFinisherEnded` |
 | 0.08 ~ 3.5 | 글리치 = **가로줄 좌우 찢김 + 찢긴 줄 밝은 부분 끌림만**(11-09) · 색: 흑백·호박색·주사선·보스 노이즈(카메라 이동 UV) — 흑백 플래시 삭제(11-09) · HUD 숨김 | `BossVictoryGlitchRender` + 셰이더 2개 |
+| 0.10(흑백 시작 = `desaturate` 곡선 > 0) | 처치자 아닌 피어 카메라 → 처치자 즉시 컷 · 처치자 외 플레이어 모든 화면에서 숨김(렌더러·캔버스·머리 위 체력바) — 정리 때 복구(11-09) | `TickDesaturateCue` |
 | (컷) | 기본 없음(게임 카메라) — 목록에 넣으면 끊어 붙임 | `BossVictoryCameraCuts` |
 | 3.5 ~ 4.5 | 정지 화면 유지(`holdSeconds`) | |
 | 4.5 ~ 5.6 | CRT 꺼짐(`Title/CRTOff`) → 검정 | `BossVictoryCrtOff` |
@@ -200,3 +201,11 @@
 ### 변경 — 흑백 플래시 삭제 · 보스 내부 노이즈 유지 (11-09 사용자 결정)
 - 사용자: 1) 보스 안쪽 줄무늬 노이즈(카메라 이동 UV)는 **유지**. 2) 화면이 하얗게 번쩍이는 흑백 플래시는 **삭제**(토글 없음).
 - 삭제: 셰이더 플래시 줄 · 곡선 `flash` · Frame `Flash` 칸. `_GlitchB.w` 는 비워 둠(0 — 미사용).
+
+### 변경 — 흑백 시작 순간: 피어 카메라 처치자로 · 처치자 외 캐릭터 숨김 (11-09 사용자)
+- 사용자: "흑백 효과 들어올 때 피어들 카메라 처치자로 포커스 옮기고 피어들의 캐릭터는 SetActive false."
+- **시각** = 설정 `desaturate` 곡선이 0 을 넘는 첫 프레임(기본 0.10초) — 새 시각 칸 없음, 곡선을 옮기면 같이 옮겨진다. 늦게 받은 피어는 첫 프레임에 바로.
+- **카메라**: 처치자가 아닌 피어만 `CameraTargetSwitcher.SetTemporaryFollow(처치자 CameraFollowTarget 자식)` — 즉시 컷(PreviousStateIsValid false). 처치자 본인 화면 그대로. 정리 때 `ClearTemporaryFollow`(지금 대상 = 오너·관전 대상으로 컷 복귀). 노이즈 UV 누적은 그 다음 프레임을 뺀다.
+- **숨김**: 처치자 외 플레이어(디버그 랩 팀원 복제본 포함)를 모든 피어에서 — 자식 Renderer(그림자 포함)·Canvas·`UnitOverheadHealthBar`(바 본체는 공용 오버레이 캔버스에 있어 컴포넌트를 끄면 OnDisable 이 숨김) `enabled = false`. 매 프레임 렌더러를 켜는 오너 조준 쿼드(`PlayerAimIndicator.LateUpdate`) 때문에 LateUpdate(실행 순서 10001)에서 다시 끈다.
+- **루트 SetActive(false) 안 씀**: NetworkObject 루트를 끄면 NGO 동기화·RPC 가 깨지고, `CameraFollowTarget` 이 비활성이 되면 카메라 추적 목록(`IsValidFollowTarget` = activeInHierarchy)에서 빠져 복구 때 카메라가 대상을 잃는다.
+- 한계: 기본 첫 찢김은 0.2초라 0.10초 컷은 가려지지 않는다(가리려면 `tear` 곡선에 0.1 펄스 추가 또는 흑백 시작을 0.2 로). 숨긴 뒤 새로 붙는 이펙트(처치 판정 때 소거됨)·DecalProjector 는 대상 아님.

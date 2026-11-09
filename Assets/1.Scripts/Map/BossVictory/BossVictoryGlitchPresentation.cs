@@ -17,6 +17,9 @@ using VeyTrace.Rendering.Occlusion;
 /// 플레이어 흑백·보스 노이즈(렌더링 레이어 비트) · HUD 숨김.</para>
 /// <para><b>4단계</b> — 글리치 시계로 카메라 컷(설정 SO 목록, <see cref="BossVictoryCameraCuts"/>): 첫 컷부터 연출 vcam(블렌드 없음) · 컷마다 그 순간 위치로 구도 고정 ·
 /// 연출 동안 월드 UI·윤곽선·벽 가림·카메라 흔들림 끔 · 카메라를 향하지 않는 벽 숨김.</para>
+/// <para><b>흑백 시작 순간</b>(11-09 사용자 — 설정 <c>desaturate</c> 곡선이 0 을 넘는 첫 프레임, 새 시각 칸 없음): 처치자가 아닌 피어의 게임 카메라가 처치자로 즉시 컷
+/// (<see cref="CameraTargetSwitcher.SetTemporaryFollow"/>) · 처치자 외 플레이어 캐릭터를 이 화면에서 숨김(렌더러·월드 캔버스·머리 위 체력바 끔 —
+/// 루트 SetActive 는 NGO·카메라 추적 목록이 깨져 쓰지 않는다). 정리(디버그 랩 F7 포함) 때 원상복구.</para>
 /// </summary>
 [DefaultExecutionOrder(10001)]   // PlayerAttackSpeedAnimator(10000)가 Update 에서 쓰는 animator.speed 를 그 뒤에 덮는다
 [DisallowMultipleComponent]
@@ -66,6 +69,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     bool _finisherWarned;
 
     readonly List<GameObject> _others = new List<GameObject>();
+
+    // 흑백 시작 순간(11-09 사용자) — 피어 카메라 처치자로 · 처치자 외 플레이어 숨김
+    bool _desatCueDone;
+    CameraTargetSwitcher _focusSwitcher;   // 이 연출이 임시 추적을 건 카메라(정리 때 이것만 푼다)
+    readonly List<Renderer> _hiddenOtherRenderers = new List<Renderer>();
+    readonly List<Behaviour> _hiddenOtherBehaviours = new List<Behaviour>();   // 월드 캔버스·머리 위 체력바
     readonly List<Animator> _animators = new List<Animator>();
     readonly List<Role> _animatorRoles = new List<Role>();
     readonly List<float> _animatorSpeeds = new List<float>();     // 덮기 전 원래 속도
@@ -396,7 +405,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             _hudHidden = true;
         }
 
-        if (!_renderOn) return;
+        if (_renderOn) SetGlitchFrame(s, t);
+        TickDesaturateCue(s, t);   // 노이즈 UV 누적 뒤 — 카메라 컷이 다음 프레임 누적에서 빠지게
+    }
+
+    void SetGlitchFrame(BossVictoryGlitchSettings s, float t)
+    {
         var frame = new BossVictoryGlitchRender.Frame
         {
             Master = s.master.Evaluate(t),
@@ -411,6 +425,87 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
         frame.NoiseOffset = TickNoiseOffset(s);
         BossVictoryGlitchRender.SetFrame(frame);
+    }
+
+    // ── 흑백 시작 순간: 피어 카메라 처치자로 · 처치자 외 플레이어 숨김(11-09 사용자) ─────────
+    // 시각 = desaturate 곡선이 0 을 넘는 첫 프레임(기본 0.10초 — 첫 찢김 0.2 직전). 늦게 받은 피어는 첫 프레임에 바로.
+
+    void TickDesaturateCue(BossVictoryGlitchSettings s, float t)
+    {
+        if (_desatCueDone || s.desaturate.Evaluate(t) <= 0f) return;
+        _desatCueDone = true;
+        FocusKiller();
+        HideOthers();
+    }
+
+    // 처치자 본인 화면은 그대로. 나머지 피어는 즉시 컷(SetTemporaryFollow = PreviousStateIsValid false — 감쇠로 쓸고 가지 않는다).
+    void FocusKiller()
+    {
+        if (_killer == null || _killer.IsOwner) return;
+        CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
+        if (switcher == null) return;
+        Transform target = FindFollowTarget(_killer.transform);
+        switcher.SetTemporaryFollow(target);
+        _focusSwitcher = switcher;
+        _cutJumped = true;   // 다음 프레임 노이즈 UV 누적에서 이 순간이동을 뺀다
+    }
+
+    // 플레이어 vcam 이 평소 따라가는 자식(CameraFollowTarget 태그) — 없으면 루트.
+    static Transform FindFollowTarget(Transform root)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            if (t != root && t.CompareTag("CameraFollowTarget")) return t;
+        return root;
+    }
+
+    // 게임오브젝트는 끄지 않는다 — NetworkObject 루트를 끄면 NGO 동기화·RPC 가 깨지고, CameraFollowTarget 이 비활성이면 카메라 추적 목록에서 빠진다.
+    void HideOthers()
+    {
+        for (int i = 0; i < _others.Count; i++)
+        {
+            GameObject root = _others[i];
+            if (root == null) continue;
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r == null || !r.enabled) continue;
+                r.enabled = false;   // 그림자도 같이 빠진다
+                _hiddenOtherRenderers.Add(r);
+            }
+            foreach (Canvas c in root.GetComponentsInChildren<Canvas>(true))
+                HideBehaviour(c);
+            foreach (UnitOverheadHealthBar bar in root.GetComponentsInChildren<UnitOverheadHealthBar>(true))
+                HideBehaviour(bar);   // 바 본체는 공용 오버레이 캔버스로 옮겨져 있다 — 컴포넌트를 끄면 OnDisable 이 바를 숨긴다
+        }
+    }
+
+    void HideBehaviour(Behaviour b)
+    {
+        if (b == null || !b.enabled) return;
+        b.enabled = false;
+        _hiddenOtherBehaviours.Add(b);
+    }
+
+    // 매 프레임 렌더러를 켜는 표시(오너 조준 쿼드 — PlayerAimIndicator.LateUpdate)가 있어 기본 순서 LateUpdate 뒤(10001)에 다시 끈다.
+    void LateUpdate()
+    {
+        for (int i = 0; i < _hiddenOtherRenderers.Count; i++)
+        {
+            Renderer r = _hiddenOtherRenderers[i];
+            if (r != null && r.enabled) r.enabled = false;
+        }
+    }
+
+    void RestoreDesaturateCue()
+    {
+        _desatCueDone = false;
+        if (_focusSwitcher != null) _focusSwitcher.ClearTemporaryFollow();   // 지금 대상(오너·관전 대상)으로 컷 복귀
+        _focusSwitcher = null;
+        for (int i = 0; i < _hiddenOtherRenderers.Count; i++)
+            if (_hiddenOtherRenderers[i] != null) _hiddenOtherRenderers[i].enabled = true;
+        _hiddenOtherRenderers.Clear();
+        for (int i = 0; i < _hiddenOtherBehaviours.Count; i++)
+            if (_hiddenOtherBehaviours[i] != null) _hiddenOtherBehaviours[i].enabled = true;
+        _hiddenOtherBehaviours.Clear();
     }
 
     // ── 끝: 유지 → CRT 꺼짐(6단계) ─────────────────────────────────────────
@@ -764,6 +859,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _crtPending = false;
         _finished = false;
         RestoreCuts();
+        RestoreDesaturateCue();
         _overlay?.Dispose();   // HUD 복구 · 컷 카메라 나감(블렌드 없음) · 디밍 기준점 복구
         _overlay = null;
 
