@@ -1,7 +1,20 @@
 # PLAN — 보스 처치 연출 교체: ZZZ "WIPEOUT" 글리치 (2026-11-09 사용자 확정)
 
 > **원본 문서**(브랜치 `feature/BossVictoryDebugScene`). 옛 처치 연출 문서 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) 는 Legacy 기록.
-> 진행: 1단계(옛 연출 Legacy 이동·연결 끊기) ✅ — 아래 "진행 기록".
+> 진행(11-09): 1 Legacy 이동 ✅ · 2 시간 배율·소거·처치 연출 스킬 ✅ · 3 글리치 렌더·흑백·보스 노이즈·SO 타임라인 ✅ · 4 카메라 컷 구조 ✅(기본 목록 비움 — 게임 카메라만) · 사양 변경: 글리치 = 처치 판정 즉시 ✅ · 5 Rectify 글자 ✅ · 6 유지 → CRT 꺼짐 → 로비 결과 ✅ · 7 디버그 랩·문서 ✅ — 아래 "진행 기록". ⏳ Unity 컴파일·셰이더·EditMode·Play(이 레인은 Unity 없음).
+
+## 지금 흐름 한눈에 (최종 — 아래 진행 기록이 근거)
+| 처치 판정 뒤(초, 게임 시간) | 일 | 어디서 |
+|---|---|---|
+| 0 | 서버: 막타·보스·시각 복제 · 무적 · 연출 잠금(스킬 취소·입력 차단) · 장판·투사체 디스폰. 각 피어: 이펙트 소거 · 그 외 플레이어 0.05 · 보스 0 · **글리치 시계 시작** | `TryStartVictoryServer` · `BossVictoryGlitchPresentation.Begin` |
+| 0 ~ 스킬 End | 처치자가 처치 연출 스킬(기본 R)을 표시로만 재생(×1) → End 에서 처치자·보스 ×0.1 | `PlayPresentationOnly` · `OnFinisherEnded` |
+| 0.08 ~ 3.5 | 글리치 곡선 16개(흑백·호박색·주사선·물결·블록·슬라이스·RGB·플래시·보스 노이즈·HUD 숨김) | `BossVictoryGlitchRender` + 셰이더 2개 |
+| 0.15 ~ | "Rectify" 외곽선 → 0.3~0.6 왼쪽부터 다색 채움 → 0.67 흰 섬광 → 노랑 | `BossVictoryRectifyText` |
+| (컷) | 기본 없음(게임 카메라) — 목록에 넣으면 끊어 붙임 | `BossVictoryCameraCuts` |
+| 3.5 ~ 4.5 | 정지 화면 유지(`holdSeconds`) | |
+| 4.5 ~ 5.6 | CRT 꺼짐(`Title/CRTOff`) → 검정 | `BossVictoryCrtOff` |
+| 호스트 끝 | 서버가 결과 전환 → 로비(결과 패널) | `TickVictoryServer` → `TickResultTransition` |
+수치는 전부 `Resources/BossVictory/BossVictoryGlitchSettings.asset`. 디버그 = `0.Scenes/Debug/DebugBossVictory`(Dev Boot, 솔로 호스트, F7 처음부터·F8 일시정지·배속).
 
 레퍼런스: `C:\Users\user\Desktop\Top WIPEOUTS and CAKEOUTS ver. 4 (3.1) - Zenless Zone Zero [KfjGNVzCIdA].webm` 0~1.2초.
 프레임 시트: `_lane-artifacts/Work2/zzz_sheet.png`(0.1초 간격), `zzz_sheet2.png`(0.28~0.70초 30fps).
@@ -153,3 +166,8 @@
 - 서버: `_victoryMinResultAt`(시각 하한) → `_victoryResultReady`. `TickVictoryServer` 가 **호스트 피어 표시가 같은 회차를 끝낸 순간** `_resultTransitionAt = 지금` → 기존 `TickResultTransition` → `MapSceneManager.GoToResult()`(로비 + 결과 패널, 기존 흐름). 그 전엔 `HoldsResultForVictory` 가 처치 안전망(12초)도 붙잡는다. 연출 시계는 처치 판정부터 게임 시간으로 흘러 스킬 End 와 무관하게 반드시 끝난다.
 - 클라 화면은 자기 시계로 꺼지고, 호스트가 먼저 끝나면 꺼지는 도중 로비로 넘어갈 수 있다(피어 간 미세 차이 허용).
 - 총 길이(기본) ≈ 3.5 + 1 + 1.1 = 5.6초(처치 판정부터).
+
+### 7단계 — 디버그 랩·문서 (11-09)
+- 랩(`Dev/BossVictoryLab/DebugBossVictoryLab`): 기존 "처음부터 (F7)"·일시정지(F8)·배속·자동 반복 그대로. 패널에 표시 단계·글리치 시각·컷 번호·CRT 꺼짐 끝 표시 · **재생 중 패널 접기**(기본 켬 — 오른쪽 아래 한 줄, CRT 꺼짐 캡처에 IMGUI 패널이 안 찍히게) · 끝 판정 = 호스트 화면 CRT 꺼짐 끝(결과 차단 신호), 안전망 15초 툴팁 갱신.
+- 문서: 이 문서 맨 위 "지금 흐름 한눈에" · AGENTS.md 색인 문구 갱신.
+- Play 확인(사용자): 아래 6항목 — ① 처치 즉시 흑백·호박색·보스 노이즈·HUD 숨김 ② 처치자 스킬 애니가 글리치 속에서 재생·End 에서 느려짐 ③ Rectify 외곽선 → 다색 채움 → 섬광 → 노랑 ④ 3.5초 뒤 1초 정지 → CRT 꺼짐 → 검정 ⑤ 랩: 끝나면 원상복구 → 반복, 카메라·HUD·벽 복구 ⑥ 실게임/MPPM: 호스트 꺼짐 끝에 로비 결과 패널.

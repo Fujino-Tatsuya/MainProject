@@ -15,7 +15,8 @@ using UnityEngine;
 ///
 /// <list type="bullet">
 /// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · 패널 = 자동 반복·배속·막타 각도/거리/방향·팀원 수.</item>
-/// <item>처치 연출 = ZZZ 글리치(PLAN-boss-victory-glitch, 교체 중). 옛 카메라 무빙·프리셋·슬라이더·주황·회색 원은 Legacy(연결 끊음).</item>
+/// <item>처치 연출 = ZZZ 글리치(PLAN-boss-victory-glitch — 처치 판정 즉시 글리치·처치 연출 스킬 → Rectify 글자 → 유지 → CRT 꺼짐). 옛 카메라 무빙·프리셋·슬라이더·주황·회색 원은 Legacy(연결 끊음).</item>
+/// <item>끝 = 호스트 화면 CRT 꺼짐이 끝나 결과 전환 순간 → 랩이 차단하고 원상복구 → 처음부터. 패널은 재생 중 접힌다(CRT 꺼짐 캡처에 안 찍히게 — "패널 숨김" 끄면 계속 보임).</item>
 /// <item>배속은 Time.timeScale 만 바꾼다 — 새 연출은 각 피어 로컬 게임 시간·애니 이벤트로 흐른다.</item>
 /// <item>호스트 1인 전용. 게이트 = <c>UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS</c>.</item>
 /// </list>
@@ -45,7 +46,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     [SerializeField, Min(0f)] float loopHoldSeconds = 1.5f;
     [Tooltip("원상복구 뒤 처치까지(실제 초) — 카메라가 플레이 시점으로 돌아올 틈.")]
     [SerializeField, Min(0f)] float restartDelaySeconds = 0.8f;
-    [Tooltip("연출 단계 끝(3.20초) 뒤 결과 차단 신호가 이만큼 안 오면 끝난 것으로 본다(실제 초, 안전망).")]
+    [Tooltip("처치 뒤 결과 차단 신호(호스트 화면 CRT 꺼짐 끝)가 이만큼 안 오면 끝난 것으로 본다(실제 초, 안전망 — 기본 연출 ≈ 5.6초 + 배속).")]
     [SerializeField, Min(1f)] float endFallbackSeconds = 15f;
 
     [Header("막타·팀원 배치")]
@@ -69,6 +70,8 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     [Header("패널")]
     [SerializeField] Vector2 panelPosition = new Vector2(10f, 10f);
     [SerializeField, Min(240f)] float panelWidth = 380f;
+    [Tooltip("재생 중(처치 ~ 끝) 패널을 한 줄로 접는다 — 화면·CRT 꺼짐 캡처를 가리지 않게. F7/F8 은 그대로.")]
+    [SerializeField] bool hidePanelDuringPlay = true;
 
     BossEncounterDirector _director;
     GameObject _room;
@@ -388,6 +391,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
     void OnGUI()
     {
+        if (hidePanelDuringPlay && DrawCompactWhilePlaying()) return;
         float height = _folded ? 30f : Screen.height - panelPosition.y - 10f;
         GUILayout.BeginArea(new Rect(panelPosition.x, panelPosition.y, panelWidth, height), GUI.skin.box);
         GUILayout.BeginHorizontal();
@@ -407,6 +411,9 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             float elapsed = v.Elapsed(_director.NetworkManager.ServerTime.Time);
             GUILayout.Label($"<b>처치 뒤 {elapsed:0.00}초</b>(실제 시간) · 막타 client {v.KillerClientId}{(reached ? " · 끝 — 결과 전환 차단" : "")}", Rich());
             GUILayout.Label($"배속 {Time.timeScale:0.00}{(_paused ? " · 일시정지" : "")}");
+            BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
+            if (p != null && p.Sequence == v.Sequence)
+                GUILayout.Label($"표시: {p.CurrentPhase} · 글리치 {p.GlitchTime:0.00}초(게임 시간) · 컷 {(p.CutIndex < 0 ? "게임 카메라" : p.CutIndex.ToString())}{(p.Finished ? " · CRT 꺼짐 끝" : "")}");
         }
         else
         {
@@ -450,10 +457,29 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             GUILayout.EndHorizontal();
         }
         bossFacesKiller = GUILayout.Toggle(bossFacesKiller, " 보스가 막타를 본다");
+        hidePanelDuringPlay = GUILayout.Toggle(hidePanelDuringPlay, " 재생 중 패널 접기(CRT 꺼짐 캡처에 안 찍히게)");
 
         GUI.enabled = true;
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    // 재생 중(처치 ~ 결과 차단) — 오른쪽 아래 한 줄. 반환 = 그렸다(전체 패널 생략).
+    bool DrawCompactWhilePlaying()
+    {
+        if (_director == null || !_director.IsSpawned) return false;
+        BossEncounterDirector.VictoryState v = _director.Victory;
+        if (!v.Active || _director.DevVictoryResultReached) return false;
+        BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
+        string t = p != null && p.Sequence == v.Sequence ? $"{p.GlitchTime:0.0}s" : "-";
+        const float w = 260f, h = 26f;
+        GUILayout.BeginArea(new Rect(Screen.width - w - 10f, Screen.height - h - 10f, w, h));
+        GUILayout.BeginHorizontal();
+        GUILayout.Label($"랩 재생 중 {t} · F7 · F8");
+        if (GUILayout.Button("패널", GUILayout.Width(50f))) hidePanelDuringPlay = false;
+        GUILayout.EndHorizontal();
+        GUILayout.EndArea();
+        return true;
     }
 
     void SetCharacterIndex(int slot, int value)
