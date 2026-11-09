@@ -53,21 +53,6 @@ MonoBehaviour:
       fadeIn: 0.01
       fadeOut: 0.08
       weight: 1
-    - start: 1.42
-      length: 0.19
-      fadeIn: 0.1
-      fadeOut: 0.09
-      weight: 1
-    - start: 1.62
-      length: 0.11
-      fadeIn: 0.05
-      fadeOut: 0.06
-      weight: 1
-    - start: 2.43
-      length: 0.24
-      fadeIn: 0.12
-      fadeOut: 0.12
-      weight: 1
     smear:
     - start: 0.09
       length: 0.16
@@ -79,16 +64,6 @@ MonoBehaviour:
       fadeIn: 0.01
       fadeOut: 0.08
       weight: 1
-    - start: 1.42
-      length: 0.2
-      fadeIn: 0.1
-      fadeOut: 0.1
-      weight: 1
-    - start: 2.43
-      length: 0.24
-      fadeIn: 0.12
-      fadeOut: 0.12
-      weight: 1
     hudHide:
     - start: 0.08
       length: 5.52
@@ -96,17 +71,12 @@ MonoBehaviour:
       fadeOut: 0
       weight: 1
     hold:
-    - start: 3.5
+    - start: 3.49
       length: 1
       fadeIn: 0
       fadeOut: 0
       weight: 1
-    crtOff:
-    - start: 4.5
-      length: 1.1
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
+    crtOff: []
     focusKillerTime: 0.2
     hideOthersTime: 0.2
     lobbyTransitionTime: 5.6
