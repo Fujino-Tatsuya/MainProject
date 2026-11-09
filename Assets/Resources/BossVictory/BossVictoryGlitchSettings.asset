@@ -21,6 +21,9 @@ MonoBehaviour:
   backDashDuration: 0.5
   backDashEase: 3
   backDashAngle: -30
+  backDashIdleDelay: 0.35
+  bossHitStateName: getowned
+  bossHitFadeSeconds: 0.05
   focusKillerBlendSeconds: 0
   hideOthersTarget: 0
   timeline:
@@ -30,59 +33,203 @@ MonoBehaviour:
       fadeIn: 0.09
       fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.016378526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
     amber:
     - start: 0.3
       length: 5.3
       fadeIn: 0.15
       fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.028301883
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
     scanline:
     - start: 0.105
       length: 5.495
       fadeIn: 0.09
       fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.016378526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
     bossNoise:
     - start: 0.12
       length: 5.48
       fadeIn: 0.05
       fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.009124088
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
     tear:
     - start: 0.09
       length: 0.16
-      fadeIn: 0.105
-      fadeOut: 0.05
+      fadeIn: 0
+      fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.65625
+        value: 1
+        curve: 0
+      - u: 0.6875
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
     - start: 0.32
       length: 0.09
-      fadeIn: 0.01
-      fadeOut: 0.08
+      fadeIn: 0
+      fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.111111104
+        value: 1
+        curve: 0
+      - u: 0.111111164
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
     smear:
     - start: 0.09
       length: 0.16
-      fadeIn: 0.105
-      fadeOut: 0.05
+      fadeIn: 0
+      fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.65625
+        value: 1
+        curve: 0
+      - u: 0.6875
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
     - start: 0.32
       length: 0.09
-      fadeIn: 0.01
-      fadeOut: 0.08
+      fadeIn: 0
+      fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.111111104
+        value: 1
+        curve: 0
+      - u: 0.111111164
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
     hudHide:
     - start: 0.08
       length: 5.52
       fadeIn: 0.04
       fadeOut: 0
       weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.0072463765
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
     crtOff: []
-    cameraCut: []
-    cameraCutShots: []
+    cameraCut:
+    - start: 1.04
+      length: 4.56
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+    cameraCutShots:
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 0.70313674, y: 0.56469953, z: -6.1380944}
+        rotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
+        fov: 60.000004
+        curve: 1
+      - u: 1
+        position: {x: 0.71563476, y: 0.56469953, z: -6.1611843}
+        rotation: {x: -0.101200655, y: 0.019297486, z: 0.0018662212, w: 0.9946771}
+        fov: 60.000004
+        curve: 1
+      smoothPath: 1
+      hideWalls: 1
+      startPosition: {x: 0.70313674, y: 0.56469953, z: -6.1380944}
+      startRotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
+      startFov: 60.000004
+      hasEnd: 0
+      endPosition: {x: 0.70313674, y: 0.56469953, z: -6.1380944}
+      endRotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
+      endFov: 60.000004
+      ease: 1
+    killerAction:
+    - start: 0
+      length: 0.2
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
     focusKillerTime: 0.2
     hideOthersTime: 0.2
     lobbyTransitionTime: 5.6
-    killerActionEndTime: 0.2
+    backDashStartTime: 0.2
+    finisherStartTime: 0.65
+    finisherTrimSeconds: 0
+    slowStartTime: 0
+    bossHitAnimTime: 0.2
+    bossFreezeTime: 0
+    bossSlowTime: 0.2
+    killerActionEndTime: 0
   amberColor: {r: 0.8235294, g: 0.6509804, b: 0.30588236, a: 1}
   scanlineCount: 360
   tearLinePixels: 3
