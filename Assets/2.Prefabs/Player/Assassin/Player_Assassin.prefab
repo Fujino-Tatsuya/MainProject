@@ -2746,6 +2746,8 @@ MonoBehaviour:
   stormSlashScale: 1
   pierceScale: 1
   pierceMinLength: 0.3
+  shadowReturnDashColor: {r: 0.23529412, g: 0, b: 0.3962264, a: 1}
+  shadowReturnDashSaturation: 1
   normalSlashSuccess:
   - {fileID: 7694227013285046603}
   - {fileID: 3518524579844883986}

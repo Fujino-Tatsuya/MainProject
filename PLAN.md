@@ -1,3 +1,27 @@
+# ▶▶▶ 계획 = **그림자 회귀 표식에 검은 오러** (2026-11-09 · grill 확정 · ✅ 민경 "추천대로" · ✅ 구현 · ⏳ Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-09). 대상 `FX_ShadowReturn_Marker_Shadow.prefab`(SVN) + `AssassinShadowReturnView.cs`(git, 민경 VFX 코드).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 레이어 | `FX_Assassin_BladeVortex` 의 검은 오러 + 붉은 불티(11-09 추가, HDR 가산 새 재질 `M_ShadowReturn_Ember`) — 어두운 연기 2개(`Smoke_burst_sim_4_alpha_Soft` 고리, `Smoke_loop_sim_fb_10_alpha_soft` 몸통) + 검은 퍼지(`FuzzAlpha_Soft`) + 불티(`Flecks_Shiny_Additive` 기반). 붉은 바람·퍼지 가산 레이어는 제외 |
+| 모양 | 그림자 웅덩이에서 낮게(~1m) 피어오르며 단검을 감싸는 기둥, 위로 옅어짐 |
+| 색 | BladeVortex 그대로 검붉은 틴트 |
+| 세기 | BladeVortex 의 약 절반(알파 ½, 방출 ~0.6배), 표식 크기에 맞춰 축소 |
+| 재질 | BladeVortex 와 같은 PilotoStudio 재질 공유 — 새 텍스처·재질 없음 |
+| 단검 림 | 11-09 추가 — `Mesh/Rim` + `M_ShadowReturn_Rim`(VFX/RimOverlay, 빨강 HDR), 연보라 `Edge` 끔, `_Fade` 연동 |
+| 페이드 | 메시는 기존대로(_BaseColor 알파·끝 깜빡임). 파티클은 그 블록·렌더러 끄기에서 제외 — 사라질 때 방출만 멈추고 남은 입자가 흩어진 뒤 표식 파괴 |
+
+## 작업
+1. 프리팹: 루트 아래 `Aura` 묶음 + 레이어 3개(BladeVortex 에서 복사, 새 fileID). FuzzAlpha 는 1회 버스트 → 짧은 주기 루프(숨 쉬는 검은 후광).
+2. `AssassinShadowReturnView`: `Apply` 가 ParticleSystemRenderer 를 건너뜀 · `Hide` 때 표식 파티클 방출 정지 · 파괴 = 메시 알파 0 **그리고** 살아 있는 입자 0.
+
+## 검증
+- Play: Q 후 출발점에 오러가 서서히 차오름 / 복귀·만료 때 메시는 페이드, 연기는 흩어지며 끝 / 끝 1초 깜빡임은 메시만.
+
+---
+
 # ▶▶▶ 계획 = **거너 R — 다른 클라 화면에서 낙뢰 빔·장판 바닥 선 알파 낮추기** (2026-11-06 · grill 확정 · ✅ 민경 승인 · ✅ 구현 · ⏳ 컴파일·MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-06). 스폰 코드 한 줄 = **은희 영역**(`GunnerTrackingLaserSkill`) → 핸드오프.
