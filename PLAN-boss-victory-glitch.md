@@ -7,10 +7,10 @@
 | 처치 판정 뒤(초, 게임 시간) | 일 | 어디서 |
 |---|---|---|
 | 0 | 서버: 막타·보스·시각 복제 · 무적 · 연출 잠금(스킬 취소·입력 차단) · 장판·투사체 디스폰. 각 피어: 이펙트 소거 · 그 외 플레이어 0.05 · 보스 0 · **글리치 시계 시작** | `TryStartVictoryServer` · `BossVictoryGlitchPresentation.Begin` |
-| 0 ~ 스킬 End | 처치자: 하던 동작 ×0.5 그 클립 끝까지 → 백대쉬(등장 연출 밀림, ×1) → 처치 연출 스킬(기본 R, 표시 전용, ×1) → End 에서 처치자·보스 ×0.1 | `StartKillerSequence` · `BossEncounterDirector.StepSkid` · `PlayPresentationOnly` · `OnFinisherEnded` |
+| 0 ~ 스킬 End | 처치자: 하던 동작 ×0.5 그 클립 끝까지(또는 '처치자 동작 끝 → 백대쉬' 마커 중 이른 쪽, 255 — 기본 끔) → 백대쉬(등장 연출 밀림, ×1) → 처치 연출 스킬(기본 R, 표시 전용, ×1) → End 에서 처치자·보스 ×0.1 | `StartKillerSequence` · `BossEncounterDirector.StepSkid` · `PlayPresentationOnly` · `OnFinisherEnded` |
 | 0.08 ~ 3.5 (클립) | 글리치 = **가로줄 좌우 찢김 + 찢긴 줄 밝은 부분 끌림만**(11-09) · 색: 흑백·호박색·주사선·보스 노이즈(카메라 이동 UV) — 흑백 플래시 삭제(11-09) · HUD 숨김 | `BossVictoryGlitchRender` + 셰이더 2개 |
 | 0.20(마커 2개 — 첫 찢김 최고점) | 처치자 아닌 피어 카메라 → 처치자 즉시 컷 · 처치자 외 플레이어 모든 화면에서 숨김(렌더러·캔버스·머리 위 체력바) — 되감거나 정리 때 복구(11-09) | `TickMarkers` |
-| (컷) | 기본 없음(게임 카메라) — 목록에 넣으면 끊어 붙임 | `BossVictoryCameraCuts` |
+| (컷) | 기본 없음(게임 카메라) — 타임라인 '카메라 컷' 트랙에 클립을 넣으면 그 시작에 끊어 붙이고 다음 컷 시작까지 유지 · 컷별 '벽 숨김'(기본 켬, 255) | `TickCuts` · `BossVictoryCameraCuts` |
 | 3.5 ~ 4.5 | 정지 유지 클립(화면 효과 시각을 클립 시작에 고정) | `BossVictoryTimeline.EffectTime` |
 | 4.5 ~ 5.6 | TV 꺼짐 클립(`Title/CRTOff`, 시작에 캡처·진행 = 클립 안 위치) → 검정 | `BossVictoryCrtOff` |
 | 5.6(로비 전환 마커) | 호스트 화면이 지나면 서버가 결과 전환 → 로비(결과 패널) | `TickCrtAndLobby` → `TickVictoryServer` |
@@ -253,3 +253,14 @@
 - 새 데이터 없음 — 기존 마커 `lobbyTransitionTime` 표시만 고침. 안 보였던 이유: 마커 줄이 맨 아래 + 시간 숫자만 + 기본 줌(160px/초)이면 5.6초가 창 오른쪽 밖.
 - 마커 줄을 **맨 위**(눈금자 바로 아래)로 · 처음 열 때 전체 보기 · 마커마다 "이름 시각s" 라벨 상시("로비 전환 5.60s" — 초록·굵게·큰 마름모·굵은 세로선) · 화면 밖이면 줄 끝에 ◀/▶ 라벨(누르면 그쪽으로 이동) · 마름모 ±14px 또는 라벨을 끌어 시각 변경(이동량 기준·0.01 스냅·Undo 한 묶음) · 좌우 화살표 커서 · 선택 시 아래 수치 칸 + 설명.
 - **규칙 확인(코드)**: 실게임 — 호스트 표시가 마커를 지나면 `TickVictoryServer` 가 결과 전환 시각을 지금으로(보스 디스폰 대기보다 늦어도/빨라도 마커 시각에 넘어감) → `TickResultTransition` → 로비 결과. 디버그 씬 — 같은 순간 `DevBlockResultTransition` 이 막고 한 바퀴 끝(`DevVictoryResultReached`) → 랩 `loopHoldSeconds`(기본 1.5 실제 초) 뒤 처음부터. 로비로 안 간다.
+
+### 255 — 카메라 컷 트랙 · 처치자 동작 끝 마커 · 스킬 End 시각 표시 (11-09 사용자 — grill 확정, 4) 정정 반영)
+- **카메라 컷 → 타임라인 트랙**: `BossVictoryTrack.CameraCut`(창 '카메라 컷' ·다음 컷까지). 클립 1개 = 컷 1개, **클립 시작 = 컷 시작, 다음 컷 시작까지 유지**(255 전 `ActiveIndex` 규칙 그대로 — 클립 길이는 표시용, 창이 저장마다 `FitCameraCutLengths` 로 다음 컷 시작·마지막은 로비 전환 마커까지 맞춤, 끝 잡기 없음·몸통 끌기만).
+  - 컷 값 = `timeline.cameraCutShots`(클립과 같은 번호 — 종류·거리·내려다보는 각·방위·초점 높이·FOV·**벽 숨김**). `BossVictoryCameraCuts.Cut.startTime` 삭제(시작 = 클립). 창에서 컷 클립을 누르면 아래에서 값 편집, 클립 안에 "#번호 종류(· 벽 숨김 끔)" 표시. 추가·붙여넣기·삭제·복사가 값도 함께 · 개수 어긋나면 `SyncCameraCutShots`(모자라면 기본값 = 와이드 16·22·50·1.5·40·벽 숨김 켬).
+  - **벽 숨김(컷별, 기본 켬)**: 켠 컷 = 이 컷 카메라에서 앞면이 안 보이는 벽을 더 끔(이어지는 켠 컷끼리 누적 — 255 전과 같음) · 끈 컷 = 숨겼던 벽 모두 다시 켬. 되감기로 앞 컷이면 모두 켠 뒤 그 컷 기준으로 다시 끔 · **첫 컷 앞으로 되감으면 게임 카메라로 복귀**(255 전 한계 해소). Play 중 창에서 컷 값을 고치면 `PreviewRecut` 으로 지금 컷을 다시 잡음.
+  - **옛 `BossVictoryGlitchSettings.cuts` 삭제 · 이관 손실 0**: 삭제 시점 에셋 = `cuts: []`(옮길 값 없음 — 트랙도 빈 채로 시작 = 같은 화면). EditMode `옛_cuts_배열은_삭제됐고_에셋에_옮길_값이_남아_있지_않다` 가 칸 삭제·에셋 YAML 의 `cuts:` 가 없거나 `[]`·컷 값 개수 = 클립 개수를 확인(값이 있었다면 지우기 전에 옮기도록 막는 장치). Unity 가 에셋을 다시 저장하면 `cuts: []` 줄은 사라진다.
+- **처치자 동작 끝 → 백대쉬 마커**(4) 정정 — 사용자: 'Animator speed 0 정지' 안 취소): `BossVictoryMarker.KillerActionEnd`(`killerActionEndTime`, **0 = 끔 = 기본**). 처치자 하던 동작 단계(×0.5)에서 글리치 시각 t ≥ 마커면 그 자리에서 끊고 `BeginBackDash`. 클립이 먼저 끝나면 클립 끝(둘 중 이른 쪽) · 하던 동작이 없으면(대기·이동) 처음부터 백대쉬 · 이후 백대쉬 → 처치 연출 스킬 → End 0.1 그대로. 순수 함수 `BossVictoryTimeline.ShouldEndKillerAction(마커, t)`(마커 > 0 && t ≥ 마커). 각 피어 로컬, 새 RPC·복제 값 없음. 창 마커 줄 '처치자 동작 끝 → 백대쉬'(0 이면 "(끔 — 클립 끝까지)", 선택 시 '끄기' 버튼).
+  - 한계: 동작 **애니만** 끊는다 — 서버 게임플레이 동작(스킬 실행 상태)은 그대로 두고(255 전과 같이 연출 잠금이 처치자 동작을 취소하지 않음) 자기 End·서버 안전망으로 끝난다. 처치 연출 스킬은 255 전처럼 그 스킬이 끝난 뒤(`ActiveSkill == null`) 튼다 — 스킬(Q/E/R) 도중에 끊으면 백대쉬 뒤 처치 연출 스킬 시작이 그 스킬 끝(안전망)까지 늦을 수 있다(평타는 해당 없음). 스크럽으로 되돌아가지 않는다(한 번 지난 단계 — ⏮ 로 다시).
+- **처치 연출 스킬 End 시각(읽기 전용)**: 창 아래 수치 칸 위 한 줄. 랩 재생 중 = 이번 회차 실제 글리치 시각(`BossVictoryGlitchPresentation.FinisherEndedAt`, 아직이면 "아직 안 옴") · 아니면 캐릭터별 추정 = 열린 씬 `BossEncounterDirector.IntroSkidDuration`(백대쉬) + 처치 연출 스킬 상태 클립의 Skill End 이벤트 시각(가정: 하던 동작 없음·공속 100%, '다시 계산' 버튼). 새 타이머 칸 없음 — 처치자 순서·시간 배율은 애니 이벤트 그대로.
+- 그대로(3): 이펙트 소거(t=0)·입력 잠금(끝까지)은 코드.
+- EditMode: `^BossVictoryCameraCut`(트랙 구조·다음 컷까지 유지·컷 값 짝/보정·기본값 벽 숨김 켬·길이 자동·옛 cuts 이관) · `^BossVictoryTimeline`(에셋 구조에 컷 값 짝 · 동작 끝 마커 끔/지남/이름·음수). ⏳ Unity 컴파일·EditMode·Play 미검증(이 레인 Unity MCP 없음 — 오프라인 컴파일 3종 통과).
