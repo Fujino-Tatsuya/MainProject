@@ -49,6 +49,7 @@ internal static class CombatEditModeTestRunner
         "^BossVictoryLab", // BossVictoryLabRulesTests — 처치 연출 반복 디버그 랩 배치·씬 격리(할 일 244)
         "^BossVictoryFinisher", // BossVictoryFinisherTests — 처치 연출 스킬 클립 End 이벤트(PLAN-boss-victory-glitch Q9)
         "^BossVictoryCameraCut", // BossVictoryCameraCutTests — 처치 연출 카메라 컷 고르기·구도(PLAN-boss-victory-glitch 4단계)
+        "^BossVictoryBossTimeScale", // BossVictoryBossTimeScaleTests — 처치 연출 보스 노드 배율(마지막 노드가 이김)·23호 피격 애니 상태(PLAN-boss-victory-glitch 255 후속 5)
         "^BossVictoryKillerSequence", // BossVictoryKillerSequenceTests — 처치자 순서 노드 단계 판정·기본값·옛 마커 이관(PLAN-boss-victory-glitch 255 후속 4)
         "^BossVictoryBackDash", // BossVictoryBackDashTests — 처치 연출 백대쉬 기본값 = 등장 밀림·방향 보정(PLAN-boss-victory-glitch 255 후속 3)
         "^BossVictoryTimeline" // BossVictoryTimelineTests — 처치 연출 타임라인 클립 평가·기본값 = 옛 곡선(PLAN-boss-victory-glitch 타임라인 창)

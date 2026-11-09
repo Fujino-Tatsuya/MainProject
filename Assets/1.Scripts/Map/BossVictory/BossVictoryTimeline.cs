@@ -25,7 +25,10 @@ public enum BossVictoryMarker
     LobbyTransition,  // 로비 전환 — 호스트 화면이 지나면 서버가 결과로 넘긴다
     BackDashStart,    // 백대쉬 시작 — 하던 동작이 남아 있으면 끊고 백대쉬(255 후속 4 — 옛 '처치자 동작 끝 → 백대쉬' 마커는 처치자 평타 클립 끝으로)
     FinisherStart,    // 스킬 연출 시작 — 처치 연출 스킬을 표시용으로 바로(백대쉬가 덜 끝났으면 끊음, 이전 스킬을 기다리지 않음)
-    SlowStart,        // 느려짐 시작 — 처치자·보스 End 후 배율(0 = 끔, 스킬 End 이벤트)
+    SlowStart,        // 느려짐 시작 — 처치자 End 후 배율(0 = 끔, 스킬 End 이벤트). 보스는 보스 슬로우가 꺼졌을 때만 따른다(255 후속 5)
+    BossHitAnim,      // 보스 피격 애니 시작 — 설정 SO 상태(23호 getowned = Boss_23_ParryHit_InPlace)를 처음부터, 보스 ×1(상태 이름이 비면 없음 — 255 후속 5)
+    BossFreeze,       // 보스 정지 — 보스 배율 0(그 자세로). 0 = 끔
+    BossSlow,         // 보스 슬로우 — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End)
 }
 
 /// <summary>클립 한 개 — 시작·길이·페이드 인/아웃·세기(초, 처치 판정 뒤).</summary>
@@ -93,6 +96,12 @@ public sealed class BossVictoryTimeline
     [Min(0f)] public float finisherStartTime = DefaultFinisherStart;
     [Tooltip("느려짐 시작(초). 처치자·보스 End 후 배율. 0 = 끔 — 처치 연출 스킬 End 이벤트에서.")]
     [Min(0f)] public float slowStartTime;
+    [Tooltip("보스 피격 애니 시작(초) — 0 = 처치 순간. 상태 이름(설정 SO bossHitStateName)이 비면 쓰지 않는다.")]
+    [Min(0f)] public float bossHitAnimTime;
+    [Tooltip("보스 정지(초) — 보스 배율 0. 0 = 끔.")]
+    [Min(0f)] public float bossFreezeTime;
+    [Tooltip("보스 슬로우(초) — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End).")]
+    [Min(0f)] public float bossSlowTime;
 
     // 옛 '처치자 동작 끝 → 백대쉬' 마커(255) — 읽기만 해서 처치자 평타 클립 끝·백대쉬 시작·스킬 연출 시작으로 옮긴다(255 후속 4, 설정 SO OnAfterDeserialize). 옮긴 뒤 0.
     [SerializeField, HideInInspector] float killerActionEndTime;   // 칸 이름 그대로(옛 에셋 값을 읽는다)
@@ -126,6 +135,9 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.BackDashStart => backDashStartTime,
         BossVictoryMarker.FinisherStart => finisherStartTime,
         BossVictoryMarker.SlowStart => slowStartTime,
+        BossVictoryMarker.BossHitAnim => bossHitAnimTime,
+        BossVictoryMarker.BossFreeze => bossFreezeTime,
+        BossVictoryMarker.BossSlow => bossSlowTime,
         _ => throw new ArgumentOutOfRangeException(nameof(marker)),
     };
 
@@ -140,6 +152,9 @@ public sealed class BossVictoryTimeline
             case BossVictoryMarker.BackDashStart: backDashStartTime = time; break;
             case BossVictoryMarker.FinisherStart: finisherStartTime = time; break;
             case BossVictoryMarker.SlowStart: slowStartTime = time; break;
+            case BossVictoryMarker.BossHitAnim: bossHitAnimTime = time; break;
+            case BossVictoryMarker.BossFreeze: bossFreezeTime = time; break;
+            case BossVictoryMarker.BossSlow: bossSlowTime = time; break;
         }
     }
 
@@ -181,6 +196,9 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.BackDashStart => "백대쉬 시작",
         BossVictoryMarker.FinisherStart => "스킬 연출 시작",
         BossVictoryMarker.SlowStart => "느려짐 시작",
+        BossVictoryMarker.BossHitAnim => "보스 피격 애니 시작",
+        BossVictoryMarker.BossFreeze => "보스 정지",
+        BossVictoryMarker.BossSlow => "보스 슬로우",
         _ => marker.ToString(),
     };
 
@@ -274,6 +292,19 @@ public sealed class BossVictoryTimeline
         clip = default;
         return false;
     }
+
+    /// <summary>0 이 '끔'인 마커인가(느려짐 시작·보스 정지·보스 슬로우). 나머지는 0 = 처치 순간.</summary>
+    public static bool ZeroMeansOff(BossVictoryMarker marker) =>
+        marker is BossVictoryMarker.SlowStart or BossVictoryMarker.BossFreeze or BossVictoryMarker.BossSlow;
+
+    /// <summary>보스 노드 시각(<see cref="BossVictoryBossTimeScale.Scale"/> 입력). <paramref name="hasHitAnim"/> = 설정 SO 피격 애니 상태 이름이 있다.</summary>
+    public BossVictoryBossTimeScale.Nodes BossNodes(bool hasHitAnim) => new BossVictoryBossTimeScale.Nodes
+    {
+        HasHitAnim = hasHitAnim,
+        HitAt = bossHitAnimTime,
+        FreezeAt = bossFreezeTime,
+        SlowAt = bossSlowTime,
+    };
 
     /// <summary>처치자 단계 시각(<see cref="BossVictoryKillerSequence.Target"/> 입력). 평타 끝 = 클립 끝(시작은 0 고정이라 시작 칸 무시).</summary>
     public BossVictoryKillerSequence.Times KillerTimes()

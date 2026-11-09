@@ -11,7 +11,9 @@ using VeyTrace.Rendering.Occlusion;
 ///
 /// <para><b>2단계(지금)</b> — 처치 판정 즉시: 이 피어의 스킬 이펙트·장판 표시·투사체 소거(Q11) · 대상별 시간 배율(전역 timeScale 아님):
 /// 처치자 1 · 그 외 플레이어 0.05 · 보스 0. 처치자 캐릭터에 처치 연출 스킬(Q9, 칸 = <see cref="PlayerVictoryFinisher"/>)을 표시로만 재생하고,
-/// 타임라인 '느려짐 시작' 마커(꺼짐이면 그 클립 End 이벤트 — 이 피어 화면 기준, Q12)에서 처치자·보스 0.1 → <see cref="FinisherEnded"/>.</para>
+/// 타임라인 '느려짐 시작' 마커(꺼짐이면 그 클립 End 이벤트 — 이 피어 화면 기준, Q12)에서 처치자 0.1 → <see cref="FinisherEnded"/>.
+/// 보스(255 후속 5) = 처치 순간 0 → '보스 피격 애니 시작'(23호 getowned = ParryHit_InPlace, ×1) · '보스 정지'(0) · '보스 슬로우'(꺼짐이면 처치자 느려짐 순간) 중
+/// 시각이 가장 늦은 노드(<see cref="BossVictoryBossTimeScale"/>).</para>
 /// <para><b>3단계</b> — <b>처치 판정 순간부터</b>(11-09 사양 변경 — 처치 연출 스킬은 글리치 속에서 재생) 화면 글리치(<see cref="BossVictoryGlitchRender"/>,
 /// 세기 = 설정 SO 타임라인 곡선, 시계 <see cref="GlitchTime"/> = 복제 처치 시각 기준) ·
 /// 플레이어 흑백·보스 노이즈(렌더링 레이어 비트) · HUD 숨김.</para>
@@ -32,7 +34,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         None,       // 연출 없음
         Finisher,   // 처치 판정 ~ 느려짐 시작(처치자 1 · 그 외 0.05 · 보스 0)
-        Slow,       // 느려짐 시작 마커(꺼짐이면 처치 연출 스킬 End) 이후(처치자 0.1 · 그 외 0.05 · 보스 0.1)
+        Slow,       // 느려짐 시작 마커(꺼짐이면 처치 연출 스킬 End) 이후(처치자 0.1 · 그 외 0.05). 보스 배율은 보스 노드가 따로 정한다(255 후속 5)
     }
 
     enum Role { Killer, Other, Boss }
@@ -40,7 +42,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 지금 연출(없으면 null).</summary>
     public static BossVictoryGlitchPresentation Instance { get; private set; }
 
-    /// <summary>[이 피어] 처치자·보스가 End 후 배율이 된 순간 — '느려짐 시작' 마커(꺼짐이면 처치 연출 스킬 End). 글리치 시작 신호는 아니다(글리치는 처치 판정 순간부터).</summary>
+    /// <summary>[이 피어] 처치자가 End 후 배율이 된 순간 — '느려짐 시작' 마커(꺼짐이면 처치 연출 스킬 End). 글리치 시작 신호는 아니다(글리치는 처치 판정 순간부터).</summary>
     public static event Action<BossEncounterDirector.VictoryState> FinisherEnded;
 
     BossEncounterDirector _director;
@@ -71,6 +73,13 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     public string KillerStepName => _killerStep.ToString();
     bool _finisherWarned;
     float _finisherEndedAt = -1f;
+    float _killerSlowAt = -1f;   // 처치자 느려짐이 온 글리치 시각 — 보스 슬로우 마커가 꺼졌을 때 보스도 이 순간(255 후속 5)
+
+    // 보스 노드(255 후속 5) — 피격 애니는 한 번(앞으로만), 배율은 매 프레임 BossVictoryBossTimeScale.
+    bool _bossHitPlayed;
+    float _bossEffectRate = -1f;
+    readonly List<Animator> _bossHitAnimators = new List<Animator>();   // 피격 애니를 튼 보스 Animator 중 사망 트리거 파라미터가 있는 것
+    string _bossDeathTrigger;
 
     /// <summary>[이 피어] 이번 회차 처치 연출 스킬 End 가 온 글리치 시각(아직이면 -1). 타임라인 창 'End 시각' 표시용(255 — 판정엔 안 씀).</summary>
     public float FinisherEndedAt => _running ? _finisherEndedAt : -1f;
@@ -158,12 +167,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 #endif
 
     /// <summary>[이 피어] 보스 시간 배율 — 서버(호스트)의 사망 표현 대기도 이 값으로 흐른다(<see cref="BossEncounterDirector.VictoryDeathTimeScaleFor"/>).</summary>
-    public float BossTimeScale => _phase switch
-    {
-        Phase.Finisher => 0f,
-        Phase.Slow => _settings != null ? _settings.bossAfterFinisherScale : 0.1f,
-        _ => 1f,
-    };
+    public float BossTimeScale => _running && _settings != null
+        ? BossVictoryBossTimeScale.Scale(_settings.timeline.BossNodes(HasBossHitAnim), _killerSlowAt, _settings.bossAfterFinisherScale, _glitchTime)
+        : 1f;
+
+    bool HasBossHitAnim => !string.IsNullOrEmpty(_settings.bossHitStateName);
 
     void Awake()
     {
@@ -195,6 +203,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
         if (!_running) return;
         TickKillerSequence();
+        TickBoss();
         TickAnimators();
         if (_glitchOn) TickGlitch();
     }
@@ -208,6 +217,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _running = true;
         _phase = Phase.Finisher;
         _finisherEndedAt = -1f;
+        _killerSlowAt = -1f;
+        _bossHitPlayed = false;
+        _bossEffectRate = -1f;
+        _bossHitAnimators.Clear();
         _finisherWarned = false;
         _killerStep = BossVictoryKillerSequence.Step.None;
         _dashRunning = false;
@@ -441,14 +454,62 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         EnterSlow("처치 연출 스킬 End");
     }
 
-    // 처치자 ×killerAfterFinisherScale · 보스 ×bossAfterFinisherScale — 느려짐 시작 마커(켜짐) 또는 스킬 End(마커 꺼짐) 한 번.
+    // 처치자 ×killerAfterFinisherScale — 느려짐 시작 마커(켜짐) 또는 스킬 End(마커 꺼짐) 한 번. 보스 슬로우 마커가 꺼졌으면 보스도 이 순간(TickBoss).
     void EnterSlow(string reason)
     {
         if (_phase != Phase.Finisher) return;
         _phase = Phase.Slow;
+        _killerSlowAt = _glitchTime;
         ApplyEffectRates();
-        Edit.Log($"[BossVictory] {reason} — 처치자 ×{_settings.killerAfterFinisherScale} · 보스 ×{_settings.bossAfterFinisherScale} (글리치 t {_glitchTime:0.00})", this);
+        Edit.Log($"[BossVictory] {reason} — 처치자 ×{_settings.killerAfterFinisherScale}{(_settings.timeline.bossSlowTime > 0f ? "" : $" · 보스 ×{_settings.bossAfterFinisherScale}(보스 슬로우 끔)")} (글리치 t {_glitchTime:0.00})", this);
         FinisherEnded?.Invoke(_state);
+    }
+
+    // ── 보스 노드(255 후속 5): 피격 애니 시작 · 정지 · 슬로우 ─────────────────
+    // 배율 = BossVictoryBossTimeScale(시각이 가장 늦은 노드) — 애니(TickAnimators)·이펙트(여기)·서버 사망 표현 대기(BossTimeScale)가 같은 값.
+
+    void TickBoss()
+    {
+        if (_boss == null) return;
+        if (!_bossHitPlayed && BossVictoryBossTimeScale.ShouldPlayHitAnim(_settings.timeline.BossNodes(HasBossHitAnim), _glitchTime))
+            PlayBossHitAnim();
+        // 처치 순간 서버 사망 상태가 건 사망 트리거(AnyState→Death)가 피격 애니를 빼앗지 않게 — 사망 상태 복제가 늦게 와도 매 프레임 비운다.
+        for (int i = 0; i < _bossHitAnimators.Count; i++)
+            if (_bossHitAnimators[i] != null) _bossHitAnimators[i].ResetTrigger(_bossDeathTrigger);
+        float rate = BossTimeScale;
+        if (Mathf.Approximately(rate, _bossEffectRate)) return;
+        _bossEffectRate = rate;
+        SetEffectRate(_boss.transform, rate);
+    }
+
+    // 설정 SO 상태(23호 getowned = Boss_23_ParryHit_InPlace, 루트모션 없음)를 처음부터 — 그 상태가 있는 보스 Animator 에만.
+    void PlayBossHitAnim()
+    {
+        _bossHitPlayed = true;
+        string state = _settings.bossHitStateName;
+        int hash = Animator.StringToHash(state);
+        _bossDeathTrigger = _boss.TryGetComponent(out MonsterBase monster) && monster.MonsterData != null ? monster.MonsterData.deathTrigger : null;
+        int played = 0;
+        for (int i = 0; i < _animators.Count; i++)
+        {
+            Animator a = _animators[i];
+            if (_animatorRoles[i] != Role.Boss || a == null || !a.isActiveAndEnabled || a.runtimeAnimatorController == null || !a.HasState(0, hash)) continue;
+            if (_settings.bossHitFadeSeconds > 0f) a.CrossFadeInFixedTime(hash, _settings.bossHitFadeSeconds, 0, 0f);
+            else a.Play(hash, 0, 0f);
+            played++;
+            if (!string.IsNullOrEmpty(_bossDeathTrigger) && HasTrigger(a, _bossDeathTrigger)) _bossHitAnimators.Add(a);
+        }
+        if (played == 0)
+            Edit.LogWarning($"[BossVictory] 보스 피격 애니 상태 '{state}' 가 보스 Animator 에 없다 — 마지막 자세 그대로(설정 SO bossHitStateName).", this);
+        else
+            Edit.Log($"[BossVictory] 보스 피격 애니 '{state}' (글리치 t {_glitchTime:0.00})", this);
+    }
+
+    static bool HasTrigger(Animator a, string name)
+    {
+        foreach (AnimatorControllerParameter p in a.parameters)
+            if (p.type == AnimatorControllerParameterType.Trigger && p.name == name) return true;
+        return false;
     }
 
     // ── 화면 글리치(3단계) ─────────────────────────────────────────────────
@@ -962,7 +1023,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_killer != null) SetEffectRate(_killer.transform, killer);
         for (int i = 0; i < _others.Count; i++)
             if (_others[i] != null) SetEffectRate(_others[i].transform, _settings.otherPlayersScale);
-        if (_boss != null) SetEffectRate(_boss.transform, BossTimeScale);
+        // 보스 이펙트 배율은 TickBoss(보스 노드가 시각으로 바꾼다).
     }
 
     void SetEffectRate(Transform root, float rate)
@@ -989,6 +1050,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _running = false;
         _phase = Phase.None;
         _killerStep = BossVictoryKillerSequence.Step.None;
+        _bossHitAnimators.Clear();
         EndDash();
 
         if (_killerSkills != null)
