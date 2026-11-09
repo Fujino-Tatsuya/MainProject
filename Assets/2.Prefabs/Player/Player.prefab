@@ -1167,7 +1167,7 @@ MonoBehaviour:
   outOfRangeIcon:
     texture: {fileID: 0}
     hotspot: {x: 0, y: 0}
-  cursorScale: 1.2
+  cursorScale: 0.8
   referenceScreenHeight: 1080
   defaultCursorMode: 0
   targetingCursorMode: 0
