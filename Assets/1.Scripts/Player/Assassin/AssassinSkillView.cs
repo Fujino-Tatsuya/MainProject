@@ -61,6 +61,14 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     [Tooltip("이 거리(m)보다 짧게 끝나면(돌진 직후 벽 등) 일섬은 생략하고 버스트만 낸다.")]
     [SerializeField, Min(0f)] private float pierceMinLength = 0.3f;
 
+    // 그림자 회귀(ASN_2_RETURN) 보유 시 Q 돌진 연출 색(2026-11-09 민경). 색 지정 재생(EffectTint) — 색상(hue)만 이 색으로 바꾸고
+    // 밝기·알파·흐름은 원래 이펙트 그대로. 특성 목록은 복제되므로 모든 피어가 같은 색으로 본다.
+    [Header("그림자 회귀 Q 색 — 일반 Q 일섬·버스트, 변신 Q Storm Slash (복귀 돌진 포함)")]
+    [Tooltip("그림자 회귀를 찍은 어쌔신의 Q 돌진 연출 색. 색상(hue)만 쓴다 — 밝기·알파는 원래 이펙트 것.")]
+    [SerializeField] private Color shadowReturnDashColor = new Color32(0x4B, 0x00, 0x82, 0xFF);
+    [Tooltip("원래 채도에 곱하는 값(1 = 그대로). 흰 심은 이 값과 무관하게 흰 채로 남는다.")]
+    [SerializeField, Min(0f)] private float shadowReturnDashSaturation = 1f;
+
     [Header("평타 베기 — EffectSocketPlayer(Player_Assassin/VFX/*, 엔트리·소켓은 각 컴포넌트에서)")]
     [Tooltip("일반 1~4타 적중 성공 — 서버 판정 → RPC 로 같은 타 일반 베기와 겹쳐 원샷. 인덱스 = 타 순서(0~3). 엔트리 = Assassin_LClick_Success.\n" +
              "(일반 베기 자체는 클립의 PlayEffect 이벤트가 낸다.)")]
@@ -211,10 +219,34 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
         if (line == null || burst == null)
             Edit.LogWarning("[AssassinSkillView] EffectCatalog.Assassin_Q_PierceLine/PierceBurst 가 비어 일반 Q 연출 일부를 건너뛴다.", this);
 
+        EffectTint tint = DashTint;
         if (line != null && length >= pierceMinLength)
-            effects.Play(line, pierceStart, rotation, new Vector3(pierceScale, pierceScale, length));
+        {
+            Vector3 lineScale = new Vector3(pierceScale, pierceScale, length);
+            if (tint.IsSet)
+                effects.SetTint(effects.PlayRecallable(line, pierceStart, rotation, lineScale), tint);
+            else
+                effects.Play(line, pierceStart, rotation, lineScale);
+        }
         if (burst != null)
-            effects.Play(burst, endPoint, rotation, pierceScale);
+        {
+            if (tint.IsSet)
+                effects.SetTint(effects.PlayRecallable(burst, endPoint, rotation, pierceScale), tint);
+            else
+                effects.Play(burst, endPoint, rotation, pierceScale);
+        }
+    }
+
+    /// <summary>Q 돌진 연출 색 — 그림자 회귀 보유면 <see cref="shadowReturnDashColor"/>, 아니면 원래 색.</summary>
+    private EffectTint DashTint
+    {
+        get
+        {
+            PlayerTraitModifiers traits = player != null ? PlayerTraitModifiers.For(player) : null;
+            return traits != null && traits.HasTrait(TraitModeIds.AssassinShadowReturn)
+                ? EffectTint.FromColor(shadowReturnDashColor, shadowReturnDashSaturation)
+                : EffectTint.None;
+        }
     }
 
     /// <summary>
@@ -267,6 +299,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
         }
 
         stormSlashLoop = effects.PlayLooping(entry, transform, stormSlashOffset, stormSlashScale);
+        effects.SetTint(stormSlashLoop, DashTint);   // 그림자 회귀 없으면 None = 원래 색
         stormSlashDeadline = Time.time + Mathf.Max(0f, maxDuration) + 1f;
     }
 

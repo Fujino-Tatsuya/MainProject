@@ -6505,7 +6505,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1006850121594653262}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720131, type: 3}
   m_Name: 
@@ -6515,8 +6515,9 @@ MonoBehaviour:
   autoNameHints:
   - head
   - hand
+  - foot
   autoPickLimit: 6
-  lineMaterial: {fileID: 2100000, guid: e0574a2cb61d4938af39c70e5d1b826f, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 83bcb02ba2efae840b7a035667592f16, type: 2}
   lineTime: 0.2
   startWidth: 0.05
   endWidth: 0
@@ -6569,8 +6570,8 @@ MonoBehaviour:
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: 3b8f06d25a1e49c7ae04f31b96d2057c, type: 2}
   speedLines: {fileID: 807663423485243698}
-  spawnInterval: 0.05
-  ghostLifetime: 0.3
+  spawnInterval: 0.01
+  ghostLifetime: 0.08
   fadeCurve:
     serializedVersion: 2
     m_Curve:
@@ -6604,7 +6605,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  maxGhosts: 40
+  maxGhosts: 100
   logDiagnostics: 0
   safetyTimeout: 2
 --- !u!114 &6415595436376966411
