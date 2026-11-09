@@ -240,6 +240,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             List<BossVictoryClip> clips = Timeline.Clips(track);
             for (int i = 0; i < clips.Count; i++) DrawClip(local, track, i, clips[i]);
         }
+        DrawCutBlends(local);
         GUI.EndClip();
     }
 
@@ -412,7 +413,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 끌기 = 이동 · 양 끝(좌우 화살표 커서 — 왼쪽 = 시작 이동·끝 고정, 오른쪽 = 길이) · 클립 위 마름모 = 키(중간 키 끌기 = 시각, 더블클릭 = 키 추가, 255 후속 6) ·
     // 우클릭 = 추가/복사/붙여넣기/삭제 · Del(키 선택 중이면 그 키) · Ctrl+C/V · 0.01초 스냅 · Undo.
 
-    enum DragMode { None, Move, ResizeLeft, ResizeRight, Key, Marker, Playhead, FinisherTrim }
+    enum DragMode { None, Move, ResizeLeft, ResizeRight, Key, Marker, Playhead, FinisherTrim, CutBlend }
 
     const float MinLength = 0.01f;
     const float HandleSize = 7f;
@@ -856,6 +857,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             if (!RowRect(lanes, TrackRow(track)).Contains(mouse)) continue;
+            if (track == BossVictoryTrack.CameraCut && PickCutBlend(lanes, mouse, out int blendCut))
+            {
+                Select((int)track, blendCut, -1);
+                _drag = DragMode.CutBlend;
+                return;
+            }
             if (PickKey(lanes, track, mouse, out int keyClip, out int key))
             {
                 Select((int)track, keyClip, -1);
@@ -928,6 +935,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             float x = TimeToX(lanes, Timeline.MarkerTime(marker));
             AddCursor(lanes, new Rect(x - MarkerSizeLobby - 4f, row.y, (MarkerSizeLobby + 4f) * 2f, row.height), MouseCursor.ResizeHorizontal);
         }
+        for (int i = 0; i < Timeline.cameraCut.Count; i++)
+            if (CutBlendRect(lanes, i, out Rect wedge))
+                AddCursor(lanes, new Rect(wedge.x - HandleSize, wedge.y, HandleSize * 2f, wedge.height), MouseCursor.ResizeHorizontal);
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             List<BossVictoryClip> clips = Timeline.Clips(track);
@@ -979,6 +989,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             return;
         }
         if (!HasClipSelection) return;
+        if (_drag == DragMode.CutBlend)
+        {
+            SetCutBlendSeconds(_selIndex, Timeline.cameraCut[_selIndex].start - Snap(mt));
+            Repaint();
+            return;
+        }
         if (_drag == DragMode.Key)
         {
             DragKey((BossVictoryTrack)_selTrack, _selIndex, _selKey, mt);
@@ -1058,6 +1074,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 Select((int)track, hit, -1);
                 menu.AddItem(new GUIContent("복사"), false, CopySelected);
                 menu.AddItem(new GUIContent("삭제"), false, DeleteSelected);
+                if (track == BossVictoryTrack.CameraCut)
+                {
+                    int cutIndex = hit;
+                    if (Timeline.CameraCutBlendSeconds(cutIndex) > 0f) menu.AddItem(new GUIContent("블렌드 제거"), false, () => SetCutBlend(cutIndex, 0f));
+                    else if (Timeline.CameraCutBlendLimit(cutIndex) > 0f) menu.AddItem(new GUIContent("블렌드 추가 (앞 컷에서 0.3초)"), false, () => SetCutBlend(cutIndex, DefaultCutBlend));
+                    else menu.AddDisabledItem(new GUIContent("블렌드 추가 (앞에 시간이 없음)"));
+                }
                 menu.AddSeparator("");
             }
             if (CanAdd(track)) menu.AddItem(new GUIContent($"클립 추가 ({t:0.00}초)"), false, () => AddClip(tr, t));
@@ -1334,6 +1357,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             Timeline.cameraCutShots[_selIndex] = shot;
             Save();
         }
+        DrawCutBlendInspector();
         DrawCutKeyInspector();
     }
 
@@ -1653,6 +1677,113 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Animator animator = character.GetComponentInChildren<Animator>(true);
         if (skill == null || skill.Data == null || animator == null || animator.runtimeAnimatorController == null) return null;
         return AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.Data.AnimatorStateName);
+    }
+
+    // ── 카메라 컷 블렌드(255 후속 8) — 들어오는 컷 시작에서 앞 클립 위로 겹치는 쐐기(Unity Timeline 크로스페이드 모양) ──
+    // 블렌드 구간 = [컷 시작 − 블렌드, 컷 시작). 쐐기 = 앞 클립 페이드아웃 대각선 위 삼각형 + 곡선(남은 앞 화면 비율) 얇은 선 + '블렌드 0.30s'. 왼쪽 끝 끌기 = 시간(0 = 사라짐).
+
+    const float DefaultCutBlend = 0.3f;
+    static readonly string[] BlendCurveLabels = { "선형", "ease in/out", "ease in", "ease out" };
+    static readonly Color BlendColor = new Color(0.55f, 0.95f, 0.75f);
+
+    bool CutBlendRect(Rect lanes, int index, out Rect r)
+    {
+        r = default;
+        float b = Timeline.CameraCutBlendSeconds(index);
+        if (b <= 0f) return false;
+        Rect row = RowRect(lanes, TrackRow(BossVictoryTrack.CameraCut));
+        float start = Timeline.cameraCut[index].start;
+        float x0 = TimeToX(lanes, start - b), x1 = TimeToX(lanes, start);
+        r = new Rect(x0, row.y + 2f, Mathf.Max(1f, x1 - x0), row.height - 4f);
+        return true;
+    }
+
+    void DrawCutBlends(Rect lanes)
+    {
+        for (int i = 0; i < Timeline.cameraCut.Count; i++)
+        {
+            if (!CutBlendRect(lanes, i, out Rect r)) continue;
+            bool selected = IsSelected(BossVictoryTrack.CameraCut, i);
+            Color c = selected ? Color.white : BlendColor;
+            Handles.color = new Color(c.r, c.g, c.b, 0.35f);
+            Handles.DrawAAConvexPolygon(new Vector3(r.x, r.y), new Vector3(r.xMax, r.y), new Vector3(r.xMax, r.yMax));   // 앞 클립 페이드아웃 대각선 위
+            Handles.color = new Color(c.r, c.g, c.b, 0.6f);
+            Handles.DrawAAPolyLine(1f, new Vector3(r.x, r.y), new Vector3(r.xMax, r.yMax));
+            BossVictoryKeyCurve curve = Timeline.CameraCutShot(i).blendCurve;
+            const int n = 16;
+            var pts = new Vector3[n + 1];
+            for (int k = 0; k <= n; k++)
+            {
+                float u = k / (float)n;
+                pts[k] = new Vector3(r.x + u * r.width, r.y + BossVictoryKeys.Ease(curve, u) * r.height, 0f);   // 앞 화면이 빠지는 정도
+            }
+            Handles.color = c;
+            Handles.DrawAAPolyLine(1.5f, pts);
+            EditorGUI.DrawRect(new Rect(r.x - 1f, r.y, 2f, r.height), c);   // 왼쪽 끝 = 끌어서 시간
+            string label = $"블렌드 {Timeline.CameraCutBlendSeconds(i):0.00}s";
+            float w = EditorStyles.miniLabel.CalcSize(new GUIContent(label)).x + 4f;
+            Rect lr = new Rect(r.xMax - w, r.y - 1f, w, 12f);
+            EditorGUI.DrawRect(lr, new Color(0f, 0f, 0f, 0.55f));
+            GUI.Label(lr, label, EditorStyles.miniLabel);
+        }
+    }
+
+    bool PickCutBlend(Rect lanes, Vector2 mouse, out int index)
+    {
+        index = -1;
+        float best = HandleSize;
+        for (int i = 0; i < Timeline.cameraCut.Count; i++)
+        {
+            if (!CutBlendRect(lanes, i, out Rect r) || mouse.y < r.y || mouse.y > r.yMax) continue;
+            float d = Mathf.Abs(mouse.x - r.x);
+            if (d > best) continue;
+            best = d;
+            index = i;
+        }
+        return index >= 0;
+    }
+
+    // 끌기 중(RecordDrag 가 기록) — 최대 = 앞 컷 길이(첫 컷이면 컷 시작). 0 이하 = 블렌드 없음.
+    void SetCutBlendSeconds(int index, float seconds)
+    {
+        Timeline.SyncCameraCutShots();
+        BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[index];
+        shot.blendSeconds = Mathf.Clamp(seconds, 0f, Timeline.CameraCutBlendLimit(index));
+        if (shot.blendSeconds < MinLength) shot.blendSeconds = 0f;
+        Timeline.cameraCutShots[index] = shot;
+    }
+
+    void SetCutBlend(int index, float seconds)
+    {
+        Record(seconds > 0f ? "처치 연출 타임라인 컷 블렌드 추가" : "처치 연출 타임라인 컷 블렌드 제거");
+        SetCutBlendSeconds(index, seconds);
+        Select((int)BossVictoryTrack.CameraCut, index, -1);
+        Save();
+        Repaint();
+    }
+
+    void DrawCutBlendInspector()
+    {
+        Timeline.SyncCameraCutShots();
+        BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[_selIndex];
+        float limit = Timeline.CameraCutBlendLimit(_selIndex);
+        int prev = Timeline.PreviousCameraCut(_selIndex);
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField($"앞 컷에서 블렌드 — {(prev >= 0 ? $"컷 #{prev + 1}" : "게임 카메라")} → 이 컷 첫 화면 (최대 {limit:0.00}초)", EditorStyles.miniBoldLabel);
+        EditorGUI.BeginChangeCheck();
+        float seconds = EditorGUILayout.Slider("시간(초, 0 = 툭 끊김)", Mathf.Min(shot.blendSeconds, limit), 0f, Mathf.Max(0.01f, limit));
+        int curve = EditorGUILayout.Popup("곡선", Mathf.Clamp((int)shot.blendCurve, 0, BlendCurveLabels.Length - 1), BlendCurveLabels);
+        if (EditorGUI.EndChangeCheck())
+        {
+            RecordField("처치 연출 타임라인 컷 블렌드");
+            SetCutBlendSeconds(_selIndex, seconds);
+            shot = Timeline.cameraCutShots[_selIndex];
+            shot.blendCurve = (BossVictoryKeyCurve)curve;
+            Timeline.cameraCutShots[_selIndex] = shot;
+            Save();
+        }
+        EditorGUILayout.LabelField("구간 = 이 컷 시작 전 그 시간 동안(쐐기). 앞 컷은 계속 진행하고, 그 화면에서 이 컷 첫 화면으로 월드 위치·회전·FOV 를 섞는다(기준점이 달라도 자연스럽게). " +
+                                   "블렌드 중 벽 숨김 = 이 컷 설정 · 첫 컷이면 컷 카메라를 켜는 순간의 게임 카메라 화면에서. 우클릭 '블렌드 추가/제거' · 쐐기 왼쪽 끝 끌기.", EditorStyles.wordWrappedMiniLabel);
     }
 
     // ── 처치 연출 스킬 클립(255 후속 7) — '스킬 연출 시작' 마커 줄을 클립으로: 시작 = 마커 값, 길이 = 캐릭터 클립 전체(공속 100%) 또는 끝 자르기 ──
