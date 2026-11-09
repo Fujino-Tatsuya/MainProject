@@ -41,4 +41,39 @@ public sealed class SuppressHasteVignetteModelTests
 
         Assert.That(next, Is.EqualTo(0f).Within(Tolerance));
     }
+
+    [Test]
+    public void BurstFactor_StartsAtMultiplierAndDecaysToOne()
+    {
+        Assert.That(SuppressHasteVignetteModel.BurstFactor(0f, 0.2f, 1.8f), Is.EqualTo(1.8f).Within(Tolerance));
+        Assert.That(SuppressHasteVignetteModel.BurstFactor(0.1f, 0.2f, 1.8f), Is.EqualTo(1.4f).Within(Tolerance));
+        Assert.That(SuppressHasteVignetteModel.BurstFactor(0.2f, 0.2f, 1.8f), Is.EqualTo(1f));
+        Assert.That(SuppressHasteVignetteModel.BurstFactor(float.MaxValue, 0.2f, 1.8f), Is.EqualTo(1f));
+    }
+
+    [Test]
+    public void BurstFactor_DisabledByZeroDurationOrMultiplierAtMostOne()
+    {
+        Assert.That(SuppressHasteVignetteModel.BurstFactor(0f, 0f, 1.8f), Is.EqualTo(1f));
+        Assert.That(SuppressHasteVignetteModel.BurstFactor(0f, 0.2f, 1f), Is.EqualTo(1f));
+        Assert.That(SuppressHasteVignetteModel.BurstFactor(0f, 0.2f, 0.5f), Is.EqualTo(1f));
+    }
+
+    [Test]
+    public void LineFrame_StepsByFpsAndZeroFpsIsFixed()
+    {
+        Assert.That(SuppressHasteVignetteModel.LineFrame(0.99f / 24f, 24f), Is.EqualTo(0));
+        Assert.That(SuppressHasteVignetteModel.LineFrame(1.01f / 24f, 24f), Is.EqualTo(1));
+        Assert.That(SuppressHasteVignetteModel.LineFrame(1f, 24f), Is.EqualTo(24));
+        Assert.That(SuppressHasteVignetteModel.LineFrame(5f, 0f), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void IsTurnOn_OnlyOnRisingEdge()
+    {
+        Assert.That(SuppressHasteVignetteModel.IsTurnOn(false, true), Is.True);
+        Assert.That(SuppressHasteVignetteModel.IsTurnOn(true, true), Is.False);
+        Assert.That(SuppressHasteVignetteModel.IsTurnOn(true, false), Is.False);
+        Assert.That(SuppressHasteVignetteModel.IsTurnOn(false, false), Is.False);
+    }
 }

@@ -11677,10 +11677,6 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5959139205858432143, guid: 1c339ffde89a315438f8c11eda81ff81, type: 3}
-      propertyPath: maxAlpha
-      value: 0.981
-      objectReference: {fileID: 0}
-    - target: {fileID: 5959139205858432143, guid: 1c339ffde89a315438f8c11eda81ff81, type: 3}
       propertyPath: visibleAlphaThreshold
       value: 0
       objectReference: {fileID: 0}

@@ -14,7 +14,7 @@
 | 상태이상 | `CooldownRateModifier`(대표) · `MoveSpeedFinalMultiplier` · `AttackSpeedFinalMultiplier` — 출처 = 보스 `NetworkObjectId`, 스택 1 | player-stats.md §3 |
 | HUD 아이콘 | 대표(`CooldownRateModifier`) 1개만, 나머지 둘 숨김(`SuppressHasteRules.IsHudHidden`) | — |
 | 데이터 | xlsx `SuppressHaste` 시트 → `Assets/Resources/Player/SuppressHasteData.asset` | [data-table.md](data-table.md) 시트 표 |
-| 연출 | 비네팅(§2) · 피해 숫자 합산 · N타 줌인(기본 4타) · 보스 체력바 흰 칸 멈춤(§2.A, 할 일 174) | — |
+| 연출 | 스피드 라인 비네팅(§2) · 피해 숫자 합산 · N타 줌인(기본 4타) · 보스 체력바 흰 칸 멈춤(§2.A, 할 일 174) | — |
 | 다른 출처 | `SuppressHaste.GrantServer(sourceId, suppressDuration)` — 보스 종류 무관 서버 API | handoff §2 |
 
 - 쿨 속도 배율은 쿨 시계(§1.1)가 소비한다 — 스킬(우클릭·Q·E·궁극기)·대시 충전·가붕이 패시브 내부 쿨.
@@ -36,34 +36,33 @@
 - **결정(2026-10-22 메인)**: 가붕이 패시브 내부 쿨은 스킬 쿨과 같은 스킬 시계를 써 **슬로우 모션을 반영**한다(이전 = 복제된 절대 서버시각 `readyServerTime` 기준이라 슬로우와 무관했다).
 - 테스트: EditMode `CooldownClockTests`·`DashCooldownClockSyncTests`·`PassiveCooldownSyncTests`·`CooldownRateWiringTests`(배율 2 스킬·대시·패시브 절반, 중간 해제 2→1, 곱 계산).
 
-## 2. 화면 연출 — 비네팅 (PLAN T7)
+## 2. 화면 연출 — 스피드 라인 비네팅 (PLAN T7 → 249 · 252)
+> 2026-11-09 할 일 252: 옛 **흰 가장자리 채움(Image·임시 스프라이트 `SuppressHasteVignette_Temp.png`)은 삭제**하고 249 **스피드 라인(집중선)만** 남겼다. 이름(`SuppressHasteVignette*`)은 guid·참조 안정 때문에 그대로.
+
 | 무엇 | 위치 |
 |---|---|
-| 코드 | `Assets/1.Scripts/UI/Combat/SuppressHasteVignetteHUD.cs` |
-| 프리팹 | `Assets/2.Prefabs/UI/SuppressHasteVignette.prefab` — 풀스크린 `Image`(raycastTarget 끔) |
-| 임시 스프라이트 | `Assets/2.Prefabs/UI/Textures/SuppressHasteVignette_Temp.png` — 흰색, 가장자리 불투명·중앙 투명(에셋 1장, 런타임 생성 없음) |
-| 배치 | `CombatHUD.prefab` › `Layer_Persistent` 아래 인스턴스 1개(다른 요소는 그대로. 옛 `ShieldVignette` 형제는 실드 비네팅 삭제로 없어짐) |
+| 코드 | `Assets/1.Scripts/UI/Combat/SuppressHasteVignetteHUD.cs` · 순수 계산 `SuppressHasteVignetteModel.cs`(StepAlpha·BurstFactor·LineFrame·IsTurnOn) |
+| 셰이더·재질 | `Assets/1.Scripts/UI/Combat/Shaders/UISpeedLines.shader`(`UI/SpeedLines`) · `Assets/3.Materials/UI/MA_SpeedLines.mat` — 텍스처 없이 절차 생성 |
+| 프리팹 | `Assets/2.Prefabs/UI/SuppressHasteVignette.prefab` — 풀스크린 RectTransform + HUD 컴포넌트만. 선은 Play 때 만드는 자식 RawImage `SpeedLines`(raycastTarget·maskable 끔) |
+| 배치 | `CombatHUD.prefab` › `Layer_Persistent` 아래 인스턴스 1개(오버라이드 `visibleAlphaThreshold` 0 만 남음) |
 
 - **표시 조건**: 로컬 플레이어(`Player.LocalPlayerChanged` 로 직접 받음 — `CombatHUD.cs` 무변경)에게 `CooldownRateModifier` 가 있으면 페이드 인, 없어지면 페이드 아웃.
-  `StatusEffectController.EffectsChanged` 때만 다시 읽는다(매 프레임 탐색 없음). 바인딩 순간 한 번 직접 읽는다(첫 동기화엔 이벤트가 안 난다).
-- 쓰러지면 서버가 버프를 빼므로 비네팅도 같이 사라진다 — 생명 상태를 따로 보지 않는다.
+  `StatusEffectController.EffectsChanged` 때만 다시 읽는다(매 프레임 탐색 없음). 바인딩 순간 한 번 직접 읽는다(첫 동기화엔 이벤트가 안 난다 — 이때는 버스트 없이 유지 상태).
+- **켜짐 버스트**: 꺼짐 → 켜짐 순간 버스트 시간 동안 선 밀도·알파 × 버스트 배율에서 1 로 내려온다.
+- 쓰러지면 서버가 버프를 빼므로 선도 같이 사라진다 — 생명 상태를 따로 보지 않는다.
 - 다른 플레이어의 버프는 안 보인다(로컬 플레이어 것만).
-- 페이드는 게임 시간(`Time.deltaTime`) — 인터럽트 슬로우 동안 느려진다. 계산은 `SuppressHasteVignetteModel.StepAlpha`(옛 실드 비네팅 모델에서 옮김).
+- 페이드·버스트·선 갱신은 게임 시간(`Time.deltaTime`) — 인터럽트 슬로우 동안 느려진다.
 
 ### 2.1 인스펙터 필드 (프리팹)
 | 필드 | 기본 | 뜻 |
 |---|---|---|
-| `vignetteSprite` | 임시 흰색 PNG | **이미지 교체 = 이것만 바꾼다** |
-| `vignetteColor` | 흰색 | 스프라이트에 곱하는 색. 컬러 이미지로 바꾸면 흰색 그대로 둔다 |
-| `maxAlpha` | 0.6 | 버프 중 최대 알파 |
-| `data` | `SuppressHasteData.asset` | 페이드 인/아웃 시간(`vignetteFadeIn` 0.2 / `vignetteFadeOut` 0.3)을 읽는 시트 에셋. 비우면 Resources 에서 찾는다 |
+| 스피드 라인(249) | `MA_SpeedLines` | `speedLineMaterial`(비면 아무것도 안 그림)·`lineColor` 흰색·`lineAlpha` 0.55·`lineCount` 90·`lineDensity` 0.5·`lineThickness` 0.35·`lineInnerMin/Max` 0.75/1.05·`lineFps` 24·`centerClearRadius` 0.6 |
+| 켜짐 버스트(249) | 0.2초 × 1.8 | `burstDuration`·`burstMultiplier`. 시트 대상 아님(HUD 인스펙터) |
+| `data` | `SuppressHasteData.asset` | **스피드 라인 페이드** 인/아웃 시간(`vignetteFadeIn` 0.2 / `vignetteFadeOut` 0.3)을 읽는 시트 에셋. 비우면 Resources 에서 찾는다 |
+| `visibleAlphaThreshold` | 0.001 | 선 알파가 이 값 이하이면 RawImage 를 꺼서 전체 화면 투명 드로우를 생략(CombatHUD 인스턴스는 0) |
+| 에디터 미리보기 | 꺼짐 | Play 없이 Prefab Mode 에서 강도·버스트 시점·선 배치 번호로 보기(저장 안 되는 자식, Play·빌드 무시) |
 
-- 페이드 시간은 프리팹이 아니라 **시트**(xlsx `SuppressHaste`)에서 고친다 — 빌드는 항상 xlsx 값([data-table.md](data-table.md)).
-
-### 2.2 이미지로 바꾸는 법
-1. 가장자리만 불투명한 스프라이트(Texture Type = Sprite, Clamp 권장)를 `Assets/2.Prefabs/UI/Textures/` 또는 아트 경로에 둔다.
-2. `SuppressHasteVignette.prefab` 의 `vignetteSprite` 에 넣는다. 컬러 이미지면 `vignetteColor` 를 흰색으로 둔다.
-3. 임시 PNG 는 참조가 없어진 뒤 지워도 된다.
+- 페이드 시간은 프리팹이 아니라 **시트**(xlsx `SuppressHaste` 의 `vignetteFadeIn`/`vignetteFadeOut`)에서 고친다 — 빌드는 항상 xlsx 값([data-table.md](data-table.md)).
 
 ## 2.A 연출 3가지 (할 일 174, 2026-11-02)
 
