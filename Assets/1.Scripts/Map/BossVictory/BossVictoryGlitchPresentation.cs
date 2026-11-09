@@ -142,6 +142,16 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // 4단계 — 카메라 컷
     int _cutIndex = -1;
     BossVictoryCameraCuts.Subjects _cutSubjects;   // 지금 컷이 시작될 때 본 처치자·보스 위치(컷 동안 고정)
+    // 컷 블렌드(255 후속 8) — 들어오는 컷 기준 위치는 블렌드 시작 순간 잡아 그 컷 동안 그대로 쓴다(블렌드 끝 = 컷 시작에서 안 튐).
+    int _blendIndex = -1;
+    BossVictoryCameraCuts.Subjects _blendSubjects;
+    int _lastBlendIndex = -1;   // 지난 프레임 블렌드 컷 — 블렌드가 끝나 그 컷이 시작되면 블렌드 때 잡은 기준 위치를 이어 쓴다
+    BossVictoryCameraCuts.Subjects _lastBlendSubjects;
+    int _shownCut = -1;   // 초점·벽 숨김 기준 컷(블렌드 중 = 들어오는 컷)
+    bool _gameCamValid;   // 첫 컷 블렌드 출발 = 컷 카메라를 켜기 직전 게임 카메라 화면(되감아도 같은 값)
+    Vector3 _gameCamPos;
+    Quaternion _gameCamRot;
+    float _gameCamFov;
     bool _cutSuppressed;
     CinemachineExternalImpulseListener _impulseListener;
     bool _impulseWasEnabled;
@@ -811,43 +821,96 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // 화면은 매 프레임 시각 t 의 진행으로 시작 → 끝 화면 사이를 곡선대로 보간한다(255 후속 2 — 끝 화면 없으면 고정, 되감아도 t 그대로).
     // 컷마다 벽 숨김 켜기/끄기(255): 켠 컷 = 지금 카메라 위치에서 가리는 벽을 더 끈다(이동 중이면 매 프레임, 이어지는 켠 컷끼리 누적) · 끈 컷 = 숨겼던 벽을 모두 다시 켠다.
     // 되감기(스크럽)로 앞 컷으로 가면 벽을 모두 켠 뒤 그 컷 기준으로 다시 끈다 · 첫 컷 전으로 가면 게임 카메라로 돌아간다.
+    // 컷 블렌드(255 후속 8): 들어오는 컷 시작 전 [시작 − 블렌드, 시작) 동안 지금 컷 화면(계속 진행 중 — 첫 컷이면 게임 카메라 그 순간 화면)
+    // → 들어오는 컷 첫 화면으로 월드 기준 섞음. 시각 t 의 순수 결과(되감기 정확). 블렌드 중 벽 숨김 = 들어오는 컷 설정, 컷 진입 처리 = 블렌드 시작 순간.
     void TickCuts()
     {
         BossVictoryTimeline tl = _settings.timeline;
         int index = tl.ActiveCameraCut(_glitchTime);
-        if (index < 0)
+        int incoming = tl.BlendingCameraCut(_glitchTime, out float blend);
+        if (index < 0 && incoming < 0)
         {
-            if (_cutIndex < 0) return;
+            _blendIndex = -1;
+            _gameCamValid = false;   // 게임 카메라로 돌아감 — 다음 첫 컷 블렌드는 그때 화면에서
+            if (_cutIndex < 0 && (_overlay == null || !_overlay.IsCameraActive)) return;
             RestoreCuts();
             _overlay?.ExitCamera(0f);
             _overlay?.SetDimFocus(null);
             _cutJumped = true;
             return;
         }
-        BossVictoryCameraCuts.Cut cut = tl.CameraCutShot(index);
-        bool changed = index != _cutIndex;
-        bool rewound = changed && _cutIndex >= 0 && tl.cameraCut[index].start < tl.cameraCut[_cutIndex].start;
-        if (changed)
+        if (incoming >= 0 && incoming != _blendIndex)
         {
-            _cutIndex = index;
-            _cutJumped = true;
-            _cutSubjects = CutSubjects();
+            _blendIndex = incoming;
+            _blendSubjects = CutSubjects();
         }
-        BossVictoryCameraCuts.Pose(cut, _cutSubjects, tl.CameraCutProgress(index, _glitchTime), out Vector3 pos, out Quaternion rot, out float fov);
+        else if (incoming < 0) _blendIndex = -1;
 
         _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
+        if (index < 0 && !_gameCamValid)
+        {
+            Camera main = Camera.main;
+            _gameCamValid = main != null;
+            if (main != null)
+            {
+                _gameCamPos = main.transform.position;
+                _gameCamRot = main.transform.rotation;
+                _gameCamFov = main.fieldOfView;
+            }
+        }
+
+        bool changed = index != _cutIndex;
+        bool rewound = changed && _cutIndex >= 0 && (index < 0 || tl.cameraCut[index].start < tl.cameraCut[_cutIndex].start);
+        if (changed)
+        {
+            bool fromBlend = index >= 0 && _blendIndex < 0 && _lastBlendIndex == index;
+            _cutIndex = index;
+            _cutJumped = !fromBlend;   // 블렌드 끝에서 이어지면 텔레포트가 아니다
+            if (index >= 0) _cutSubjects = fromBlend ? _lastBlendSubjects : CutSubjects();
+        }
+        _lastBlendIndex = _blendIndex;
+        _lastBlendSubjects = _blendSubjects;
+
+        Vector3 pos;
+        Quaternion rot;
+        float fov;
+        if (index >= 0)
+            BossVictoryCameraCuts.Pose(tl.CameraCutShot(index), _cutSubjects, tl.CameraCutProgress(index, _glitchTime), out pos, out rot, out fov);
+        else
+        {
+            pos = _gameCamPos;
+            rot = _gameCamValid ? _gameCamRot : Quaternion.identity;
+            fov = _gameCamValid ? _gameCamFov : 40f;
+        }
+        if (incoming >= 0)
+        {
+            BossVictoryCameraCuts.Pose(tl.CameraCutShot(incoming), _blendSubjects, 0f, out Vector3 toPos, out Quaternion toRot, out float toFov);
+            BossVictoryCameraCuts.Blend(pos, rot, fov, toPos, toRot, toFov, blend, out pos, out rot, out fov);
+        }
+        // 벽 숨김·초점 = 들어오는 컷(블렌드 중) 또는 지금 컷
+        int shown = incoming >= 0 ? incoming : index;
+        BossVictoryCameraCuts.Cut cut = tl.CameraCutShot(shown);
+        BossVictoryCameraCuts.Subjects shownSubjects = incoming >= 0 ? _blendSubjects : _cutSubjects;
+
         if (!_overlay.IsCameraActive)
         {
             if (!_overlay.EnterCamera(pos, rot, fov, 0f))
                 Edit.LogWarning("[BossVictory] CameraTargetSwitcher 가 없어 컷 카메라를 못 켰다.", this);
-            SuppressForCuts(_cutSubjects);
+            SuppressForCuts(shownSubjects);   // 컷 진입 처리 = 블렌드 시작 순간(첫 컷 블렌드면 그때)
         }
-        else _overlay.PlaceCamera(pos, rot, fov);   // 매 프레임 — 이동 컷·창에서 고친 값이 바로 반영
-        if (changed) _overlay.SetDimFocus(BossVictoryCameraCuts.AnchorPoint(cut.anchor, _cutSubjects));
+        else _overlay.PlaceCamera(pos, rot, fov);   // 매 프레임 — 이동 컷·블렌드·창에서 고친 값이 바로 반영
+        bool shownChanged = shown != _shownCut;
+        _shownCut = shown;
+        if (shownChanged) _overlay.SetDimFocus(BossVictoryCameraCuts.AnchorPoint(cut.anchor, shownSubjects));
         if (!cut.hideWalls || rewound) ShowWalls();
         if (cut.hideWalls) HideWalls(pos, rot * Vector3.forward);
-        if (changed)
-            Edit.Log($"[BossVictory] 컷 {index} 기준 {cut.anchor}{(cut.Moves ? $" · 이동 키 {(cut.HasKeys ? cut.keys.Count : 2)}개{(cut.smoothPath ? " 곡선" : "")}" : " · 고정")}{(cut.hideWalls ? "" : " · 벽 숨김 끔")} — t {_glitchTime:0.00}", this);
+        if (shownChanged && incoming >= 0)
+            Edit.Log($"[BossVictory] 컷 {incoming} 블렌드 시작 {tl.CameraCutBlendSeconds(incoming):0.##}초 {tl.CameraCutShot(incoming).blendCurve} — {(index >= 0 ? $"컷 {index}" : "게임 카메라")}에서 (t {_glitchTime:0.00})", this);
+        if (changed && index >= 0)
+        {
+            BossVictoryCameraCuts.Cut ac = tl.CameraCutShot(index);
+            Edit.Log($"[BossVictory] 컷 {index} 기준 {ac.anchor}{(ac.Moves ? $" · 이동 키 {(ac.HasKeys ? ac.keys.Count : 2)}개{(ac.smoothPath ? " 곡선" : "")}" : " · 고정")}{(ac.hideWalls ? "" : " · 벽 숨김 끔")} — t {_glitchTime:0.00}", this);
+        }
     }
 
     /// <summary>[이 피어] 컷 화면 저장 기준 위치 — 컷이 켜져 있으면 그 컷이 잡은 위치, 아니면 지금 위치. 연출 중이 아니면 false(타임라인 창 'Scene 뷰로' 버튼).</summary>
@@ -952,6 +1015,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void RestoreCuts()
     {
         _cutIndex = -1;
+        _shownCut = -1;
+        _blendIndex = _lastBlendIndex = -1;
+        _gameCamValid = false;
         ShowWalls();
         _walls.Clear();
         for (int i = 0; i < _hiddenWorldCanvases.Count; i++)

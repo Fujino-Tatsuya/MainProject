@@ -60,6 +60,10 @@ public static class BossVictoryCameraCuts
         public bool smoothPath;
         [Tooltip("이 컷 동안 카메라를 가리는 벽(앞면이 카메라를 향하지 않는 벽)을 끈다(이동 중이면 매 프레임 그 위치로). 끄면 이 컷 동안 벽 숨김 없음 — 숨겼던 벽도 다시 보인다.")]
         public bool hideWalls;
+        [Tooltip("앞 컷에서 블렌드(초) — 이 컷 시작 전 이 시간 동안 앞 컷 화면(첫 컷이면 게임 카메라) → 이 컷 첫 화면으로 월드 위치·회전·FOV 를 섞는다. 0 = 툭 끊김. 앞 컷 길이(첫 컷이면 컷 시작 시각) 이하로 쓴다(255 후속 8).")]
+        [Min(0f)] public float blendSeconds;
+        [Tooltip("블렌드 곡선(선형·ease in/out·ease in·ease out).")]
+        public BossVictoryKeyCurve blendCurve;
 
         // 옛 2점 형식(255 후속 2) — 읽기만 해서 키로 옮긴다(MigrateToKeys). 키가 있으면 쓰지 않는다.
         [HideInInspector] public Vector3 startPosition;
@@ -108,7 +112,7 @@ public static class BossVictoryCameraCuts
                 Orbit(16f, 22f, 50f, 1.5f, out Vector3 p, out Quaternion r);
                 return new Cut
                 {
-                    anchor = Anchor.Middle, keys = new List<CutKey> { CutKey.Make(0f, p, r, 40f) }, hideWalls = true,
+                    anchor = Anchor.Middle, keys = new List<CutKey> { CutKey.Make(0f, p, r, 40f) }, hideWalls = true, blendCurve = BossVictoryKeyCurve.EaseInOut,
                 };
             }
         }
@@ -222,6 +226,16 @@ public static class BossVictoryCameraCuts
         }
         rotation = Quaternion.Slerp(Normalize(a.rotation), Normalize(b.rotation), k);
         fov = Mathf.LerpUnclamped(a.fov, b.fov, k);
+    }
+
+    /// <summary>컷 블렌드(255 후속 8) — 월드 기준 위치 Lerp·회전 Slerp·FOV Lerp. <paramref name="weight"/> 0 = 앞 화면, 1 = 들어오는 컷 화면.</summary>
+    public static void Blend(Vector3 fromPosition, Quaternion fromRotation, float fromFov, Vector3 toPosition, Quaternion toRotation, float toFov, float weight,
+                             out Vector3 position, out Quaternion rotation, out float fov)
+    {
+        weight = Mathf.Clamp01(weight);
+        position = Vector3.LerpUnclamped(fromPosition, toPosition, weight);
+        rotation = Quaternion.Slerp(Normalize(fromRotation), Normalize(toRotation), weight);
+        fov = Mathf.LerpUnclamped(fromFov, toFov, weight);
     }
 
     /// <summary>옛 매개변수 구도(초점 높이에서 거리·내려다보는 각·방위로 돌아본 카메라)를 기준 좌표계 자세로 — 새 컷 기본값용.</summary>

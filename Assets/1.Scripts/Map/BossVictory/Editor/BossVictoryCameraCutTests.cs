@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 4단계 카메라 컷(PLAN-boss-victory-glitch) — 컷 고르기·기본 목록 · 타임라인 '카메라 컷' 트랙(255: 트랙 구조·컷 값 짝·길이 자동·옛 cuts 이관) ·
-/// 시작→끝 화면(255 후속 2: 기준 좌표계 왕복·축 방향·보간·곡선·끝 없으면 고정·시각 t 진행).
+/// 시작→끝 화면(255 후속 2: 기준 좌표계 왕복·축 방향·보간·곡선·끝 없으면 고정·시각 t 진행) · 컷 블렌드(255 후속 8: 구간·곡선·앞 컷 길이 제한·첫 컷 게임 카메라·0 = 기존).
 /// 실행 = <c>Tools/Tests/전투 EditMode 테스트 실행</c>(필터 ^BossVictoryCameraCut).
 /// </summary>
 public sealed class BossVictoryCameraCutTests
@@ -259,5 +259,83 @@ public sealed class BossVictoryCameraCutTests
         var settings = UnityEditor.AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(AssetPath);
         Assert.IsNotNull(settings);
         Assert.AreEqual(settings.timeline.cameraCut.Count, settings.timeline.cameraCutShots.Count, "컷 값 개수 = 컷 클립 개수");
+    }
+
+    // ── 컷 블렌드(255 후속 8) ──
+
+    static BossVictoryTimeline BlendTimeline(float blend0, float blend1, BossVictoryKeyCurve curve = BossVictoryKeyCurve.Linear)
+    {
+        var tl = new BossVictoryTimeline { lobbyTransitionTime = 5f };
+        tl.cameraCut.AddRange(Starts(1f, 2f));
+        BossVictoryCameraCuts.Cut a = BossVictoryCameraCuts.Cut.Default, b = BossVictoryCameraCuts.Cut.Default;
+        a.blendSeconds = blend0; a.blendCurve = curve;
+        b.blendSeconds = blend1; b.blendCurve = curve;
+        tl.cameraCutShots.Add(a);
+        tl.cameraCutShots.Add(b);
+        return tl;
+    }
+
+    [Test]
+    public void 블렌드_0_이면_기존과_같다()
+    {
+        BossVictoryTimeline tl = BlendTimeline(0f, 0f);
+        for (float t = 0f; t < 5f; t += 0.05f)
+        {
+            Assert.AreEqual(-1, tl.BlendingCameraCut(t, out float w), $"t {t}");
+            Assert.AreEqual(1f, w);
+        }
+        Assert.AreEqual(0f, BossVictoryCameraCuts.Cut.Default.blendSeconds, "새 컷 기본 = 툭 끊김");
+    }
+
+    [Test]
+    public void 블렌드_구간과_곡선()
+    {
+        BossVictoryTimeline tl = BlendTimeline(0f, 0.4f);
+        Assert.AreEqual(-1, tl.BlendingCameraCut(1.59f, out _), "구간 전");
+        Assert.AreEqual(1, tl.BlendingCameraCut(1.6f, out float w0));
+        Assert.AreEqual(0f, w0, 1e-5f, "시작 = 앞 화면");
+        Assert.AreEqual(1, tl.BlendingCameraCut(1.8f, out float wMid));
+        Assert.AreEqual(0.5f, wMid, 1e-4f);
+        Assert.AreEqual(0, tl.ActiveCameraCut(1.8f), "블렌드 중 지금 컷 = 앞 컷(계속 진행)");
+        Assert.AreEqual(-1, tl.BlendingCameraCut(2f, out _), "컷 시작 = 블렌드 끝");
+        Assert.AreEqual(1, tl.ActiveCameraCut(2f));
+
+        BossVictoryTimeline easeIn = BlendTimeline(0f, 0.4f, BossVictoryKeyCurve.EaseIn);
+        easeIn.BlendingCameraCut(1.8f, out float wIn);
+        Assert.AreEqual(0.25f, wIn, 1e-4f);
+    }
+
+    [Test]
+    public void 블렌드_시간은_앞_컷_길이_이하_첫_컷은_시작까지()
+    {
+        BossVictoryTimeline tl = BlendTimeline(3f, 5f);
+        Assert.AreEqual(-1, tl.PreviousCameraCut(0));
+        Assert.AreEqual(0, tl.PreviousCameraCut(1));
+        Assert.AreEqual(1f, tl.CameraCutBlendLimit(0), 1e-5f, "첫 컷 = 컷 시작(1초)까지");
+        Assert.AreEqual(1f, tl.CameraCutBlendLimit(1), 1e-5f, "앞 컷 길이 1초");
+        Assert.AreEqual(1f, tl.CameraCutBlendSeconds(0), 1e-5f);
+        Assert.AreEqual(1f, tl.CameraCutBlendSeconds(1), 1e-5f);
+        Assert.AreEqual(0, tl.BlendingCameraCut(0f, out _), "첫 컷 블렌드는 처치 순간부터");
+        Assert.AreEqual(-1, tl.ActiveCameraCut(0.5f), "첫 컷 블렌드 중 지금 컷 없음 = 게임 카메라에서 출발");
+        Assert.AreEqual(0, tl.BlendingCameraCut(0.5f, out _));
+    }
+
+    [Test]
+    public void 블렌드_보간은_월드_기준()
+    {
+        Vector3 pa = new Vector3(0f, 2f, -5f), pb = new Vector3(4f, 6f, 3f);
+        Quaternion ra = Quaternion.Euler(10f, 0f, 0f), rb = Quaternion.Euler(30f, 90f, 0f);
+        BossVictoryCameraCuts.Blend(pa, ra, 30f, pb, rb, 50f, 0f, out Vector3 p0, out Quaternion r0, out float f0);
+        Assert.Less(Vector3.Distance(p0, pa), 1e-4f);
+        Assert.Less(Quaternion.Angle(r0, ra), 0.01f);
+        Assert.AreEqual(30f, f0, 1e-4f);
+        BossVictoryCameraCuts.Blend(pa, ra, 30f, pb, rb, 50f, 1f, out Vector3 p1, out Quaternion r1, out float f1);
+        Assert.Less(Vector3.Distance(p1, pb), 1e-4f);
+        Assert.Less(Quaternion.Angle(r1, rb), 0.01f);
+        Assert.AreEqual(50f, f1, 1e-4f);
+        BossVictoryCameraCuts.Blend(pa, ra, 30f, pb, rb, 50f, 0.5f, out Vector3 pm, out Quaternion rm, out float fm);
+        Assert.Less(Vector3.Distance(pm, (pa + pb) * 0.5f), 1e-4f);
+        Assert.AreEqual(Quaternion.Angle(ra, rm), Quaternion.Angle(rm, rb), 0.05f, "회전 = slerp 가운데");
+        Assert.AreEqual(40f, fm, 1e-4f);
     }
 }

@@ -258,6 +258,49 @@ public sealed class BossVictoryTimeline
     /// <summary>시각 t 에 켜진 카메라 컷 번호(없으면 -1) — 클립 시작이 t 이하인 것 중 가장 늦은 것.</summary>
     public int ActiveCameraCut(float t) => BossVictoryCameraCuts.ActiveIndex(cameraCut, t);
 
+    /// <summary>컷 <paramref name="index"/> 바로 앞 컷(시작 순 — 같은 시작이면 번호 순, <see cref="CameraCutEnd"/> 와 같은 순서). 첫 컷이면 -1.</summary>
+    public int PreviousCameraCut(int index)
+    {
+        float start = cameraCut[index].start;
+        int best = -1;
+        for (int j = 0; j < cameraCut.Count; j++)
+        {
+            float s = cameraCut[j].start;
+            if (j == index || s > start || (s == start && j > index)) continue;
+            if (best < 0 || s > cameraCut[best].start || (s == cameraCut[best].start && j > best)) best = j;
+        }
+        return best;
+    }
+
+    /// <summary>컷 블렌드 최대(초) = 앞 컷 길이(앞 컷 시작 ~ 이 컷 시작) · 첫 컷이면 컷 시작 시각(처치 순간 전으로 못 감, 255 후속 8).</summary>
+    public float CameraCutBlendLimit(int index)
+    {
+        int prev = PreviousCameraCut(index);
+        return Mathf.Max(0f, cameraCut[index].start - (prev >= 0 ? cameraCut[prev].start : 0f));
+    }
+
+    /// <summary>컷 블렌드 시간(초) — 칸 값을 최대로 자른 것. 0 = 툭 끊김.</summary>
+    public float CameraCutBlendSeconds(int index) => Mathf.Clamp(CameraCutShot(index).blendSeconds, 0f, CameraCutBlendLimit(index));
+
+    /// <summary>
+    /// 시각 <paramref name="t"/> 에 블렌드 중인 컷(들어오는 컷) — 블렌드 구간 = [컷 시작 − 블렌드, 컷 시작). 그 동안 화면은 지금 컷(<see cref="ActiveCameraCut"/>,
+    /// 첫 컷이면 게임 카메라)에서 들어오는 컷 첫 화면으로 섞인다. <paramref name="weight"/> = 곡선 뒤 섞는 정도(0 → 1). 없으면 -1·weight 1.
+    /// </summary>
+    public int BlendingCameraCut(float t, out float weight)
+    {
+        weight = 1f;
+        for (int i = 0; i < cameraCut.Count; i++)
+        {
+            float b = CameraCutBlendSeconds(i);
+            if (b <= 0f) continue;
+            float start = cameraCut[i].start;
+            if (t < start - b || t >= start) continue;
+            weight = BossVictoryKeys.Ease(CameraCutShot(i).blendCurve, (t - (start - b)) / b);
+            return i;
+        }
+        return -1;
+    }
+
     /// <summary>컷 <paramref name="index"/> 의 값(값 목록이 모자라면 기본값).</summary>
     public BossVictoryCameraCuts.Cut CameraCutShot(int index) =>
         index >= 0 && index < cameraCutShots.Count ? cameraCutShots[index] : BossVictoryCameraCuts.Cut.Default;
