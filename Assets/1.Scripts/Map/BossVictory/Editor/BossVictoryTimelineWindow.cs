@@ -46,6 +46,48 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (_settings == null) _settings = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(DefaultAssetPath);
         Undo.undoRedoPerformed += OnUndoRedo;
         wantsMouseMove = false;
+        _inspectorHeight = EditorPrefs.GetFloat(InspectorHeightPref, DefaultInspectorHeight);
+    }
+
+    // ── 타임라인 / 노드 인스펙터 분할 바(255 후속 9) — 위아래로 끌어 인스펙터 높이(최소·최대 제한, EditorPrefs 기억). 넘치는 쪽은 세로 스크롤. ──
+    const string InspectorHeightPref = "BossVictoryTimelineWindow.InspectorHeight";
+    const float DefaultInspectorHeight = 260f;
+    const float MinInspectorHeight = 80f;
+    const float MinTimelineHeight = 120f;
+    const float SplitterHeight = 6f;
+    float _inspectorHeight = DefaultInspectorHeight;
+    bool _splitDragging;
+    Vector2 _timelineScroll;
+    Vector2 _inspectorScroll;
+
+    float MaxInspectorHeight => Mathf.Max(MinInspectorHeight, position.height - EditorStyles.toolbar.fixedHeight - SplitterHeight - MinTimelineHeight);
+
+    void DrawSplitter()
+    {
+        Rect bar = GUILayoutUtility.GetRect(position.width, SplitterHeight, GUILayout.ExpandWidth(true));
+        int id = GUIUtility.GetControlID(FocusType.Passive);
+        Event e = Event.current;
+        EditorGUI.DrawRect(new Rect(bar.x, bar.y + SplitterHeight * 0.5f - 1f, bar.width, 2f), _splitDragging ? Color.white : new Color(0.08f, 0.08f, 0.08f));
+        EditorGUIUtility.AddCursorRect(bar, MouseCursor.ResizeVertical);
+        switch (e.type)
+        {
+            case EventType.MouseDown when e.button == 0 && bar.Contains(e.mousePosition):
+                _splitDragging = true;
+                GUIUtility.hotControl = id;
+                e.Use();
+                break;
+            case EventType.MouseDrag when _splitDragging && GUIUtility.hotControl == id:
+                _inspectorHeight = Mathf.Clamp(position.height - e.mousePosition.y - SplitterHeight * 0.5f, MinInspectorHeight, MaxInspectorHeight);
+                e.Use();
+                Repaint();
+                break;
+            case EventType.MouseUp when _splitDragging:
+                _splitDragging = false;
+                if (GUIUtility.hotControl == id) GUIUtility.hotControl = 0;
+                EditorPrefs.SetFloat(InspectorHeightPref, _inspectorHeight);
+                e.Use();
+                break;
+        }
     }
 
     void OnDisable()
@@ -72,7 +114,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
 
         int rows = BossVictoryTimeline.Tracks.Length + BossVictoryTimeline.Markers.Length;
-        Rect area = GUILayoutUtility.GetRect(position.width, RulerHeight + rows * RowHeight + 16f);
+        float contentHeight = RulerHeight + rows * RowHeight + 16f;
+        float inspectorHeight = Mathf.Clamp(_inspectorHeight, MinInspectorHeight, MaxInspectorHeight);
+        float timelineHeight = Mathf.Max(MinTimelineHeight, position.height - EditorStyles.toolbar.fixedHeight - SplitterHeight - inspectorHeight);
+        Rect view = GUILayoutUtility.GetRect(position.width, timelineHeight, GUILayout.ExpandWidth(true));
+        bool scrolls = contentHeight > view.height;
+        Rect content = new Rect(0f, 0f, view.width - (scrolls ? 15f : 0f), contentHeight);
+        _timelineScroll = GUI.BeginScrollView(view, _timelineScroll, content, false, false);
+        Rect area = content;
         Rect labels = new Rect(area.x, area.y + RulerHeight, LabelWidth, rows * RowHeight);
         Rect lanes = new Rect(area.x + LabelWidth, area.y + RulerHeight, area.width - LabelWidth, rows * RowHeight);
         Rect ruler = new Rect(lanes.x, area.y, lanes.width, RulerHeight);
@@ -89,7 +138,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         DrawPlayhead(ruler, lanes);
         AddCursorRects(lanes);
         DrawScrollbar(scroll);
+        GUI.EndScrollView(false);   // 휠은 줌(HandleView) — 세로는 스크롤 막대로
+
+        DrawSplitter();
+        _inspectorScroll = EditorGUILayout.BeginScrollView(_inspectorScroll, GUILayout.Height(inspectorHeight));
         DrawInspector();
+        EditorGUILayout.EndScrollView();
     }
 
     // 줄 이름 누르기 = 그 노드 선택(트랙 = 모양 값 · 마커 = 시각·옵션) — 255 후속 3.
