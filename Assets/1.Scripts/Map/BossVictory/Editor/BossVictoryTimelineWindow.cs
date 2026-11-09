@@ -179,7 +179,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             DrawRowBackground(labels, lanes, row);
             GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight),
-                "◆ " + BossVictoryTimeline.MarkerLabel(marker), MarkerLabelStyle(marker));
+                marker == BossVictoryMarker.FinisherStart ? "▬ 처치 연출 스킬" : "◆ " + BossVictoryTimeline.MarkerLabel(marker), MarkerLabelStyle(marker));
             row++;
         }
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
@@ -325,8 +325,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         GUI.BeginClip(lanes);
         Rect local = new Rect(0f, 0f, lanes.width, lanes.height);
+        DrawFinisherClip(local);
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
+            if (marker == BossVictoryMarker.FinisherStart) continue;   // 처치 연출 스킬 = 클립(255 후속 7)
             bool lobby = marker == BossVictoryMarker.LobbyTransition;
             float x = TimeToX(local, Timeline.MarkerTime(marker));
             Color c = IsSelectedMarker(marker) ? Color.white : MarkerTint(marker);
@@ -373,6 +375,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
+            if (marker == BossVictoryMarker.FinisherStart) continue;   // 클립 — PickFinisherClip
             picked = marker;
             Rect row = RowRect(lanes, MarkerRow(marker));
             if (!row.Contains(mouse)) continue;
@@ -409,7 +412,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 끌기 = 이동 · 양 끝(좌우 화살표 커서 — 왼쪽 = 시작 이동·끝 고정, 오른쪽 = 길이) · 클립 위 마름모 = 키(중간 키 끌기 = 시각, 더블클릭 = 키 추가, 255 후속 6) ·
     // 우클릭 = 추가/복사/붙여넣기/삭제 · Del(키 선택 중이면 그 키) · Ctrl+C/V · 0.01초 스냅 · Undo.
 
-    enum DragMode { None, Move, ResizeLeft, ResizeRight, Key, Marker, Playhead }
+    enum DragMode { None, Move, ResizeLeft, ResizeRight, Key, Marker, Playhead, FinisherTrim }
 
     const float MinLength = 0.01f;
     const float HandleSize = 7f;
@@ -739,6 +742,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // SO 에 바로 저장(Play 끝나도 유지 — Q5).
     void Save()
     {
+        _finisherClipKey = null;   // 처치 연출 스킬 칸이 바뀌었을 수 있다 — 클립 다시 찾기
         Timeline.SyncCameraCutShots();
         Timeline.FitCameraCutLengths();   // 컷 길이 = 다음 컷 시작까지(표시용 — 판정은 시작만)
         EditorUtility.SetDirty(_settings);
@@ -835,6 +839,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         _dragRecorded = false;
         _dragMouseT0 = XToTime(lanes, mouse.x);
+        if (PickFinisherClip(lanes, mouse, out bool trimEdge))
+        {
+            Select(-1, -1, (int)BossVictoryMarker.FinisherStart);
+            _dragMarkerOrig = Timeline.finisherStartTime;
+            _drag = trimEdge ? DragMode.FinisherTrim : DragMode.Marker;
+            return;
+        }
         if (PickMarker(lanes, mouse, out BossVictoryMarker picked))
         {
             Select(-1, -1, (int)picked);
@@ -904,8 +915,15 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 마우스 커서 — 끝 = 좌우 화살표 · 몸통 = 이동 · 중간 키 = 밀기.
     void AddCursorRects(Rect lanes)
     {
+        if (FinisherClipRect(lanes, out Rect fr))
+        {
+            float inner = EdgeInner(fr);
+            AddCursor(lanes, new Rect(fr.x, fr.y, Mathf.Max(0f, fr.width - inner), fr.height), MouseCursor.MoveArrow);
+            if (FinisherFull(out _, out _) > 0f) AddCursor(lanes, new Rect(fr.xMax - inner, fr.y, EdgeOuter + inner, fr.height), MouseCursor.ResizeHorizontal);
+        }
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
+            if (marker == BossVictoryMarker.FinisherStart) continue;
             Rect row = RowRect(lanes, MarkerRow(marker));
             float x = TimeToX(lanes, Timeline.MarkerTime(marker));
             AddCursor(lanes, new Rect(x - MarkerSizeLobby - 4f, row.y, (MarkerSizeLobby + 4f) * 2f, row.height), MouseCursor.ResizeHorizontal);
@@ -948,6 +966,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
         RecordDrag();   // 매 끌기 이벤트 기록 — 손을 떼면 한 묶음으로 합친다
         _dragRecorded = true;
+        if (_drag == DragMode.FinisherTrim)
+        {
+            DragFinisherTrim(mt);
+            Repaint();
+            return;
+        }
         if (_drag == DragMode.Marker)
         {
             Timeline.SetMarkerTime((BossVictoryMarker)_selMarker, Snap(_dragMarkerOrig + (mt - _dragMouseT0)));   // 라벨을 잡아도 튀지 않게 이동량으로
@@ -1013,6 +1037,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             BossVictoryMarker m = marker;
             menu.AddItem(new GUIContent($"여기({t:0.00}초)로 옮기기"), false, () => MoveMarker(m, t));
             menu.AddItem(new GUIContent($"재생 헤드({_playhead:0.00}초)로 옮기기"), false, () => MoveMarker(m, _playhead));
+            if (m == BossVictoryMarker.FinisherStart)
+            {
+                if (Timeline.finisherTrimSeconds > 0f) menu.AddItem(new GUIContent("끝 자르기 풀기(클립 끝까지)"), false, () => SetFinisherTrim(0f));
+                else menu.AddDisabledItem(new GUIContent("끝 자르기 풀기(안 잘림)"));
+            }
             menu.ShowAsContext();
             return;
         }
@@ -1178,8 +1207,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             "이 시각에 처치자가 백대쉬한다 — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다. " +
             "처치자 순서 노드는 각 피어가 자기 화면 시계로 앞으로만 판정 — 스크럽으로 되돌아가지 않는다(다시 보려면 ⏮).",
         BossVictoryMarker.FinisherStart =>
-            "이 시각에 처치 연출 스킬을 표시용으로 바로 튼다 — 백대쉬가 덜 끝났으면 끊고, 처치 순간 쓰던 스킬이 남아 있어도 기다리지 않는다. " +
-            "기본 = 백대쉬 시작 + 백대쉬 시간 + 백대쉬 후 대기. 앞으로만(⏮ 로 다시 보기).",
+            "클립 시작 = 처치 연출 스킬을 표시용으로 바로 트는 시각 — 백대쉬가 덜 끝났으면 끊고, 처치 순간 쓰던 스킬이 남아 있어도 기다리지 않는다. " +
+            "기본 = 백대쉬 시작 + 백대쉬 시간 + 백대쉬 후 대기. 클립 길이 = 그 캐릭터 처치 연출 스킬 클립 전체(공속 100%). " +
+            "오른쪽 끝을 앞으로 끌면 끝 자르기 — 그 프레임에서 처치자 애니가 멈춘다(배율 0, 원래 끝보다 늘릴 수 없음). 앞으로만(⏮ 로 다시 보기).",
         BossVictoryMarker.SlowStart =>
             "이 시각부터 처치자가 End 후 배율(아래 칸)로 느려진다. 0 = 끔 — 처치 연출 스킬 클립의 End 이벤트에서. 보스는 '보스 슬로우' 가 꺼져 있을 때만 이 순간을 따른다. 앞으로만(⏮ 로 다시 보기).",
         BossVictoryMarker.BossHitAnim =>
@@ -1462,6 +1492,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 }
                 break;
             case BossVictoryMarker.FinisherStart:
+                DrawFinisherClipOptions();
                 DrawSettingsFields("처치 연출 스킬 칸", nameof(BossVictoryGlitchSettings.defaultFinisherSlot));
                 break;
             case BossVictoryMarker.SlowStart:
@@ -1600,16 +1631,183 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     float FinisherEndEventTime(GameObject prefab)
     {
-        PlayerSkillSlot slot = PlayerVictoryFinisher.ResolveSlot(prefab, _settings);
-        PlayerSkillController controller = prefab.GetComponentInChildren<PlayerSkillController>(true);
-        PlayerSkillBase skill = controller != null ? controller.GetSkill(slot) : null;
-        Animator animator = prefab.GetComponentInChildren<Animator>(true);
-        if (skill == null || skill.Data == null || animator == null || animator.runtimeAnimatorController == null) return -1f;
-        AnimationClip clip = AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.Data.AnimatorStateName);
-        if (clip == null) return -1f;
+        AnimationClip clip = FinisherClipOf(prefab);
+        return clip != null ? EndEventTime(clip) : -1f;
+    }
+
+    static float EndEventTime(AnimationClip clip)
+    {
         foreach (AnimationEvent ev in AnimationUtility.GetAnimationEvents(clip))
             if (ev.functionName == nameof(PlayerAnimationEventRelay.HandleSkillEvent) && ev.intParameter == (int)SkillAnimationEventType.End)
                 return ev.time;
         return -1f;
     }
+
+    // 캐릭터(프리팹 또는 플레이 중 처치자)의 처치 연출 스킬 상태 클립.
+    AnimationClip FinisherClipOf(GameObject character)
+    {
+        if (character == null) return null;
+        PlayerSkillSlot slot = PlayerVictoryFinisher.ResolveSlot(character, _settings);
+        PlayerSkillController controller = character.GetComponentInChildren<PlayerSkillController>(true);
+        PlayerSkillBase skill = controller != null ? controller.GetSkill(slot) : null;
+        Animator animator = character.GetComponentInChildren<Animator>(true);
+        if (skill == null || skill.Data == null || animator == null || animator.runtimeAnimatorController == null) return null;
+        return AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.Data.AnimatorStateName);
+    }
+
+    // ── 처치 연출 스킬 클립(255 후속 7) — '스킬 연출 시작' 마커 줄을 클립으로: 시작 = 마커 값, 길이 = 캐릭터 클립 전체(공속 100%) 또는 끝 자르기 ──
+    // 미리보기 캐릭터 = 아래 칸에서 고름 · 디버그 랩 재생 중이면 실제 처치자. 자르기 값은 클립 시간(초) 하나 — 캐릭터마다 클립 길이가 다르면 프레임 표시도 다르다.
+
+    static readonly string[] FinisherPreviewLabels = { "팔라딘", "거너", "어쌔신" };
+    static readonly Color FinisherColor = new Color(0.80f, 0.45f, 0.55f);
+    [SerializeField] int _finisherPreview;
+    Object _finisherClipKey;
+    AnimationClip _finisherClipCache;
+    string _finisherWhoCache;
+
+    // 지금 보여 줄 처치 연출 스킬 클립과 원래 길이(초). 없으면 0.
+    float FinisherFull(out AnimationClip clip, out string who)
+    {
+        GameObject killer = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null ? BossVictoryGlitchPresentation.Instance.KillerObject : null;
+        Object key = killer != null ? killer : AssetDatabase.LoadAssetAtPath<GameObject>(FinisherVariantPaths[Mathf.Clamp(_finisherPreview, 0, FinisherVariantPaths.Length - 1)]);
+        if (key != _finisherClipKey)
+        {
+            _finisherClipKey = key;
+            _finisherClipCache = FinisherClipOf(key as GameObject);
+            _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : FinisherPreviewLabels[Mathf.Clamp(_finisherPreview, 0, FinisherPreviewLabels.Length - 1)];
+        }
+        clip = _finisherClipCache;
+        who = _finisherWhoCache;
+        return clip != null ? clip.length : 0f;
+    }
+
+    // 클립 칸 — 원래 길이를 모르면(클립 없음) 시작 표시만 짧게.
+    bool FinisherClipRect(Rect lanes, out Rect r)
+    {
+        float full = FinisherFull(out _, out _);
+        float length = full > 0f ? BossVictoryAnimTrim.PlayedLength(Timeline.finisherTrimSeconds, full) : Mathf.Max(MinLength, Timeline.finisherTrimSeconds);
+        if (length <= 0f) length = 0.1f;
+        Rect row = RowRect(lanes, MarkerRow(BossVictoryMarker.FinisherStart));
+        float x0 = TimeToX(lanes, Timeline.finisherStartTime), x1 = TimeToX(lanes, Timeline.finisherStartTime + length);
+        r = new Rect(x0, row.y + 2f, Mathf.Max(2f, x1 - x0), row.height - 4f);
+        return r.xMax >= lanes.x && r.x <= lanes.xMax;
+    }
+
+    void DrawFinisherClip(Rect lanes)
+    {
+        if (!FinisherClipRect(lanes, out Rect r)) return;
+        float full = FinisherFull(out AnimationClip clip, out string who);
+        bool selected = IsSelectedMarker(BossVictoryMarker.FinisherStart);
+        float trim = Timeline.finisherTrimSeconds;
+        bool trimmed = full > 0f && BossVictoryAnimTrim.IsTrimmed(trim, full);
+        if (trimmed)   // 잘려 나간 뒤쪽 = 흐린 칸(원래 끝까지)
+        {
+            float xFull = TimeToX(lanes, Timeline.finisherStartTime + full);
+            EditorGUI.DrawRect(new Rect(r.xMax, r.y, Mathf.Max(0f, xFull - r.xMax), r.height), new Color(FinisherColor.r, FinisherColor.g, FinisherColor.b, 0.18f));
+        }
+        EditorGUI.DrawRect(r, FinisherColor * (selected ? 1f : 0.75f));
+        if (clip != null)
+        {
+            float fps = BossVictoryAnimTrim.FrameRate(clip.frameRate);
+            float played = BossVictoryAnimTrim.PlayedLength(trim, full);
+            float frameWidth = _pixelsPerSecond / fps;
+            int step = frameWidth >= 4f ? 1 : frameWidth >= 0.8f ? 5 : 0;   // 프레임 눈금(너무 촘촘하면 5프레임마다, 그보다 촘촘하면 생략)
+            for (int k = step; step > 0 && k < Mathf.RoundToInt(played * fps); k += step)
+            {
+                float x = r.x + k * frameWidth;
+                bool major = k % 10 == 0;
+                EditorGUI.DrawRect(new Rect(x, r.yMax - (major ? 7f : 4f), 1f, major ? 7f : 4f), new Color(1f, 1f, 1f, major ? 0.6f : 0.35f));
+            }
+            float end = EndEventTime(clip);
+            if (end >= 0f && end <= played)
+            {
+                float xe = r.x + end * _pixelsPerSecond;
+                EditorGUI.DrawRect(new Rect(xe - 0.5f, r.y, 1.5f, r.height), new Color(1f, 0.95f, 0.4f, 0.9f));   // End 이벤트(노란 선)
+            }
+        }
+        string label = clip != null
+            ? $"처치 연출 스킬 {Timeline.finisherStartTime:0.00}s · {who} {BossVictoryAnimTrim.FrameLabel(trim, full, clip.frameRate)}{(trimmed ? " 잘림" : "")}"
+            : $"처치 연출 스킬 {Timeline.finisherStartTime:0.00}s · {who} 클립 없음";
+        GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, Mathf.Max(r.width, 260f)), r.height - 2f), label, EditorStyles.miniBoldLabel);
+        if (selected) DrawOutline(r, Color.white);
+        if (trimmed) EditorGUI.DrawRect(new Rect(r.xMax - 2f, r.y, 2f, r.height), Color.white);   // 자른 끝
+    }
+
+    // 몸통 = 시작 이동(마커 끌기와 같음) · 오른쪽 끝 = 끝 자르기(원래 길이를 알 때만).
+    bool PickFinisherClip(Rect lanes, Vector2 mouse, out bool trimEdge)
+    {
+        trimEdge = false;
+        if (!FinisherClipRect(lanes, out Rect r)) return false;
+        float inner = EdgeInner(r);
+        if (FinisherFull(out _, out _) > 0f && mouse.y >= r.y && mouse.y <= r.yMax && mouse.x >= r.xMax - inner && mouse.x <= r.xMax + EdgeOuter)
+        {
+            trimEdge = true;
+            return true;
+        }
+        return r.Contains(mouse);
+    }
+
+    void DragFinisherTrim(float mouseTime)
+    {
+        float full = FinisherFull(out AnimationClip clip, out _);
+        if (clip == null) return;
+        Timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(mouseTime - Timeline.finisherStartTime, full, clip.frameRate);
+    }
+
+    void SetFinisherTrim(float trim)
+    {
+        Record("처치 연출 타임라인 스킬 끝 자르기");
+        float full = FinisherFull(out AnimationClip clip, out _);
+        Timeline.finisherTrimSeconds = clip != null ? BossVictoryAnimTrim.ClampTrim(trim, full, clip.frameRate) : Mathf.Max(0f, trim);
+        Select(-1, -1, (int)BossVictoryMarker.FinisherStart);
+        Save();
+        Repaint();
+    }
+
+    void DrawFinisherClipOptions()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("처치 연출 스킬 클립 · 끝 자르기", EditorStyles.miniBoldLabel);
+        bool live = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null && BossVictoryGlitchPresentation.Instance.KillerObject != null;
+        using (new EditorGUI.DisabledScope(live))
+        {
+            int preview = EditorGUILayout.Popup(new GUIContent("미리보기 캐릭터", "클립 길이·프레임을 이 캐릭터 기준으로 보여 준다. 디버그 랩 재생 중이면 실제 처치자."), _finisherPreview, FinisherPreviewLabels);
+            if (preview != _finisherPreview)
+            {
+                _finisherPreview = preview;
+                _finisherClipKey = null;
+            }
+        }
+        float full = FinisherFull(out AnimationClip clip, out string who);
+        if (clip == null)
+        {
+            EditorGUILayout.HelpBox($"{who} 의 처치 연출 스킬 클립을 못 찾았다 — 길이·자르기를 보여 줄 수 없다.", MessageType.Info);
+            return;
+        }
+        float fps = BossVictoryAnimTrim.FrameRate(clip.frameRate);
+        int fullFrames = BossVictoryAnimTrim.Frames(full, fps);
+        float end = EndEventTime(clip);
+        EditorGUILayout.LabelField("클립", $"{who} · {clip.name} · {full:0.00}초 = {fullFrames}f @ {fps:0}fps(공속 100%){(end >= 0f ? $" · End 이벤트 {BossVictoryAnimTrim.Frames(end, fps)}f" : " · End 이벤트 없음")}", EditorStyles.wordWrappedMiniLabel);
+        float trim = Timeline.finisherTrimSeconds;
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUI.BeginChangeCheck();
+            int frame = EditorGUILayout.IntSlider("끝 프레임", BossVictoryAnimTrim.Frames(BossVictoryAnimTrim.PlayedLength(trim, full), fps), 1, Mathf.Max(1, fullFrames));
+            if (EditorGUI.EndChangeCheck()) SetFinisherTrim(frame / fps);
+            using (new EditorGUI.DisabledScope(trim <= 0f))
+                if (GUILayout.Button("안 자름", GUILayout.Width(60f))) SetFinisherTrim(0f);
+        }
+        if (trim > 0f && full > 0f && trim >= full)
+            EditorGUILayout.HelpBox($"자른 길이 {trim:0.00}초 ≥ {who} 클립 {full:0.00}초 — 이 캐릭터는 안 잘린다(클립 끝까지).", MessageType.None);
+        string slow = Timeline.slowStartTime > 0f
+            ? $"느려짐은 '느려짐 시작' 마커 {Timeline.slowStartTime:0.00}s."
+            : end >= 0f && BossVictoryAnimTrim.IsTrimmed(trim, full) && trim < end
+                ? "자른 끝이 End 이벤트보다 앞 — 느려짐은 자른 끝(멈추는 순간)에서."
+                : "느려짐은 End 이벤트에서(지금 규칙).";
+        EditorGUILayout.LabelField(
+            "오른쪽 끝을 앞으로 끌면 그 프레임에서 처치자 애니가 멈춘다(배율 0, 공속과 무관 — 클립 프레임 기준). 원래 끝보다 늘릴 수 없고, 끝까지 끌면 '안 자름'. " +
+            "이미 생긴 이펙트는 지금 규칙대로 계속되고, 자른 뒤의 애니 이벤트는 나지 않는다(의도). " + slow,
+            EditorStyles.wordWrappedMiniLabel);
+    }
+
 }
