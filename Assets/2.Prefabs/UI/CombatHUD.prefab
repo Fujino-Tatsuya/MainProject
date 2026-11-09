@@ -5243,7 +5243,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HealthVignetteHUD
   image: {fileID: 5903875357747303386}
-  vignetteSprite: {fileID: 0}
+  vignetteMaterial: {fileID: 2100000, guid: 5f47dc6804d7bd8ec06644ed124c8ee3, type: 2}
   startRatio: 0.8
   maxAlpha: 0.6
   vignetteColor: {r: 1, g: 0, b: 0, a: 1}

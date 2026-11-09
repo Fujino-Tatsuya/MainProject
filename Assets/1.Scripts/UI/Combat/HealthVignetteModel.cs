@@ -98,6 +98,31 @@ public static class HealthVignetteModel
     }
 
     /// <summary>
+    /// 비네팅 모양 마스크(0 = 투명, 1 = 가장자리 불투명) — 셰이더 UI/HealthVignette 의 frag 와 같은 식(셰이더를 고치면 여기도).
+    /// uv 0..1(화면 전체), 반경: 0 = 중앙, 1 = 변의 중점. 사각 정도 0·보정 0·세기 1 이면 옛 방사형 텍스처(VignetteSpriteFactory.CreateRadial)와 같다.
+    /// </summary>
+    /// <param name="squareness">모서리 사각 정도 0 = 타원, 1 = 둥근 사각(초타원 지수 2 → 12)</param>
+    /// <param name="aspect">화면 가로/세로</param>
+    /// <param name="aspectCorrection">0 = 축별 정규화(옛 방식), 1 = 좌우 띠 폭을 위아래와 같은 픽셀 폭으로</param>
+    public static float EdgeMask(Vector2 uv, float innerRadius, float outerRadius, float squareness,
+        float strength, float aspect, float aspectCorrection)
+    {
+        float px = Mathf.Abs(uv.x * 2f - 1f);
+        float py = Mathf.Abs(uv.y * 2f - 1f);
+        float stretch = Mathf.Lerp(1f, Mathf.Max(aspect, 1e-3f), Mathf.Clamp01(aspectCorrection));
+        px = Mathf.Max(0f, 1f - (1f - px) * stretch);
+
+        float n = Mathf.Lerp(2f, 12f, Mathf.Clamp01(squareness));
+        px = Mathf.Max(px, 1e-5f);
+        py = Mathf.Max(py, 1e-5f);
+        float d = Mathf.Pow(Mathf.Pow(px, n) + Mathf.Pow(py, n), 1f / n);
+
+        float outer = Mathf.Max(outerRadius, innerRadius + 1e-4f);
+        float t = Mathf.Clamp01((d - innerRadius) / (outer - innerRadius));
+        return t * t * (3f - 2f * t) * Mathf.Clamp01(strength);
+    }
+
+    /// <summary>
     /// 평상시 비네팅과 플래시를 이미지 하나의 색으로 합친다. 알파는 둘 중 큰 쪽, RGB 는 플래시 비중만큼 플래시 색으로.
     /// 마지막에 <paramref name="darken"/>(0..1)만큼 RGB 에 검은색을 곱한다 — 사망·Soul·관전 표현.
     /// </summary>
