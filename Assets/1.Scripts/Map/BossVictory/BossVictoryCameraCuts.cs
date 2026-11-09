@@ -6,7 +6,7 @@ using UnityEngine;
 /// 보스 처치 연출 — ZZZ 글리치 4단계 카메라 컷(PLAN-boss-victory-glitch). 순수 계산만(테스트 대상 — <c>BossVictoryCameraCutTests</c>).
 /// 컷 목록 = 타임라인 '카메라 컷' 트랙(<see cref="BossVictoryTimeline.cameraCut"/> 클립 = 시작 시각 · <see cref="BossVictoryTimeline.cameraCutShots"/> = 같은 순서의 컷 값, 255),
 /// 시계는 글리치 시각(<see cref="BossVictoryGlitchPresentation.GlitchTime"/>).
-/// 첫 컷 전까지는 게임 카메라 그대로. 컷 사이는 블렌드 없이 끊는다(전환은 글리치 블록 펄스가 가린다). 컷 안에서는 시작 → 끝 화면으로 이동(255 후속 2).
+/// 첫 컷 전까지는 게임 카메라 그대로. 컷 사이는 블렌드 없이 끊는다(전환은 글리치 블록 펄스가 가린다). 컷 안에서는 화면 키(시작·중간·끝)를 따라 이동(255 후속 6 — 옛 시작→끝 2점을 일반화).
 /// </summary>
 public static class BossVictoryCameraCuts
 {
@@ -18,7 +18,7 @@ public static class BossVictoryCameraCuts
         Boss,    // 보스 발밑(트랜스폼 위치)
     }
 
-    /// <summary>시작 → 끝 화면 이동 곡선.</summary>
+    /// <summary>이동 곡선(백대쉬 곡선 · 옛 컷 시작→끝 곡선). 컷 화면 키 구간은 <see cref="BossVictoryKeyCurve"/>(같은 순서 + 계단).</summary>
     public enum Ease
     {
         Linear,
@@ -27,28 +27,78 @@ public static class BossVictoryCameraCuts
         EaseOut,
     }
 
+    /// <summary>컷 화면 키(255 후속 6) — 컷 구간 비율 위치의 기준 좌표계 카메라 위치·회전·FOV + 다음 키까지 곡선.</summary>
+    [Serializable]
+    public struct CutKey : IBossVictoryKey
+    {
+        [Range(0f, 1f)] public float u;
+        public Vector3 position;
+        public Quaternion rotation;
+        [Range(10f, 90f)] public float fov;
+        public BossVictoryKeyCurve curve;
+
+        public float U => u;
+        public BossVictoryKeyCurve Curve => curve;
+
+        public static CutKey Make(float u, Vector3 position, Quaternion rotation, float fov, BossVictoryKeyCurve curve = BossVictoryKeyCurve.EaseInOut) =>
+            new CutKey { u = u, position = position, rotation = rotation, fov = fov, curve = curve };
+    }
+
     /// <summary>
-    /// 컷 하나(255 후속 2) = 시작 화면 → 끝 화면 2점. 화면 = 기준점 좌표계의 카메라 위치·회전 + FOV.
+    /// 컷 하나 = 화면 키 목록(255 후속 6 — 옛 시작 → 끝 2점 일반화). 화면 = 기준점 좌표계의 카메라 위치·회전 + FOV.
     /// 기준 좌표계: 원점 = <see cref="anchor"/> 점 · +Z = 처치자 → 보스 수평 방향 · +Y = 위(옛 yaw 0 = 처치자 쪽에서 보스를 봄과 같은 방향 정의).
-    /// 끝 화면이 없으면(<see cref="hasEnd"/> 끔) 고정 컷. 컷 구간 = 클립 시작 ~ 다음 컷 시작(마지막 = 로비 전환), 그동안 곡선대로 보간.
+    /// 키 1개 = 고정 컷 · 2개 이상 = 첫 키(u 0) → … → 끝 키(u 1). 컷 구간 = 클립 시작 ~ 다음 컷 시작(마지막 = 로비 전환), 키 u = 그 구간 비율.
+    /// 🔴 구조체 복사는 키 목록을 같이 쓴다 — 붙여넣기는 <see cref="WithCopiedKeys"/>.
     /// </summary>
     [Serializable]
     public struct Cut
     {
         public Anchor anchor;
-        [Tooltip("시작 화면 카메라 위치(기준 좌표계 m).")]
-        public Vector3 startPosition;
-        [Tooltip("시작 화면 카메라 회전(기준 좌표계).")]
-        public Quaternion startRotation;
-        [Range(10f, 90f)] public float startFov;
-        [Tooltip("끝 화면이 있으면 컷 구간 동안 시작 → 끝으로 이동(위치·회전·FOV). 끄면 고정 컷.")]
-        public bool hasEnd;
-        public Vector3 endPosition;
-        public Quaternion endRotation;
-        [Range(10f, 90f)] public float endFov;
-        public Ease ease;
+        [Tooltip("화면 키 — 시작(u 0)·중간·끝(u 1). 1개 = 고정 컷.")]
+        public List<CutKey> keys;
+        [Tooltip("키 3개 이상이면 위치를 부드러운 곡선(Catmull-Rom)으로 잇는다. 끄면 키 사이 직선.")]
+        public bool smoothPath;
         [Tooltip("이 컷 동안 카메라를 가리는 벽(앞면이 카메라를 향하지 않는 벽)을 끈다(이동 중이면 매 프레임 그 위치로). 끄면 이 컷 동안 벽 숨김 없음 — 숨겼던 벽도 다시 보인다.")]
         public bool hideWalls;
+
+        // 옛 2점 형식(255 후속 2) — 읽기만 해서 키로 옮긴다(MigrateToKeys). 키가 있으면 쓰지 않는다.
+        [HideInInspector] public Vector3 startPosition;
+        [HideInInspector] public Quaternion startRotation;
+        [HideInInspector] public float startFov;
+        [HideInInspector] public bool hasEnd;
+        [HideInInspector] public Vector3 endPosition;
+        [HideInInspector] public Quaternion endRotation;
+        [HideInInspector] public float endFov;
+        [HideInInspector] public Ease ease;
+
+        public bool HasKeys => keys != null && keys.Count > 0;
+
+        /// <summary>움직이는 컷인가(키 2개 이상 — 옛 형식이면 끝 화면이 있다).</summary>
+        public bool Moves => HasKeys ? keys.Count >= 2 : hasEnd;
+
+        /// <summary>옛 2점 → 키(시작 = 시작 키 · 끝 = 끝 키 · 끝 없으면 키 1개). 이미 키가 있으면 그대로. 바꿨으면 true.</summary>
+        public bool MigrateToKeys()
+        {
+            if (HasKeys) return false;
+            keys = LegacyKeys();
+            return true;
+        }
+
+        /// <summary>옛 2점 값으로 만든 키 목록(이관 · 이관 전 값을 읽는 Pose).</summary>
+        public List<CutKey> LegacyKeys()
+        {
+            var list = new List<CutKey>(2) { CutKey.Make(0f, startPosition, startRotation, startFov, (BossVictoryKeyCurve)(int)ease) };
+            if (hasEnd) list.Add(CutKey.Make(1f, endPosition, endRotation, endFov));
+            return list;
+        }
+
+        /// <summary>키 목록을 새 목록으로 복사한 컷(붙여넣기·복제용).</summary>
+        public Cut WithCopiedKeys()
+        {
+            Cut c = this;
+            if (keys != null) c.keys = new List<CutKey>(keys);
+            return c;
+        }
 
         /// <summary>새 컷 기본값 — 옛 기본 와이드 구도(가운데 기준·거리 16·내려다보는 각 22·방위 50·초점 높이 1.5·FOV 40) · 고정 · 벽 숨김 켬.</summary>
         public static Cut Default
@@ -58,8 +108,7 @@ public static class BossVictoryCameraCuts
                 Orbit(16f, 22f, 50f, 1.5f, out Vector3 p, out Quaternion r);
                 return new Cut
                 {
-                    anchor = Anchor.Middle, startPosition = p, startRotation = r, startFov = 40f,
-                    endPosition = p, endRotation = r, endFov = 40f, ease = Ease.EaseInOut, hideWalls = true,
+                    anchor = Anchor.Middle, keys = new List<CutKey> { CutKey.Make(0f, p, r, 40f) }, hideWalls = true,
                 };
             }
         }
@@ -138,20 +187,41 @@ public static class BossVictoryCameraCuts
         };
     }
 
-    /// <summary>컷 진행 <paramref name="u"/>(0 = 컷 시작, 1 = 다음 컷 시작) 의 월드 카메라 자세·FOV. 끝 화면이 없으면 시작 화면 고정.</summary>
+    /// <summary>컷 진행 <paramref name="u"/>(0 = 컷 시작, 1 = 다음 컷 시작) 의 월드 카메라 자세·FOV. 키 1개면 고정. 키가 없으면(이관 전) 옛 2점 값.</summary>
     public static void Pose(in Cut cut, in Subjects s, float u, out Vector3 position, out Quaternion rotation, out float fov)
     {
-        Vector3 lp = cut.startPosition;
-        Quaternion lr = Normalize(cut.startRotation);
-        fov = cut.startFov;
-        if (cut.hasEnd)
-        {
-            float k = Evaluate(cut.ease, u);
-            lp = Vector3.Lerp(cut.startPosition, cut.endPosition, k);
-            lr = Quaternion.Slerp(lr, Normalize(cut.endRotation), k);
-            fov = Mathf.Lerp(cut.startFov, cut.endFov, k);
-        }
+        LocalPose(cut.HasKeys ? cut.keys : cut.LegacyKeys(), cut.smoothPath, u, out Vector3 lp, out Quaternion lr, out fov);
         ToWorld(cut.anchor, s, lp, lr, out position, out rotation);
+    }
+
+    /// <summary>화면 키 목록의 비율 <paramref name="u"/> 기준 좌표계 자세 — 구간 곡선 뒤 위치 Lerp(부드러운 곡선이면 키 3개 이상에서 Catmull-Rom)·회전 Slerp·FOV Lerp.</summary>
+    public static void LocalPose(IReadOnlyList<CutKey> keys, bool smoothPath, float u, out Vector3 position, out Quaternion rotation, out float fov)
+    {
+        if (keys == null || keys.Count == 0)
+        {
+            position = Vector3.zero; rotation = Quaternion.identity; fov = 40f;
+            return;
+        }
+        CutKey a = keys[0];
+        if (keys.Count == 1)
+        {
+            position = a.position; rotation = Normalize(a.rotation); fov = a.fov;
+            return;
+        }
+        float k = BossVictoryKeys.EasedSegment(keys, u, out int i);
+        a = keys[i];
+        CutKey b = keys[i + 1];
+        if (smoothPath && keys.Count >= 3)
+        {
+            Vector3 p0 = keys[Mathf.Max(0, i - 1)].position, p3 = keys[Mathf.Min(keys.Count - 1, i + 2)].position;
+            position = BossVictoryKeys.CatmullRom(p0, a.position, b.position, p3, k);
+        }
+        else
+        {
+            position = Vector3.LerpUnclamped(a.position, b.position, k);
+        }
+        rotation = Quaternion.Slerp(Normalize(a.rotation), Normalize(b.rotation), k);
+        fov = Mathf.LerpUnclamped(a.fov, b.fov, k);
     }
 
     /// <summary>옛 매개변수 구도(초점 높이에서 거리·내려다보는 각·방위로 돌아본 카메라)를 기준 좌표계 자세로 — 새 컷 기본값용.</summary>

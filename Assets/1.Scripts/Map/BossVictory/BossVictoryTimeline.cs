@@ -31,7 +31,11 @@ public enum BossVictoryMarker
     BossSlow,         // 보스 슬로우 — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End)
 }
 
-/// <summary>클립 한 개 — 시작·길이·페이드 인/아웃·세기(초, 처치 판정 뒤).</summary>
+/// <summary>
+/// 클립 한 개 — 시작·길이(초, 처치 판정 뒤). 효과 세기 트랙은 세기 키 목록(<see cref="keys"/> — 시작·중간·끝, 255 후속 6).
+/// 키가 없으면 옛 페이드 인/아웃·세기 식(코드로 만든 클립·이관 전). 설정 SO 를 읽을 때 효과 세기 트랙 클립은 같은 모양의 키로 옮긴다.
+/// 🔴 구조체 복사는 키 목록을 같이 쓴다 — 붙여넣기·복제는 <see cref="WithCopiedKeys"/>.
+/// </summary>
 [Serializable]
 public struct BossVictoryClip
 {
@@ -40,16 +44,39 @@ public struct BossVictoryClip
     [Min(0f)] public float fadeIn;
     [Min(0f)] public float fadeOut;
     [Range(0f, 1f)] public float weight;
+    /// <summary>세기 키(비율 위치 — 클립을 옮기거나 늘이면 비율대로 따라간다). 비면 옛 페이드 식.</summary>
+    public List<BossVictoryKey> keys;
 
     public float End => start + length;
+
+    public bool HasKeys => keys != null && keys.Count > 0;
+
+    /// <summary>키 목록을 새 목록으로 복사한 클립(붙여넣기·복제용).</summary>
+    public BossVictoryClip WithCopiedKeys()
+    {
+        BossVictoryClip c = this;
+        if (keys != null) c.keys = new List<BossVictoryKey>(keys);
+        return c;
+    }
+
+    /// <summary>옛 페이드 인/아웃·세기를 같은 모양의 세기 키로 바꾼다(페이드 0·세기 1 로 비움). 이미 키가 있으면 그대로. 바꿨으면 true.</summary>
+    public bool MigrateFadesToKeys()
+    {
+        if (HasKeys) return false;
+        keys = BossVictoryKeys.FromFades(length, fadeIn, fadeOut, weight);
+        fadeIn = fadeOut = 0f;
+        weight = 1f;
+        return true;
+    }
 
     public static BossVictoryClip Make(float start, float length, float fadeIn = 0f, float fadeOut = 0f, float weight = 1f) =>
         new BossVictoryClip { start = start, length = length, fadeIn = fadeIn, fadeOut = fadeOut, weight = weight };
 
-    /// <summary>시각 t 의 값 = 세기 × min(페이드 인, 페이드 아웃). 페이드 = smoothstep(옛 곡선의 기울기 0 키 보간과 같은 식). 밖이면 0.</summary>
+    /// <summary>시각 t 의 값 — 키가 있으면 키 곡선, 없으면 세기 × min(페이드 인, 페이드 아웃)(페이드 = smoothstep). 밖이면 0.</summary>
     public float Evaluate(float t)
     {
         if (length <= 0f || t < start || t > End) return 0f;
+        if (HasKeys) return BossVictoryKeys.Value(keys, (t - start) / length);
         float a = fadeIn > 0f ? Smooth((t - start) / fadeIn) : 1f;
         float b = fadeOut > 0f ? Smooth((End - t) / fadeOut) : 1f;
         return weight * Mathf.Min(a, b);
@@ -320,6 +347,35 @@ public sealed class BossVictoryTimeline
     }
 
     /// <summary>
+    /// 옛 형식 → 키(255 후속 6): 효과 세기 트랙 클립의 페이드 인/아웃·세기 → 같은 모양의 세기 키 · 카메라 컷 시작/끝 화면 → 화면 키(끝 없으면 키 1개 = 고정).
+    /// 이미 키가 있으면 그대로(새 형식). 옮긴 개수.
+    /// </summary>
+    public int MigrateKeys()
+    {
+        int n = 0;
+        foreach (BossVictoryTrack track in Tracks)
+        {
+            if (!HasFades(track)) continue;
+            List<BossVictoryClip> clips = Clips(track);
+            for (int i = 0; i < clips.Count; i++)
+            {
+                BossVictoryClip c = clips[i];
+                if (!c.MigrateFadesToKeys()) continue;
+                clips[i] = c;
+                n++;
+            }
+        }
+        for (int i = 0; i < cameraCutShots.Count; i++)
+        {
+            BossVictoryCameraCuts.Cut cut = cameraCutShots[i];
+            if (!cut.MigrateToKeys()) continue;
+            cameraCutShots[i] = cut;
+            n++;
+        }
+        return n;
+    }
+
+    /// <summary>
     /// 옛 '처치자 동작 끝 → 백대쉬' 마커 값 L(&gt; 0 = 255 후속 4 전 형식 에셋)을 옮긴다 — 처치자 평타 = [0, L] · 백대쉬 시작 = L(평타 끝 직후) ·
     /// 스킬 연출 시작 = L + 백대쉬 시간 + 백대쉬 후 대기(그때 체감). 새 형식은 옛 칸이 0 이라 아무것도 안 한다. 옮겼으면 true.
     /// </summary>
@@ -387,6 +443,7 @@ public sealed class BossVictoryTimeline
         tl.backDashStartTime = DefaultActionEnd;
         tl.finisherStartTime = DefaultFinisherStart;
         tl.slowStartTime = 0f;
+        tl.MigrateKeys();   // 효과 세기 클립 = 세기 키(같은 화면 — 255 후속 6)
         return tl;
     }
 }

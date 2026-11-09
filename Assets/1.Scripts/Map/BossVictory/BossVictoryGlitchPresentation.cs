@@ -809,7 +809,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (!cut.hideWalls || rewound) ShowWalls();
         if (cut.hideWalls) HideWalls(pos, rot * Vector3.forward);
         if (changed)
-            Edit.Log($"[BossVictory] 컷 {index} 기준 {cut.anchor}{(cut.hasEnd ? $" · 이동 {cut.ease}" : " · 고정")}{(cut.hideWalls ? "" : " · 벽 숨김 끔")} — t {_glitchTime:0.00}", this);
+            Edit.Log($"[BossVictory] 컷 {index} 기준 {cut.anchor}{(cut.Moves ? $" · 이동 키 {(cut.HasKeys ? cut.keys.Count : 2)}개{(cut.smoothPath ? " 곡선" : "")}" : " · 고정")}{(cut.hideWalls ? "" : " · 벽 숨김 끔")} — t {_glitchTime:0.00}", this);
     }
 
     /// <summary>[이 피어] 컷 화면 저장 기준 위치 — 컷이 켜져 있으면 그 컷이 잡은 위치, 아니면 지금 위치. 연출 중이 아니면 false(타임라인 창 'Scene 뷰로' 버튼).</summary>

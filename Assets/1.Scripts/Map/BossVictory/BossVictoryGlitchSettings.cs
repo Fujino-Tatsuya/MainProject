@@ -111,7 +111,13 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject, ISerialization
     void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 
     // 옛 '처치자 동작 끝 → 백대쉬' 마커 → 처치자 평타 클립·백대쉬 시작·스킬 연출 시작(255 후속 4 — 사용자 값 손실 0). 다음 저장 때 새 형식으로 남는다.
-    void ISerializationCallbackReceiver.OnAfterDeserialize() => timeline?.MigrateLegacyKillerActionEnd(backDashDuration, backDashIdleDelay);
+    // 옛 페이드 클립·컷 시작/끝 화면 → 키(255 후속 6 — 같은 화면).
+    void ISerializationCallbackReceiver.OnAfterDeserialize()
+    {
+        if (timeline == null) return;
+        timeline.MigrateLegacyKillerActionEnd(backDashDuration, backDashIdleDelay);
+        timeline.MigrateKeys();
+    }
 
     public static BossVictoryGlitchSettings Load()
     {

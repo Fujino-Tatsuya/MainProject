@@ -223,13 +223,15 @@ public sealed class BossVictoryCameraCutTests
     {
         BossVictoryCameraCuts.Cut d = BossVictoryCameraCuts.Cut.Default;
         Assert.IsTrue(d.hideWalls);
-        Assert.IsFalse(d.hasEnd, "기본 = 고정 컷");
+        Assert.AreEqual(1, d.keys.Count, "기본 = 고정 컷(키 1개)");
+        Assert.IsFalse(d.Moves);
         Assert.AreEqual(BossVictoryCameraCuts.Anchor.Middle, d.anchor);
-        Assert.That(d.startFov, Is.InRange(10f, 90f));
+        BossVictoryCameraCuts.CutKey k = d.keys[0];
+        Assert.That(k.fov, Is.InRange(10f, 90f));
         // 옛 기본 와이드(거리 16·내려다보는 각 22·방위 50·초점 높이 1.5) — 초점에서 16m, 초점을 바라본다.
         Vector3 focus = Vector3.up * 1.5f;
-        Assert.AreEqual(16f, Vector3.Distance(d.startPosition, focus), 1e-3f);
-        Assert.Greater(Vector3.Dot(d.startRotation * Vector3.forward, (focus - d.startPosition).normalized), 0.999f);
+        Assert.AreEqual(16f, Vector3.Distance(k.position, focus), 1e-3f);
+        Assert.Greater(Vector3.Dot(k.rotation * Vector3.forward, (focus - k.position).normalized), 0.999f);
     }
 
     [Test]
