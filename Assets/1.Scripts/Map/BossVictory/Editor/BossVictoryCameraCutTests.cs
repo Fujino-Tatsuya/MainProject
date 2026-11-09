@@ -67,17 +67,14 @@ public sealed class BossVictoryCameraCutTests
     }
 
     [Test]
-    public void 기본_목록은_와이드_보스클로즈업_와이드()
+    public void 기본_목록은_비어_있어_게임_카메라만_쓴다()
     {
         var settings = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
         try
         {
-            Assert.AreEqual(3, settings.cuts.Length);
-            Assert.AreEqual(BossVictoryCameraCuts.Kind.Wide, settings.cuts[0].kind);
-            Assert.AreEqual(BossVictoryCameraCuts.Kind.BossCloseup, settings.cuts[1].kind);
-            Assert.AreEqual(BossVictoryCameraCuts.Kind.Wide, settings.cuts[2].kind);
-            Assert.Less(settings.cuts[0].startTime, settings.cuts[1].startTime);
-            Assert.Less(settings.cuts[1].startTime, settings.cuts[2].startTime);
+            Assert.IsNotNull(settings.cuts);
+            Assert.AreEqual(0, settings.cuts.Length);
+            Assert.AreEqual(-1, BossVictoryCameraCuts.ActiveIndex(settings.cuts, 3f));
         }
         finally { Object.DestroyImmediate(settings); }
     }
