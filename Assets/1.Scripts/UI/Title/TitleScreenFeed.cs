@@ -251,7 +251,8 @@ public sealed class TitleScreenFeed : MonoBehaviour
             vp.aspectRatio = VideoAspectRatio.Stretch;
             vp.audioOutputMode = VideoAudioOutputMode.None;
             vp.timeUpdateMode = VideoTimeUpdateMode.UnscaledGameTime;
-            vp.skipOnDrop = true;
+            // 켜면 영상 3개가 0.5초 근처 첫 프레임에서 멈춘다(Play 진단: 끈 모니터만 정상 재생, 원본 mp4 도 같음).
+            vp.skipOnDrop = false;
 
             var v = new VideoScreen { renderer = r, original = original, material = m, rt = rt, player = vp };
             vp.loopPointReached += _ => OnVideoEnded(v);
