@@ -303,9 +303,16 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return marker == BossVictoryMarker.LobbyTransition ? s_lobbyLabel : s_markerLabel;
     }
 
+    static string OffText(BossVictoryMarker marker) => marker switch
+    {
+        BossVictoryMarker.SlowStart => "끔 — 스킬 End",
+        BossVictoryMarker.BossSlow => "끔 — 느려짐 시작 따름",
+        _ => "끔",
+    };
+
     static string MarkerText(BossVictoryTimeline tl, BossVictoryMarker marker) =>
-        marker == BossVictoryMarker.SlowStart && tl.MarkerTime(marker) <= 0f
-            ? $"{BossVictoryTimeline.MarkerLabel(marker)} (끔 — 스킬 End)"
+        BossVictoryTimeline.ZeroMeansOff(marker) && tl.MarkerTime(marker) <= 0f
+            ? $"{BossVictoryTimeline.MarkerLabel(marker)} ({OffText(marker)})"
             : $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
 
     static readonly string[] AnchorLabels = { "가운데", "처치자", "보스" };
@@ -963,7 +970,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             "이 시각에 처치 연출 스킬을 표시용으로 바로 튼다 — 백대쉬가 덜 끝났으면 끊고, 처치 순간 쓰던 스킬이 남아 있어도 기다리지 않는다. " +
             "기본 = 백대쉬 시작 + 백대쉬 시간 + 백대쉬 후 대기. 앞으로만(⏮ 로 다시 보기).",
         BossVictoryMarker.SlowStart =>
-            "이 시각부터 처치자·보스가 End 후 배율(아래 칸)로 느려진다. 0 = 끔 — 처치 연출 스킬 클립의 End 이벤트에서(255 후속 3 까지와 같음). 앞으로만(⏮ 로 다시 보기).",
+            "이 시각부터 처치자가 End 후 배율(아래 칸)로 느려진다. 0 = 끔 — 처치 연출 스킬 클립의 End 이벤트에서. 보스는 '보스 슬로우' 가 꺼져 있을 때만 이 순간을 따른다. 앞으로만(⏮ 로 다시 보기).",
+        BossVictoryMarker.BossHitAnim =>
+            "이 시각에 보스가 아래 상태(23호 getowned = Boss_23_ParryHit_InPlace, 제자리)를 처음부터 재생한다(보스 ×1). 0 = 처치 순간. 상태 이름이 비면 마지막 피격 자세 그대로. " +
+            "보스 배율은 피격 애니·정지·슬로우 중 시각이 가장 늦은 노드가 이긴다. 한 번만 — 되감기는 ⏮.",
+        BossVictoryMarker.BossFreeze =>
+            "이 시각에 보스를 그 자세로 멈춘다(배율 0). 0 = 끔. 뒤에 슬로우가 오면 슬로우 배율로 다시 움직인다(시각이 가장 늦은 노드가 이김).",
+        BossVictoryMarker.BossSlow =>
+            "이 시각부터 보스 ×End 후 배율(아래 칸). 0 = 끔 — '느려짐 시작'(그것도 끔이면 처치 연출 스킬 End) 순간을 따른다. 뒤에 정지가 오면 정지.",
         _ => "",
     };
 
@@ -996,7 +1010,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 Timeline.SetMarkerTime(marker, time);
                 Save();
             }
-            if (marker == BossVictoryMarker.SlowStart && Timeline.MarkerTime(marker) > 0f && GUILayout.Button("끄기 (0 = 스킬 End)", GUILayout.Width(160f)))
+            if (BossVictoryTimeline.ZeroMeansOff(marker) && Timeline.MarkerTime(marker) > 0f && GUILayout.Button($"끄기 (0 = {OffText(marker)})", GUILayout.Width(200f)))
             {
                 Record("처치 연출 타임라인 마커 끄기");
                 Timeline.SetMarkerTime(marker, 0f);
@@ -1254,7 +1268,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawSettingsFields("처치 연출 스킬 칸", nameof(BossVictoryGlitchSettings.defaultFinisherSlot));
                 break;
             case BossVictoryMarker.SlowStart:
-                DrawSettingsFields("End 후 배율", nameof(BossVictoryGlitchSettings.killerAfterFinisherScale), nameof(BossVictoryGlitchSettings.bossAfterFinisherScale));
+                DrawSettingsFields("처치자 End 후 배율", nameof(BossVictoryGlitchSettings.killerAfterFinisherScale));
+                break;
+            case BossVictoryMarker.BossHitAnim:
+                DrawSettingsFields("보스 피격 애니(비우면 마지막 자세)", nameof(BossVictoryGlitchSettings.bossHitStateName), nameof(BossVictoryGlitchSettings.bossHitFadeSeconds));
+                break;
+            case BossVictoryMarker.BossSlow:
+                DrawSettingsFields("보스 End 후 배율", nameof(BossVictoryGlitchSettings.bossAfterFinisherScale));
                 break;
             case BossVictoryMarker.FocusKiller:
             {
@@ -1322,7 +1342,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void DrawTimeScales()
     {
         EditorGUILayout.LabelField("처치 연출 스킬 · 시간 배율", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("처치자: 하던 동작 ×배율(처치자 평타 클립) → 백대쉬·처치 연출 스킬 ×1 → 느려짐 시작 마커(꺼짐이면 스킬 End)부터 ×End 후 배율 · 팀원: 처치 즉시 · 보스: 느려짐 전 0, 뒤 End 후 배율.", EditorStyles.wordWrappedMiniLabel);
+        EditorGUILayout.LabelField("처치자: 하던 동작 ×배율(처치자 평타 클립) → 백대쉬·처치 연출 스킬 ×1 → 느려짐 시작 마커(꺼짐이면 스킬 End)부터 ×End 후 배율 · 팀원: 처치 즉시 · 보스: 처치 순간 0 → 피격 애니 ×1 · 정지 0 · 슬로우 ×End 후 배율 중 시각이 가장 늦은 노드(보스 슬로우 끔 = 처치자 느려짐 순간).", EditorStyles.wordWrappedMiniLabel);
         DrawSettingsFields("배율·스킬 칸",
             nameof(BossVictoryGlitchSettings.killerCurrentActionScale), nameof(BossVictoryGlitchSettings.killerAfterFinisherScale),
             nameof(BossVictoryGlitchSettings.otherPlayersScale), nameof(BossVictoryGlitchSettings.bossAfterFinisherScale),
