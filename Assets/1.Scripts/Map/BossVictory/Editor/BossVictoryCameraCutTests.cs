@@ -5,15 +5,16 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// 보스 처치 연출 4단계 카메라 컷(PLAN-boss-victory-glitch) — 컷 고르기·구도 계산·기본 목록 · 타임라인 '카메라 컷' 트랙(255: 트랙 구조·컷 값 짝·길이 자동·옛 cuts 이관).
+/// 보스 처치 연출 4단계 카메라 컷(PLAN-boss-victory-glitch) — 컷 고르기·기본 목록 · 타임라인 '카메라 컷' 트랙(255: 트랙 구조·컷 값 짝·길이 자동·옛 cuts 이관) ·
+/// 시작→끝 화면(255 후속 2: 기준 좌표계 왕복·축 방향·보간·곡선·끝 없으면 고정·시각 t 진행).
 /// 실행 = <c>Tools/Tests/전투 EditMode 테스트 실행</c>(필터 ^BossVictoryCameraCut).
 /// </summary>
 public sealed class BossVictoryCameraCutTests
 {
     const string AssetPath = "Assets/Resources/BossVictory/BossVictoryGlitchSettings.asset";
 
-    static BossVictoryCameraCuts.Cut C(BossVictoryCameraCuts.Kind kind = BossVictoryCameraCuts.Kind.Wide) =>
-        new BossVictoryCameraCuts.Cut { kind = kind, distance = 10f, fov = 40f, hideWalls = true };
+    static BossVictoryCameraCuts.Cut C(BossVictoryCameraCuts.Anchor anchor = BossVictoryCameraCuts.Anchor.Middle) =>
+        new BossVictoryCameraCuts.Cut { anchor = anchor, startPosition = new Vector3(0f, 2f, -5f), startRotation = Quaternion.identity, startFov = 40f, hideWalls = true };
 
     static List<BossVictoryClip> Starts(params float[] starts)
     {
@@ -26,7 +27,6 @@ public sealed class BossVictoryCameraCutTests
     {
         Killer = Vector3.zero,
         BossBase = new Vector3(0f, 0f, 10f),
-        BossCenter = new Vector3(0f, 3f, 10f),
     };
 
     [Test]
@@ -47,35 +47,118 @@ public sealed class BossVictoryCameraCutTests
         Assert.AreEqual(0, BossVictoryCameraCuts.ActiveIndex(cuts, 9f));
     }
 
+    // ── 255 후속 2: 시작 → 끝 화면(기준 좌표계) ──
+
     [Test]
-    public void 방위_0_은_처치자_쪽에서_보스를_본다()
+    public void 기준_좌표계_축은_처치자에서_보스_방향()
+    {
+        // 처치자 (0,0,0) → 보스 (10,0,0) — 축 = 월드 +X. 기준 +Z 로 1m = 월드 +X 로 1m.
+        var s = new BossVictoryCameraCuts.Subjects { Killer = Vector3.zero, BossBase = new Vector3(10f, 0f, 0f) };
+        BossVictoryCameraCuts.ToWorld(BossVictoryCameraCuts.Anchor.Killer, s, Vector3.forward, Quaternion.identity, out Vector3 p, out Quaternion r);
+        Assert.AreEqual(new Vector3(1f, 0f, 0f), p);
+        Assert.Greater(Vector3.Dot(r * Vector3.forward, Vector3.right), 0.999f, "기준 정면 = 처치자에서 보스를 봄(옛 yaw 0 과 같은 정의)");
+        BossVictoryCameraCuts.ToWorld(BossVictoryCameraCuts.Anchor.Middle, s, Vector3.zero, Quaternion.identity, out p, out _);
+        Assert.AreEqual(new Vector3(5f, 0f, 0f), p, "가운데");
+        BossVictoryCameraCuts.ToWorld(BossVictoryCameraCuts.Anchor.Boss, s, Vector3.up, Quaternion.identity, out p, out _);
+        Assert.AreEqual(new Vector3(10f, 1f, 0f), p, "보스");
+    }
+
+    [Test]
+    public void 상대_변환_왕복_그리고_다른_자리에서_같은_구도()
+    {
+        var a = new BossVictoryCameraCuts.Subjects { Killer = new Vector3(3f, 0f, -2f), BossBase = new Vector3(-4f, 0.5f, 7f) };
+        Vector3 wp = new Vector3(1f, 6f, -9f);
+        Quaternion wr = Quaternion.Euler(25f, 130f, 3f);
+        foreach (BossVictoryCameraCuts.Anchor anchor in System.Enum.GetValues(typeof(BossVictoryCameraCuts.Anchor)))
+        {
+            BossVictoryCameraCuts.ToLocal(anchor, a, wp, wr, out Vector3 lp, out Quaternion lr);
+            BossVictoryCameraCuts.ToWorld(anchor, a, lp, lr, out Vector3 p, out Quaternion r);
+            Assert.Less(Vector3.Distance(wp, p), 1e-4f, anchor + " 위치 왕복");
+            Assert.Greater(Mathf.Abs(Quaternion.Dot(wr, r)), 0.99999f, anchor + " 회전 왕복");
+
+            // 다른 자리·방향에서 죽어도 기준점에서 본 구도(거리·축에 대한 각)가 같다.
+            var b = new BossVictoryCameraCuts.Subjects { Killer = new Vector3(50f, 2f, 50f), BossBase = new Vector3(50f, 2f, 40f) };
+            BossVictoryCameraCuts.ToWorld(anchor, b, lp, lr, out Vector3 pb, out Quaternion rb);
+            Vector3 originA = BossVictoryCameraCuts.AnchorPoint(anchor, a), originB = BossVictoryCameraCuts.AnchorPoint(anchor, b);
+            Assert.AreEqual(Vector3.Distance(wp, originA), Vector3.Distance(pb, originB), 1e-3f, anchor + " 기준점 거리 같음");
+            float camToAxisA = Vector3.SignedAngle(BossVictoryCameraCuts.Axis(a), wr * Vector3.forward, Vector3.up);
+            float camToAxisB = Vector3.SignedAngle(BossVictoryCameraCuts.Axis(b), rb * Vector3.forward, Vector3.up);
+            Assert.AreEqual(camToAxisA, camToAxisB, 1e-2f, anchor + " 축 기준 시선 방위 같음");
+        }
+    }
+
+    [Test]
+    public void 끝_화면이_없으면_고정()
+    {
+        var cut = C(BossVictoryCameraCuts.Anchor.Killer);
+        cut.endPosition = new Vector3(9f, 9f, 9f);
+        cut.endFov = 80f;
+        BossVictoryCameraCuts.Pose(cut, S(), 0f, out Vector3 p0, out Quaternion r0, out float f0);
+        BossVictoryCameraCuts.Pose(cut, S(), 0.7f, out Vector3 p1, out Quaternion r1, out float f1);
+        Assert.AreEqual(p0, p1);
+        Assert.AreEqual(f0, f1);
+        Assert.AreEqual(new Vector3(0f, 2f, -5f), p0, "처치자 (0,0,0)·축 +Z — 기준 = 월드");
+        Assert.AreEqual(40f, f0);
+    }
+
+    [Test]
+    public void 시작에서_끝으로_보간_위치_회전_FOV()
+    {
+        var cut = C(BossVictoryCameraCuts.Anchor.Killer);
+        cut.hasEnd = true;
+        cut.endPosition = new Vector3(0f, 2f, 5f);
+        cut.endRotation = Quaternion.Euler(0f, 90f, 0f);
+        cut.endFov = 60f;
+        cut.ease = BossVictoryCameraCuts.Ease.Linear;
+        BossVictoryCameraCuts.Pose(cut, S(), 0f, out Vector3 p, out Quaternion r, out float f);
+        Assert.AreEqual(new Vector3(0f, 2f, -5f), p);
+        Assert.AreEqual(40f, f, 1e-4f);
+        BossVictoryCameraCuts.Pose(cut, S(), 0.5f, out p, out r, out f);
+        Assert.Less(Vector3.Distance(new Vector3(0f, 2f, 0f), p), 1e-4f);
+        Assert.AreEqual(50f, f, 1e-4f);
+        Assert.AreEqual(45f, Quaternion.Angle(Quaternion.identity, r), 1e-2f);
+        BossVictoryCameraCuts.Pose(cut, S(), 1f, out p, out r, out f);
+        Assert.Less(Vector3.Distance(cut.endPosition, p), 1e-4f);
+        Assert.AreEqual(60f, f, 1e-4f);
+        BossVictoryCameraCuts.Pose(cut, S(), 3f, out Vector3 pOver, out _, out _);
+        Assert.Less(Vector3.Distance(cut.endPosition, pOver), 1e-4f, "진행은 0~1 로 자른다");
+    }
+
+    [Test]
+    public void 이동_곡선()
+    {
+        Assert.AreEqual(0.5f, BossVictoryCameraCuts.Evaluate(BossVictoryCameraCuts.Ease.Linear, 0.5f), 1e-6f);
+        Assert.AreEqual(0.25f, BossVictoryCameraCuts.Evaluate(BossVictoryCameraCuts.Ease.EaseIn, 0.5f), 1e-6f);
+        Assert.AreEqual(0.75f, BossVictoryCameraCuts.Evaluate(BossVictoryCameraCuts.Ease.EaseOut, 0.5f), 1e-6f);
+        Assert.AreEqual(0.5f, BossVictoryCameraCuts.Evaluate(BossVictoryCameraCuts.Ease.EaseInOut, 0.5f), 1e-6f);
+        Assert.Less(BossVictoryCameraCuts.Evaluate(BossVictoryCameraCuts.Ease.EaseInOut, 0.2f), 0.2f, "ease in/out — 처음 느림");
+        Assert.Greater(BossVictoryCameraCuts.Evaluate(BossVictoryCameraCuts.Ease.EaseInOut, 0.8f), 0.8f, "끝 느림");
+        foreach (BossVictoryCameraCuts.Ease e in System.Enum.GetValues(typeof(BossVictoryCameraCuts.Ease)))
+        {
+            Assert.AreEqual(0f, BossVictoryCameraCuts.Evaluate(e, -1f), 1e-6f, e + " 0");
+            Assert.AreEqual(1f, BossVictoryCameraCuts.Evaluate(e, 2f), 1e-6f, e + " 1");
+        }
+    }
+
+    [Test]
+    public void 컷_진행은_시각_t_기준_다음_컷_시작까지()
+    {
+        var tl = new BossVictoryTimeline { lobbyTransitionTime = 5f };
+        tl.cameraCut.AddRange(Starts(1f, 3f));
+        Assert.AreEqual(0f, tl.CameraCutProgress(0, 1f), 1e-6f);
+        Assert.AreEqual(0.5f, tl.CameraCutProgress(0, 2f), 1e-6f);
+        Assert.AreEqual(1f, tl.CameraCutProgress(0, 3f), 1e-6f);
+        Assert.AreEqual(0.5f, tl.CameraCutProgress(1, 4f), 1e-6f, "마지막 컷 = 로비 전환까지");
+        Assert.AreEqual(0.5f, tl.CameraCutProgress(0, 2f), 1e-6f, "되감아도 같은 t 면 같은 값");
+    }
+
+    [Test]
+    public void 퇴화한_회전은_단위로()
     {
         var cut = C();
-        BossVictoryCameraCuts.Pose(cut, S(), out Vector3 pos, out Quaternion rot);
-        Assert.Less(pos.z, 5f, "카메라는 가운데(z 5)보다 처치자 쪽");
-        Assert.Greater(Vector3.Dot(rot * Vector3.forward, Vector3.forward), 0.99f);
-    }
-
-    [Test]
-    public void 처치자_정면_방위_180_은_처치자를_마주본다()
-    {
-        var cut = C(BossVictoryCameraCuts.Kind.KillerFront);
-        cut.yaw = 180f;
-        cut.distance = 3f;
-        BossVictoryCameraCuts.Pose(cut, S(), out Vector3 pos, out Quaternion rot);
-        Assert.AreEqual(3f, pos.z, 0.01f);
-        Assert.Less(Vector3.Dot(rot * Vector3.forward, Vector3.forward), -0.99f);
-    }
-
-    [Test]
-    public void 보스_클로즈업_초점은_보스_몸_중심()
-    {
-        var cut = C(BossVictoryCameraCuts.Kind.BossCloseup);
-        cut.lookHeight = 0.5f;
-        Vector3 focus = BossVictoryCameraCuts.Focus(cut, S());
-        Assert.AreEqual(new Vector3(0f, 3.5f, 10f), focus);
-        BossVictoryCameraCuts.Pose(cut, S(), out Vector3 pos, out _);
-        Assert.AreEqual(cut.distance, Vector3.Distance(pos, focus), 0.01f);
+        cut.startRotation = default;   // 직렬화 기본값 (0,0,0,0)
+        BossVictoryCameraCuts.Pose(cut, S(), 0f, out _, out Quaternion r, out _);
+        Assert.Greater(Vector3.Dot(r * Vector3.forward, Vector3.forward), 0.999f);
     }
 
     [Test]
@@ -121,10 +204,10 @@ public sealed class BossVictoryCameraCutTests
     {
         var tl = new BossVictoryTimeline();
         tl.cameraCut.AddRange(Starts(0.3f, 1f));
-        var close = C(BossVictoryCameraCuts.Kind.BossCloseup);
+        var close = C(BossVictoryCameraCuts.Anchor.Boss);
         close.hideWalls = false;
         tl.cameraCutShots.Add(close);
-        Assert.AreEqual(BossVictoryCameraCuts.Kind.BossCloseup, tl.CameraCutShot(0).kind);
+        Assert.AreEqual(BossVictoryCameraCuts.Anchor.Boss, tl.CameraCutShot(0).anchor);
         Assert.IsTrue(tl.CameraCutShot(1).hideWalls, "모자란 번호 = 기본값(벽 숨김 켬)");
         Assert.IsTrue(tl.SyncCameraCutShots());
         Assert.AreEqual(2, tl.cameraCutShots.Count);
@@ -140,9 +223,13 @@ public sealed class BossVictoryCameraCutTests
     {
         BossVictoryCameraCuts.Cut d = BossVictoryCameraCuts.Cut.Default;
         Assert.IsTrue(d.hideWalls);
-        Assert.AreEqual(BossVictoryCameraCuts.Kind.Wide, d.kind);
-        Assert.Greater(d.distance, 0.1f);
-        Assert.That(d.fov, Is.InRange(10f, 90f));
+        Assert.IsFalse(d.hasEnd, "기본 = 고정 컷");
+        Assert.AreEqual(BossVictoryCameraCuts.Anchor.Middle, d.anchor);
+        Assert.That(d.startFov, Is.InRange(10f, 90f));
+        // 옛 기본 와이드(거리 16·내려다보는 각 22·방위 50·초점 높이 1.5) — 초점에서 16m, 초점을 바라본다.
+        Vector3 focus = Vector3.up * 1.5f;
+        Assert.AreEqual(16f, Vector3.Distance(d.startPosition, focus), 1e-3f);
+        Assert.Greater(Vector3.Dot(d.startRotation * Vector3.forward, (focus - d.startPosition).normalized), 0.999f);
     }
 
     [Test]

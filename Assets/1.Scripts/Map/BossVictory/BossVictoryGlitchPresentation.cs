@@ -120,6 +120,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     // 4단계 — 카메라 컷
     int _cutIndex = -1;
+    BossVictoryCameraCuts.Subjects _cutSubjects;   // 지금 컷이 시작될 때 본 처치자·보스 위치(컷 동안 고정)
     bool _cutSuppressed;
     CinemachineExternalImpulseListener _impulseListener;
     bool _impulseWasEnabled;
@@ -149,12 +150,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (!_running || !_glitchOn) return false;
         _glitchTime = Mathf.Max(0f, t);
         return true;
-    }
-
-    /// <summary>[이 피어] 타임라인 창에서 컷 값을 고쳤다 — 지금 컷을 다음 Update 에 새 값으로 다시 잡는다(구도·벽 숨김).</summary>
-    public void PreviewRecut()
-    {
-        if (_running && _cutIndex >= 0) _cutIndex = -1;
     }
 #endif
 
@@ -612,41 +607,54 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     // ── 카메라 컷(4단계) ───────────────────────────────────────────────────
 
-    // 컷 시계 = 글리치 시계(길이로 자르지 않는다 — 마지막 컷이 끝까지 유지). 구도는 컷이 바뀌는 순간 한 번 계산해 고정한다(흔들림 없음).
-    // 컷마다 벽 숨김 켜기/끄기(255): 켠 컷 = 이 컷 카메라에서 가리는 벽을 더 끈다(이어지는 켠 컷끼리 누적 — 255 전과 같음) · 끈 컷 = 숨겼던 벽을 모두 다시 켠다.
+    // 컷 시계 = 글리치 시계. 컷 = 클립 시작 ~ 다음 컷 시작(마지막 = 로비 전환). 기준 위치(처치자·보스)는 컷이 바뀌는 순간 한 번 잡아 컷 동안 고정하고,
+    // 화면은 매 프레임 시각 t 의 진행으로 시작 → 끝 화면 사이를 곡선대로 보간한다(255 후속 2 — 끝 화면 없으면 고정, 되감아도 t 그대로).
+    // 컷마다 벽 숨김 켜기/끄기(255): 켠 컷 = 지금 카메라 위치에서 가리는 벽을 더 끈다(이동 중이면 매 프레임, 이어지는 켠 컷끼리 누적) · 끈 컷 = 숨겼던 벽을 모두 다시 켠다.
     // 되감기(스크럽)로 앞 컷으로 가면 벽을 모두 켠 뒤 그 컷 기준으로 다시 끈다 · 첫 컷 전으로 가면 게임 카메라로 돌아간다.
     void TickCuts()
     {
         BossVictoryTimeline tl = _settings.timeline;
         int index = tl.ActiveCameraCut(_glitchTime);
-        if (index == _cutIndex) return;
         if (index < 0)
         {
+            if (_cutIndex < 0) return;
             RestoreCuts();
             _overlay?.ExitCamera(0f);
             _overlay?.SetDimFocus(null);
             _cutJumped = true;
             return;
         }
-        bool rewound = _cutIndex >= 0 && tl.cameraCut[index].start < tl.cameraCut[_cutIndex].start;
-        _cutIndex = index;
-        _cutJumped = true;
         BossVictoryCameraCuts.Cut cut = tl.CameraCutShot(index);
-        BossVictoryCameraCuts.Subjects subjects = CutSubjects();
-        BossVictoryCameraCuts.Pose(cut, subjects, out Vector3 pos, out Quaternion rot);
+        bool changed = index != _cutIndex;
+        bool rewound = changed && _cutIndex >= 0 && tl.cameraCut[index].start < tl.cameraCut[_cutIndex].start;
+        if (changed)
+        {
+            _cutIndex = index;
+            _cutJumped = true;
+            _cutSubjects = CutSubjects();
+        }
+        BossVictoryCameraCuts.Pose(cut, _cutSubjects, tl.CameraCutProgress(index, _glitchTime), out Vector3 pos, out Quaternion rot, out float fov);
 
         _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
         if (!_overlay.IsCameraActive)
         {
-            if (!_overlay.EnterCamera(pos, rot, cut.fov, 0f))
+            if (!_overlay.EnterCamera(pos, rot, fov, 0f))
                 Edit.LogWarning("[BossVictory] CameraTargetSwitcher 가 없어 컷 카메라를 못 켰다.", this);
-            SuppressForCuts(subjects);
+            SuppressForCuts(_cutSubjects);
         }
-        else _overlay.PlaceCamera(pos, rot, cut.fov);
-        _overlay.SetDimFocus(BossVictoryCameraCuts.Focus(cut, subjects));
+        else _overlay.PlaceCamera(pos, rot, fov);   // 매 프레임 — 이동 컷·창에서 고친 값이 바로 반영
+        if (changed) _overlay.SetDimFocus(BossVictoryCameraCuts.AnchorPoint(cut.anchor, _cutSubjects));
         if (!cut.hideWalls || rewound) ShowWalls();
         if (cut.hideWalls) HideWalls(pos, rot * Vector3.forward);
-        Edit.Log($"[BossVictory] 컷 {index} {cut.kind}{(cut.hideWalls ? "" : " · 벽 숨김 끔")} — t {_glitchTime:0.00}", this);
+        if (changed)
+            Edit.Log($"[BossVictory] 컷 {index} 기준 {cut.anchor}{(cut.hasEnd ? $" · 이동 {cut.ease}" : " · 고정")}{(cut.hideWalls ? "" : " · 벽 숨김 끔")} — t {_glitchTime:0.00}", this);
+    }
+
+    /// <summary>[이 피어] 컷 화면 저장 기준 위치 — 컷이 켜져 있으면 그 컷이 잡은 위치, 아니면 지금 위치. 연출 중이 아니면 false(타임라인 창 'Scene 뷰로' 버튼).</summary>
+    public bool TryGetCutSubjects(out BossVictoryCameraCuts.Subjects subjects)
+    {
+        subjects = _cutIndex >= 0 ? _cutSubjects : CutSubjects();
+        return _running;
     }
 
     BossVictoryCameraCuts.Subjects CutSubjects()
@@ -654,22 +662,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         var s = new BossVictoryCameraCuts.Subjects();
         s.Killer = _killer != null ? _killer.transform.position : _state.HitPoint;
         s.BossBase = _boss != null ? _boss.transform.position : _state.HitPoint;
-        s.BossCenter = s.BossBase + Vector3.up;
-        if (_boss != null && TryBossBounds(out Bounds b)) s.BossCenter = b.center;
         return s;
-    }
-
-    bool TryBossBounds(out Bounds bounds)
-    {
-        bounds = default;
-        bool any = false;
-        foreach (Renderer r in _boss.GetComponentsInChildren<Renderer>())
-        {
-            if (r == null || !r.enabled || r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
-            if (!any) { bounds = r.bounds; any = true; }
-            else bounds.Encapsulate(r.bounds);
-        }
-        return any;
     }
 
     // 컷 카메라에 들어갈 때 한 번 — 머리 위 UI·윤곽선·벽 가림·잔여 흔들림이 컷을 깬다(옛 연출과 같은 목록).

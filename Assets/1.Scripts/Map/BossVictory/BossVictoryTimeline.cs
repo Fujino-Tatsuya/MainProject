@@ -205,18 +205,32 @@ public sealed class BossVictoryTimeline
         for (int i = 0; i < cameraCut.Count; i++)
         {
             BossVictoryClip c = cameraCut[i];
-            float next = float.PositiveInfinity;
-            for (int j = 0; j < cameraCut.Count; j++)
-            {
-                float s = cameraCut[j].start;
-                if (j != i && (s > c.start || (s == c.start && j > i)) && s < next) next = s;
-            }
-            float end = float.IsPositiveInfinity(next) ? lobbyTransitionTime : next;
-            c.length = Mathf.Max(MinCutLength, end - c.start);
+            c.length = Mathf.Max(MinCutLength, CameraCutEnd(i) - c.start);
             c.fadeIn = c.fadeOut = 0f;
             c.weight = 1f;
             cameraCut[i] = c;
         }
+    }
+
+    /// <summary>컷 <paramref name="index"/> 구간 끝 = 다음(시작이 더 늦은) 컷 시작 · 마지막 컷 = 로비 전환 마커. 저장된 클립 길이와 무관(런타임·창 같은 식).</summary>
+    public float CameraCutEnd(int index)
+    {
+        float start = cameraCut[index].start;
+        float next = float.PositiveInfinity;
+        for (int j = 0; j < cameraCut.Count; j++)
+        {
+            float s = cameraCut[j].start;
+            if (j != index && (s > start || (s == start && j > index)) && s < next) next = s;
+        }
+        return float.IsPositiveInfinity(next) ? lobbyTransitionTime : next;
+    }
+
+    /// <summary>컷 <paramref name="index"/> 의 시각 t 진행(0 = 컷 시작, 1 = 구간 끝, 범위 밖은 자름). 구간이 0 이하면 1(끝 화면).</summary>
+    public float CameraCutProgress(int index, float t)
+    {
+        float start = cameraCut[index].start;
+        float length = CameraCutEnd(index) - start;
+        return length > 0f ? Mathf.Clamp01((t - start) / length) : 1f;
     }
 
     // ── 처치자 동작 끝 → 백대쉬(255) ──

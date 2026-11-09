@@ -244,7 +244,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             EditorGUI.DrawRect(new Rect(r.x, r.y, 2f, r.height), Color.white);   // 컷 = 시작 순간
             BossVictoryCameraCuts.Cut shot = Timeline.CameraCutShot(index);
             GUI.Label(new Rect(r.x + 4f, r.y + 4f, Mathf.Max(0f, r.width - 6f), r.height - 4f),
-                $"#{index + 1} {CutKindLabel(shot.kind)}{(shot.hideWalls ? "" : " · 벽 숨김 끔")}", EditorStyles.miniLabel);
+                $"#{index + 1} {AnchorLabel(shot.anchor)}{(shot.hasEnd ? " → 이동" : " 고정")}{(shot.hideWalls ? "" : " · 벽 숨김 끔")}", EditorStyles.miniLabel);
         }
         if (selected) DrawOutline(r, Color.white);
         DrawClipDecorations(r, track, clip, selected);
@@ -291,13 +291,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             ? $"{BossVictoryTimeline.MarkerLabel(marker)} (끔 — 클립 끝까지)"
             : $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
 
-    static string CutKindLabel(BossVictoryCameraCuts.Kind kind) => kind switch
-    {
-        BossVictoryCameraCuts.Kind.Wide => "와이드",
-        BossVictoryCameraCuts.Kind.BossCloseup => "보스 클로즈업",
-        BossVictoryCameraCuts.Kind.KillerFront => "처치자 정면",
-        _ => kind.ToString(),
-    };
+    static readonly string[] AnchorLabels = { "가운데", "처치자", "보스" };
+    static readonly string[] EaseLabels = { "선형", "ease in/out", "ease in", "ease out" };
+
+    static string AnchorLabel(BossVictoryCameraCuts.Anchor anchor) =>
+        (int)anchor >= 0 && (int)anchor < AnchorLabels.Length ? AnchorLabels[(int)anchor] : anchor.ToString();
 
     // 마커 = 줄 전체를 지나는 세로선 + 큰 마름모 + "이름 시각s" 라벨(상시). 화면 밖이면 그 줄 끝에 ◀/▶ 라벨을 붙여 둔다(누르면 그쪽으로 이동).
     void DrawMarkers(Rect lanes)
@@ -887,6 +885,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (!EditorApplication.isPlaying) return;
         BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
         if (p != null && _drag != DragMode.Playhead && p.GlitchTime >= 0f) _playhead = p.GlitchTime;
+        RememberSubjects();
         Repaint();
     }
 
@@ -937,6 +936,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 클립 양 끝 끌기 = 길이 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V/D · Ctrl+Z 되돌리기 · Ctrl+Y·Ctrl+Shift+Z 다시 하기", EditorStyles.miniLabel);
         }
         DrawFinisherEnd();
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            string reason = SceneViewBlockReason(out _, out _);
+            using (new EditorGUI.DisabledScope(reason != null))
+                if (GUILayout.Button($"Scene 뷰로 새 카메라 컷 ({_playhead:0.00}초)", GUILayout.Width(220f))) AddCutFromSceneView();
+            if (reason != null) GUILayout.Label(reason, EditorStyles.miniLabel);
+        }
         if (_selMarker >= 0)
         {
             var marker = (BossVictoryMarker)_selMarker;
@@ -989,31 +995,148 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
     }
 
-    // 카메라 컷 클립 — 시작(= 컷 시작)과 컷 값. 길이는 다음 컷 시작까지 자동.
+    // 카메라 컷 클립 — 시작(= 컷 시작)·기준·시작/끝 화면·곡선·벽 숨김. 길이는 다음 컷 시작까지 자동(255 후속 2).
     void DrawCutInspector()
     {
         BossVictoryClip c = Timeline.cameraCut[_selIndex];
         Timeline.SyncCameraCutShots();
         BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[_selIndex];
         EditorGUILayout.LabelField("클립", $"카메라 컷 #{_selIndex + 1}", EditorStyles.boldLabel);
+        DrawSceneViewButtons(shot);
+
         EditorGUI.BeginChangeCheck();
         c.start = Mathf.Max(0f, EditorGUILayout.FloatField("시작(초)", c.start));
-        EditorGUILayout.LabelField("유지 끝(초)", $"{c.End:0.00} — 다음 컷 시작(마지막 컷 = 로비 전환)까지 자동");
-        shot.kind = (BossVictoryCameraCuts.Kind)EditorGUILayout.Popup("종류", (int)shot.kind, new[] { "와이드(처치자·보스 가운데)", "보스 클로즈업(몸 중심)", "처치자 정면" });
-        shot.distance = Mathf.Max(0.1f, EditorGUILayout.FloatField("거리(m)", shot.distance));
-        shot.pitch = EditorGUILayout.Slider("내려다보는 각(도)", shot.pitch, -30f, 89f);
-        shot.yaw = EditorGUILayout.Slider(new GUIContent("방위(도)", "0 = 처치자 쪽에서 보스를 봄 · 180 = 반대편에서 처치자를 봄 · + = 시계 방향"), shot.yaw, -180f, 180f);
-        shot.lookHeight = EditorGUILayout.FloatField(new GUIContent("초점 높이(m)", "와이드·처치자 = 발밑 기준, 보스 클로즈업 = 몸 중심 기준"), shot.lookHeight);
-        shot.fov = EditorGUILayout.Slider("FOV", shot.fov, 10f, 90f);
-        shot.hideWalls = EditorGUILayout.Toggle(new GUIContent("벽 숨김", "켜면 이 컷 카메라를 가리는 벽을 끈다. 끄면 이 컷 동안 벽 숨김 없음 — 앞 컷에서 숨겼던 벽도 다시 보인다."), shot.hideWalls);
+        EditorGUILayout.LabelField("구간 끝(초)", $"{Timeline.CameraCutEnd(_selIndex):0.00} — 다음 컷 시작(마지막 컷 = 로비 전환)까지 자동");
+        shot.anchor = (BossVictoryCameraCuts.Anchor)EditorGUILayout.Popup(new GUIContent("기준",
+                "화면을 이 점 + 처치자→보스 수평 축 좌표계로 저장 — 어디서 죽든 같은 구도. 바꾸면 저장된 화면은 새 기준으로 다시 읽힌다(Scene 뷰로 다시 찍기 권장)."),
+            (int)shot.anchor, AnchorLabels);
+        EditorGUILayout.LabelField("시작 화면", EditorStyles.miniBoldLabel);
+        shot.startPosition = EditorGUILayout.Vector3Field("위치(기준 m)", shot.startPosition);
+        shot.startRotation = Quaternion.Euler(EditorGUILayout.Vector3Field("회전(기준 °)", shot.startRotation.eulerAngles));
+        shot.startFov = EditorGUILayout.Slider("FOV", shot.startFov, 10f, 90f);
+        shot.hasEnd = EditorGUILayout.Toggle(new GUIContent("끝 화면 (이동)", "켜면 컷 구간 동안 시작 → 끝 화면으로 이동. 끄면 고정 컷."), shot.hasEnd);
+        using (new EditorGUI.DisabledScope(!shot.hasEnd))
+        {
+            shot.endPosition = EditorGUILayout.Vector3Field("위치(기준 m)", shot.endPosition);
+            shot.endRotation = Quaternion.Euler(EditorGUILayout.Vector3Field("회전(기준 °)", shot.endRotation.eulerAngles));
+            shot.endFov = EditorGUILayout.Slider("FOV", shot.endFov, 10f, 90f);
+            shot.ease = (BossVictoryCameraCuts.Ease)EditorGUILayout.Popup("이동 곡선", (int)shot.ease, EaseLabels);
+        }
+        shot.hideWalls = EditorGUILayout.Toggle(new GUIContent("벽 숨김",
+            "켜면 이 컷 카메라를 가리는 벽을 끈다(이동 중이면 매 프레임 그 위치로). 끄면 이 컷 동안 벽 숨김 없음 — 앞 컷에서 숨겼던 벽도 다시 보인다."), shot.hideWalls);
         if (EditorGUI.EndChangeCheck())
         {
             RecordField("처치 연출 타임라인 카메라 컷 수치");
             Timeline.cameraCut[_selIndex] = c;
             Timeline.cameraCutShots[_selIndex] = shot;
             Save();
-            if (EditorApplication.isPlaying) BossVictoryGlitchPresentation.Instance?.PreviewRecut();
         }
+    }
+
+    // ── 'Scene 뷰로' — 지금 보고 있는 Scene 뷰 화면을 컷 화면으로(255 후속 2) ──
+    // 저장 = 기준 좌표계(기준점 + 처치자→보스 축). 그 기준이 되는 처치자·보스 위치:
+    // Play 중 연출이 돌면 지금 컷이 잡은 위치(컷 전이면 지금 위치) · 아니면 이 에디터 세션에서 마지막으로 본 회차 위치(SessionState). 없으면 버튼을 막는다.
+
+    const string SubjectsKey = "BossVictoryTimeline.LastSubjects";
+
+    static bool TryGetSubjects(out BossVictoryCameraCuts.Subjects s, out string source)
+    {
+        BossVictoryGlitchPresentation p = EditorApplication.isPlaying ? BossVictoryGlitchPresentation.Instance : null;
+        if (p != null && p.TryGetCutSubjects(out s))
+        {
+            source = "지금 회차";
+            return true;
+        }
+        s = default;
+        source = "";
+        if (!SessionState.GetBool(SubjectsKey, false)) return false;
+        s.Killer = SessionState.GetVector3(SubjectsKey + ".Killer", Vector3.zero);
+        s.BossBase = SessionState.GetVector3(SubjectsKey + ".Boss", Vector3.forward);
+        source = "마지막 회차";
+        return true;
+    }
+
+    // Play 중 연출이 돌면 기준 위치를 기억해 둔다(Play 를 끈 뒤에도 같은 기준으로 찍게).
+    static void RememberSubjects()
+    {
+        BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
+        if (p == null || !p.TryGetCutSubjects(out BossVictoryCameraCuts.Subjects s)) return;
+        SessionState.SetBool(SubjectsKey, true);
+        SessionState.SetVector3(SubjectsKey + ".Killer", s.Killer);
+        SessionState.SetVector3(SubjectsKey + ".Boss", s.BossBase);
+    }
+
+    static bool TryGetSceneView(out Vector3 position, out Quaternion rotation, out float fov)
+    {
+        SceneView sv = SceneView.lastActiveSceneView;
+        Camera cam = sv != null ? sv.camera : null;
+        position = cam != null ? cam.transform.position : default;
+        rotation = cam != null ? cam.transform.rotation : Quaternion.identity;
+        fov = cam != null ? Mathf.Clamp(cam.fieldOfView, 10f, 90f) : 40f;
+        return cam != null && !sv.orthographic;
+    }
+
+    // 막힌 이유(없으면 null).
+    static string SceneViewBlockReason(out BossVictoryCameraCuts.Subjects s, out string source)
+    {
+        if (!TryGetSubjects(out s, out source)) return "기준 위치 없음 — 디버그 씬(DebugBossVictory)에서 Play 해 연출을 한 번 돌리면 생긴다";
+        if (!TryGetSceneView(out _, out _, out _)) return "Scene 뷰 없음(또는 직교 보기) — Scene 뷰를 원근으로 열어 둘 것";
+        return null;
+    }
+
+    void DrawSceneViewButtons(BossVictoryCameraCuts.Cut shot)
+    {
+        string reason = SceneViewBlockReason(out BossVictoryCameraCuts.Subjects s, out string source);
+        using (new EditorGUILayout.HorizontalScope())
+        using (new EditorGUI.DisabledScope(reason != null))
+        {
+            if (GUILayout.Button("지금 Scene 뷰로 시작 화면")) CaptureSceneView(s, end: false);
+            if (GUILayout.Button("지금 Scene 뷰로 끝 화면")) CaptureSceneView(s, end: true);
+        }
+        EditorGUILayout.LabelField(reason ?? $"기준 = {source} 처치자·보스 위치 · 컷 기준 '{AnchorLabel(shot.anchor)}'", EditorStyles.wordWrappedMiniLabel);
+    }
+
+    void CaptureSceneView(BossVictoryCameraCuts.Subjects s, bool end)
+    {
+        if (!HasClipSelection || _selTrack != (int)BossVictoryTrack.CameraCut || !TryGetSceneView(out Vector3 pos, out Quaternion rot, out float fov)) return;
+        Record(end ? "처치 연출 타임라인 컷 끝 화면 = Scene 뷰" : "처치 연출 타임라인 컷 시작 화면 = Scene 뷰");
+        Timeline.SyncCameraCutShots();
+        BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[_selIndex];
+        BossVictoryCameraCuts.ToLocal(shot.anchor, s, pos, rot, out Vector3 lp, out Quaternion lr);
+        if (end)
+        {
+            shot.hasEnd = true;
+            shot.endPosition = lp;
+            shot.endRotation = lr;
+            shot.endFov = fov;
+        }
+        else
+        {
+            shot.startPosition = lp;
+            shot.startRotation = lr;
+            shot.startFov = fov;
+        }
+        Timeline.cameraCutShots[_selIndex] = shot;
+        Save();
+        Repaint();
+    }
+
+    // 재생 헤드 시각에 컷 하나를 만들고 시작 화면 = 지금 Scene 뷰(기준 = 가운데, 고정).
+    void AddCutFromSceneView()
+    {
+        if (SceneViewBlockReason(out BossVictoryCameraCuts.Subjects s, out _) != null || !TryGetSceneView(out Vector3 pos, out Quaternion rot, out float fov)) return;
+        Record("처치 연출 타임라인 Scene 뷰로 새 컷");
+        Timeline.SyncCameraCutShots();
+        BossVictoryCameraCuts.Cut shot = BossVictoryCameraCuts.Cut.Default;
+        BossVictoryCameraCuts.ToLocal(shot.anchor, s, pos, rot, out Vector3 lp, out Quaternion lr);
+        shot.startPosition = shot.endPosition = lp;
+        shot.startRotation = shot.endRotation = lr;
+        shot.startFov = shot.endFov = fov;
+        Timeline.cameraCut.Add(BossVictoryClip.Make(Mathf.Max(0f, Snap(_playhead)), 1f));
+        Timeline.cameraCutShots.Add(shot);
+        Select((int)BossVictoryTrack.CameraCut, Timeline.cameraCut.Count - 1, -1);
+        Save();
+        Repaint();
     }
 
     // ── 처치 연출 스킬 End 시각(읽기 전용, 255) ──────────────────────────
