@@ -60,18 +60,19 @@ public static class TraitUiAuthoring
             // ── 획득 특성 다시 보기(왼쪽 가운데, 벌집 2열 — 할 일 253) ──
             // 상자 왼쪽 아래가 벌집 원점(TraitIconHoneycomb) — 칸 배치는 TraitSelectionView 가 하고, 상자 위치는 이 RectTransform 이 정한다.
             RectTransform list = NewUi("AcquiredList", root.transform);
-            Anchor(list, new Vector2(0f, 0.5f), new Vector2(24f, -90f), new Vector2(116f, 180f));
+            Anchor(list, new Vector2(0f, 0.5f), new Vector2(24f, -90f), new Vector2(112f, 180f));
             list.pivot = Vector2.zero;
 
             RectTransform iconTemplate = NewUi("IconTemplate", list);
             iconTemplate.anchorMin = iconTemplate.anchorMax = Vector2.zero;
-            iconTemplate.sizeDelta = new Vector2(64f, 56f);
-            Image iconFrame = AddPanel(iconTemplate.gameObject);
-            iconFrame.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(HexagonSpritePath); // 없으면 네모
-            iconFrame.raycastTarget = true; // 호버 판정
-            iconTemplate.gameObject.AddComponent<Mask>().showMaskGraphic = true; // 아이콘을 육각형으로 자른다
+            iconTemplate.sizeDelta = new Vector2(64f, 57.2f); // 육각형 칸(TraitIcon png 안 육각형 94×84 비율)
+            // 아이콘 아트가 이미 육각형(TraitIcon) — 테두리·마스크 없이 그림만. 투명 Image 는 호버 판정 칸(육각형 크기).
+            Image hitArea = iconTemplate.gameObject.AddComponent<Image>();
+            hitArea.color = new Color(0f, 0f, 0f, 0f);
+            hitArea.raycastTarget = true;
             RectTransform iconImageRect = NewUi("Icon", iconTemplate);
-            Stretch(iconImageRect, 6f);
+            iconImageRect.anchorMin = iconImageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconImageRect.sizeDelta = new Vector2(64f * 136f / 94f, 64f * 136f / 94f); // TraitSelectionView.iconSizePerCellWidth 와 같은 비율
             Image iconImage = iconImageRect.gameObject.AddComponent<Image>();
             iconImage.raycastTarget = false;
             iconImage.preserveAspect = true;
@@ -624,8 +625,6 @@ public static class TraitUiAuthoring
 
     // ── 할 일 165 후속 — 기본 공격(LMB) 슬롯: 검 아이콘 + 보는 사람 캐릭터 색 ──
     private const string BasicAttackIconPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/tooltipIcon_Sword.png";
-    // 획득 특성 벌집 칸(253) — 평평한 윗변 흰 육각형(알파 있음, SVN 아트). 정식 아트가 오면 경로만 바꾼다.
-    private const string HexagonSpritePath = "Assets/50.Art/TestAssets/Temp_Images/CombatHUD/hexagon.png";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
     private const string TagStylesPath = "Assets/2.Prefabs/UI/SkillTooltipGenerated/SkillTooltipTagStyles.asset";
 
