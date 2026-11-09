@@ -132,7 +132,7 @@
 - **렌더** `Rendering/BossVictory/BossVictoryGlitchRender`(static) — 렌더러 에셋 무수정, 연출 동안만 `beginCameraRendering` 에서 게임 카메라에 패스 2개(옛 BossVictoryRender 방식). 마스터 세기 0 이면 비용 0.
   1. 마스크(반투명 전): 렌더링 레이어 비트 4 = 플레이어(처치자·팀원·랩 복제본), 6 = 보스 → ID 텍스처(R 플레이어 · B 보스). 셰이더 `Hidden/Rendering/BossVictoryGlitchMask`(깊이 비교 + 여유 8cm).
   2. 합성(반투명 뒤, 후처리 전): `Hidden/Rendering/BossVictoryGlitch` — 가로 늘어남·물결·계단·슬라이스·블록 모자이크(마스크도 같은 왜곡 UV) → RGB 분리·스미어 → 흑백 → 배경만 호박색(플레이어는 흑백 유지) → 보스 노이즈 → 흑백 플래시 → CRT 주사선.
-- **보스 노이즈** = `Assets/3.Materials/BossVictory/BossNoise_Stripes.png`(사용자 제공 1024², Repeat·선형·밉맵) — 실루엣 안에서 흑백을 밝은 색(`bossNoiseBrightColor` × `bossNoiseBrightIntensity` 1.6 — 과노출)·어두운 적갈색(`bossNoiseDarkColor` #3A1712)으로. 스크롤 `bossNoiseScroll`(기본 가로 0.6/초)·타일링. 공간 `bossNoiseSpace` = **Screen(기본 — 화면 세로 1)** / Boss(보스 화면 중심·높이 기준 — 보스와 같이 움직이고 클로즈업에서 커짐). 외곽 가로 지글 `bossJiggle`.
+- **보스 노이즈** = `Assets/3.Materials/BossVictory/BossNoise_Stripes.png`(사용자 제공 1024², Repeat·선형·밉맵) — 실루엣 안에서 흑백을 밝은 색(`bossNoiseBrightColor` × `bossNoiseBrightIntensity` 1.6 — 과노출)·어두운 적갈색(`bossNoiseDarkColor` #3A1712)으로. ~~스크롤 `bossNoiseScroll`~~(11-09 삭제 — 아래 "노이즈 UV = 카메라 이동")·타일링. 공간 `bossNoiseSpace` = **Screen(기본 — 화면 세로 1)** / Boss(보스 화면 중심·높이 기준 — 보스와 같이 움직이고 클로즈업에서 커짐). 외곽 가로 지글 `bossJiggle`.
 - **SO 타임라인**(`BossVictoryGlitchSettings` "글리치 타임라인") — 곡선 16개(master·desaturate·amber·scanline·wave·stepShift·stretch·block·smear·slice·rgbSplit·flash·characterGlitch·bossNoise·bossJiggle·hudHide), 길이 `glitchDuration` 3.5초(뒤로는 마지막 값 정지). 기본 곡선은 위 "타임라인 갱신" 표에 맞춘 코드 기본값(에셋에 곡선을 안 써 둬서 인스펙터에서 처음 고치는 순간 저장된다). 블록 펄스가 컷 전환 시각(0.33·1.67·2.6)을 가린다(컷은 4단계).
 - 시계 = 표시의 `GlitchTime`(게임 시간 — 랩 배속·일시정지에 같이 멈춤, 실게임은 timeScale 1). HUD 숨김 = `CinematicOverlay.HideHud`(hudHide > 0.5), 정리 때 복구.
 - 셰이더 2개·텍스처는 설정 에셋이 참조(빌드 포함).
@@ -171,3 +171,9 @@
 - 랩(`Dev/BossVictoryLab/DebugBossVictoryLab`): 기존 "처음부터 (F7)"·일시정지(F8)·배속·자동 반복 그대로. 패널에 표시 단계·글리치 시각·컷 번호·CRT 꺼짐 끝 표시 · **재생 중 패널 접기**(기본 켬 — 오른쪽 아래 한 줄, CRT 꺼짐 캡처에 IMGUI 패널이 안 찍히게) · 끝 판정 = 호스트 화면 CRT 꺼짐 끝(결과 차단 신호), 안전망 15초 툴팁 갱신.
 - 문서: 이 문서 맨 위 "지금 흐름 한눈에" · AGENTS.md 색인 문구 갱신.
 - Play 확인(사용자): 아래 6항목 — ① 처치 즉시 흑백·호박색·보스 노이즈·HUD 숨김 ② 처치자 스킬 애니가 글리치 속에서 재생·End 에서 느려짐 ③ Rectify 외곽선 → 다색 채움 → 섬광 → 노랑 ④ 3.5초 뒤 1초 정지 → CRT 꺼짐 → 검정 ⑤ 랩: 끝나면 원상복구 → 반복, 카메라·HUD·벽 복구 ⑥ 실게임/MPPM: 호스트 꺼짐 끝에 로비 결과 패널.
+
+### 변경 — 보스 노이즈 UV = 카메라 이동으로만 (11-09 사용자)
+- 시간 기반 자동 스크롤(`bossNoiseScroll` 가로 0.6/초) **삭제**. 매 프레임 `Camera.main` 위치 변화를 카메라 right/up 축에 투영해 오프셋에 누적: 오른쪽 이동 → U 감소 · 왼쪽 → U 증가 · 위 → V 증가 · 아래 → V 감소. 카메라가 멈추면 노이즈도 멈춘다.
+- 배율 = `bossNoiseCameraScale`(Vector2, **U·V 따로** — 기본 0.1/m 둘 다). 따로 둔 이유: 화면 비율·탑다운 카메라 특성상 가로·세로 이동량 느낌이 달라 따로 맞추는 게 편하다(같게 쓰려면 같은 값).
+- 첫 프레임·컷 전환 프레임(텔레포트)은 누적에서 빼고 기준점만 다시 잡는다. 화면 공간/보스 기준 토글은 그대로, 두 모드 같은 규칙(셰이더 `nUV * 타일링 + 오프셋`).
+- 외곽 가로 떨림(`bossJiggle`)·플레이어 떨림·글리치 난수는 **시간 기반 그대로 유지**(24fps 난수) — 사용자 확인 필요.

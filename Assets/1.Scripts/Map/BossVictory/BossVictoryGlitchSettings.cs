@@ -76,8 +76,9 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public NoiseSpace bossNoiseSpace = NoiseSpace.Screen;
     [Tooltip("타일링(화면 세로 또는 보스 화면 높이 1 당 반복 수).")]
     public Vector2 bossNoiseTiling = new Vector2(1f, 1f);
-    [Tooltip("스크롤(초당 UV) — 주 흐름 가로.")]
-    public Vector2 bossNoiseScroll = new Vector2(0.6f, 0f);
+    [Tooltip("카메라 이동 → 노이즈 UV 배율(카메라 1m 당 UV, x = U · y = V). 시간 흐름은 없다 — 카메라가 움직일 때만 움직인다.\n" +
+             "카메라 오른쪽 이동 → U 감소 · 왼쪽 → U 증가 · 위 → V 증가 · 아래 → V 감소(카메라 right/up 축 투영). 컷(텔레포트) 프레임은 뺀다.")]
+    public Vector2 bossNoiseCameraScale = new Vector2(0.1f, 0.1f);
     public Color bossNoiseBrightColor = new Color32(0xFF, 0xF6, 0xEA, 0xFF);
     [Tooltip("밝은 색 배율(과노출 느낌 — 블룸이 받는다).")]
     [Min(0f)] public float bossNoiseBrightIntensity = 1.6f;

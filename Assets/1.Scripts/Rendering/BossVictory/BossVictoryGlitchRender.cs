@@ -49,6 +49,7 @@ public static class BossVictoryGlitchRender
         public float BossJiggle;    // 보스 외곽 가로 지글
         public Vector2 BossScreenCenter;   // 보스 중심(뷰포트 0~1) — 노이즈 보스 기준 공간
         public float BossScreenSize;       // 보스 화면 높이(뷰포트) — 노이즈 보스 기준 공간 배율
+        public Vector2 NoiseOffset;        // 노이즈 UV 오프셋 — 카메라 이동으로만 누적(시간 흐름 없음)
     }
 
     static readonly int IdId = Shader.PropertyToID("_GlitchId");
@@ -60,7 +61,7 @@ public static class BossVictoryGlitchRender
     static readonly int IdBossScreen = Shader.PropertyToID("_BossScreen");   // xy 중심, z 화면 높이, w 공간(0 화면 · 1 보스 기준)
     static readonly int IdAmberColor = Shader.PropertyToID("_AmberColor");
     static readonly int IdNoiseTex = Shader.PropertyToID("_NoiseTex");
-    static readonly int IdNoiseST = Shader.PropertyToID("_NoiseST");          // xy 타일링, zw 스크롤(초당)
+    static readonly int IdNoiseST = Shader.PropertyToID("_NoiseST");          // xy 타일링, zw UV 오프셋(카메라 이동 누적)
     static readonly int IdNoiseBright = Shader.PropertyToID("_NoiseBright");
     static readonly int IdNoiseDark = Shader.PropertyToID("_NoiseDark");
     static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 물결 주파수, z 블록 크기(px), w 슬라이스 줄 수
@@ -123,7 +124,7 @@ public static class BossVictoryGlitchRender
         if (_composite == null || s == null) return;
         _composite.SetColor(IdAmberColor, s.amberColor.linear);
         _composite.SetTexture(IdNoiseTex, s.bossNoiseTexture != null ? s.bossNoiseTexture : Texture2D.grayTexture);
-        _composite.SetVector(IdNoiseST, new Vector4(s.bossNoiseTiling.x, s.bossNoiseTiling.y, s.bossNoiseScroll.x, s.bossNoiseScroll.y));
+        _noiseTiling = s.bossNoiseTiling;
         _composite.SetColor(IdNoiseBright, s.bossNoiseBrightColor.linear * Mathf.Max(0f, s.bossNoiseBrightIntensity));
         _composite.SetColor(IdNoiseDark, s.bossNoiseDarkColor.linear);
         _composite.SetVector(IdLook, new Vector4(Mathf.Max(1f, s.scanlineCount), Mathf.Max(0f, s.waveFrequency),
@@ -132,6 +133,7 @@ public static class BossVictoryGlitchRender
     }
 
     static float _noiseSpace;
+    static Vector2 _noiseTiling = Vector2.one;
 
     /// <summary>이번 프레임 세기(표시가 매 프레임).</summary>
     public static void SetFrame(in Frame f)
@@ -143,6 +145,7 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdC, new Vector4(f.Block, f.Smear, f.Slice, f.RgbSplit));
         _composite.SetVector(IdD, new Vector4(f.Flash, f.CharGlitch, f.BossNoise, f.BossJiggle));
         _composite.SetVector(IdBossScreen, new Vector4(f.BossScreenCenter.x, f.BossScreenCenter.y, Mathf.Max(0.01f, f.BossScreenSize), _noiseSpace));
+        _composite.SetVector(IdNoiseST, new Vector4(_noiseTiling.x, _noiseTiling.y, f.NoiseOffset.x, f.NoiseOffset.y));
     }
 
     /// <summary>렌더러에 비트를 더한다(OR). 돌려받은 목록으로 <see cref="Untag"/>.</summary>

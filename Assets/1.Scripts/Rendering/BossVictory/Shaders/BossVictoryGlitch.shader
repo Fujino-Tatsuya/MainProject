@@ -3,7 +3,7 @@
 //  반투명(이펙트) 렌더 뒤, 후처리 전. 입력 = _BlitTexture(씬색) + _GlitchIdTex(R 플레이어 · B 보스 마스크).
 //  세기는 C#(BossVictoryGlitchRender.SetFrame)이 설정 SO 타임라인 곡선으로 매 프레임 넣는다.
 //    UV 왜곡: 가로 늘어남 → 가로줄 물결 → 계단식 세로 어긋남 → 슬라이스 → 블록 모자이크(같은 UV 로 마스크도 읽는다 — 실루엣이 같이 어긋난다)
-//    색: RGB 분리 · 가로 스미어 → 흑백(Desat) → 배경만 호박색(Amber, 플레이어 제외, 플레이어는 흑백) → 보스 = 흑백 노이즈 텍스처 UV 애니메이션
+//    색: RGB 분리 · 가로 스미어 → 흑백(Desat) → 배경만 호박색(Amber, 플레이어 제외, 플레이어는 흑백) → 보스 = 흑백 노이즈 텍스처(UV 는 카메라 이동으로만 움직임)
 //        (흰 = 과노출 밝은 색, 검 = 어두운 적갈색 · 화면 공간 기본 / 보스 기준 공간 토글) → 흑백 플래시 → CRT 주사선.
 //  흰 링(충격파)은 없다(사용자 결정).
 // ----------------------------------------------------------------------------
@@ -40,7 +40,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             float4 _GlitchLook;   // x 주사선 줄 수, y 물결 주파수, z 블록 크기(px), w 슬라이스 줄 수
             float4 _BossScreen;   // xy 보스 중심(뷰포트), z 보스 화면 높이, w 공간(0 화면 · 1 보스 기준)
             float4 _AmberColor;
-            float4 _NoiseST;      // xy 타일링, zw 스크롤(초당)
+            float4 _NoiseST;      // xy 타일링, zw UV 오프셋(카메라 이동 누적 — 시간 흐름 없음)
             float4 _NoiseBright;
             float4 _NoiseDark;
 
@@ -133,7 +133,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 float2 nUV = _BossScreen.w > 0.5
                     ? (uv - _BossScreen.xy) * float2(aspect, 1.0) / _BossScreen.z   // 보스 기준(보스 화면 높이 = 1)
                     : uv * float2(aspect, 1.0);                                      // 화면 공간(세로 = 1)
-                nUV = nUV * _NoiseST.xy + _NoiseST.zw * t;
+                nUV = nUV * _NoiseST.xy + _NoiseST.zw;
                 half n = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, nUV).r;
                 half3 noiseCol = lerp(_NoiseDark.rgb, _NoiseBright.rgb, n);
                 graded = lerp(graded, noiseCol, boss * (half)_GlitchD.z);

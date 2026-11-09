@@ -67,6 +67,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     readonly List<Renderer> _tagged = new List<Renderer>();
     BossVictoryRectifyText _text;   // 5단계
 
+    // 보스 노이즈 UV — 카메라 이동으로만 누적(11-09 사용자)
+    Vector2 _noiseOffset;
+    Vector3 _noiseCamPos;
+    bool _noiseCamValid;
+    bool _cutJumped;   // 이번 프레임 컷 전환(텔레포트) — 누적에서 뺀다
+
     // 6단계 — 유지 → CRT 꺼짐
     BossVictoryCrtOff _crt;
     Coroutine _crtRoutine;
@@ -263,6 +269,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         _glitchOn = true;
         _glitchTime = startTime;
+        _noiseOffset = Vector2.zero;
+        _noiseCamValid = false;
+        _cutJumped = false;
         _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
         _text = new BossVictoryRectifyText(_overlay.Root, _settings, _director != null ? _director.IntroFont : null);
         _renderOn = BossVictoryGlitchRender.Enable(_settings);
@@ -316,6 +325,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             BossJiggle = s.bossJiggle.Evaluate(t),
         };
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
+        frame.NoiseOffset = TickNoiseOffset(s);
         BossVictoryGlitchRender.SetFrame(frame);
     }
 
@@ -360,6 +370,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         int index = BossVictoryCameraCuts.ActiveIndex(_settings.cuts, _glitchTime);
         if (index == _cutIndex || index < 0) return;
         _cutIndex = index;
+        _cutJumped = true;
         BossVictoryCameraCuts.Cut cut = _settings.cuts[index];
         BossVictoryCameraCuts.Subjects subjects = CutSubjects();
         BossVictoryCameraCuts.Pose(cut, subjects, out Vector3 pos, out Quaternion rot);
@@ -502,6 +513,28 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         EnemyOutlineFeature.SuppressedByCinematic = false;
         WallOcclusionDriver.SuppressedByCinematic = false;
         WallTransparencyGroup.SuppressedByCinematic = false;
+    }
+
+    // 보스 노이즈 UV 오프셋 — 이번 프레임 카메라 위치 변화를 카메라 right/up 축에 투영해 누적(화면 공간·보스 기준 같은 규칙).
+    // 오른쪽 → U 감소 · 위 → V 증가. 첫 프레임·컷 전환 프레임(텔레포트)은 기준점만 다시 잡는다.
+    Vector2 TickNoiseOffset(BossVictoryGlitchSettings s)
+    {
+        Camera cam = Camera.main;
+        if (cam == null) { _noiseCamValid = false; return _noiseOffset; }
+        Transform ct = cam.transform;
+        Vector3 pos = ct.position;
+        if (_noiseCamValid && !_cutJumped)
+        {
+            Vector3 delta = pos - _noiseCamPos;
+            _noiseOffset.x -= Vector3.Dot(delta, ct.right) * s.bossNoiseCameraScale.x;
+            _noiseOffset.y += Vector3.Dot(delta, ct.up) * s.bossNoiseCameraScale.y;
+            _noiseOffset.x = Mathf.Repeat(_noiseOffset.x, 1024f);   // 텍스처는 Repeat — 정밀도만 지킨다
+            _noiseOffset.y = Mathf.Repeat(_noiseOffset.y, 1024f);
+        }
+        _noiseCamPos = pos;
+        _noiseCamValid = true;
+        _cutJumped = false;
+        return _noiseOffset;
     }
 
     // 보스 화면 위치·높이(뷰포트) — 노이즈 "보스 기준" 공간용. 못 구하면 화면 가운데·높이 1.
