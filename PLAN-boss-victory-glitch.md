@@ -1,20 +1,20 @@
 # PLAN — 보스 처치 연출 교체: ZZZ "WIPEOUT" 글리치 (2026-11-09 사용자 확정)
 
 > **원본 문서**(브랜치 `feature/BossVictoryDebugScene`). 옛 처치 연출 문서 [PLAN-boss-victory-cinematic.md](PLAN-boss-victory-cinematic.md) 는 Legacy 기록.
-> 진행(11-09): 1 Legacy 이동 ✅ · 2 시간 배율·소거·처치 연출 스킬 ✅ · 3 글리치 렌더·흑백·보스 노이즈·SO 타임라인 ✅ · 4 카메라 컷 구조 ✅(기본 목록 비움 — 게임 카메라만) · 사양 변경: 글리치 = 처치 판정 즉시 ✅ · 5 Rectify 글자 ✅ → **11-09 제거**(사용자) · 6 유지 → CRT 꺼짐 → 로비 결과 ✅ · 7 디버그 랩·문서 ✅ — 아래 "진행 기록". ⏳ Unity 컴파일·셰이더·EditMode·Play(이 레인은 Unity 없음).
+> 진행(11-09): 1 Legacy 이동 ✅ · 2 시간 배율·소거·처치 연출 스킬 ✅ · 3 글리치 렌더·흑백·보스 노이즈·SO 타임라인 ✅ · 4 카메라 컷 구조 ✅(기본 목록 비움 — 게임 카메라만) · 사양 변경: 글리치 = 처치 판정 즉시 ✅ · 5 Rectify 글자 ✅ → **11-09 제거**(사용자) · 6 유지 → CRT 꺼짐 → 로비 결과 ✅ · 7 디버그 랩·문서 ✅ · **타임라인 에디터 창 ①~⑤ ✅**(곡선 → 클립 목록·마커, 창 `Tools/Boss Victory/처치 연출 타임라인`) — 아래 "진행 기록". ⏳ Unity 컴파일·셰이더·EditMode·Play(이 레인은 Unity 없음).
 
 ## 지금 흐름 한눈에 (최종 — 아래 진행 기록이 근거)
 | 처치 판정 뒤(초, 게임 시간) | 일 | 어디서 |
 |---|---|---|
 | 0 | 서버: 막타·보스·시각 복제 · 무적 · 연출 잠금(스킬 취소·입력 차단) · 장판·투사체 디스폰. 각 피어: 이펙트 소거 · 그 외 플레이어 0.05 · 보스 0 · **글리치 시계 시작** | `TryStartVictoryServer` · `BossVictoryGlitchPresentation.Begin` |
 | 0 ~ 스킬 End | 처치자: 하던 동작 ×0.5 그 클립 끝까지 → 백대쉬(등장 연출 밀림, ×1) → 처치 연출 스킬(기본 R, 표시 전용, ×1) → End 에서 처치자·보스 ×0.1 | `StartKillerSequence` · `BossEncounterDirector.StepSkid` · `PlayPresentationOnly` · `OnFinisherEnded` |
-| 0.08 ~ 3.5 | 글리치 = **가로줄 좌우 찢김 + 찢긴 줄 밝은 부분 끌림만**(11-09) · 색: 흑백·호박색·주사선·보스 노이즈(카메라 이동 UV) — 흑백 플래시 삭제(11-09) · HUD 숨김 | `BossVictoryGlitchRender` + 셰이더 2개 |
-| 0.10(흑백 시작 = `desaturate` 곡선 > 0) | 처치자 아닌 피어 카메라 → 처치자 즉시 컷 · 처치자 외 플레이어 모든 화면에서 숨김(렌더러·캔버스·머리 위 체력바) — 정리 때 복구(11-09) | `TickDesaturateCue` |
+| 0.08 ~ 3.5 (클립) | 글리치 = **가로줄 좌우 찢김 + 찢긴 줄 밝은 부분 끌림만**(11-09) · 색: 흑백·호박색·주사선·보스 노이즈(카메라 이동 UV) — 흑백 플래시 삭제(11-09) · HUD 숨김 | `BossVictoryGlitchRender` + 셰이더 2개 |
+| 0.20(마커 2개 — 첫 찢김 최고점) | 처치자 아닌 피어 카메라 → 처치자 즉시 컷 · 처치자 외 플레이어 모든 화면에서 숨김(렌더러·캔버스·머리 위 체력바) — 되감거나 정리 때 복구(11-09) | `TickMarkers` |
 | (컷) | 기본 없음(게임 카메라) — 목록에 넣으면 끊어 붙임 | `BossVictoryCameraCuts` |
-| 3.5 ~ 4.5 | 정지 화면 유지(`holdSeconds`) | |
-| 4.5 ~ 5.6 | CRT 꺼짐(`Title/CRTOff`) → 검정 | `BossVictoryCrtOff` |
-| 호스트 끝 | 서버가 결과 전환 → 로비(결과 패널) | `TickVictoryServer` → `TickResultTransition` |
-수치는 전부 `Resources/BossVictory/BossVictoryGlitchSettings.asset`. 디버그 = `0.Scenes/Debug/DebugBossVictory`(Dev Boot, 솔로 호스트, F7 처음부터·F8 일시정지·배속).
+| 3.5 ~ 4.5 | 정지 유지 클립(화면 효과 시각을 클립 시작에 고정) | `BossVictoryTimeline.EffectTime` |
+| 4.5 ~ 5.6 | TV 꺼짐 클립(`Title/CRTOff`, 시작에 캡처·진행 = 클립 안 위치) → 검정 | `BossVictoryCrtOff` |
+| 5.6(로비 전환 마커) | 호스트 화면이 지나면 서버가 결과 전환 → 로비(결과 패널) | `TickCrtAndLobby` → `TickVictoryServer` |
+수치는 전부 `Resources/BossVictory/BossVictoryGlitchSettings.asset` — 시각·길이는 타임라인(`timeline`, 창 `Tools/Boss Victory/처치 연출 타임라인`). 디버그 = `0.Scenes/Debug/DebugBossVictory`(Dev Boot, 솔로 호스트, F7 처음부터·F8 일시정지·배속 · 창 재생 헤드 스크럽).
 
 레퍼런스: `C:\Users\user\Desktop\Top WIPEOUTS and CAKEOUTS ver. 4 (3.1) - Zenless Zone Zero [KfjGNVzCIdA].webm` 0~1.2초.
 프레임 시트: `_lane-artifacts/Work2/zzz_sheet.png`(0.1초 간격), `zzz_sheet2.png`(0.28~0.70초 30fps).
@@ -225,3 +225,11 @@
 - **Q6 첫 버전 기능**: 클립 드래그 이동·양 끝 리사이즈·페이드 손잡이·추가/삭제·복사/붙여넣기·시간축 줌·0.01초 스냅·Undo·선택 클립 수치 직접 입력. 키프레임 곡선 편집 제외.
 - **Q7** Work2 `feature/BossVictoryDebugScene` 이어서.
 - 완료 조건: 기본 클립 평가 = 옛 기본 곡선(에셋 값) — EditMode `^BossVictoryTimeline` 로 0~5.6초 표본 비교.
+
+### 타임라인 에디터 창 ①~⑤ (11-09 — 위 "타임라인 에디터 창" 사양)
+- **① 데이터·런타임**(`881ac08a`): `BossVictoryTimeline`(SO 칸 `timeline`) — 트랙 10개 클립 목록(`BossVictoryClip` 시작·길이·페이드 인/아웃·세기, smoothstep 페이드, 겹치면 큰 값) + 마커 3개. 곡선 8개·`glitchDuration`·`holdSeconds`·`crtOffSeconds` 삭제. 표시는 매 프레임 시각 t 상태로 맞춤 — HUD 숨김(되돌림 포함)·마커(되감으면 카메라·숨김 되돌림)·TV 꺼짐(`BossVictoryCrtOff.SetProgress`, 앞으로 되감으면 걷음)·로비 전환 마커(지날 때 `PresentationFinished`). 에셋 YAML 을 기본 클립으로 다시 씀. EditMode `^BossVictoryTimeline` — 코드·에셋 기본 클립 vs 교체 직전 에셋 곡선 0~5.6초 0.0025초 간격 오차 1e-3.
+- **② 창 표시**(`0ba65feb`): `Editor/BossVictoryTimelineWindow.cs` — 눈금자(줌에 맞춘 0.01~2초 눈금)·트랙 이름(·펄스/·1개)·클립 색(구간 파랑·펄스 주황·정지 유지/TV 꺼짐 보라)+값 모양 선·마커 마름모+세로선·재생 헤드(빨강)·휠 줌(마우스 기준)·가운데 버튼 이동·가로 스크롤·전체 보기.
+- **③ 편집**(`174d395e`): 끌기 = 이동 · 양 끝 5px = 길이 · 선택 클립 위쪽 흰 네모 = 페이드 인/아웃 · 마커 끌기 · 우클릭 = 클립 추가(구간 1초·페이드 0.1 / 펄스 0.2초·페이드 0.1씩 / TV 꺼짐 1개만)·복사·붙여넣기·삭제·마커 여기/재생 헤드로 · Del · Ctrl+C/V(재생 헤드에)/D(바로 뒤에) · 0.01초 스냅 토글 · Undo(RecordObject) · 아래에 선택 클립/마커 수치 칸. 고칠 때마다 SetDirty + SaveAssetIfDirty(Play 끝나도 유지).
+- **④ 스크럽 미리보기**(`a1ea85f5`): Play 중 디버그 씬 — 눈금자 클릭/끌기 = 랩 일시정지(`DebugBossVictoryLab.Paused`, Time.timeScale 0) + `BossVictoryGlitchPresentation.PreviewSeek(t)`(에디터·개발 빌드 전용) → 그 시각 화면 고정. 도구 막대 ⏮ 처음부터(= F7, `Replay`)·▶/❚❚. 재생 중엔 재생 헤드가 글리치 시계를 따라간다.
+- 한계: 스크럽은 타임라인이 정하는 것만(처치자 순서·애니 배율·이펙트는 애니 이벤트로 흘러 그대로 멈춰 있음) · TV 꺼짐 구간으로 스크럽하면 그 순간 화면을 다시 캡처 · 카메라 컷(기본 비어 있음)은 컷 앞으로 되감아도 게임 카메라로 안 돌아감 · 공용화(다른 연출)는 나중.
+- 🟨 **전체 세기(master) 트랙 추가** — 사양 트랙 목록엔 없지만 옛 `master` 곡선(0.08~0.15)이 모든 효과에 곱해져 있어 빼면 같은 화면 조건이 깨져 남김.
