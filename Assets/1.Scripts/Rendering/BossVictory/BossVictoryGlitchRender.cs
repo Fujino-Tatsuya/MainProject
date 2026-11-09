@@ -38,7 +38,6 @@ public static class BossVictoryGlitchRender
         public float Scanline;      // CRT 주사선
         public float Tear;          // 가로줄 좌우 찢김(유일한 모양 글리치)
         public float Smear;         // 찢긴 줄 밝은 부분 가로 끌림
-        public float Flash;         // 흑백 플래시
         public float BossNoise;     // 보스 노이즈 세기
         public Vector2 BossScreenCenter;   // 보스 중심(뷰포트 0~1) — 노이즈 보스 기준 공간
         public float BossScreenSize;       // 보스 화면 높이(뷰포트) — 노이즈 보스 기준 공간 배율
@@ -48,7 +47,7 @@ public static class BossVictoryGlitchRender
     static readonly int IdId = Shader.PropertyToID("_GlitchId");
     static readonly int IdIdTex = Shader.PropertyToID("_GlitchIdTex");
     static readonly int IdA = Shader.PropertyToID("_GlitchA");        // x master, y time, z desat, w amber
-    static readonly int IdB = Shader.PropertyToID("_GlitchB");        // x scanline, y tear, z smear, w flash
+    static readonly int IdB = Shader.PropertyToID("_GlitchB");        // x scanline, y tear, z smear, w (미사용)
     static readonly int IdC = Shader.PropertyToID("_GlitchC");        // x bossNoise
     static readonly int IdTear = Shader.PropertyToID("_GlitchTear");  // x 최대 밀림, y 켜지는 줄 비율, z 끌림 길이
     static readonly int IdBossScreen = Shader.PropertyToID("_BossScreen");   // xy 중심, z 화면 높이, w 공간(0 화면 · 1 보스 기준)
@@ -135,7 +134,7 @@ public static class BossVictoryGlitchRender
         _master = Mathf.Clamp01(f.Master);
         if (_composite == null) return;
         _composite.SetVector(IdA, new Vector4(_master, f.Time, f.Desaturate, f.Amber));
-        _composite.SetVector(IdB, new Vector4(f.Scanline, f.Tear, f.Smear, f.Flash));
+        _composite.SetVector(IdB, new Vector4(f.Scanline, f.Tear, f.Smear, 0f));
         _composite.SetVector(IdC, new Vector4(f.BossNoise, 0f, 0f, 0f));
         _composite.SetVector(IdBossScreen, new Vector4(f.BossScreenCenter.x, f.BossScreenCenter.y, Mathf.Max(0.01f, f.BossScreenSize), _noiseSpace));
         _composite.SetVector(IdNoiseST, new Vector4(_noiseTiling.x, _noiseTiling.y, f.NoiseOffset.x, f.NoiseOffset.y));

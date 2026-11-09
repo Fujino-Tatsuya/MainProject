@@ -406,7 +406,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             Scanline = s.scanline.Evaluate(t),
             Tear = s.tear.Evaluate(t),
             Smear = s.smear.Evaluate(t),
-            Flash = s.flash.Evaluate(t),
             BossNoise = s.bossNoise.Evaluate(t),
         };
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);

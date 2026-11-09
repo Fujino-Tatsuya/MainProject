@@ -38,8 +38,6 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public AnimationCurve tear = Pulses(0.2f, 0.12f, 0.33f, 0.08f, 1.52f, 0.1f, 1.67f, 0.06f, 2.55f, 0.12f);
     [Tooltip("찢긴 줄의 밝은 부분 가로 끌림(스미어) 세기(0~1) — 찢긴 줄에만 걸린다.")]
     public AnimationCurve smear = Pulses(0.2f, 0.12f, 0.33f, 0.08f, 1.52f, 0.1f, 2.55f, 0.12f);
-    [Tooltip("흑백 플래시(밝기 — 모양 글리치 아님).")]
-    public AnimationCurve flash = Pulses(1.34f, 0.06f);
     [Tooltip("보스 노이즈 세기(보스 실루엣 안).")]
     public AnimationCurve bossNoise = Ramp(0.12f, 0.17f);
     [Tooltip("HUD 숨김(0.5 넘으면 숨김).")]

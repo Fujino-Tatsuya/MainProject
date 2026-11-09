@@ -5,7 +5,7 @@
 //    글리치 = **가로줄 좌우 찢김만**(사용자 11-09 — 사각형·블록 노이즈 금지): 가는 가로줄(굵기 = 기본 px × 1~배수)마다 무작위로 켜져
 //      좌우로 다른 길이만큼 밀린다(마스크도 같은 UV — 인물·보스 실루엣도 같이 찢긴다) + 찢긴 줄의 밝은 부분이 밀린 방향 뒤로 끌린다(스미어).
 //    색(글리치 아님): 흑백(Desat) → 배경만 호박색(플레이어 제외) → 보스 = 흑백 노이즈 텍스처(UV 는 카메라 이동으로만)
-//      → 흑백 플래시 → CRT 주사선.
+//      → CRT 주사선.
 // ----------------------------------------------------------------------------
 Shader "Hidden/Rendering/BossVictoryGlitch"
 {
@@ -34,7 +34,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             SAMPLER(sampler_NoiseTex);
 
             float4 _GlitchA;      // x master, y time, z desat, w amber
-            float4 _GlitchB;      // x scanline, y tear, z smear, w flash
+            float4 _GlitchB;      // x scanline, y tear, z smear, w (미사용)
             float4 _GlitchC;      // x bossNoise
             float4 _GlitchLook;   // x 주사선 줄 수, y 찢김 줄 기본 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
             float4 _GlitchTear;   // x 최대 밀림(화면 너비 비율), y 켜지는 줄 비율(세기 1 기준), z 끌림 길이(화면 너비 비율)
@@ -125,9 +125,6 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half n = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, nUV).r;
                 half3 noiseCol = lerp(_NoiseDark.rgb, _NoiseBright.rgb, n);
                 graded = lerp(graded, noiseCol, boss * (half)_GlitchC.x);
-
-                // 흑백 플래시
-                graded = lerp(graded, (Luma(graded) * 1.8h).xxx, (half)_GlitchB.w);
 
                 // CRT 주사선
                 half scan = 0.5h + 0.5h * sin(uv0.y * _GlitchLook.x * 6.28318h);
