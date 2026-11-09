@@ -40,10 +40,10 @@ public class HealthVignetteHUD : MonoBehaviour
     [SerializeField] private Color vignetteColor = Color.red;
 
     [Header("맥동")]
-    [Tooltip("시작 비율 바로 아래에서의 맥동 속도(초당 주기 수).")]
-    [SerializeField, Min(0f)] private float minPulseSpeed = 0.8f;
-    [Tooltip("체력 0 에서의 맥동 속도(초당 주기 수).")]
-    [SerializeField, Min(0f)] private float maxPulseSpeed = 2.5f;
+    [Tooltip("시작 비율 바로 아래에서의 맥동 속도(초당 주기 수 = BPM ÷ 60). 기본 1.667 = 100 BPM — 사람이 흥분했을 때 평균 심박.")]
+    [SerializeField, Min(0f)] private float minPulseSpeed = 100f / 60f;
+    [Tooltip("체력 0 에서의 맥동 속도(초당 주기 수 = BPM ÷ 60). 기본 2.083 = 125 BPM — 가볍게 뛸 때(최대 심박 50~75%) 평균 심박.")]
+    [SerializeField, Min(0f)] private float maxPulseSpeed = 125f / 60f;
     [Tooltip("체력 0 에서의 맥동 진폭(알파). 체력이 높을수록 이 값에 비례해 작아진다.")]
     [SerializeField, Range(0f, 1f)] private float pulseAmplitude = 0.2f;
 

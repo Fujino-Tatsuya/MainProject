@@ -5255,8 +5255,8 @@ MonoBehaviour:
   startRatio: 0.8
   maxAlpha: 0.6
   vignetteColor: {r: 1, g: 0, b: 0, a: 1}
-  minPulseSpeed: 0.8
-  maxPulseSpeed: 3
+  minPulseSpeed: 1.6666666
+  maxPulseSpeed: 2.0833333
   pulseAmplitude: 0.2
   flashDuration: 0.2
   flashAlpha: 0.7
