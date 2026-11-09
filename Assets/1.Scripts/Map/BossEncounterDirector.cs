@@ -1020,17 +1020,18 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
     /// <summary>[등장 연출 밀림 설정] 밀림 시간(초) — 보스 처치 연출 백대쉬가 같은 값을 쓴다.</summary>
     public float IntroSkidDuration => impactSkidDuration;
 
-    /// <summary>밀림 끝 → Idle 복귀까지 더 기다리는 시간(초) — 등장 연출과 처치 연출 백대쉬 공용.</summary>
+    /// <summary>밀림 끝 → Idle 복귀까지 더 기다리는 시간(초) — 등장 연출 상수. 처치 연출 백대쉬는 설정 SO backDashIdleDelay(기본 = 이 값, 255 후속 4).</summary>
     public static float SkidIdleDelay => ReactionIdleDelay;
 
     /// <summary>
     /// 등장 연출 밀림(백대쉬) 한 걸음 — 등장 연출(오너 FixedUpdate)과 보스 처치 연출 백대쉬가 같이 쓴다.
     /// 처음 한 번 리액션 상태(<see cref="SkidReactionStates"/> 중 있는 것) → 시간 비율만큼 <paramref name="dir"/> 로 밀기(<paramref name="motor"/> 가 null 이면
-    /// 애니만 — 오너가 아닌 피어) → 밀림 끝 + <see cref="ReactionIdleDelay"/> 에 Idle. 반환 = 끝났다(Idle 복귀까지).
+    /// 애니만 — 오너가 아닌 피어) → 밀림 끝 + <paramref name="idleDelay"/>(기본 <see cref="ReactionIdleDelay"/> — 처치 연출은 설정 SO 백대쉬 후 대기) 에 Idle. 반환 = 끝났다(Idle 복귀까지).
     /// <paramref name="ease"/> = 진행 곡선(null = <see cref="BossIntroFormation.SkidEase"/> — 등장 연출. 처치 연출 백대쉬는 설정 SO 곡선).
     /// </summary>
     public static bool StepSkid(Player player, PlayerMotor motor, Vector3 dir, float distance, double startAt, float duration, double now,
-                                ref float done, ref bool reactionPlayed, ref bool idleRestored, System.Func<float, float> ease = null)
+                                ref float done, ref bool reactionPlayed, ref bool idleRestored, System.Func<float, float> ease = null,
+                                float idleDelay = ReactionIdleDelay)
     {
         Animator animator = player != null ? player.CharacterAnimator : null;
         if (!reactionPlayed)
@@ -1046,7 +1047,7 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         done = eased;
         if (step > 0f && motor != null) motor.AddGroundedDisplacement(dir * step);
 
-        if (now < startAt + duration + ReactionIdleDelay) return false;
+        if (now < startAt + duration + idleDelay) return false;
         if (!idleRestored)
         {
             idleRestored = true;
@@ -1054,6 +1055,9 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         }
         return true;
     }
+
+    /// <summary>Idle 상태(<see cref="IdleStates"/> 중 있는 것)로 CrossFade — 보스 처치 연출이 처치자 평타 클립 끝에서 하던 동작을 끊을 때(255 후속 4).</summary>
+    public static void CrossFadeIdle(Animator animator) => CrossFadeFirstExisting(animator, IdleStates);
 
     private static void CrossFadeFirstExisting(Animator animator, string[] states)
     {

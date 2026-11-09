@@ -14,6 +14,7 @@ public enum BossVictoryTrack
     HudHide,     // HUD 숨김(0.5 초과)
     CrtOff,      // TV 꺼짐 — 첫 클립만, 시작에 화면 캡처·길이 = 꺼짐 길이
     CameraCut,   // 카메라 컷 — 클립 시작 = 컷 시작, 다음 컷 시작까지 유지(길이는 자동). 컷 값 = cameraCutShots 같은 번호(255)
+    KillerAction, // 처치자 평타 — 첫 클립만, 시작 0 고정, 끝 = 처치 순간 하던 동작을 끊는 시각(없으면 자기 클립 끝까지 — 255 후속 4)
 }
 
 /// <summary>보스 처치 연출 타임라인 순간 마커.</summary>
@@ -22,7 +23,9 @@ public enum BossVictoryMarker
     FocusKiller,      // 처치자가 아닌 피어 카메라 → 처치자(즉시 컷)
     HideOthers,       // 처치자 외 플레이어 캐릭터 숨김(모든 피어)
     LobbyTransition,  // 로비 전환 — 호스트 화면이 지나면 서버가 결과로 넘긴다
-    KillerActionEnd,  // 처치자 동작 끝 → 백대쉬 — 처치 순간 하던 동작(평타 등)을 이 시각에 끊고 백대쉬(0 = 끔, 클립 끝까지 — 255)
+    BackDashStart,    // 백대쉬 시작 — 하던 동작이 남아 있으면 끊고 백대쉬(255 후속 4 — 옛 '처치자 동작 끝 → 백대쉬' 마커는 처치자 평타 클립 끝으로)
+    FinisherStart,    // 스킬 연출 시작 — 처치 연출 스킬을 표시용으로 바로(백대쉬가 덜 끝났으면 끊음, 이전 스킬을 기다리지 않음)
+    SlowStart,        // 느려짐 시작 — 처치자·보스 End 후 배율(0 = 끔, 스킬 End 이벤트)
 }
 
 /// <summary>클립 한 개 — 시작·길이·페이드 인/아웃·세기(초, 처치 판정 뒤).</summary>
@@ -78,12 +81,24 @@ public sealed class BossVictoryTimeline
     public List<BossVictoryClip> cameraCut = new List<BossVictoryClip>();
     /// <summary>카메라 컷 값 — <see cref="cameraCut"/> 와 같은 번호(창이 추가·삭제·붙여넣기를 함께 한다, 개수 어긋나면 <see cref="SyncCameraCutShots"/>).</summary>
     public List<BossVictoryCameraCuts.Cut> cameraCutShots = new List<BossVictoryCameraCuts.Cut>();
+    /// <summary>처치자 평타 — 첫 클립만, 시작 0 · 끝 = 하던 동작을 끊는 시각(255 후속 4).</summary>
+    public List<BossVictoryClip> killerAction = new List<BossVictoryClip>();
 
     [Min(0f)] public float focusKillerTime = 0.2f;
     [Min(0f)] public float hideOthersTime = 0.2f;
     [Min(0f)] public float lobbyTransitionTime = 5.6f;
-    [Tooltip("처치자 동작 끝 → 백대쉬(초). 0 = 끔 — 하던 동작 클립 끝까지 재생 뒤 백대쉬(255 전과 같음).")]
-    [Min(0f)] public float killerActionEndTime;
+    [Tooltip("백대쉬 시작(초). 하던 동작이 남아 있으면 끊고 백대쉬.")]
+    [Min(0f)] public float backDashStartTime = DefaultActionEnd;
+    [Tooltip("스킬 연출 시작(초). 처치 연출 스킬을 표시용으로 바로 튼다 — 백대쉬가 덜 끝났으면 끊고, 이전 스킬을 기다리지 않는다.")]
+    [Min(0f)] public float finisherStartTime = DefaultFinisherStart;
+    [Tooltip("느려짐 시작(초). 처치자·보스 End 후 배율. 0 = 끔 — 처치 연출 스킬 End 이벤트에서.")]
+    [Min(0f)] public float slowStartTime;
+
+    // 옛 '처치자 동작 끝 → 백대쉬' 마커(255) — 읽기만 해서 처치자 평타 클립 끝·백대쉬 시작·스킬 연출 시작으로 옮긴다(255 후속 4, 설정 SO OnAfterDeserialize). 옮긴 뒤 0.
+    [SerializeField, HideInInspector] float killerActionEndTime;   // 칸 이름 그대로(옛 에셋 값을 읽는다)
+
+    public const float DefaultActionEnd = 0.13f;   // 사용자 값(옛 마커 0.13) = 평타 끝·백대쉬 시작 기본
+    public const float DefaultFinisherStart = 0.83f;   // 0.13 + 백대쉬 0.35 + 백대쉬 후 대기 0.35(BossVictoryKillerSequence.DefaultFinisherStart)
 
     public static readonly BossVictoryTrack[] Tracks = (BossVictoryTrack[])Enum.GetValues(typeof(BossVictoryTrack));
     public static readonly BossVictoryMarker[] Markers = (BossVictoryMarker[])Enum.GetValues(typeof(BossVictoryMarker));
@@ -99,6 +114,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.HudHide => hudHide,
         BossVictoryTrack.CrtOff => crtOff,
         BossVictoryTrack.CameraCut => cameraCut,
+        BossVictoryTrack.KillerAction => killerAction,
         _ => throw new ArgumentOutOfRangeException(nameof(track)),
     };
 
@@ -107,7 +123,9 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.FocusKiller => focusKillerTime,
         BossVictoryMarker.HideOthers => hideOthersTime,
         BossVictoryMarker.LobbyTransition => lobbyTransitionTime,
-        BossVictoryMarker.KillerActionEnd => killerActionEndTime,
+        BossVictoryMarker.BackDashStart => backDashStartTime,
+        BossVictoryMarker.FinisherStart => finisherStartTime,
+        BossVictoryMarker.SlowStart => slowStartTime,
         _ => throw new ArgumentOutOfRangeException(nameof(marker)),
     };
 
@@ -119,20 +137,26 @@ public sealed class BossVictoryTimeline
             case BossVictoryMarker.FocusKiller: focusKillerTime = time; break;
             case BossVictoryMarker.HideOthers: hideOthersTime = time; break;
             case BossVictoryMarker.LobbyTransition: lobbyTransitionTime = time; break;
-            case BossVictoryMarker.KillerActionEnd: killerActionEndTime = time; break;
+            case BossVictoryMarker.BackDashStart: backDashStartTime = time; break;
+            case BossVictoryMarker.FinisherStart: finisherStartTime = time; break;
+            case BossVictoryMarker.SlowStart: slowStartTime = time; break;
         }
     }
 
     public static TrackKind KindOf(BossVictoryTrack track) => track switch
     {
         BossVictoryTrack.Tear or BossVictoryTrack.Smear => TrackKind.Pulse,
-        BossVictoryTrack.CrtOff => TrackKind.Single,
+        BossVictoryTrack.CrtOff or BossVictoryTrack.KillerAction => TrackKind.Single,
         BossVictoryTrack.CameraCut => TrackKind.Cut,
         _ => TrackKind.Range,
     };
 
-    /// <summary>페이드·세기가 의미 있는 트랙인가(TV 꺼짐은 구간만 · 카메라 컷은 시작만).</summary>
-    public static bool HasFades(BossVictoryTrack track) => track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut;
+    /// <summary>페이드·세기가 의미 있는 트랙인가(TV 꺼짐·처치자 평타는 구간만 · 카메라 컷은 시작만).</summary>
+    public static bool HasFades(BossVictoryTrack track) =>
+        track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut && track != BossVictoryTrack.KillerAction;
+
+    /// <summary>시작이 0 고정인 트랙인가(처치자 평타 — 처치 순간부터, 끝만 고친다).</summary>
+    public static bool StartFixed(BossVictoryTrack track) => track == BossVictoryTrack.KillerAction;
 
     public static string TrackLabel(BossVictoryTrack track) => track switch
     {
@@ -145,6 +169,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.HudHide => "HUD 숨김",
         BossVictoryTrack.CrtOff => "TV 꺼짐",
         BossVictoryTrack.CameraCut => "카메라 컷",
+        BossVictoryTrack.KillerAction => "처치자 평타",
         _ => track.ToString(),
     };
 
@@ -153,7 +178,9 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.FocusKiller => "카메라 → 처치자",
         BossVictoryMarker.HideOthers => "처치자 외 숨김",
         BossVictoryMarker.LobbyTransition => "로비 전환",
-        BossVictoryMarker.KillerActionEnd => "처치자 동작 끝 → 백대쉬",
+        BossVictoryMarker.BackDashStart => "백대쉬 시작",
+        BossVictoryMarker.FinisherStart => "스킬 연출 시작",
+        BossVictoryMarker.SlowStart => "느려짐 시작",
         _ => marker.ToString(),
     };
 
@@ -233,10 +260,50 @@ public sealed class BossVictoryTimeline
         return length > 0f ? Mathf.Clamp01((t - start) / length) : 1f;
     }
 
-    // ── 처치자 동작 끝 → 백대쉬(255) ──
+    // ── 처치자 순서(255 후속 4) ──
 
-    /// <summary>처치자의 하던 동작을 지금 끊고 백대쉬로 넘어가는가 — 마커가 켜져 있고(&gt; 0) 시각이 지났다. 클립 끝은 호출부가 따로 본다(둘 중 이른 쪽).</summary>
-    public static bool ShouldEndKillerAction(float markerTime, float t) => markerTime > 0f && t >= markerTime;
+    /// <summary>처치자 평타 = 첫 클립(길이 &gt; 0). 없으면 false — 하던 동작은 자기 클립 끝까지.</summary>
+    public bool TryGetKillerAction(out BossVictoryClip clip)
+    {
+        for (int i = 0; i < killerAction.Count; i++)
+        {
+            if (killerAction[i].length <= 0f) continue;
+            clip = killerAction[i];
+            return true;
+        }
+        clip = default;
+        return false;
+    }
+
+    /// <summary>처치자 단계 시각(<see cref="BossVictoryKillerSequence.Target"/> 입력). 평타 끝 = 클립 끝(시작은 0 고정이라 시작 칸 무시).</summary>
+    public BossVictoryKillerSequence.Times KillerTimes()
+    {
+        bool has = TryGetKillerAction(out BossVictoryClip clip);
+        return new BossVictoryKillerSequence.Times
+        {
+            HasActionClip = has,
+            ActionEnd = has ? clip.End : 0f,
+            BackDashStart = backDashStartTime,
+            FinisherStart = finisherStartTime,
+        };
+    }
+
+    /// <summary>
+    /// 옛 '처치자 동작 끝 → 백대쉬' 마커 값 L(&gt; 0 = 255 후속 4 전 형식 에셋)을 옮긴다 — 처치자 평타 = [0, L] · 백대쉬 시작 = L(평타 끝 직후) ·
+    /// 스킬 연출 시작 = L + 백대쉬 시간 + 백대쉬 후 대기(그때 체감). 새 형식은 옛 칸이 0 이라 아무것도 안 한다. 옮겼으면 true.
+    /// </summary>
+    public bool MigrateLegacyKillerActionEnd(float backDashDuration, float backDashIdleDelay)
+    {
+        if (killerActionEndTime <= 0f) return false;
+        float end = killerActionEndTime;
+        killerAction ??= new List<BossVictoryClip>();
+        killerAction.Clear();
+        killerAction.Add(BossVictoryClip.Make(0f, end));
+        backDashStartTime = end;
+        finisherStartTime = BossVictoryKillerSequence.DefaultFinisherStart(end, backDashDuration, backDashIdleDelay);
+        killerActionEndTime = 0f;
+        return true;
+    }
 
     /// <summary>모든 클립 끝·마커 중 가장 늦은 시각(창 시간축 길이).</summary>
     public float Duration
@@ -285,6 +352,10 @@ public sealed class BossVictoryTimeline
         tl.focusKillerTime = 0.2f;
         tl.hideOthersTime = 0.2f;
         tl.lobbyTransitionTime = end;
+        tl.killerAction.Add(BossVictoryClip.Make(0f, DefaultActionEnd));
+        tl.backDashStartTime = DefaultActionEnd;
+        tl.finisherStartTime = DefaultFinisherStart;
+        tl.slowStartTime = 0f;
         return tl;
     }
 }

@@ -5,18 +5,18 @@ using UnityEngine;
 /// (없으면 코드 기본값). 단계가 늘 때마다 칸을 더한다 — 2단계 = 대상별 시간 배율·처치 연출 스킬 · 3단계 = 글리치 타임라인(→ 클립 목록 <see cref="BossVictoryTimeline"/>) · 4단계 = 카메라 컷 · 6단계 = TV 꺼짐.
 /// </summary>
 [CreateAssetMenu(menuName = "MainProject/Boss Victory Glitch Settings", fileName = "BossVictoryGlitchSettings")]
-public sealed class BossVictoryGlitchSettings : ScriptableObject
+public sealed class BossVictoryGlitchSettings : ScriptableObject, ISerializationCallbackReceiver
 {
     public const string ResourcePath = "BossVictory/BossVictoryGlitchSettings";
 
     [Header("대상별 시간 배율(전역 timeScale 아님 — 각 피어 로컬 애니·이펙트)")]
-    [Tooltip("처치자 — 처치 순간 하던 동작(평타·스킬 등 루프 아닌 클립)을 이 배율로 그 클립 끝까지. 그 뒤 백대쉬·처치 연출 스킬은 1.")]
+    [Tooltip("처치자 — 처치 순간 하던 동작(평타·스킬 등 루프 아닌 클립)을 이 배율로(타임라인 처치자 평타 클립 끝 또는 그 클립 끝까지). 그 뒤 백대쉬·처치 연출 스킬은 1.")]
     [Range(0.05f, 1f)] public float killerCurrentActionScale = 0.5f;
-    [Tooltip("처치자 — 처치 연출 스킬이 End 에 닿은 뒤 배율(그 전엔 1).")]
+    [Tooltip("처치자 — 느려짐 시작 마커(꺼짐이면 처치 연출 스킬 End) 뒤 배율(그 전엔 1).")]
     [Range(0f, 1f)] public float killerAfterFinisherScale = 0.1f;
     [Tooltip("처치자 외 플레이어 — 처치 판정 즉시 배율.")]
     [Range(0f, 1f)] public float otherPlayersScale = 0.05f;
-    [Tooltip("보스 — 처치 연출 스킬이 End 에 닿은 뒤 배율(그 전엔 0 = 마지막 피격 자세로 정지).")]
+    [Tooltip("보스 — 느려짐 시작 마커(꺼짐이면 처치 연출 스킬 End) 뒤 배율(그 전엔 0 = 마지막 피격 자세로 정지).")]
     [Range(0f, 1f)] public float bossAfterFinisherScale = 0.1f;
 
     [Header("처치 연출 스킬(Q9)")]
@@ -32,6 +32,8 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public BossVictoryCameraCuts.Ease backDashEase = BossVictoryCameraCuts.Ease.EaseOut;
     [Tooltip("방향 보정(도) — 0 = 보스 반대쪽, + = 위에서 봐 시계 방향으로 돌림.")]
     [Range(-180f, 180f)] public float backDashAngle;
+    [Tooltip("백대쉬 후 대기(초) — 백대쉬 끝 ~ Idle 복귀. 기본 0.35 = 보스 등장 밀림 ReactionIdleDelay(등장 연출은 상수 그대로).")]
+    [Min(0f)] public float backDashIdleDelay = 0.35f;
 
     public enum HideOthersTarget { Teammates, TeammatesAndAttachedEffects }
 
@@ -100,6 +102,11 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     static BossVictoryGlitchSettings _cached;
 
     /// <summary>Resources 에셋, 없으면 코드 기본값 인스턴스.</summary>
+    void ISerializationCallbackReceiver.OnBeforeSerialize() { }
+
+    // 옛 '처치자 동작 끝 → 백대쉬' 마커 → 처치자 평타 클립·백대쉬 시작·스킬 연출 시작(255 후속 4 — 사용자 값 손실 0). 다음 저장 때 새 형식으로 남는다.
+    void ISerializationCallbackReceiver.OnAfterDeserialize() => timeline?.MigrateLegacyKillerActionEnd(backDashDuration, backDashIdleDelay);
+
     public static BossVictoryGlitchSettings Load()
     {
         if (_cached != null) return _cached;
