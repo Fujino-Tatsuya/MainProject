@@ -508,6 +508,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
 
     // [서버] L00 라커 방문(할 일 157 ③) — 매 프레임 라커 볼륨 폴링. 스폰 완료 참여자만 판정·완료 조건(로딩 중 접속자는 세지 않는다).
     // 방문은 1인 1회 누적(나갔다 와도 유지, 캐릭터 교체해도 clientId 라 유지). 볼륨 칸이 비면 오류 1회 후 자동 통과.
+    // 할 일 251: 볼륨 안에 L00 행 holdSeconds(기본 2초, 서버 시각) 연속 머물러야 방문 — 그 전에 나가거나 디스폰되면 그 사람 타이머 리셋.
     private void TickLockerVisitServer()
     {
         if (_flow.CurrentKind != LobbyTutorialStepKind.LockerVisit || _flow.HasPendingAdvance)
@@ -519,15 +520,20 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             Debug.LogError($"{Tag} 라커 볼륨(lockerArea — Area_Locker)이 비었다 — L00 라커 방문을 판정하지 못해 스폰 완료 참여자를 자동 방문 처리한다.", this);
         }
 
+        var now = ServerNow();
+        var step = ServerStep();
+        var dwellSeconds = lockerArea == null || step == null ? 0d : step.holdSeconds;
+
         _participantBuffer.Clear();
         _participantBuffer.AddRange(_flow.Participants);
         foreach (var clientId in _participantBuffer)
         {
-            if (!TryGetPlayer(clientId, out var player) || _flow.HasVisitedLocker(clientId))
+            if (_flow.HasVisitedLocker(clientId))
                 continue;
 
-            if ((lockerArea == null || lockerArea.CountsPlayer(player)) && _flow.MarkLockerVisited(clientId))
-                Debug.Log($"[SceneFlow] {Tag} 라커 방문{(lockerArea == null ? "(볼륨 없음 — 자동)" : "")} client {clientId} " +
+            var inside = TryGetPlayer(clientId, out var player) && (lockerArea == null || lockerArea.CountsPlayer(player));
+            if (_flow.ReportLockerPresence(clientId, inside, now, dwellSeconds))
+                Debug.Log($"[SceneFlow] {Tag} 라커 방문{(lockerArea == null ? "(볼륨 없음 — 자동)" : $"({dwellSeconds:0.##}초 머묾)")} client {clientId} " +
                           $"[{string.Join(",", _flow.LockerVisited)}]");
         }
 

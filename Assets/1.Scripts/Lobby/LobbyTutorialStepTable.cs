@@ -89,7 +89,7 @@ public sealed class LobbyTutorialStep
 
     [Header("집결")]
     public LobbyGatherPoint gatherPoint;
-    [Tooltip("집결 유지 시간(초, 서버 시각). T20 만 3 = 시작 카운트다운.")]
+    [Tooltip("집결 유지 시간(초, 서버 시각). T20 만 3 = 시작 카운트다운. L00(LockerVisit) 행 = 라커 볼륨 안에 연속으로 머물러야 하는 시간(할 일 251, 기본 2).")]
     [Min(0f)]
     public float holdSeconds = 0.3f;
 
