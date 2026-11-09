@@ -76,6 +76,16 @@ public sealed class LobbyTutorialStepTableTests
     }
 
     [Test]
+    public void L00_라커_방문은_2초_머묾()
+    {
+        var table = LoadAsset();
+        var l00 = table[table.IndexOf("L00_LockerVisit")];
+
+        Assert.That(l00.kind, Is.EqualTo(LobbyTutorialStepKind.LockerVisit));
+        Assert.That(l00.holdSeconds, Is.EqualTo(2f));
+    }
+
+    [Test]
     public void 브리핑_대사_4행만_입력_잠금()
     {
         var table = LoadAsset();

@@ -316,4 +316,74 @@ public sealed class LobbyTutorialFlowTests
         Assert.That(flow.Tick(11), Is.True);
         Assert.That(flow.StepIndex, Is.EqualTo(4));
     }
+
+    // ── 할 일 251: 라커 볼륨 안 2초 머묾 ──
+
+    [Test]
+    public void 라커_머묾_2초가_지나야_방문()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.ReportLockerPresence(0, true, 10d, 2d), Is.False);   // 진입
+        Assert.That(flow.ReportLockerPresence(0, true, 11.9d, 2d), Is.False);
+        Assert.That(flow.HasVisitedLocker(0), Is.False);
+        Assert.That(flow.ReportLockerPresence(0, true, 12d, 2d), Is.True);
+        Assert.That(flow.HasVisitedLocker(0), Is.True);
+        Assert.That(flow.ReportLockerPresence(0, true, 13d, 2d), Is.False);   // 이미 방문
+    }
+
+    [Test]
+    public void 라커_2초_전에_나가면_타이머_리셋()
+    {
+        var flow = Create(0);
+
+        flow.ReportLockerPresence(0, true, 10d, 2d);
+        flow.ReportLockerPresence(0, false, 11.5d, 2d);                        // 나감
+        Assert.That(flow.ReportLockerPresence(0, true, 12d, 2d), Is.False);   // 다시 진입 = 처음부터
+        Assert.That(flow.ReportLockerPresence(0, true, 13.9d, 2d), Is.False);
+        Assert.That(flow.ReportLockerPresence(0, true, 14d, 2d), Is.True);
+    }
+
+    [Test]
+    public void 라커_머묾은_사람마다_따로_전원_방문해야_완료()
+    {
+        var flow = Create(0, 1);
+
+        flow.ReportLockerPresence(0, true, 10d, 2d);
+        flow.ReportLockerPresence(1, true, 11d, 2d);
+        Assert.That(flow.ReportLockerPresence(0, true, 12d, 2d), Is.True);
+        Assert.That(flow.ReportLockerPresence(1, true, 12d, 2d), Is.False);
+        Assert.That(flow.AllSpawnedParticipantsVisitedLocker(_ => true), Is.False);
+        Assert.That(flow.ReportLockerPresence(1, true, 13d, 2d), Is.True);
+        Assert.That(flow.AllSpawnedParticipantsVisitedLocker(_ => true), Is.True);
+    }
+
+    [Test]
+    public void 라커_머묾_0초는_들어간_즉시_방문()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.ReportLockerPresence(0, true, 10d, 0d), Is.True);
+    }
+
+    [Test]
+    public void 라커_머묾_중_연결_종료하면_타이머도_지움()
+    {
+        var flow = Create(0);
+
+        flow.ReportLockerPresence(0, true, 10d, 2d);
+        flow.RemoveClient(0);
+        flow.AddClient(0);
+        Assert.That(flow.ReportLockerPresence(0, true, 12d, 2d), Is.False);   // 다시 처음부터
+        Assert.That(flow.ReportLockerPresence(0, true, 14d, 2d), Is.True);
+    }
+
+    [Test]
+    public void 라커_머묾은_참여자만()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.ReportLockerPresence(9, true, 10d, 0d), Is.False);   // 접속자 아님
+        Assert.That(flow.HasVisitedLocker(9), Is.False);
+    }
 }
