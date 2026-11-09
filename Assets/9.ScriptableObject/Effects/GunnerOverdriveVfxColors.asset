@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: GunnerOverdriveVfxColors
   m_EditorClassIdentifier: Assembly-CSharp::GunnerOverdriveVfxColors
   stage1: {r: 1, g: 0.7347936, b: 0.11764705, a: 1}
-  stage2: {r: 1, g: 0.14102286, b: 0.12549019, a: 1}
+  stage2: {r: 1, g: 0.40027803, b: 0.12549019, a: 1}
   stage3: {r: 0.9019608, g: 0.05098037, b: 0.54901963, a: 1}
   saturation: 1
