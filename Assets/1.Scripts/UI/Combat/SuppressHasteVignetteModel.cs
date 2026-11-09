@@ -1,17 +1,12 @@
 using UnityEngine;
 
 /// <summary>
-/// 실드 비네팅의 순수 계산. 표시 여부(살아 있고 실드 &gt; 0)와 고정 알파까지의 페이드 인/아웃.
-/// MonoBehaviour(<see cref="ShieldVignetteHUD"/>)는 시간·상태만 넘기고 값은 여기서 받는다 — EditMode 테스트 대상.
+/// 제압 가속 비네팅의 순수 계산 — 고정 알파까지의 페이드 인/아웃.
+/// MonoBehaviour(<see cref="SuppressHasteVignetteHUD"/>)는 시간·상태만 넘기고 값은 여기서 받는다 — EditMode 테스트 대상.
+/// (옛 실드 비네팅 모델에서 페이드 계산만 남겨 옮겼다 — 실드 비네팅은 삭제.)
 /// </summary>
-public static class ShieldVignetteModel
+public static class SuppressHasteVignetteModel
 {
-    /// <summary>살아 있고 실드가 남아 있을 때만 보인다. 사망·Soul·관전에선 숨긴다.</summary>
-    public static bool ShouldShow(int currentShield, bool alive)
-    {
-        return alive && currentShield > 0;
-    }
-
     /// <summary>
     /// 현재 알파를 목표(보이면 <paramref name="shownAlpha"/>, 아니면 0)로 한 프레임 옮긴다.
     /// 0 ↔ 고정 알파 전체 구간을 각각 페이드 인/아웃 시간에 걸쳐 지나는 속도. 시간이 0 이하면 즉시 도달.

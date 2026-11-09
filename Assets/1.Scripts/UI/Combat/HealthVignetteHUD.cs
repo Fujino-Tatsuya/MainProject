@@ -7,7 +7,6 @@ using UnityEngine.UI;
 /// - 피격(ClientDamagedAmount, amount>0) 순간 짧게 번쩍인다 — 시작 비율 이상이면 흰색, 아래일수록 붉게.
 /// - 사망·Soul·관전(Alive 가 아닌 모든 상태)에선 색에 검은색을 곱해 서서히 검게 바꾸고, 맥동·피격 플래시는 끈다.
 /// 계산은 <see cref="HealthVignetteModel"/>. 카메라의 URP HP 비네트(<see cref="CameraFeedback"/>)와는 별개다.
-/// 실드 비네팅(<see cref="ShieldVignetteHUD"/>)은 별도 이미지라 여기서 섞지 않는다.
 /// </summary>
 public class HealthVignetteHUD : MonoBehaviour
 {
