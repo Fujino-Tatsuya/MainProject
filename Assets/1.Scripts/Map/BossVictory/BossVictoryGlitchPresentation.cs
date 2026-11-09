@@ -87,6 +87,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     bool _bossHitPlayed;
     float _bossEffectRate = -1f;
     readonly List<Animator> _bossHitAnimators = new List<Animator>();   // 피격 애니를 튼 보스 Animator 중 사망 트리거 파라미터가 있는 것
+    readonly List<Animator> _bossPlayedAnimators = new List<Animator>();   // 피격 애니를 튼 보스 Animator 전부(끝 자르기 판정, 255 후속 10)
+    float _bossTrimAt = -1f;   // 피격 애니가 자른 끝에 닿은 글리치 시각(아직이면 -1) — 보스 배율 규칙의 한 노드
+
+    /// <summary>[이 피어] 지금 보스(연출 중이 아니면 null) — 타임라인 창이 실제 보스의 피격 애니 클립 길이를 보여 준다.</summary>
+    public GameObject BossObject => _running ? _boss : null;
     string _bossDeathTrigger;
 
     /// <summary>[이 피어] 이번 회차 처치 연출 스킬 End 가 온 글리치 시각(아직이면 -1). 타임라인 창 'End 시각' 표시용(255 — 판정엔 안 씀).</summary>
@@ -186,7 +191,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     /// <summary>[이 피어] 보스 시간 배율 — 서버(호스트)의 사망 표현 대기도 이 값으로 흐른다(<see cref="BossEncounterDirector.VictoryDeathTimeScaleFor"/>).</summary>
     public float BossTimeScale => _running && _settings != null
-        ? BossVictoryBossTimeScale.Scale(_settings.timeline.BossNodes(HasBossHitAnim), _killerSlowAt, _settings.bossAfterFinisherScale, _glitchTime)
+        ? BossVictoryBossTimeScale.Scale(_settings.timeline.BossNodes(HasBossHitAnim, _bossTrimAt), _killerSlowAt, _settings.bossAfterFinisherScale, _glitchTime)
         : 1f;
 
     bool HasBossHitAnim => !string.IsNullOrEmpty(_settings.bossHitStateName);
@@ -237,6 +242,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _finisherEndedAt = -1f;
         _killerSlowAt = -1f;
         _bossHitPlayed = false;
+        _bossTrimAt = -1f;
+        _bossPlayedAnimators.Clear();
         _bossEffectRate = -1f;
         _bossHitAnimators.Clear();
         _finisherWarned = false;
@@ -521,6 +528,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_boss == null) return;
         if (!_bossHitPlayed && BossVictoryBossTimeScale.ShouldPlayHitAnim(_settings.timeline.BossNodes(HasBossHitAnim), _glitchTime))
             PlayBossHitAnim();
+        if (_bossHitPlayed && _bossTrimAt < 0f) TickBossHitTrim();
         // 처치 순간 서버 사망 상태가 건 사망 트리거(AnyState→Death)가 피격 애니를 빼앗지 않게 — 사망 상태 복제가 늦게 와도 매 프레임 비운다.
         for (int i = 0; i < _bossHitAnimators.Count; i++)
             if (_bossHitAnimators[i] != null) _bossHitAnimators[i].ResetTrigger(_bossDeathTrigger);
@@ -545,12 +553,28 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (_settings.bossHitFadeSeconds > 0f) a.CrossFadeInFixedTime(hash, _settings.bossHitFadeSeconds, 0, 0f);
             else a.Play(hash, 0, 0f);
             played++;
+            _bossPlayedAnimators.Add(a);
             if (!string.IsNullOrEmpty(_bossDeathTrigger) && HasTrigger(a, _bossDeathTrigger)) _bossHitAnimators.Add(a);
         }
         if (played == 0)
             Edit.LogWarning($"[BossVictory] 보스 피격 애니 상태 '{state}' 가 보스 Animator 에 없다 — 마지막 자세 그대로(설정 SO bossHitStateName).", this);
         else
             Edit.Log($"[BossVictory] 보스 피격 애니 '{state}' (글리치 t {_glitchTime:0.00})", this);
+    }
+
+    // 피격 애니 끝 자르기(255 후속 10) — 자른 프레임(클립 시간)에 닿은 순간을 보스 배율 노드로 남긴다(배율 0, 뒤 슬로우 노드가 오면 다시 움직임). 한 번만.
+    void TickBossHitTrim()
+    {
+        float trim = _settings.timeline.bossHitTrimSeconds;
+        if (trim <= 0f) return;
+        int hash = Animator.StringToHash(_settings.bossHitStateName);
+        for (int i = 0; i < _bossPlayedAnimators.Count; i++)
+        {
+            if (!BossVictoryAnimTrim.TryReachTrim(_bossPlayedAnimators[i], hash, trim, out AnimationClip clip)) continue;
+            _bossTrimAt = _glitchTime;
+            Edit.Log($"[BossVictory] 보스 피격 애니 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, clip.frameRate)}({clip.name}) 에서 정지 (글리치 t {_glitchTime:0.00})", this);
+            return;
+        }
     }
 
     static bool HasTrigger(Animator a, string name)
@@ -1157,6 +1181,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerStep = BossVictoryKillerSequence.Step.None;
         _killerFrozen = false;
         _bossHitAnimators.Clear();
+        _bossPlayedAnimators.Clear();
         EndDash();
 
         if (_killerSkills != null)

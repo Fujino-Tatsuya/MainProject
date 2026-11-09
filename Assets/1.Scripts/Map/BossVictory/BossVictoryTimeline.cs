@@ -127,6 +127,8 @@ public sealed class BossVictoryTimeline
     [Min(0f)] public float slowStartTime;
     [Tooltip("보스 피격 애니 시작(초) — 0 = 처치 순간. 상태 이름(설정 SO bossHitStateName)이 비면 쓰지 않는다.")]
     [Min(0f)] public float bossHitAnimTime;
+    [Tooltip("보스 피격 애니 끝 자르기(클립 시간 초 — 프레임 단위). 0 = 안 자름(클립 끝까지). 그 프레임에서 보스 배율 0 — 뒤에 슬로우 노드가 오면 다시 움직임(255 후속 10).")]
+    [Min(0f)] public float bossHitTrimSeconds;
     [Tooltip("보스 정지(초) — 보스 배율 0. 0 = 끔.")]
     [Min(0f)] public float bossFreezeTime;
     [Tooltip("보스 슬로우(초) — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End).")]
@@ -370,9 +372,12 @@ public sealed class BossVictoryTimeline
         marker is BossVictoryMarker.SlowStart or BossVictoryMarker.BossFreeze or BossVictoryMarker.BossSlow;
 
     /// <summary>보스 노드 시각(<see cref="BossVictoryBossTimeScale.Scale"/> 입력). <paramref name="hasHitAnim"/> = 설정 SO 피격 애니 상태 이름이 있다.</summary>
-    public BossVictoryBossTimeScale.Nodes BossNodes(bool hasHitAnim) => new BossVictoryBossTimeScale.Nodes
+    /// <summary>보스 노드. <paramref name="trimAt"/> = 피격 애니가 자른 끝에 닿은 글리치 시각(아직·안 자름이면 음수, 255 후속 10).</summary>
+    public BossVictoryBossTimeScale.Nodes BossNodes(bool hasHitAnim, float trimAt = -1f) => new BossVictoryBossTimeScale.Nodes
     {
         HasHitAnim = hasHitAnim,
+        Trimmed = trimAt >= 0f,
+        TrimAt = trimAt,
         HitAt = bossHitAnimTime,
         FreezeAt = bossFreezeTime,
         SlowAt = bossSlowTime,

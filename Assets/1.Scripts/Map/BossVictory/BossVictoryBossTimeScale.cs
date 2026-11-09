@@ -1,7 +1,8 @@
 /// <summary>
 /// 보스 처치 연출 — 보스 시간 배율 순수 함수(255 후속 5, 테스트 <c>BossVictoryBossTimeScaleTests</c>). 애니·이펙트·서버 사망 표현 대기가 같은 값을 읽는다.
 /// 처치 순간 0(마지막 피격 자세) → 노드들이 시각 순으로 상태를 바꾸고 <b>시각이 가장 늦은(지난) 노드가 이긴다</b>(같은 시각이면 피격 애니 &lt; 정지 &lt; 슬로우):
-/// '보스 피격 애니 시작'(상태가 있으면) = 1 · '보스 정지'(켜짐) = 0 · '보스 슬로우'(켜짐, 꺼짐이면 처치자 느려짐 순간) = End 후 배율.
+/// '보스 피격 애니 시작'(상태가 있으면) = 1 · 피격 애니 자른 끝에 닿은 순간(255 후속 10) = 0 · '보스 정지'(켜짐) = 0 · '보스 슬로우'(켜짐, 꺼짐이면 처치자 느려짐 순간) = End 후 배율.
+/// 같은 시각이면 피격 애니 &lt; 자른 끝 &lt; 정지 &lt; 슬로우. 자른 끝 뒤에 슬로우가 오면 다시 움직인다(자른 프레임 뒤로).
 /// </summary>
 public static class BossVictoryBossTimeScale
 {
@@ -12,6 +13,8 @@ public static class BossVictoryBossTimeScale
         public float HitAt;
         public float FreezeAt;
         public float SlowAt;
+        public bool Trimmed;      // 피격 애니가 자른 끝 프레임에 닿았다(255 후속 10 — 애니 시간이라 런타임이 닿은 순간을 알려 준다)
+        public float TrimAt;      // 그 글리치 시각
     }
 
     /// <summary>
@@ -22,6 +25,7 @@ public static class BossVictoryBossTimeScale
         float scale = 0f;
         float at = float.NegativeInfinity;
         if (nodes.HasHitAnim) Apply(nodes.HitAt, 1f, t, ref at, ref scale);
+        if (nodes.HasHitAnim && nodes.Trimmed) Apply(nodes.TrimAt, 0f, t, ref at, ref scale);
         if (nodes.FreezeAt > 0f) Apply(nodes.FreezeAt, 0f, t, ref at, ref scale);
         float slow = nodes.SlowAt > 0f ? nodes.SlowAt : killerSlowAt;
         if (slow >= 0f) Apply(slow, slowScale, t, ref at, ref scale);
