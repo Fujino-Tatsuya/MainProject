@@ -79,6 +79,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Rect scroll = new Rect(lanes.x, lanes.yMax, lanes.width, 16f);
 
         HandleView(lanes, ruler);
+        HandleLabelClick(labels);
         HandleEdit(lanes, ruler);
         if (!HasClipSelection) _selIndex = -1;   // Undo 로 목록이 줄었으면
         DrawRows(labels, lanes);
@@ -89,6 +90,20 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         AddCursorRects(lanes);
         DrawScrollbar(scroll);
         DrawInspector();
+    }
+
+    // 줄 이름 누르기 = 그 노드 선택(트랙 = 모양 값 · 마커 = 시각·옵션) — 255 후속 3.
+    void HandleLabelClick(Rect labels)
+    {
+        Event e = Event.current;
+        if (e.type != EventType.MouseDown || e.button != 0 || !labels.Contains(e.mousePosition)) return;
+        int row = Mathf.FloorToInt((e.mousePosition.y - labels.y) / RowHeight);
+        int markers = BossVictoryTimeline.Markers.Length;
+        if (row < markers) Select(-1, -1, row);
+        else if (row - markers < BossVictoryTimeline.Tracks.Length) Select(row - markers, -1, -1);
+        else return;
+        e.Use();
+        Repaint();
     }
 
     // ── 도구 막대 ─────────────────────────────────────────────────────────
@@ -177,6 +192,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 BossVictoryTimeline.TrackKind.Cut => " ·다음 컷까지",
                 _ => "",
             };
+            if (_selTrack == (int)track && _selIndex < 0)
+                EditorGUI.DrawRect(new Rect(labels.x, labels.y + row * RowHeight, 3f, RowHeight), Color.white);
             GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight),
                 BossVictoryTimeline.TrackLabel(track) + kind, EditorStyles.miniLabel);
             row++;
@@ -410,11 +427,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     bool IsSelectedMarker(BossVictoryMarker marker) => _selMarker == (int)marker;
     bool HasClipSelection => _selTrack >= 0 && _selIndex >= 0 && _selIndex < Timeline.Clips((BossVictoryTrack)_selTrack).Count;
 
+    bool _selFinisher;   // '처치 연출 스킬 End' 줄 노드(시간 배율 칸)
+
     void Select(int track, int index, int marker)
     {
         _selTrack = track;
         _selIndex = index;
         _selMarker = marker;
+        _selFinisher = false;
         GUI.FocusControl(null);
     }
 
@@ -474,7 +494,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void OnUndoRedo()
     {
         if (_settings == null) return;
-        if (_selTrack >= 0 && !HasClipSelection) Select(-1, -1, -1);
+        if (_selIndex >= 0 && !HasClipSelection) Select(-1, -1, -1);
         if (_selMarker >= BossVictoryTimeline.Markers.Length) Select(-1, -1, -1);
         _drag = DragMode.None;
         _dragRecorded = false;
@@ -962,17 +982,31 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 Timeline.SetMarkerTime(marker, 0f);
                 Save();
             }
+            DrawMarkerOptions(marker);
+            return;
+        }
+        if (_selFinisher)
+        {
+            DrawTimeScales();
+            return;
+        }
+        if (_selTrack >= 0 && !HasClipSelection)
+        {
+            var only = (BossVictoryTrack)_selTrack;
+            EditorGUILayout.LabelField("트랙", BossVictoryTimeline.TrackLabel(only), EditorStyles.boldLabel);
+            DrawTrackShape(only);
             return;
         }
         if (!HasClipSelection)
         {
-            EditorGUILayout.LabelField("선택 없음 — 클립이나 마커를 누르면 수치를 고칠 수 있다.", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("선택 없음 — 클립·마커·트랙 이름·'시간 배율' 을 누르면 수치를 고칠 수 있다.", EditorStyles.miniLabel);
             return;
         }
         var track = (BossVictoryTrack)_selTrack;
         if (track == BossVictoryTrack.CameraCut)
         {
             DrawCutInspector();
+            DrawTrackShape(track);
             return;
         }
         BossVictoryClip c = Timeline.Clips(track)[_selIndex];
@@ -993,6 +1027,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             Timeline.Clips(track)[_selIndex] = Clamp(c);
             Save();
         }
+        DrawTrackShape(track);
     }
 
     // 카메라 컷 클립 — 시작(= 컷 시작)·기준·시작/끝 화면·곡선·벽 숨김. 길이는 다음 컷 시작까지 자동(255 후속 2).
@@ -1139,6 +1174,115 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Repaint();
     }
 
+    // ── 노드별 설정 칸(255 후속 3) — 데이터는 설정 SO 칸 그대로(SO 인스펙터에도 보임). SerializedObject 로 고쳐 Undo·저장 ──
+
+    SerializedObject _so;
+
+    SerializedObject SettingsObject()
+    {
+        if (_so == null || _so.targetObject != _settings) _so = new SerializedObject(_settings);
+        _so.Update();
+        return _so;
+    }
+
+    void ApplySettings(SerializedObject so)
+    {
+        if (so.ApplyModifiedProperties()) Save();
+    }
+
+    void DrawSettingsFields(string title, params string[] names)
+    {
+        SerializedObject so = SettingsObject();
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
+        foreach (string n in names)
+        {
+            SerializedProperty p = so.FindProperty(n);
+            if (p != null) EditorGUILayout.PropertyField(p, true);
+        }
+        ApplySettings(so);
+    }
+
+    // 마커 노드 — 시각 외 옵션.
+    void DrawMarkerOptions(BossVictoryMarker marker)
+    {
+        switch (marker)
+        {
+            case BossVictoryMarker.KillerActionEnd:
+                DrawSettingsFields("백대쉬(처치 연출 전용 — 마커가 꺼져 있어도 적용: 하던 동작이 없으면 처음부터 백대쉬)",
+                    nameof(BossVictoryGlitchSettings.backDashDistance), nameof(BossVictoryGlitchSettings.backDashDuration),
+                    nameof(BossVictoryGlitchSettings.backDashEase), nameof(BossVictoryGlitchSettings.backDashAngle));
+                EditorGUILayout.LabelField("방향 = 보스 반대쪽을 보정 각만큼 돌림(+ = 시계 방향). 리액션 애니는 보스 등장 밀림과 같다. 기본값 = 보스 등장 밀림 값.", EditorStyles.wordWrappedMiniLabel);
+                break;
+            case BossVictoryMarker.FocusKiller:
+            {
+                SerializedObject so = SettingsObject();
+                SerializedProperty p = so.FindProperty(nameof(BossVictoryGlitchSettings.focusKillerBlendSeconds));
+                EditorGUILayout.Space(4f);
+                bool cut = p.floatValue <= 0f;
+                bool newCut = EditorGUILayout.Toggle(new GUIContent("즉시 컷", "끄면 원래 카메라 대상에서 처치자로 짧게 부드럽게 옮긴다(ease in/out)."), cut);
+                if (newCut != cut) p.floatValue = newCut ? 0f : 0.3f;
+                if (!newCut) p.floatValue = Mathf.Max(0.01f, EditorGUILayout.FloatField("블렌드(초)", p.floatValue));
+                ApplySettings(so);
+                break;
+            }
+            case BossVictoryMarker.HideOthers:
+                DrawSettingsFields("숨김 대상", nameof(BossVictoryGlitchSettings.hideOthersTarget));
+                EditorGUILayout.LabelField("팀원 = 렌더러·월드 캔버스·머리 위 체력바(몸 아래 소켓 이펙트 포함) · + 붙은 이펙트 = 팀원을 따라다니는 풀 이펙트도. 소환물은 지금 플레이어 캐릭터에 없다.", EditorStyles.wordWrappedMiniLabel);
+                break;
+        }
+    }
+
+    // 트랙 노드(트랙 이름 또는 그 클립 선택) — 그 트랙 모양 값.
+    void DrawTrackShape(BossVictoryTrack track)
+    {
+        switch (track)
+        {
+            case BossVictoryTrack.Amber:
+                DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor));
+                break;
+            case BossVictoryTrack.Scanline:
+                DrawSettingsFields("주사선 모양", nameof(BossVictoryGlitchSettings.scanlineCount));
+                break;
+            case BossVictoryTrack.BossNoise:
+                DrawSettingsFields("보스 노이즈 모양",
+                    nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseSpace),
+                    nameof(BossVictoryGlitchSettings.bossNoiseTiling), nameof(BossVictoryGlitchSettings.bossNoiseCameraScale),
+                    nameof(BossVictoryGlitchSettings.bossNoiseBrightColor), nameof(BossVictoryGlitchSettings.bossNoiseBrightIntensity),
+                    nameof(BossVictoryGlitchSettings.bossNoiseDarkColor));
+                break;
+            case BossVictoryTrack.Tear:
+                DrawSettingsFields("가로 찢김 모양(끌림과 같은 줄)",
+                    nameof(BossVictoryGlitchSettings.tearLinePixels), nameof(BossVictoryGlitchSettings.tearLineMaxMultiplier),
+                    nameof(BossVictoryGlitchSettings.tearMaxShift), nameof(BossVictoryGlitchSettings.tearDensity),
+                    nameof(BossVictoryGlitchSettings.tearRefreshRate));
+                break;
+            case BossVictoryTrack.Smear:
+                DrawSettingsFields("밝은 부분 끌림 모양(줄 = 가로 찢김 값)", nameof(BossVictoryGlitchSettings.tearStreakLength));
+                break;
+            case BossVictoryTrack.CrtOff:
+                DrawSettingsFields("TV 꺼짐 모양", nameof(BossVictoryGlitchSettings.crtOffGlowColor));
+                break;
+            case BossVictoryTrack.CameraCut:
+                DrawSettingsFields("벽 숨김 기준(컷 공통)", nameof(BossVictoryGlitchSettings.wallFacingThreshold), nameof(BossVictoryGlitchSettings.wallSearchRadius));
+                break;
+            default:
+                EditorGUILayout.LabelField("이 트랙은 세기(클립)만 — 따로 모양 값 없음.", EditorStyles.miniLabel);
+                break;
+        }
+    }
+
+    // 처치 연출 스킬 End 줄 노드 — 대상별 시간 배율·기본 스킬 칸.
+    void DrawTimeScales()
+    {
+        EditorGUILayout.LabelField("처치 연출 스킬 · 시간 배율", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("처치자: 하던 동작 ×배율 → 백대쉬·처치 연출 스킬 ×1 → 스킬 End 이벤트부터 ×End 후 배율 · 팀원: 처치 즉시 · 보스: End 전 0, End 후 배율.", EditorStyles.wordWrappedMiniLabel);
+        DrawSettingsFields("배율·스킬 칸",
+            nameof(BossVictoryGlitchSettings.killerCurrentActionScale), nameof(BossVictoryGlitchSettings.killerAfterFinisherScale),
+            nameof(BossVictoryGlitchSettings.otherPlayersScale), nameof(BossVictoryGlitchSettings.bossAfterFinisherScale),
+            nameof(BossVictoryGlitchSettings.defaultFinisherSlot));
+    }
+
     // ── 처치 연출 스킬 End 시각(읽기 전용, 255) ──────────────────────────
     // 처치자 순서·시간 배율은 애니 이벤트가 정한다(타임라인 값 아님). 랩 재생 중이면 이번 회차 실제 시각, 아니면 캐릭터별 클립으로 추정.
 
@@ -1147,14 +1291,20 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void DrawFinisherEnd()
     {
         BossVictoryGlitchPresentation p = EditorApplication.isPlaying ? BossVictoryGlitchPresentation.Instance : null;
-        if (p != null && p.GlitchTime >= 0f)
-        {
-            float at = p.FinisherEndedAt;
-            EditorGUILayout.LabelField("처치 연출 스킬 End", at >= 0f ? $"실제 {at:0.00}s (이번 회차 — 이 시각부터 처치자·보스 ×0.1)" : "실제 — 아직 안 옴(백대쉬·스킬 재생 중)", EditorStyles.miniBoldLabel);
-            return;
-        }
         using (new EditorGUILayout.HorizontalScope())
         {
+            if (GUILayout.Toggle(_selFinisher, "시간 배율", EditorStyles.miniButton, GUILayout.Width(64f)) != _selFinisher)
+            {
+                bool on = !_selFinisher;
+                Select(-1, -1, -1);
+                _selFinisher = on;
+            }
+            if (p != null && p.GlitchTime >= 0f)
+            {
+                float at = p.FinisherEndedAt;
+                EditorGUILayout.LabelField("처치 연출 스킬 End", at >= 0f ? $"실제 {at:0.00}s (이번 회차 — 이 시각부터 처치자·보스 End 후 배율)" : "실제 — 아직 안 옴(백대쉬·스킬 재생 중)", EditorStyles.miniBoldLabel);
+                return;
+            }
             _finisherEstimate ??= EstimateFinisherEnd();
             EditorGUILayout.LabelField("처치 연출 스킬 End 예상", _finisherEstimate, EditorStyles.miniLabel);
             if (GUILayout.Button("다시 계산", EditorStyles.miniButton, GUILayout.Width(64f))) _finisherEstimate = null;
