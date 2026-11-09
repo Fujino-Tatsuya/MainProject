@@ -23,6 +23,24 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("캐릭터 Variant 에 PlayerVictoryFinisher 가 없을 때 쓰는 스킬 칸. 그 스킬의 애니·이펙트를 표시로만 재생하고 클립 End 이벤트에서 처치자·보스가 느려진다.")]
     public PlayerSkillSlot defaultFinisherSlot = PlayerSkillSlot.Ultimate;
 
+    [Header("백대쉬(처치 연출 전용 — 기본값 = 보스 등장 밀림 BossEncounterDirector impactSkid 값 복사, 255 후속 3)")]
+    [Tooltip("백대쉬 거리(m). 보스 등장 밀림과 따로 — 등장 연출은 영향 없음.")]
+    [Min(0f)] public float backDashDistance = 1.5f;
+    [Tooltip("백대쉬 시간(초).")]
+    [Min(0.05f)] public float backDashDuration = 0.35f;
+    [Tooltip("백대쉬 이동 곡선(기본 ease out = 보스 등장 밀림 SkidEase 와 같은 식).")]
+    public BossVictoryCameraCuts.Ease backDashEase = BossVictoryCameraCuts.Ease.EaseOut;
+    [Tooltip("방향 보정(도) — 0 = 보스 반대쪽, + = 위에서 봐 시계 방향으로 돌림.")]
+    [Range(-180f, 180f)] public float backDashAngle;
+
+    public enum HideOthersTarget { Teammates, TeammatesAndAttachedEffects }
+
+    [Header("마커 옵션(시각 = 타임라인 마커, 255 후속 3)")]
+    [Tooltip("카메라 → 처치자: 0 = 즉시 컷(기본), > 0 = 이 시간(초) 동안 부드럽게 옮김(ease in/out).")]
+    [Min(0f)] public float focusKillerBlendSeconds;
+    [Tooltip("처치자 외 숨김 대상 — 팀원만(기본) / 팀원 + 팀원에게 붙어 따라다니는 이펙트(EffectManager 추종 이펙트). 소환물은 지금 플레이어 캐릭터에 없다.")]
+    public HideOthersTarget hideOthersTarget = HideOthersTarget.Teammates;
+
     [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 편집)")]
     [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
     public BossVictoryTimeline timeline = BossVictoryTimeline.CreateDefault();

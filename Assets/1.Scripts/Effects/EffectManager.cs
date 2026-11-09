@@ -513,6 +513,29 @@ public class EffectManager : MonoBehaviour
     }
 
     /// <summary>
+    /// [읽기 전용] <paramref name="root"/> 또는 그 자식을 추종 중인 재생 이펙트의 렌더러를 <paramref name="into"/> 에 더한다(지우지 않음).
+    /// 쓰는 곳: 보스 처치 연출 '처치자 외 숨김 — 팀원 + 붙은 이펙트'(매 프레임 다시 모아 끄고, 빠진 것은 다시 켠다).
+    /// </summary>
+    public void CollectFollowingRenderers(Transform root, List<Renderer> into)
+    {
+        if (root == null || into == null) return;
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            ActiveEffect active = _slots[i];
+            if (!active.inUse || active.follow == null || !active.follow.IsChildOf(root)) continue;
+            for (int p = 0; p < active.instances.Count; p++)
+            {
+                GameObject instance = active.instances[p].go;
+                if (instance == null) continue;
+                instance.GetComponentsInChildren(true, s_rendererScratch);
+                into.AddRange(s_rendererScratch);
+            }
+        }
+    }
+
+    static readonly List<Renderer> s_rendererScratch = new List<Renderer>();
+
+    /// <summary>
     /// 핸들이 가리키는 <b>재생 중인 파트 인스턴스</b>들을 <paramref name="buffer"/>에 채운다.
     /// 반환값은 채운 개수이고, 재생이 이미 끝났으면 0이다.
     ///

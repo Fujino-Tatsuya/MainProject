@@ -1027,9 +1027,10 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
     /// 등장 연출 밀림(백대쉬) 한 걸음 — 등장 연출(오너 FixedUpdate)과 보스 처치 연출 백대쉬가 같이 쓴다.
     /// 처음 한 번 리액션 상태(<see cref="SkidReactionStates"/> 중 있는 것) → 시간 비율만큼 <paramref name="dir"/> 로 밀기(<paramref name="motor"/> 가 null 이면
     /// 애니만 — 오너가 아닌 피어) → 밀림 끝 + <see cref="ReactionIdleDelay"/> 에 Idle. 반환 = 끝났다(Idle 복귀까지).
+    /// <paramref name="ease"/> = 진행 곡선(null = <see cref="BossIntroFormation.SkidEase"/> — 등장 연출. 처치 연출 백대쉬는 설정 SO 곡선).
     /// </summary>
     public static bool StepSkid(Player player, PlayerMotor motor, Vector3 dir, float distance, double startAt, float duration, double now,
-                                ref float done, ref bool reactionPlayed, ref bool idleRestored)
+                                ref float done, ref bool reactionPlayed, ref bool idleRestored, System.Func<float, float> ease = null)
     {
         Animator animator = player != null ? player.CharacterAnimator : null;
         if (!reactionPlayed)
@@ -1040,7 +1041,7 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         }
 
         float t = duration > 0f ? (float)((now - startAt) / duration) : 1f;
-        float eased = BossIntroFormation.SkidEase(t);
+        float eased = ease != null ? ease(Mathf.Clamp01(t)) : BossIntroFormation.SkidEase(t);
         float step = (eased - done) * distance;
         done = eased;
         if (step > 0f && motor != null) motor.AddGroundedDisplacement(dir * step);

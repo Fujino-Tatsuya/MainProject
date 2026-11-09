@@ -61,6 +61,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     int _killerActionState;
     PlayerMotor _dashMotor;          // 오너 피어만(이동은 오너 권위) — 다른 피어는 애니만, 위치는 복제로 본다
     Vector3 _dashDir;
+    System.Func<float, float> _dashEase;   // 설정 SO 백대쉬 곡선(한 번 만들어 재사용)
     double _dashStartAt;
     float _dashDone;
     bool _dashReaction;
@@ -80,6 +81,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     bool _focusOn;
     bool _othersHidden;
     CameraTargetSwitcher _focusSwitcher;   // 이 연출이 임시 추적을 건 카메라(정리 때 이것만 푼다)
+    Transform _focusProxy, _focusFrom, _focusTo;   // 짧게 블렌드(255 후속 3) — 원래 추적 대상 → 처치자 사이를 시각 t 로 옮기는 대리점
+    readonly List<Renderer> _hiddenEffectRenderers = new List<Renderer>();   // 숨김 대상 '팀원 + 붙은 이펙트' — 매 프레임 다시 모음
+    readonly List<Renderer> _effectScratch = new List<Renderer>();
     readonly List<Renderer> _hiddenOtherRenderers = new List<Renderer>();
     readonly List<Behaviour> _hiddenOtherBehaviours = new List<Behaviour>();   // 월드 캔버스·머리 위 체력바
     readonly List<Animator> _animators = new List<Animator>();
@@ -305,14 +309,15 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         return !st.loop && st.normalizedTime >= 0.98f;
     }
 
-    // 백대쉬 = 보스 등장 연출 밀림(BossEncounterDirector.StepSkid — 같은 리액션 상태·거리·시간·이징). 보스 반대쪽으로.
+    // 백대쉬 = 보스 등장 연출 밀림 동작(BossEncounterDirector.StepSkid — 같은 리액션 상태) · 거리·시간·곡선·방향 보정 = 설정 SO 처치 연출 전용 값
+    // (기본 = 등장 밀림 값 복사, 255 후속 3). 방향 = 보스 반대쪽을 보정 각만큼 돌림(BossVictoryBackDash.Direction).
     void BeginBackDash()
     {
         _killerStep = KillerStep.BackDash;
         ApplyEffectRates();
-        Vector3 away = _boss != null ? _killer.transform.position - _boss.transform.position : -_killer.transform.forward;
-        away.y = 0f;
-        _dashDir = away.sqrMagnitude > 0.0001f ? away.normalized : Vector3.back;
+        Vector3 killerPos = _killer.transform.position;
+        _dashDir = BossVictoryBackDash.Direction(killerPos, _boss != null ? _boss.transform.position : killerPos, _killer.transform.forward, _settings.backDashAngle);
+        _dashEase ??= u => BossVictoryCameraCuts.Evaluate(_settings.backDashEase, u);
         _dashStartAt = Time.timeAsDouble;
         _dashDone = 0f;
         _dashReaction = false;
@@ -325,14 +330,14 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             motor.PassThroughUnitsOverride = true;
             _dashMotor = motor;
         }
-        Edit.Log($"[BossVictory] 처치자 백대쉬 — {_director.IntroSkidDistance:0.##}m / {_director.IntroSkidDuration:0.##}초{(_dashMotor != null ? "(오너 이동)" : "(애니만 — 위치는 복제)")}", this);
+        Edit.Log($"[BossVictory] 처치자 백대쉬 — {_settings.backDashDistance:0.##}m / {_settings.backDashDuration:0.##}초 · {_settings.backDashEase} · 보정 {_settings.backDashAngle:0}°{(_dashMotor != null ? "(오너 이동)" : "(애니만 — 위치는 복제)")}", this);
     }
 
     void FixedUpdate()
     {
         if (!_running || _killerStep != KillerStep.BackDash || _killer == null) return;
-        if (!BossEncounterDirector.StepSkid(_killer, _dashMotor, _dashDir, _director.IntroSkidDistance, _dashStartAt, _director.IntroSkidDuration,
-                                            Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle))
+        if (!BossEncounterDirector.StepSkid(_killer, _dashMotor, _dashDir, _settings.backDashDistance, _dashStartAt, _settings.backDashDuration,
+                                            Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle, _dashEase))
             return;
         EndDashMotor();
         _killerStep = KillerStep.Finisher;
@@ -474,6 +479,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             else Unfocus();
             _focusOn = focus;
         }
+        if (_focusProxy != null && _focusFrom != null && _focusTo != null)
+        {
+            float u = (t - tl.focusKillerTime) / Mathf.Max(0.0001f, _settings.focusKillerBlendSeconds);
+            _focusProxy.position = Vector3.Lerp(_focusFrom.position, _focusTo.position, BossVictoryCameraCuts.Evaluate(BossVictoryCameraCuts.Ease.EaseInOut, u));
+        }
         bool hide = t >= tl.hideOthersTime;
         if (hide != _othersHidden)
         {
@@ -490,8 +500,19 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
         if (switcher == null) return;
         Transform target = FindFollowTarget(_killer.transform);
-        switcher.SetTemporaryFollow(target);
         _focusSwitcher = switcher;
+        Transform from = switcher.CurrentFollowTarget;
+        if (_settings.focusKillerBlendSeconds > 0f && from != null)
+        {
+            // 짧게 블렌드 — 대리점을 원래 대상 자리에 두고 따라가게 한 뒤(점프 없음) TickMarkers 가 시각 t 로 처치자 쪽에 옮긴다.
+            _focusProxy = new GameObject("BossVictoryFocusProxy").transform;
+            _focusProxy.position = from.position;
+            _focusFrom = from;
+            _focusTo = target;
+            switcher.SetTemporaryFollow(_focusProxy);
+            return;
+        }
+        switcher.SetTemporaryFollow(target);   // 즉시 컷(기본)
         _cutJumped = true;   // 다음 프레임 노이즈 UV 누적에서 이 순간이동을 뺀다
     }
 
@@ -538,6 +559,32 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             Renderer r = _hiddenOtherRenderers[i];
             if (r != null && r.enabled) r.enabled = false;
         }
+        if (_othersHidden && _settings != null && _settings.hideOthersTarget == BossVictoryGlitchSettings.HideOthersTarget.TeammatesAndAttachedEffects)
+            HideAttachedEffects();
+    }
+
+    // 팀원에게 붙어 따라다니는 풀 이펙트(EffectManager 추종) — 풀 인스턴스는 반납·재대출되므로 매 프레임 지금 붙어 있는 것만 끄고,
+    // 더 이상 팀원을 따라가지 않는 것은 다시 켠다(다른 대상에 재대출된 인스턴스가 꺼진 채 남지 않게). 팀원 몸 아래 소켓 이펙트는 HideOthers 렌더러에 이미 포함.
+    void HideAttachedEffects()
+    {
+        _effectScratch.Clear();
+        if (EffectManager.TryGet(out EffectManager effects, this))
+            for (int i = 0; i < _others.Count; i++)
+                if (_others[i] != null) effects.CollectFollowingRenderers(_others[i].transform, _effectScratch);
+        for (int i = _hiddenEffectRenderers.Count - 1; i >= 0; i--)
+        {
+            Renderer r = _hiddenEffectRenderers[i];
+            if (r != null && _effectScratch.Contains(r)) continue;
+            if (r != null) r.enabled = true;
+            _hiddenEffectRenderers.RemoveAt(i);
+        }
+        for (int i = 0; i < _effectScratch.Count; i++)
+        {
+            Renderer r = _effectScratch[i];
+            if (r == null || !r.enabled) continue;
+            r.enabled = false;
+            _hiddenEffectRenderers.Add(r);
+        }
     }
 
     void RestoreMarkers()
@@ -552,6 +599,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         if (_focusSwitcher != null) _focusSwitcher.ClearTemporaryFollow();   // 지금 대상(오너·관전 대상)으로 컷 복귀
         _focusSwitcher = null;
+        if (_focusProxy != null) Destroy(_focusProxy.gameObject);
+        _focusProxy = _focusFrom = _focusTo = null;
     }
 
     void ShowOthers()
@@ -562,6 +611,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         for (int i = 0; i < _hiddenOtherBehaviours.Count; i++)
             if (_hiddenOtherBehaviours[i] != null) _hiddenOtherBehaviours[i].enabled = true;
         _hiddenOtherBehaviours.Clear();
+        for (int i = 0; i < _hiddenEffectRenderers.Count; i++)
+            if (_hiddenEffectRenderers[i] != null) _hiddenEffectRenderers[i].enabled = true;
+        _hiddenEffectRenderers.Clear();
     }
 
     // ── 끝: 유지 → CRT 꺼짐(6단계) ─────────────────────────────────────────
