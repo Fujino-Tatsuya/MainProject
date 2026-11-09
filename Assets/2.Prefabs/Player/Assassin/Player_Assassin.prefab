@@ -2781,7 +2781,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 768617275354264640}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720131, type: 3}
   m_Name: 
@@ -2793,14 +2793,14 @@ MonoBehaviour:
   - hand
   - foot
   autoPickLimit: 6
-  lineMaterial: {fileID: 2100000, guid: 9682fe48f0f74ac0ad7c26c0eeed2e26, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 83bcb02ba2efae840b7a035667592f16, type: 2}
   lineTime: 0.2
   startWidth: 0.05
   endWidth: 0
   lineColor:
     serializedVersion: 2
-    key0: {r: 1, g: 1, b: 1, a: 1}
-    key1: {r: 1, g: 1, b: 1, a: 0.7}
+    key0: {r: 0, g: 0, b: 0, a: 1}
+    key1: {r: 0.4339623, g: 0, b: 0, a: 0.7}
     key2: {r: 0, g: 0, b: 0, a: 0}
     key3: {r: 0, g: 0, b: 0, a: 0}
     key4: {r: 0, g: 0, b: 0, a: 0}
@@ -2842,11 +2842,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 2798426011539977253}
+  extraRoots: []
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: 264ba99ef70d414cae5a11ddb0ae98c3, type: 2}
   speedLines: {fileID: 5014993645813120936}
-  spawnInterval: 0.05
-  ghostLifetime: 0.3
+  spawnInterval: 0.01
+  ghostLifetime: 0.08
   fadeCurve:
     serializedVersion: 2
     m_Curve:
@@ -2880,7 +2881,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  maxGhosts: 40
+  maxGhosts: 100
   logDiagnostics: 0
   safetyTimeout: 2
 --- !u!114 &8453647513839019182
