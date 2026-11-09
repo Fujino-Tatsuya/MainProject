@@ -64,8 +64,10 @@ public sealed class TitleScreenFeed : MonoBehaviour
     [SerializeField] private VideoClip[] _videoClips;
     [Tooltip("영상 렌더 텍스처 크기(모니터마다 1장).")]
     [SerializeField] private Vector2Int _videoSize = new(640, 360);
-    [Tooltip("영상 UV 배율(xy)·오프셋(zw). 화면이 16:9 가 아니어서 늘어나 보이면 가운데 자르기 — 예) 4:3 화면 = (0.75, 1, 0.125, 0).")]
-    [SerializeField] private Vector4 _videoUv = new(1f, 1f, 0f, 0f);
+    [Tooltip("영상 모니터 전용 재질(Title/CRTScreen, 예: MA_TitleWallVideo). 모니터마다 이것을 복제해 _MainTex 만 영상 RT 로 바꾼다 — " +
+             "CRT 값·흐름(_Roll)·이음새(_SeamBlend)·지직 표현(_Flicker)·Tiling/Offset(늘어남 보정)은 전부 이 재질 값 그대로. " +
+             "비면 벽 재질(_wallMaterialSource)을 복제하고 흐름 0·이음새 0.05 만 덮는다.")]
+    [SerializeField] private Material _videoMaterial;
 
     private struct TvState { public float roll, speed, kick, glitch; }
     private TvState[] _tv;
@@ -221,13 +223,17 @@ public sealed class TitleScreenFeed : MonoBehaviour
             rt.Create();
             ClearBlack(rt);
 
-            // 세로 흐름(동기 띠·감기)만 끈다 — _Flicker(지직 표현)는 머티리얼 값 그대로라 지직은 남는다.
-            // 셰이더가 지직이 있으면 위아래 이음새를 섞는데, 그 폭을 최소로 줄여 영상 위아래 끝만 살짝 닿게 한다.
-            var m = new Material(_wallMaterialSource) { name = $"TitleWallVideo{i} (Instance)", mainTexture = rt };
-            m.SetFloat(IdRoll, 0f);
-            m.SetFloat(IdSeamBlend, 0.05f);
-            m.mainTextureScale = new Vector2(_videoUv.x, _videoUv.y);
-            m.mainTextureOffset = new Vector2(_videoUv.z, _videoUv.w);
+            // 전용 재질이 있으면 값은 전부 그 재질 그대로(_MainTex 텍스처만 RT — Tiling/Offset 도 재질 값 유지).
+            // 없으면 벽 재질 복제 + 세로 흐름(동기 띠·감기)만 끄고, 지직이 있을 때 섞이는 위아래 이음새 폭을 최소로.
+            var m = new Material(_videoMaterial != null ? _videoMaterial : _wallMaterialSource)
+            {
+                name = $"TitleWallVideo{i} (Instance)", mainTexture = rt
+            };
+            if (_videoMaterial == null)
+            {
+                m.SetFloat(IdRoll, 0f);
+                m.SetFloat(IdSeamBlend, 0.05f);
+            }
 
             Material[] original = r.sharedMaterials;
             var mats = new Material[original.Length];

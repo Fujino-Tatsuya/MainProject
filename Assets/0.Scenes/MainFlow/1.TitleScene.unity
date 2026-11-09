@@ -2806,7 +2806,7 @@ MonoBehaviour:
   - {fileID: 32900000, guid: 987a40ea30fe1d33e4fa7837770a9636, type: 3}
   - {fileID: 32900000, guid: f768c5f18dd476c8f5be9d576ad7bc26, type: 3}
   _videoSize: {x: 640, y: 360}
-  _videoUv: {x: 1, y: 1, z: 0, w: 0}
+  _videoMaterial: {fileID: 2100000, guid: 5626fede6627a0077fbbe43e2530a531, type: 2}
 --- !u!4 &2137555596
 Transform:
   m_ObjectHideFlags: 0

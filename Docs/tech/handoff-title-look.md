@@ -35,8 +35,10 @@
     대략 위치(TitleOffice 기준): (4) 왼쪽 위 1.8배 · (8) 가운데 맨 뒤 아래쪽 2.83배(가장 큼) · (11) 오른쪽 아래.
   - `_videoClips` = `Assets/50.Art/Video/Title/01~05_*_Zone_Tour.mp4`(SVN r641, 원래 r639 `Lobby/` 에 올라온 것을 옮김).
 - **겹침 없음**: `TitleWallVideoPlaylist`(순수 함수, `TitleWallVideoPlaylistTests`) — 시작은 무작위 시작점부터 연속 3개, 끝나면 그 다음 번호부터 순환하며 다른 모니터가 지금 틀지 않는 첫 영상.
-- **룩**: 모니터마다 벽 머티리얼 인스턴스 1장(`_MainTex` = 영상 RT 640×360). `_Roll` 0(세로 흐름·동기 띠 없음)·`_SeamBlend` 0.05, 지직(`_WallGlitch`)은 평소 빈도 그대로, CRT(주사선·색수차·비네트)는 다른 벽 모니터와 같다. `TitleCrtFx` 에 등록.
-  화면 비율이 16:9 가 아니라 늘어나 보이면 `_videoUv`(배율 xy·오프셋 zw)로 가운데 자르기.
+- **룩**: 영상 모니터 전용 재질 **`Assets/3.Materials/title/MA_TitleWallVideo.mat`**(`TitleScreenFeed._videoMaterial`, 11-09 사용자 Play 튜닝값 — Brightness 1.36·Glow 1.03·Tint 9FFFD6·지직 표현 `_Flicker` 0.739·`_Roll` 0·`_SeamBlend` 0.05)을
+  모니터마다 복제해 `_MainTex` 텍스처만 영상 RT(640×360)로 바꾼다. **값은 이 재질을 고친다**(Play 중 `TitleWallVideoN (Instance)` 를 고친 값은 사라진다). 늘어나 보이면 이 재질 `_MainTex` Tiling/Offset 으로 가운데 자르기.
+  칸이 비면 벽 재질 복제 + `_Roll` 0·`_SeamBlend` 0.05 만 덮는다.
+  - 코드가 런타임에 덮는 것(재질 값 무시): `_MainTex` 텍스처(RT) · `_FxTime`·`_Glitch`·`_Tear`(`TitleCrtFx` 가 매 프레임 — 인스펙터 Glitch 칸은 상시 버스트 값) · MPB `_WallRoll` 0·`_WallGlitch`(모니터별 지직, `_glitchRate` 빈도 — 인스펙터에 안 보이는 칸).
 - **임포트**: `TitleWallVideoImport`(AssetPostprocessor) 가 `Video/Title/` 영상을 **절반 해상도 640×360 트랜스코드·소리 끔**으로 강제한다(.meta 는 SVN 이라 손으로 안 박음). 설정을 바꾸면 `Version` 을 올린다.
 - **정리**: 씬을 떠나면(OnDisable) VideoPlayer 오브젝트·RT·머티리얼을 지우고 원래 머티리얼로 되돌린다. 중앙 모니터 CRT 꺼짐·페이드 흐름은 건드리지 않는다.
 - **빌드 포함**: 영상은 씬 참조로만 들어간다(Addressables·Resources 아님).
