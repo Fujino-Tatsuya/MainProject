@@ -5154,6 +5154,9 @@ MonoBehaviour:
     view: {fileID: 7131738266071729875}
   - slot: 2
     view: {fileID: 5299019928955893025}
+  rageBelowMinColor: {r: 1, g: 1, b: 1, a: 1}
+  rageReadyColor: {r: 1, g: 0.3, b: 0.3, a: 1}
+  rageTransformedColor: {r: 0.85, g: 0.5, b: 1, a: 1}
 --- !u!1 &2476480201904717522
 GameObject:
   m_ObjectHideFlags: 0
@@ -5244,21 +5247,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HealthVignetteHUD
   image: {fileID: 5903875357747303386}
   vignetteMaterial: {fileID: 2100000, guid: 5f47dc6804d7bd8ec06644ed124c8ee3, type: 2}
+  innerRadius: 0.74
+  outerRadius: 0.99
+  cornerSquareness: 1
+  aspectCorrection: 0
+  edgeStrength: 1
   startRatio: 0.8
   maxAlpha: 0.6
   vignetteColor: {r: 1, g: 0, b: 0, a: 1}
   minPulseSpeed: 0.8
-  maxPulseSpeed: 2.5
+  maxPulseSpeed: 3
   pulseAmplitude: 0.2
   flashDuration: 0.2
   flashAlpha: 0.7
+  flashCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: -1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: -1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   flashSafeColor: {r: 1, g: 1, b: 1, a: 1}
   flashDangerColor: {r: 1, g: 0, b: 0, a: 1}
   darkenDuration: 0.5
-  fallbackTextureSize: 128
-  fallbackInnerRadius: 0.9
-  fallbackOuterRadius: 1.2
   visibleAlphaThreshold: 0.001
+  editorPreview: 0
+  editorPreviewHealthRatio: 0.3
+  editorPreviewFlashTime: 1
 --- !u!1 &2538338206906985416
 GameObject:
   m_ObjectHideFlags: 0
@@ -11642,6 +11674,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3516762708054510600, guid: 1c339ffde89a315438f8c11eda81ff81, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5959139205858432143, guid: 1c339ffde89a315438f8c11eda81ff81, type: 3}
+      propertyPath: maxAlpha
+      value: 0.981
+      objectReference: {fileID: 0}
+    - target: {fileID: 5959139205858432143, guid: 1c339ffde89a315438f8c11eda81ff81, type: 3}
+      propertyPath: visibleAlphaThreshold
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
