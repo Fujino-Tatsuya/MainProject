@@ -93,14 +93,54 @@ public static class WindowsNativeCursor
         return true;
     }
 
-    /// <summary><c>Cursor.visible</c> 을 WndProc 쪽에 알린다(숨김이면 Unity 처리에 맡긴다). 메인 스레드에서 매 프레임.</summary>
-    public static void SyncVisible(bool visible)
+    /// <summary>
+    /// 메인 스레드에서 매 프레임(LateUpdate). <c>Cursor.visible</c> 을 WndProc 쪽에 알리고(숨김이면 Unity 처리에 맡긴다),
+    /// Unity 가 프레임 중에 자기 커서(시스템 화살표)로 덮었으면 다시 세운다.
+    /// 진단: 덮여 있던 프레임 수·WndProc 에서 되세운 횟수를 5초마다 Player.log 에 한 줄 남긴다.
+    /// </summary>
+    public static void Tick(bool visible)
     {
-        if (visible == s_visible)
-            return;
         s_visible = visible;
-        if (visible && s_current != IntPtr.Zero)
+        if (s_current == IntPtr.Zero)
+            return;
+
+        s_diagFrames++;
+        if (ShouldOwnCursor() && GetCursor() != s_current)
+        {
+            s_diagOverwrittenFrames++;
             SetCursor(s_current);
+        }
+
+        float now = Time.realtimeSinceStartup;
+        if (now - s_diagStart >= DiagIntervalSeconds)
+        {
+            Debug.Log($"[NativeCursor] {now - s_diagStart:F1}s — 프레임 {s_diagFrames} 중 덮인 프레임 {s_diagOverwrittenFrames} · WndProc 되세움 {s_diagWndProcFixes}");
+            s_diagStart = now;
+            s_diagFrames = 0;
+            s_diagOverwrittenFrames = 0;
+            s_diagWndProcFixes = 0;
+        }
+    }
+
+    private const float DiagIntervalSeconds = 5f;
+    private static float s_diagStart;
+    private static int s_diagFrames;
+    private static int s_diagOverwrittenFrames;
+    private static int s_diagWndProcFixes;
+
+    // 우리 커서를 세워도 되는 때 = 커서 있음·보임·게임 창이 앞·마우스가 게임 창 클라이언트 위. 창 밖·비활성·숨김에선 절대 안 세운다.
+    private static bool ShouldOwnCursor()
+    {
+        if (s_current == IntPtr.Zero || !s_visible || s_hwnd == IntPtr.Zero)
+            return false;
+        if (GetForegroundWindow() != s_hwnd)
+            return false;
+        if (!GetCursorPos(out POINT screen) || WindowFromPoint(screen) != s_hwnd)
+            return false;
+        POINT client = screen;
+        ScreenToClient(s_hwnd, ref client);
+        GetClientRect(s_hwnd, out RECT rect);
+        return client.x >= rect.left && client.x < rect.right && client.y >= rect.top && client.y < rect.bottom;
     }
 
     // ── 서브클래싱 ─────────────────────────────────────────────
@@ -169,7 +209,18 @@ public static class WindowsNativeCursor
             SetCursor(s_current);
             return (IntPtr)1;
         }
-        return CallWindowProc(s_originalProc, hWnd, msg, wParam, lParam);
+
+        IntPtr result = CallWindowProc(s_originalProc, hWnd, msg, wParam, lParam);
+
+        // Unity 가 WM_SETCURSOR 밖(마우스 이동·Raw Input 처리)에서 자기 커서를 다시 세운다 — 처리 직후 되세운다.
+        if ((msg == WM_MOUSEMOVE || msg == WM_INPUT || msg == WM_SETCURSOR)
+            && ShouldOwnCursor()
+            && GetCursor() != s_current)
+        {
+            s_diagWndProcFixes++;
+            SetCursor(s_current);
+        }
+        return result;
     }
 
     // 이 프로세스의 Unity 게임 창(클래스 UnityWndClass).
@@ -214,6 +265,42 @@ public static class WindowsNativeCursor
     private const long HTCLIENT = 1;
     private const uint BI_BITFIELDS = 3;
     private const uint DIB_RGB_COLORS = 0;
+    private const uint WM_MOUSEMOVE = 0x0200;
+    private const uint WM_INPUT = 0x00FF;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int x;
+        public int y;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetCursor();
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT point);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT point);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ScreenToClient(IntPtr hWnd, ref POINT point);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr hWnd, out RECT rect);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 
     private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
@@ -313,6 +400,6 @@ public static class WindowsNativeCursor
     public static IntPtr Create(byte[] bgraTopDown, int width, int height, Vector2Int hotspot) => IntPtr.Zero;
     public static void Destroy(IntPtr cursor) { }
     public static bool Show(IntPtr cursor) => false;
-    public static void SyncVisible(bool visible) { }
+    public static void Tick(bool visible) { }
 #endif
 }

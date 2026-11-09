@@ -72,11 +72,11 @@ public class SkillCursorView : MonoBehaviour
         ReleaseScaled();
     }
 
-    // 네이티브 커서는 Unity 가 모르는 상태다 — 숨김(설정창 등 Cursor.visible=false)이면 WndProc 가 Unity 처리에 넘기도록 매 프레임 알린다.
+    // 네이티브 커서는 Unity 가 모르는 상태다 — 숨김(설정창 등 Cursor.visible=false)을 알리고, Unity 가 덮은 커서를 되세운다(진단 로그 포함).
     private void LateUpdate()
     {
         if (isLocal && WindowsNativeCursor.IsSupported)
-            WindowsNativeCursor.SyncVisible(Cursor.visible);
+            WindowsNativeCursor.Tick(Cursor.visible);
     }
 
     private void ReleaseNative()
