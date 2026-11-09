@@ -42,6 +42,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void OnEnable()
     {
         if (_settings == null) _settings = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(DefaultAssetPath);
+        Undo.undoRedoPerformed += Repaint;
+        wantsMouseMove = false;
+    }
+
+    void OnDisable()
+    {
+        Undo.undoRedoPerformed -= Repaint;
     }
 
     BossVictoryTimeline Timeline => _settings != null ? _settings.timeline : null;
@@ -64,6 +71,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Rect scroll = new Rect(lanes.x, lanes.yMax, lanes.width, 16f);
 
         HandleView(lanes, ruler);
+        HandleEdit(lanes, ruler);
+        if (!HasClipSelection) _selIndex = -1;   // Undo 로 목록이 줄었으면
         DrawRows(labels, lanes);
         DrawRuler(ruler);
         DrawTrackClips(lanes);
@@ -276,14 +285,383 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _scrollTime = GUI.HorizontalScrollbar(r, _scrollTime, visible, 0f, total);
     }
 
-    // ── 선택(편집 단계에서 채움) ────────────────────────────────────────
+    // ── 선택·편집 ────────────────────────────────────────────────────────
+    // 끌기 = 이동 · 양 끝 = 길이 · 위쪽 작은 네모 = 페이드 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V · 0.01초 스냅 · Undo.
 
-    bool IsSelected(BossVictoryTrack track, int index) => false;
-    bool IsSelectedMarker(BossVictoryMarker marker) => false;
-    void DrawClipDecorations(Rect r, BossVictoryTrack track, BossVictoryClip clip, bool selected) { }
+    enum DragMode { None, Move, ResizeLeft, ResizeRight, FadeIn, FadeOut, Marker, Playhead }
 
+    const float MinLength = 0.01f;
+    const float EdgeGrab = 5f;
+    const float HandleSize = 7f;
+
+    [SerializeField] bool _snap = true;
+    int _selTrack = -1;
+    int _selIndex = -1;
+    int _selMarker = -1;
+    DragMode _drag;
+    BossVictoryClip _dragOrig;
+    float _dragMouseT0;
+    bool _dragRecorded;
+    static bool s_hasClipboard;
+    static BossVictoryClip s_clipboard;
+    static BossVictoryTrack s_clipboardTrack;
+
+    float Snap(float t) => _snap ? Mathf.Round(t * 100f) / 100f : t;
+
+    bool IsSelected(BossVictoryTrack track, int index) => _selTrack == (int)track && _selIndex == index;
+    bool IsSelectedMarker(BossVictoryMarker marker) => _selMarker == (int)marker;
+    bool HasClipSelection => _selTrack >= 0 && _selIndex >= 0 && _selIndex < Timeline.Clips((BossVictoryTrack)_selTrack).Count;
+
+    void Select(int track, int index, int marker)
+    {
+        _selTrack = track;
+        _selIndex = index;
+        _selMarker = marker;
+        GUI.FocusControl(null);
+    }
+
+    void DrawClipDecorations(Rect r, BossVictoryTrack track, BossVictoryClip clip, bool selected)
+    {
+        if (!selected || !BossVictoryTimeline.HasFades(track)) return;
+        float xIn = r.x + clip.fadeIn / Mathf.Max(MinLength, clip.length) * r.width;
+        float xOut = r.xMax - clip.fadeOut / Mathf.Max(MinLength, clip.length) * r.width;
+        EditorGUI.DrawRect(new Rect(xIn - HandleSize * 0.5f, r.y, HandleSize, HandleSize), Color.white);
+        EditorGUI.DrawRect(new Rect(xOut - HandleSize * 0.5f, r.y, HandleSize, HandleSize), Color.white);
+    }
+
+    void Record(string label)
+    {
+        Undo.RecordObject(_settings, label);
+    }
+
+    // SO 에 바로 저장(Play 끝나도 유지 — Q5).
+    void Save()
+    {
+        EditorUtility.SetDirty(_settings);
+        AssetDatabase.SaveAssetIfDirty(_settings);
+    }
+
+    void HandleEdit(Rect lanes, Rect ruler)
+    {
+        Event e = Event.current;
+        switch (e.type)
+        {
+            case EventType.MouseDown when e.button == 0:
+                if (ruler.Contains(e.mousePosition))
+                {
+                    _drag = DragMode.Playhead;
+                    SetPlayhead(XToTime(lanes, e.mousePosition.x));
+                    e.Use();
+                }
+                else if (lanes.Contains(e.mousePosition))
+                {
+                    BeginDrag(lanes, e.mousePosition);
+                    e.Use();
+                }
+                break;
+            case EventType.MouseDrag when e.button == 0 && _drag != DragMode.None:
+                ApplyDrag(lanes, e.mousePosition);
+                e.Use();
+                break;
+            case EventType.MouseUp when e.button == 0 && _drag != DragMode.None:
+                if (_dragRecorded) Save();
+                _drag = DragMode.None;
+                _dragRecorded = false;
+                e.Use();
+                break;
+            case EventType.ContextClick when lanes.Contains(e.mousePosition):
+                ShowContextMenu(lanes, e.mousePosition);
+                e.Use();
+                break;
+            case EventType.ValidateCommand when IsEditCommand(e.commandName) && GUIUtility.keyboardControl == 0:
+                e.Use();
+                break;
+            case EventType.ExecuteCommand when IsEditCommand(e.commandName) && GUIUtility.keyboardControl == 0:
+                ExecuteCommand(e.commandName);
+                e.Use();
+                break;
+            case EventType.KeyDown when e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace:
+                if (HasClipSelection && GUIUtility.keyboardControl == 0)
+                {
+                    DeleteSelected();
+                    e.Use();
+                }
+                break;
+        }
+    }
+
+    static bool IsEditCommand(string name) => name == "Copy" || name == "Paste" || name == "Delete" || name == "SoftDelete" || name == "Duplicate";
+
+    void ExecuteCommand(string name)
+    {
+        switch (name)
+        {
+            case "Copy": CopySelected(); break;
+            case "Paste":
+                PasteAt(_selTrack >= 0 ? (BossVictoryTrack)_selTrack : s_clipboardTrack, _playhead);
+                break;
+            case "Duplicate":
+                if (HasClipSelection)
+                {
+                    CopySelected();
+                    BossVictoryClip c = Timeline.Clips((BossVictoryTrack)_selTrack)[_selIndex];
+                    PasteAt((BossVictoryTrack)_selTrack, c.End);
+                }
+                break;
+            default: DeleteSelected(); break;
+        }
+    }
+
+    void BeginDrag(Rect lanes, Vector2 mouse)
+    {
+        _dragRecorded = false;
+        _dragMouseT0 = XToTime(lanes, mouse.x);
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        {
+            Rect row = RowRect(lanes, MarkerRow(marker));
+            if (!row.Contains(mouse) || Mathf.Abs(mouse.x - TimeToX(lanes, Timeline.MarkerTime(marker))) > HandleSize + 1f) continue;
+            Select(-1, -1, (int)marker);
+            _drag = DragMode.Marker;
+            return;
+        }
+        foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
+        {
+            if (!RowRect(lanes, TrackRow(track)).Contains(mouse)) continue;
+            List<BossVictoryClip> clips = Timeline.Clips(track);
+            for (int i = clips.Count - 1; i >= 0; i--)
+            {
+                Rect r = ClipRect(lanes, TrackRow(track), clips[i]);
+                if (mouse.x < r.x - EdgeGrab || mouse.x > r.xMax + EdgeGrab) continue;
+                Select((int)track, i, -1);
+                _dragOrig = clips[i];
+                _drag = PickClipMode(track, r, clips[i], mouse);
+                return;
+            }
+            break;
+        }
+        Select(-1, -1, -1);
+        _drag = DragMode.None;
+    }
+
+    DragMode PickClipMode(BossVictoryTrack track, Rect r, BossVictoryClip clip, Vector2 mouse)
+    {
+        if (BossVictoryTimeline.HasFades(track) && mouse.y <= r.y + HandleSize + 1f)
+        {
+            float len = Mathf.Max(MinLength, clip.length);
+            float xIn = r.x + clip.fadeIn / len * r.width;
+            float xOut = r.xMax - clip.fadeOut / len * r.width;
+            if (Mathf.Abs(mouse.x - xIn) <= HandleSize) return DragMode.FadeIn;
+            if (Mathf.Abs(mouse.x - xOut) <= HandleSize) return DragMode.FadeOut;
+        }
+        if (Mathf.Abs(mouse.x - r.x) <= EdgeGrab) return DragMode.ResizeLeft;
+        if (Mathf.Abs(mouse.x - r.xMax) <= EdgeGrab) return DragMode.ResizeRight;
+        return DragMode.Move;
+    }
+
+    void ApplyDrag(Rect lanes, Vector2 mouse)
+    {
+        float mt = XToTime(lanes, mouse.x);
+        if (_drag == DragMode.Playhead)
+        {
+            SetPlayhead(mt);
+            return;
+        }
+        if (!_dragRecorded)
+        {
+            Record("처치 연출 타임라인 끌기");
+            _dragRecorded = true;
+        }
+        if (_drag == DragMode.Marker)
+        {
+            Timeline.SetMarkerTime((BossVictoryMarker)_selMarker, Snap(mt));
+            Repaint();
+            return;
+        }
+        if (!HasClipSelection) return;
+        BossVictoryClip o = _dragOrig, c = o;
+        float d = mt - _dragMouseT0;
+        switch (_drag)
+        {
+            case DragMode.Move:
+                c.start = Mathf.Max(0f, Snap(o.start + d));
+                break;
+            case DragMode.ResizeLeft:
+                c.start = Mathf.Clamp(Snap(o.start + d), 0f, o.End - MinLength);
+                c.length = o.End - c.start;
+                break;
+            case DragMode.ResizeRight:
+                c.length = Mathf.Max(MinLength, Snap(o.End + d) - o.start);
+                break;
+            case DragMode.FadeIn:
+                c.fadeIn = Mathf.Clamp(Snap(mt - o.start), 0f, o.length);
+                break;
+            case DragMode.FadeOut:
+                c.fadeOut = Mathf.Clamp(Snap(o.End - mt), 0f, o.length);
+                break;
+        }
+        Timeline.Clips((BossVictoryTrack)_selTrack)[_selIndex] = Clamp(c);
+        Repaint();
+    }
+
+    static BossVictoryClip Clamp(BossVictoryClip c)
+    {
+        c.start = Mathf.Max(0f, c.start);
+        c.length = Mathf.Max(MinLength, c.length);
+        c.fadeIn = Mathf.Clamp(c.fadeIn, 0f, c.length);
+        c.fadeOut = Mathf.Clamp(c.fadeOut, 0f, c.length);
+        c.weight = Mathf.Clamp01(c.weight);
+        return c;
+    }
+
+    void ShowContextMenu(Rect lanes, Vector2 mouse)
+    {
+        float t = Mathf.Max(0f, Snap(XToTime(lanes, mouse.x)));
+        var menu = new GenericMenu();
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        {
+            if (!RowRect(lanes, MarkerRow(marker)).Contains(mouse)) continue;
+            BossVictoryMarker m = marker;
+            menu.AddItem(new GUIContent($"여기({t:0.00}초)로 옮기기"), false, () => MoveMarker(m, t));
+            menu.AddItem(new GUIContent($"재생 헤드({_playhead:0.00}초)로 옮기기"), false, () => MoveMarker(m, _playhead));
+            menu.ShowAsContext();
+            return;
+        }
+        foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
+        {
+            if (!RowRect(lanes, TrackRow(track)).Contains(mouse)) continue;
+            BossVictoryTrack tr = track;
+            List<BossVictoryClip> clips = Timeline.Clips(track);
+            int hit = -1;
+            for (int i = clips.Count - 1; i >= 0 && hit < 0; i--)
+                if (ClipRect(lanes, TrackRow(track), clips[i]).Contains(mouse)) hit = i;
+            if (hit >= 0)
+            {
+                Select((int)track, hit, -1);
+                menu.AddItem(new GUIContent("복사"), false, CopySelected);
+                menu.AddItem(new GUIContent("삭제"), false, DeleteSelected);
+                menu.AddSeparator("");
+            }
+            if (CanAdd(track)) menu.AddItem(new GUIContent($"클립 추가 ({t:0.00}초)"), false, () => AddClip(tr, t));
+            else menu.AddDisabledItem(new GUIContent("클립 추가 (TV 꺼짐은 1개만)"));
+            if (s_hasClipboard && CanAdd(track)) menu.AddItem(new GUIContent($"붙여넣기 ({t:0.00}초)"), false, () => PasteAt(tr, t));
+            else menu.AddDisabledItem(new GUIContent("붙여넣기"));
+            menu.ShowAsContext();
+            return;
+        }
+    }
+
+    bool CanAdd(BossVictoryTrack track) =>
+        BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Single || Timeline.Clips(track).Count == 0;
+
+    static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.KindOf(track) switch
+    {
+        BossVictoryTimeline.TrackKind.Pulse => BossVictoryClip.Make(start, 0.2f, 0.1f, 0.1f),
+        BossVictoryTimeline.TrackKind.Single => BossVictoryClip.Make(start, 1f),
+        _ => track == BossVictoryTrack.Hold ? BossVictoryClip.Make(start, 1f) : BossVictoryClip.Make(start, 1f, 0.1f, 0.1f),
+    };
+
+    void AddClip(BossVictoryTrack track, float start)
+    {
+        if (!CanAdd(track)) return;
+        Record("처치 연출 타임라인 클립 추가");
+        List<BossVictoryClip> clips = Timeline.Clips(track);
+        clips.Add(NewClip(track, start));
+        Select((int)track, clips.Count - 1, -1);
+        Save();
+        Repaint();
+    }
+
+    void MoveMarker(BossVictoryMarker marker, float t)
+    {
+        Record("처치 연출 타임라인 마커 옮기기");
+        Timeline.SetMarkerTime(marker, Snap(t));
+        Select(-1, -1, (int)marker);
+        Save();
+        Repaint();
+    }
+
+    void CopySelected()
+    {
+        if (!HasClipSelection) return;
+        s_clipboardTrack = (BossVictoryTrack)_selTrack;
+        s_clipboard = Timeline.Clips(s_clipboardTrack)[_selIndex];
+        s_hasClipboard = true;
+    }
+
+    void PasteAt(BossVictoryTrack track, float start)
+    {
+        if (!s_hasClipboard || !CanAdd(track)) return;
+        Record("처치 연출 타임라인 붙여넣기");
+        BossVictoryClip c = s_clipboard;
+        c.start = Mathf.Max(0f, Snap(start));
+        List<BossVictoryClip> clips = Timeline.Clips(track);
+        clips.Add(Clamp(c));
+        Select((int)track, clips.Count - 1, -1);
+        Save();
+        Repaint();
+    }
+
+    void DeleteSelected()
+    {
+        if (!HasClipSelection) return;
+        Record("처치 연출 타임라인 클립 삭제");
+        Timeline.Clips((BossVictoryTrack)_selTrack).RemoveAt(_selIndex);
+        Select(-1, -1, -1);
+        Save();
+        Repaint();
+    }
+
+    void SetPlayhead(float t)
+    {
+        _playhead = Mathf.Max(0f, Snap(t));
+        Repaint();
+    }
+
+    // 선택 클립·마커 수치 직접 입력
     void DrawInspector()
     {
-        EditorGUILayout.HelpBox("휠 = 줌 · 가운데 버튼 끌기 = 이동.", MessageType.None);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            _snap = EditorGUILayout.ToggleLeft("0.01초 스냅", _snap, GUILayout.Width(100f));
+            GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V/D", EditorStyles.miniLabel);
+        }
+        if (_selMarker >= 0)
+        {
+            var marker = (BossVictoryMarker)_selMarker;
+            EditorGUILayout.LabelField("마커", BossVictoryTimeline.MarkerLabel(marker), EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+            float time = EditorGUILayout.FloatField("시각(초)", Timeline.MarkerTime(marker));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Record("처치 연출 타임라인 마커 수치");
+                Timeline.SetMarkerTime(marker, time);
+                Save();
+            }
+            return;
+        }
+        if (!HasClipSelection)
+        {
+            EditorGUILayout.LabelField("선택 없음 — 클립이나 마커를 누르면 수치를 고칠 수 있다.", EditorStyles.miniLabel);
+            return;
+        }
+        var track = (BossVictoryTrack)_selTrack;
+        BossVictoryClip c = Timeline.Clips(track)[_selIndex];
+        EditorGUILayout.LabelField("클립", $"{BossVictoryTimeline.TrackLabel(track)} #{_selIndex + 1}", EditorStyles.boldLabel);
+        EditorGUI.BeginChangeCheck();
+        c.start = EditorGUILayout.FloatField("시작(초)", c.start);
+        c.length = EditorGUILayout.FloatField("길이(초)", c.length);
+        EditorGUILayout.LabelField("끝(초)", c.End.ToString("0.00"));
+        if (BossVictoryTimeline.HasFades(track))
+        {
+            c.fadeIn = EditorGUILayout.FloatField("페이드 인(초)", c.fadeIn);
+            c.fadeOut = EditorGUILayout.FloatField("페이드 아웃(초)", c.fadeOut);
+            c.weight = EditorGUILayout.Slider("세기", c.weight, 0f, 1f);
+        }
+        if (EditorGUI.EndChangeCheck())
+        {
+            Record("처치 연출 타임라인 클립 수치");
+            Timeline.Clips(track)[_selIndex] = Clamp(c);
+            Save();
+        }
     }
 }
