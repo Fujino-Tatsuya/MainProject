@@ -183,8 +183,14 @@ MonoBehaviour:
         curve: 0
     crtOff: []
     cameraCut:
-    - start: 1.04
-      length: 4.56
+    - start: 1.03
+      length: 4.5699997
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+    - start: 0.31
+      length: 0.71999997
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -204,6 +210,8 @@ MonoBehaviour:
         curve: 1
       smoothPath: 1
       hideWalls: 1
+      blendSeconds: 0
+      blendCurve: 0
       startPosition: {x: 0.70313674, y: 0.56469953, z: -6.1380944}
       startRotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
       startFov: 60.000004
@@ -212,6 +220,25 @@ MonoBehaviour:
       endRotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
       endFov: 60.000004
       ease: 1
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 1.1093352, y: 1.5867021, z: -4.795919}
+        rotation: {x: -0.04253631, y: -0.042586945, z: -0.001902293, w: 0.99818504}
+        fov: 60.000004
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 0
+      blendCurve: 0
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
     killerAction:
     - start: 0
       length: 0.2
@@ -227,6 +254,7 @@ MonoBehaviour:
     finisherTrimSeconds: 0
     slowStartTime: 0
     bossHitAnimTime: 0.2
+    bossHitTrimSeconds: 0
     bossFreezeTime: 0
     bossSlowTime: 0.2
     killerActionEndTime: 0
