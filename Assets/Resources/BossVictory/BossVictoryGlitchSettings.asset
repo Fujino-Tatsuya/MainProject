@@ -12,11 +12,129 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4746dfe25f278299b295f57c9881699, type: 3}
   m_Name: BossVictoryGlitchSettings
   m_EditorClassIdentifier: Assembly-CSharp::BossVictoryGlitchSettings
+  killerCurrentActionScale: 0.5
   killerAfterFinisherScale: 0.1
   otherPlayersScale: 0.05
   bossAfterFinisherScale: 0.1
   defaultFinisherSlot: 3
+  timeline:
+    master:
+    - start: 0.08
+      length: 5.52
+      fadeIn: 0.07
+      fadeOut: 0
+      weight: 1
+    desaturate:
+    - start: 0.1
+      length: 5.5
+      fadeIn: 0.1
+      fadeOut: 0
+      weight: 1
+    amber:
+    - start: 0.3
+      length: 5.3
+      fadeIn: 0.15
+      fadeOut: 0
+      weight: 1
+    scanline:
+    - start: 0.1
+      length: 5.5
+      fadeIn: 0.1
+      fadeOut: 0
+      weight: 1
+    bossNoise:
+    - start: 0.12
+      length: 5.48
+      fadeIn: 0.05
+      fadeOut: 0
+      weight: 1
+    tear:
+    - start: 0.08
+      length: 0.17
+      fadeIn: 0.12
+      fadeOut: 0.05
+      weight: 1
+    - start: 0.32
+      length: 0.09
+      fadeIn: 0.01
+      fadeOut: 0.08
+      weight: 1
+    - start: 1.42
+      length: 0.19
+      fadeIn: 0.1
+      fadeOut: 0.09
+      weight: 1
+    - start: 1.62
+      length: 0.11
+      fadeIn: 0.05
+      fadeOut: 0.06
+      weight: 1
+    - start: 2.43
+      length: 0.24
+      fadeIn: 0.12
+      fadeOut: 0.12
+      weight: 1
+    smear:
+    - start: 0.08
+      length: 0.17
+      fadeIn: 0.12
+      fadeOut: 0.05
+      weight: 1
+    - start: 0.32
+      length: 0.09
+      fadeIn: 0.01
+      fadeOut: 0.08
+      weight: 1
+    - start: 1.42
+      length: 0.2
+      fadeIn: 0.1
+      fadeOut: 0.1
+      weight: 1
+    - start: 2.43
+      length: 0.24
+      fadeIn: 0.12
+      fadeOut: 0.12
+      weight: 1
+    hudHide:
+    - start: 0.08
+      length: 5.52
+      fadeIn: 0.04
+      fadeOut: 0
+      weight: 1
+    hold:
+    - start: 3.5
+      length: 1
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+    crtOff:
+    - start: 4.5
+      length: 1.1
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+    focusKillerTime: 0.2
+    hideOthersTime: 0.2
+    lobbyTransitionTime: 5.6
+  amberColor: {r: 0.8235294, g: 0.6509804, b: 0.30588236, a: 1}
+  scanlineCount: 360
+  tearLinePixels: 3
+  tearLineMaxMultiplier: 3
+  tearMaxShift: 0.12
+  tearDensity: 0.35
+  tearRefreshRate: 24
+  tearStreakLength: 0.08
   bossNoiseTexture: {fileID: 2800000, guid: 465bf8b24a9102e0f904bee0aebfbe89, type: 3}
+  bossNoiseSpace: 0
+  bossNoiseTiling: {x: 1, y: 1}
+  bossNoiseCameraScale: {x: 0.1, y: 0.1}
+  bossNoiseBrightColor: {r: 1, g: 0.9647059, b: 0.91764706, a: 1}
+  bossNoiseBrightIntensity: 1.6
+  bossNoiseDarkColor: {r: 0.22745098, g: 0.09019608, b: 0.07058824, a: 1}
+  cuts: []
+  wallFacingThreshold: 0.3
+  wallSearchRadius: 40
+  crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}
   maskShader: {fileID: 4800000, guid: 3efaf0437d7bf628e1397fc495a613e1, type: 3}
   compositeShader: {fileID: 4800000, guid: 979774beff724b5e1fd017b192707160, type: 3}
   crtOffShader: {fileID: 4800000, guid: 9c24c9581dab14646ac4ddcb56d7141b, type: 3}

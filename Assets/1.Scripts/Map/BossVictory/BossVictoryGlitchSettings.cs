@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 — ZZZ 글리치(PLAN-boss-victory-glitch) 수치. 정본 에셋: <c>Resources/BossVictory/BossVictoryGlitchSettings.asset</c>
-/// (없으면 코드 기본값). 단계가 늘 때마다 칸을 더한다 — 2단계 = 대상별 시간 배율·처치 연출 스킬 · 3단계 = 글리치 타임라인 · 4단계 = 카메라 컷 · 6단계 = 유지·CRT 꺼짐.
+/// (없으면 코드 기본값). 단계가 늘 때마다 칸을 더한다 — 2단계 = 대상별 시간 배율·처치 연출 스킬 · 3단계 = 글리치 타임라인(→ 클립 목록 <see cref="BossVictoryTimeline"/>) · 4단계 = 카메라 컷 · 6단계 = TV 꺼짐.
 /// </summary>
 [CreateAssetMenu(menuName = "MainProject/Boss Victory Glitch Settings", fileName = "BossVictoryGlitchSettings")]
 public sealed class BossVictoryGlitchSettings : ScriptableObject
@@ -23,25 +23,9 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("캐릭터 Variant 에 PlayerVictoryFinisher 가 없을 때 쓰는 스킬 칸. 그 스킬의 애니·이펙트를 표시로만 재생하고 클립 End 이벤트에서 처치자·보스가 느려진다.")]
     public PlayerSkillSlot defaultFinisherSlot = PlayerSkillSlot.Ultimate;
 
-    [Header("글리치 타임라인(3단계 — t = 처치 판정 순간(복제 처치 시각) 뒤 초. 처치 연출 스킬은 이 속에서 재생)")]
-    [Tooltip("타임라인 길이(초). 이 뒤로는 마지막 값으로 정지 화면(유지 시간은 5단계).")]
-    [Min(0.1f)] public float glitchDuration = 3.5f;
-    [Tooltip("전체 세기(0 = 원래 화면). 0 이면 렌더 패스를 아예 건너뛴다.")]
-    public AnimationCurve master = Ramp(0.08f, 0.15f);
-    [Tooltip("화면 흑백(~0.17 부터 끝까지).")]
-    public AnimationCurve desaturate = Ramp(0.1f, 0.2f);
-    [Tooltip("배경 호박색 틴트(플레이어 제외 — 캐릭터는 흑백 유지). 와이드 컷(~0.33)부터.")]
-    public AnimationCurve amber = Ramp(0.3f, 0.45f);
-    [Tooltip("CRT 주사선(끝까지 유지).")]
-    public AnimationCurve scanline = Ramp(0.1f, 0.2f);
-    [Tooltip("가로줄 좌우 찢김 세기(0~1) — 글리치는 이것 하나(사용자 11-09: 사각형·블록 노이즈 금지). 켜지는 줄 비율·밀림 거리에 곱한다.")]
-    public AnimationCurve tear = Pulses(0.2f, 0.12f, 0.33f, 0.08f, 1.52f, 0.1f, 1.67f, 0.06f, 2.55f, 0.12f);
-    [Tooltip("찢긴 줄의 밝은 부분 가로 끌림(스미어) 세기(0~1) — 찢긴 줄에만 걸린다.")]
-    public AnimationCurve smear = Pulses(0.2f, 0.12f, 0.33f, 0.08f, 1.52f, 0.1f, 2.55f, 0.12f);
-    [Tooltip("보스 노이즈 세기(보스 실루엣 안).")]
-    public AnimationCurve bossNoise = Ramp(0.12f, 0.17f);
-    [Tooltip("HUD 숨김(0.5 넘으면 숨김).")]
-    public AnimationCurve hudHide = Ramp(0.08f, 0.12f);
+    [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 편집)")]
+    [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·정지 유지·TV 꺼짐 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
+    public BossVictoryTimeline timeline = BossVictoryTimeline.CreateDefault();
 
     [Header("글리치 색·모양")]
     [Tooltip("배경 호박색(sRGB).")]
@@ -87,11 +71,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("벽 숨김 후보 반경(m, 처치자·보스 가운데 기준).")]
     [Min(1f)] public float wallSearchRadius = 40f;
 
-    [Header("끝 — 유지 → CRT 꺼짐 암전 → 로비 결과(6단계)")]
-    [Tooltip("글리치 타임라인(glitchDuration)이 끝난 뒤 정지 화면 유지(초).")]
-    [Min(0f)] public float holdSeconds = 1f;
-    [Tooltip("CRT 꺼짐 길이(초) — 타이틀 → 로비 꺼짐(Title/CRTOff)과 같은 연출. 끝 = 검정, 호스트 화면에서 끝나면 서버가 로비(결과 패널)로 넘긴다.")]
-    [Min(0.05f)] public float crtOffSeconds = 1.1f;
+    [Header("TV 꺼짐(시각·길이 = 타임라인 TV 꺼짐 클립)")]
     [Tooltip("CRT 꺼짐 발광 색(타이틀과 같은 파랑이 기본).")]
     public Color crtOffGlowColor = new Color(0.25f, 0.62f, 1f, 1f);
 
@@ -100,24 +80,6 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public Shader compositeShader;
     [Tooltip("Title/CRTOff(UI/Title/Shaders/TitleCRTOff.shader).")]
     public Shader crtOffShader;
-
-    // 기본 곡선 — a 에서 b 까지 0 → peak, 이후 유지.
-    static AnimationCurve Ramp(float a, float b, float peak = 1f) =>
-        new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(a, 0f), new Keyframe(b, peak), new Keyframe(10f, peak));
-
-    // 기본 곡선 — (중심, 반폭) 쌍마다 0 → 1 → 0 펄스.
-    static AnimationCurve Pulses(params float[] centerHalf)
-    {
-        var keys = new System.Collections.Generic.List<Keyframe> { new Keyframe(0f, 0f) };
-        for (int i = 0; i + 1 < centerHalf.Length; i += 2)
-        {
-            float c = centerHalf[i], h = centerHalf[i + 1];
-            keys.Add(new Keyframe(c - h, 0f));
-            keys.Add(new Keyframe(c, 1f));
-            keys.Add(new Keyframe(c + h, 0f));
-        }
-        return new AnimationCurve(keys.ToArray());
-    }
 
     static BossVictoryGlitchSettings _cached;
 

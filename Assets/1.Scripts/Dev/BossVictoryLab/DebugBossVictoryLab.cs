@@ -46,7 +46,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     [SerializeField, Min(0f)] float loopHoldSeconds = 1.5f;
     [Tooltip("원상복구 뒤 처치까지(실제 초) — 카메라가 플레이 시점으로 돌아올 틈.")]
     [SerializeField, Min(0f)] float restartDelaySeconds = 0.8f;
-    [Tooltip("처치 뒤 결과 차단 신호(호스트 화면 CRT 꺼짐 끝)가 이만큼 안 오면 끝난 것으로 본다(실제 초, 안전망 — 기본 연출 ≈ 5.6초 + 배속).")]
+    [Tooltip("처치 뒤 결과 차단 신호(호스트 화면이 타임라인 로비 전환 마커를 지남)가 이만큼 안 오면 끝난 것으로 본다(실제 초, 안전망 — 기본 연출 ≈ 5.6초 + 배속).")]
     [SerializeField, Min(1f)] float endFallbackSeconds = 15f;
 
     [Header("막타·팀원 배치")]
@@ -413,7 +413,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             GUILayout.Label($"배속 {Time.timeScale:0.00}{(_paused ? " · 일시정지" : "")}");
             BossVictoryGlitchPresentation p = BossVictoryGlitchPresentation.Instance;
             if (p != null && p.Sequence == v.Sequence)
-                GUILayout.Label($"표시: {p.CurrentPhase}·처치자 {p.KillerStepName} · 글리치 {p.GlitchTime:0.00}초(게임 시간) · 컷 {(p.CutIndex < 0 ? "게임 카메라" : p.CutIndex.ToString())}{(p.Finished ? " · CRT 꺼짐 끝" : "")}");
+                GUILayout.Label($"표시: {p.CurrentPhase}·처치자 {p.KillerStepName} · 글리치 {p.GlitchTime:0.00}초(게임 시간) · 컷 {(p.CutIndex < 0 ? "게임 카메라" : p.CutIndex.ToString())}{(p.Finished ? " · 로비 전환 마커 지남" : "")}");
         }
         else
         {

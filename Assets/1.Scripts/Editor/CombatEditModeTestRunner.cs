@@ -48,7 +48,8 @@ internal static class CombatEditModeTestRunner
         "^BossVictoryRules", // BossVictoryRulesTests(Legacy) — 옛 보스 B 승리 연출 타임라인·곡선·구도(PLAN-boss-victory-cinematic)
         "^BossVictoryLab", // BossVictoryLabRulesTests — 처치 연출 반복 디버그 랩 배치·씬 격리(할 일 244)
         "^BossVictoryFinisher", // BossVictoryFinisherTests — 처치 연출 스킬 클립 End 이벤트(PLAN-boss-victory-glitch Q9)
-        "^BossVictoryCameraCut" // BossVictoryCameraCutTests — 처치 연출 카메라 컷 고르기·구도(PLAN-boss-victory-glitch 4단계)
+        "^BossVictoryCameraCut", // BossVictoryCameraCutTests — 처치 연출 카메라 컷 고르기·구도(PLAN-boss-victory-glitch 4단계)
+        "^BossVictoryTimeline" // BossVictoryTimelineTests — 처치 연출 타임라인 클립 평가·기본값 = 옛 곡선(PLAN-boss-victory-glitch 타임라인 창)
     };
 
     const string Tag = "[CombatTests]";

@@ -19,9 +19,6 @@ public sealed class BossVictoryCrtOff
     readonly GameObject _root;
     readonly Material _material;
     readonly Texture2D _capture;
-    float _time;
-
-    public bool Finished { get; private set; }
 
     /// <summary>프레임 끝(WaitForEndOfFrame 뒤)에 만든다 — 그 순간 화면이 캡처된다. 셰이더가 없으면 캡처 없이 검정으로 페이드한다.</summary>
     public BossVictoryCrtOff(string name, Shader shader, Color glowColor)
@@ -55,23 +52,20 @@ public sealed class BossVictoryCrtOff
         }
     }
 
-    /// <summary>진행. <paramref name="duration"/> 초에 끝(검정).</summary>
-    public void Tick(float deltaTime, float duration)
+    /// <summary>진행 = 타임라인 TV 꺼짐 클립 안 위치(0~1, 1 = 검정). <paramref name="elapsed"/> = 클립 시작 뒤 초(셰이더 잡음 시계). 스크럽으로 되감아도 된다.</summary>
+    public void SetProgress(float progress, float elapsed)
     {
-        if (Finished) return;
-        _time += Mathf.Max(0f, deltaTime);
-        float p = Mathf.Clamp01(_time / Mathf.Max(0.01f, duration));
+        float p = Mathf.Clamp01(progress);
         if (_material != null)
         {
             _material.SetFloat(IdProgress, p);
-            _material.SetFloat(IdFxTime, _time);
+            _material.SetFloat(IdFxTime, Mathf.Max(0f, elapsed));
         }
         else
         {
             RawImage image = _root.GetComponentInChildren<RawImage>();
             image.color = new Color(0f, 0f, 0f, p);
         }
-        if (p >= 1f) Finished = true;
     }
 
     public void Dispose()

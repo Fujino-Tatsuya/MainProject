@@ -17,7 +17,8 @@ using VeyTrace.Rendering.Occlusion;
 /// 플레이어 흑백·보스 노이즈(렌더링 레이어 비트) · HUD 숨김.</para>
 /// <para><b>4단계</b> — 글리치 시계로 카메라 컷(설정 SO 목록, <see cref="BossVictoryCameraCuts"/>): 첫 컷부터 연출 vcam(블렌드 없음) · 컷마다 그 순간 위치로 구도 고정 ·
 /// 연출 동안 월드 UI·윤곽선·벽 가림·카메라 흔들림 끔 · 카메라를 향하지 않는 벽 숨김.</para>
-/// <para><b>흑백 시작 순간</b>(11-09 사용자 — 설정 <c>desaturate</c> 곡선이 0 을 넘는 첫 프레임, 새 시각 칸 없음): 처치자가 아닌 피어의 게임 카메라가 처치자로 즉시 컷
+/// <para><b>타임라인</b>(설정 SO <see cref="BossVictoryTimeline"/> — 트랙별 클립·마커, 창 <c>Tools/Boss Victory/처치 연출 타임라인</c>): 화면 효과·HUD 숨김·정지 유지·TV 꺼짐·로비 전환은
+/// 매 프레임 시각 t 의 상태로 맞춘다(되감아도 맞다). <b>마커</b>(기본 0.20 = 첫 찢김 최고점): 처치자가 아닌 피어의 게임 카메라가 처치자로 즉시 컷
 /// (<see cref="CameraTargetSwitcher.SetTemporaryFollow"/>) · 처치자 외 플레이어 캐릭터를 이 화면에서 숨김(렌더러·월드 캔버스·머리 위 체력바 끔 —
 /// 루트 SetActive 는 NGO·카메라 추적 목록이 깨져 쓰지 않는다). 정리(디버그 랩 F7 포함) 때 원상복구.</para>
 /// </summary>
@@ -71,7 +72,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     readonly List<GameObject> _others = new List<GameObject>();
 
     // 흑백 시작 순간(11-09 사용자) — 피어 카메라 처치자로 · 처치자 외 플레이어 숨김
-    bool _desatCueDone;
+    bool _focusOn;
+    bool _othersHidden;
     CameraTargetSwitcher _focusSwitcher;   // 이 연출이 임시 추적을 건 카메라(정리 때 이것만 푼다)
     readonly List<Renderer> _hiddenOtherRenderers = new List<Renderer>();
     readonly List<Behaviour> _hiddenOtherBehaviours = new List<Behaviour>();   // 월드 캔버스·머리 위 체력바
@@ -102,10 +104,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     bool _crtPending;
     bool _finished;
 
-    /// <summary>[이 피어] 연출이 끝났다(CRT 꺼짐 끝 = 화면 검정). 서버(호스트)는 이 순간 로비 결과로 넘긴다.</summary>
+    /// <summary>[이 피어] 연출이 끝났다(타임라인 로비 전환 마커 — 기본 = TV 꺼짐 끝, 화면 검정). 서버(호스트)는 이 순간 로비 결과로 넘긴다.</summary>
     public static event Action<BossEncounterDirector.VictoryState> PresentationFinished;
 
-    /// <summary>[이 피어] 지금 회차 연출이 끝났는가(CRT 꺼짐 끝).</summary>
+    /// <summary>[이 피어] 지금 회차 연출이 끝났는가(로비 전환 마커를 지났다).</summary>
     public bool Finished => _running && _finished;
 
     /// <summary>[이 피어] 지금 표시 중인 회차(<see cref="BossEncounterDirector.VictoryState.Sequence"/>).</summary>
@@ -389,53 +391,67 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     }
 
     // 글리치 시계 = 게임 시간(랩 배속·일시정지에 같이 멈춘다). 실게임은 timeScale 1.
+    // 타임라인(설정 SO 클립·마커)이 정하는 것은 전부 시각 t 의 상태로 맞춘다(되감아도 맞다 — 창 스크럽 미리보기).
     void TickGlitch()
     {
         _glitchTime += Time.deltaTime;
-        float t = Mathf.Min(_glitchTime, _settings.glitchDuration);
+        float t = _glitchTime;
         BossVictoryGlitchSettings s = _settings;
+        BossVictoryTimeline tl = s.timeline;
+        float et = tl.EffectTime(t);   // 정지 유지 클립 안이면 그 시작에 고정
         TickCuts();
-        TickEnd(s);
+        TickCrtAndLobby(tl, t);
 
-        bool hide = s.hudHide.Evaluate(t) > 0.5f;
-        if (hide && !_hudHidden)
+        bool hide = tl.Evaluate(BossVictoryTrack.HudHide, et) > 0.5f;
+        if (hide != _hudHidden)
         {
             _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
-            _overlay.HideHud();
-            _hudHidden = true;
+            if (hide) _overlay.HideHud();
+            else _overlay.RestoreHud();
+            _hudHidden = hide;
         }
 
-        if (_renderOn) SetGlitchFrame(s, t);
-        TickDesaturateCue(s, t);   // 노이즈 UV 누적 뒤 — 카메라 컷이 다음 프레임 누적에서 빠지게
+        if (_renderOn) SetGlitchFrame(s, tl, et);
+        TickMarkers(tl, t);   // 노이즈 UV 누적 뒤 — 카메라 컷이 다음 프레임 누적에서 빠지게
     }
 
-    void SetGlitchFrame(BossVictoryGlitchSettings s, float t)
+    void SetGlitchFrame(BossVictoryGlitchSettings s, BossVictoryTimeline tl, float t)
     {
         var frame = new BossVictoryGlitchRender.Frame
         {
-            Master = s.master.Evaluate(t),
-            Time = _glitchTime,
-            Desaturate = s.desaturate.Evaluate(t),
-            Amber = s.amber.Evaluate(t),
-            Scanline = s.scanline.Evaluate(t),
-            Tear = s.tear.Evaluate(t),
-            Smear = s.smear.Evaluate(t),
-            BossNoise = s.bossNoise.Evaluate(t),
+            Master = tl.Evaluate(BossVictoryTrack.Master, t),
+            Time = t,
+            Desaturate = tl.Evaluate(BossVictoryTrack.Desaturate, t),
+            Amber = tl.Evaluate(BossVictoryTrack.Amber, t),
+            Scanline = tl.Evaluate(BossVictoryTrack.Scanline, t),
+            Tear = tl.Evaluate(BossVictoryTrack.Tear, t),
+            Smear = tl.Evaluate(BossVictoryTrack.Smear, t),
+            BossNoise = tl.Evaluate(BossVictoryTrack.BossNoise, t),
         };
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
         frame.NoiseOffset = TickNoiseOffset(s);
         BossVictoryGlitchRender.SetFrame(frame);
     }
 
-    // ── 흑백 시작 순간: 피어 카메라 처치자로 · 처치자 외 플레이어 숨김(11-09 사용자) ─────────
-    // 시각 = desaturate 곡선이 0 을 넘는 첫 프레임(기본 0.10초 — 첫 찢김 0.2 직전). 늦게 받은 피어는 첫 프레임에 바로.
+    // ── 마커: 피어 카메라 처치자로 · 처치자 외 플레이어 숨김(11-09 사용자) ─────────────────
+    // 시각 = 타임라인 마커(기본 0.20 = 첫 찢김 최고점). 늦게 받은 피어는 첫 프레임에 바로. 마커 앞으로 되감으면 되돌린다.
 
-    void TickDesaturateCue(BossVictoryGlitchSettings s, float t)
+    void TickMarkers(BossVictoryTimeline tl, float t)
     {
-        if (_desatCueDone || s.desaturate.Evaluate(t) <= 0f) return;
-        _desatCueDone = true;
-        FocusKiller();
-        HideOthers();
+        bool focus = t >= tl.focusKillerTime;
+        if (focus != _focusOn)
+        {
+            if (focus) FocusKiller();
+            else Unfocus();
+            _focusOn = focus;
+        }
+        bool hide = t >= tl.hideOthersTime;
+        if (hide != _othersHidden)
+        {
+            if (hide) HideOthers();
+            else ShowOthers();
+            _othersHidden = hide;
+        }
     }
 
     // 처치자 본인 화면은 그대로. 나머지 피어는 즉시 컷(SetTemporaryFollow = PreviousStateIsValid false — 감쇠로 쓸고 가지 않는다).
@@ -495,11 +511,22 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
     }
 
-    void RestoreDesaturateCue()
+    void RestoreMarkers()
     {
-        _desatCueDone = false;
+        Unfocus();
+        ShowOthers();
+        _focusOn = false;
+        _othersHidden = false;
+    }
+
+    void Unfocus()
+    {
         if (_focusSwitcher != null) _focusSwitcher.ClearTemporaryFollow();   // 지금 대상(오너·관전 대상)으로 컷 복귀
         _focusSwitcher = null;
+    }
+
+    void ShowOthers()
+    {
         for (int i = 0; i < _hiddenOtherRenderers.Count; i++)
             if (_hiddenOtherRenderers[i] != null) _hiddenOtherRenderers[i].enabled = true;
         _hiddenOtherRenderers.Clear();
@@ -510,24 +537,35 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     // ── 끝: 유지 → CRT 꺼짐(6단계) ─────────────────────────────────────────
 
-    // 타임라인 끝 + 유지 시간이 지나면 이 프레임 끝 화면을 캡처해 꺼짐을 시작한다. 시계 = 게임 시간(랩 일시정지에 같이 멈춤).
-    void TickEnd(BossVictoryGlitchSettings s)
+    // TV 꺼짐 클립 시작 = 이 프레임 끝 화면을 캡처해 꺼짐 시작, 진행 = 클립 안 위치. 로비 전환 마커를 지나면 연출 끝(호스트 화면이면 서버가 결과로 넘긴다).
+    // 시계 = 게임 시간(랩 일시정지에 같이 멈춤). 되감으면 꺼짐을 걷고 끝 표시도 내린다(창 스크럽 미리보기).
+    void TickCrtAndLobby(BossVictoryTimeline tl, float t)
     {
-        if (_crt == null)
+        if (tl.TryGetCrtOff(out BossVictoryClip crt) && t >= crt.start)
         {
-            if (!_crtPending && _glitchTime >= s.glitchDuration + s.holdSeconds)
+            if (_crt != null) _crt.SetProgress((t - crt.start) / Mathf.Max(0.01f, crt.length), t - crt.start);
+            else if (!_crtPending)
             {
                 _crtPending = true;
                 _crtRoutine = StartCoroutine(BeginCrtOff());
             }
-            return;
         }
-        if (_finished) return;
-        _crt.Tick(Time.deltaTime, s.crtOffSeconds);
-        if (!_crt.Finished) return;
-        _finished = true;
-        Edit.Log($"[BossVictory] 연출 끝(CRT 꺼짐) — 회차 {_sequence} · t {_glitchTime:0.00}", this);
+        else if (_crt != null || _crtPending) DisposeCrt();
+
+        bool end = t >= tl.lobbyTransitionTime;
+        if (end == _finished) return;
+        _finished = end;
+        if (!end) return;
+        Edit.Log($"[BossVictory] 연출 끝(로비 전환 마커) — 회차 {_sequence} · t {_glitchTime:0.00}", this);
         PresentationFinished?.Invoke(_state);
+    }
+
+    void DisposeCrt()
+    {
+        if (_crtRoutine != null) { StopCoroutine(_crtRoutine); _crtRoutine = null; }
+        _crt?.Dispose();
+        _crt = null;
+        _crtPending = false;
     }
 
     System.Collections.IEnumerator BeginCrtOff()
@@ -853,13 +891,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         BossVictoryGlitchRender.Untag(_tagged);
         if (_renderOn) { BossVictoryGlitchRender.Disable(); _renderOn = false; }
         _hudHidden = false;
-        if (_crtRoutine != null) { StopCoroutine(_crtRoutine); _crtRoutine = null; }
-        _crt?.Dispose();
-        _crt = null;
-        _crtPending = false;
+        DisposeCrt();
         _finished = false;
         RestoreCuts();
-        RestoreDesaturateCue();
+        RestoreMarkers();
         _overlay?.Dispose();   // HUD 복구 · 컷 카메라 나감(블렌드 없음) · 디밍 기준점 복구
         _overlay = null;
 
