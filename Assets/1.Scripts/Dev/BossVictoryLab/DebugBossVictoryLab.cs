@@ -50,6 +50,10 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     [Tooltip("처치 뒤 결과 차단 신호(호스트 화면이 타임라인 로비 전환 마커를 지남)가 이만큼 안 오면 끝난 것으로 본다(실제 초, 안전망 — 기본 연출 ≈ 5.6초 + 배속).")]
     [SerializeField, Min(1f)] float endFallbackSeconds = 15f;
 
+    [Header("진단")]
+    [Tooltip("노드·키가 발화할 때마다 콘솔에 '[BossVictory 시계] … 타임라인 t / 실제 경과' 한 줄(디버그 씬 한정). 끄면 조용.")]
+    [SerializeField] bool timelineClockLog = true;
+
     [Header("막타·팀원 배치")]
     [Tooltip("보스 기준 막타 각도(도) — 0 = 화면 아래, + = 위에서 볼 때 시계 방향.")]
     [SerializeField, Range(-180f, 180f)] float killerAngle = 0f;
@@ -105,6 +109,15 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     // ── 수명 ────────────────────────────────────────────────────────────────
 
     void Awake() => Instance = this;
+
+    void OnEnable() => BossVictoryGlitchPresentation.TimelineClockLog = timelineClockLog;
+
+    void OnValidate()
+    {
+        if (Application.isPlaying && isActiveAndEnabled) BossVictoryGlitchPresentation.TimelineClockLog = timelineClockLog;
+    }
+
+    void OnDisable() => BossVictoryGlitchPresentation.TimelineClockLog = false;
 
     void Start()
     {

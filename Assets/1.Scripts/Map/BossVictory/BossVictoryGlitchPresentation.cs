@@ -77,6 +77,88 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 지금 처치자(연출 중이 아니면 null) — 타임라인 창이 실제 처치자의 처치 연출 스킬 클립 길이를 보여 준다.</summary>
     public GameObject KillerObject => _running && _killer != null ? _killer.gameObject : null;
 
+    // ── 시계 진단(디버그 씬 — 랩 timelineClockLog) · 클립 노드 실측 표본(에디터 — 창이 클립 시간을 타임라인 초로 그린다) ──
+    /// <summary>[디버그] 켜면 노드·키가 발화할 때마다 "타임라인 t / 실제 경과" 한 줄(디버그 랩이 켠다 — 랩 인스펙터 timelineClockLog).</summary>
+    public static bool TimelineClockLog;
+    double _realStartAt;     // 처치 순간의 실제 시각(realtimeSinceStartup) — 시작 경과만큼 앞으로 당김
+    float _clockLogPrevT = -1f;
+    string _finisherTimingKey, _bossTimingKey;
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    void ClockLog(string what)
+    {
+        if (!TimelineClockLog) return;
+        Edit.Log($"[BossVictory 시계] {what} — 타임라인 t {_glitchTime:0.000} / 실제 경과 {Time.realtimeSinceStartupAsDouble - _realStartAt:0.000}", this);
+    }
+
+    // 효과 세기 키·카메라 컷 키를 이번 프레임에 지났으면 한 줄씩(진단 켜졌을 때만).
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    void ClockLogKeys(float from, float to)
+    {
+        if (!TimelineClockLog || to <= from) return;
+        BossVictoryTimeline tl = _settings.timeline;
+        foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
+        {
+            if (!BossVictoryTimeline.HasFades(track)) continue;
+            List<BossVictoryClip> clips = tl.Clips(track);
+            for (int i = 0; i < clips.Count; i++)
+            {
+                if (!clips[i].HasKeys) continue;
+                for (int k = 0; k < clips[i].keys.Count; k++)
+                {
+                    float at = clips[i].start + clips[i].keys[k].u * clips[i].length;
+                    if (at > from && at <= to) ClockLog($"{BossVictoryTimeline.TrackLabel(track)} #{i + 1} 키 {k + 1}({at:0.000}s, 세기 {clips[i].keys[k].value:0.##})");
+                }
+            }
+        }
+        for (int i = 0; i < tl.cameraCut.Count; i++)
+        {
+            BossVictoryCameraCuts.Cut cut = tl.CameraCutShot(i);
+            if (!cut.HasKeys) continue;
+            float start = tl.cameraCut[i].start, span = tl.CameraCutEnd(i) - start;
+            for (int k = 1; k < cut.keys.Count; k++)
+            {
+                float at = start + cut.keys[k].u * span;
+                if (at > from && at <= to) ClockLog($"카메라 컷 #{i + 1} 키 {k + 1}({at:0.000}s)");
+            }
+        }
+    }
+
+    // [에디터] 클립 노드 실측 표본 — 노드 시작(타임라인 마커 값) 뒤 초 ↔ 클립 시간(BossVictoryClipTiming).
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    void SampleClipTiming()
+    {
+#if UNITY_EDITOR
+        BossVictoryTimeline tl = _settings.timeline;
+        if (_finisherState != 0 && SampleState(_killerAnimator, _finisherState, out AnimationClip fc, out float ft))
+        {
+            if (_finisherTimingKey == null) { _finisherTimingKey = BossVictoryClipTiming.Key(false, fc.name); BossVictoryClipTiming.BeginRun(_finisherTimingKey); }
+            BossVictoryClipTiming.Record(_finisherTimingKey, _glitchTime - tl.finisherStartTime, ft);
+        }
+        if (_bossHitPlayed && _bossPlayedAnimators.Count > 0 && SampleState(_bossPlayedAnimators[0], Animator.StringToHash(_settings.bossHitStateName), out AnimationClip bc, out float bt))
+        {
+            if (_bossTimingKey == null) { _bossTimingKey = BossVictoryClipTiming.Key(true, bc.name); BossVictoryClipTiming.BeginRun(_bossTimingKey); }
+            BossVictoryClipTiming.Record(_bossTimingKey, _glitchTime - tl.bossHitAnimTime, bt);
+        }
+#endif
+    }
+
+    static readonly List<AnimatorClipInfo> s_sampleClips = new List<AnimatorClipInfo>(2);
+
+    static bool SampleState(Animator a, int stateHash, out AnimationClip clip, out float clipTime)
+    {
+        clip = null;
+        clipTime = 0f;
+        if (a == null || !a.isActiveAndEnabled || a.IsInTransition(0)) return false;
+        AnimatorStateInfo info = a.GetCurrentAnimatorStateInfo(0);
+        if (info.shortNameHash != stateHash) return false;
+        a.GetCurrentAnimatorClipInfo(0, s_sampleClips);
+        if (s_sampleClips.Count == 0 || s_sampleClips[0].clip == null) return false;
+        clip = s_sampleClips[0].clip;
+        clipTime = Mathf.Min(info.normalizedTime, 1f) * clip.length;
+        return true;
+    }
+
     /// <summary>[이 피어] 처치자 순서 단계(디버그 표시용).</summary>
     public string KillerStepName => _killerStep.ToString();
     bool _finisherWarned;
@@ -228,6 +310,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         TickKillerSequence();
         TickBoss();
         TickAnimators();
+        SampleClipTiming();
         if (_glitchOn) TickGlitch();
     }
 
@@ -252,6 +335,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _finisherState = 0;
         _finisherEndEvent = -1f;
         _killerFrozen = false;
+        _finisherTimingKey = _bossTimingKey = null;
+        _clockLogPrevT = -1f;
 
         PlayerLifeInputPolicy.SetVictoryInputHeld(true);
         // 벽 가림(반투명) = 연출 내내 끈다 — 컷 유무·되감기와 무관하게 여기(시작)와 Teardown(정리) 한 곳에서만.
@@ -285,6 +370,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         // 글리치 = 처치 판정 순간부터(복제 처치 시각 기준 — 늦게 받은 피어는 그만큼 앞에서 시작). 이후는 게임 시간(랩 배속·일시정지에 같이 멈춤).
         double serverNow = _director.NetworkManager != null ? _director.NetworkManager.ServerTime.Time : v.StartServerTime;
         StartGlitch(Mathf.Max(0f, v.Elapsed(serverNow)));
+        _realStartAt = Time.realtimeSinceStartupAsDouble - _glitchTime;
+        ClockLog("처치 순간(글리치 시작)");
 
         if (_killer == null)
             Edit.LogWarning($"[BossVictory] 막타 client {v.KillerClientId} 의 플레이어가 이 피어에 없다 — 처치 연출 스킬을 못 튼다.", this);
@@ -347,9 +434,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         {
             case BossVictoryKillerSequence.Step.Wait:   // 처치자 평타 클립 끝 — 하던 동작을 끊고 대기 자세
                 BossEncounterDirector.CrossFadeIdle(_killerAnimator);
+                ClockLog($"처치자 평타 클립 끝 {_settings.timeline.KillerTimes().ActionEnd:0.000}s");
                 Edit.Log($"[BossVictory] 처치자 평타 끝 — 하던 동작 끊고 대기 (글리치 t {_glitchTime:0.00})", this);
                 break;
             case BossVictoryKillerSequence.Step.BackDash:
+                ClockLog($"백대쉬 시작 {_settings.timeline.backDashStartTime:0.000}s");
                 BeginBackDash();
                 break;
             case BossVictoryKillerSequence.Step.Finisher:
@@ -455,6 +544,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             return;
         }
         _finisherState = Animator.StringToHash(skill.Data.AnimatorStateName);
+        ClockLog($"처치 연출 스킬 시작 {_settings.timeline.finisherStartTime:0.000}s");
         Edit.Log($"[BossVictory] 처치 연출 스킬 — {_killer.name} {slot} {skill.Data.AnimatorStateName}" +
                  (FinisherTrim > 0f ? $" · 끝 자르기 {FinisherTrim:0.###}초(클립 시간)" : ""), this);
     }
@@ -469,6 +559,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (trim <= 0f || !BossVictoryAnimTrim.TryReachTrim(_killerAnimator, _finisherState, trim, out AnimationClip clip)) return;
         _killerFrozen = true;
         _finisherEndEvent = EndEventTime(clip);
+        ClockLog($"처치 연출 스킬 끝 자르기 도달(클립 {trim:0.000}s)");
         int fps = Mathf.RoundToInt(BossVictoryAnimTrim.FrameRate(clip.frameRate));
         Edit.Log($"[BossVictory] 처치 연출 스킬 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, fps)}({clip.name}) 에서 멈춤 (글리치 t {_glitchTime:0.00})", this);
         if (_phase == Phase.Finisher && BossVictoryAnimTrim.SlowAtTrimEnd(_settings.timeline.slowStartTime, trim, _finisherEndEvent))
@@ -501,6 +592,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_killerSkills != null) _killerSkills.PresentationSkillEnded -= OnFinisherEnded;
         if (!_running) return;
         _finisherEndedAt = _glitchTime;
+        ClockLog("처치 연출 스킬 End 이벤트");
         if (_settings.timeline.slowStartTime > 0f)
         {
             Edit.Log($"[BossVictory] 처치 연출 스킬 End (글리치 t {_glitchTime:0.00}) — 느려짐은 '느려짐 시작' 마커 {_settings.timeline.slowStartTime:0.00}s", this);
@@ -515,6 +607,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_phase != Phase.Finisher) return;
         _phase = Phase.Slow;
         _killerSlowAt = _glitchTime;
+        ClockLog($"처치자 느려짐 — {reason}");
         ApplyEffectRates();
         Edit.Log($"[BossVictory] {reason} — 처치자 ×{_settings.killerAfterFinisherScale}{(_settings.timeline.bossSlowTime > 0f ? "" : $" · 보스 ×{_settings.bossAfterFinisherScale}(보스 슬로우 끔)")} (글리치 t {_glitchTime:0.00})", this);
         FinisherEnded?.Invoke(_state);
@@ -534,6 +627,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (_bossHitAnimators[i] != null) _bossHitAnimators[i].ResetTrigger(_bossDeathTrigger);
         float rate = BossTimeScale;
         if (Mathf.Approximately(rate, _bossEffectRate)) return;
+        ClockLog($"보스 배율 ×{rate:0.##}");
         _bossEffectRate = rate;
         SetEffectRate(_boss.transform, rate);
     }
@@ -543,6 +637,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         _bossHitPlayed = true;
         string state = _settings.bossHitStateName;
+        ClockLog($"보스 피격 애니 시작 {_settings.timeline.bossHitAnimTime:0.000}s '{state}'");
         int hash = Animator.StringToHash(state);
         _bossDeathTrigger = _boss.TryGetComponent(out MonsterBase monster) && monster.MonsterData != null ? monster.MonsterData.deathTrigger : null;
         int played = 0;
@@ -572,6 +667,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         {
             if (!BossVictoryAnimTrim.TryReachTrim(_bossPlayedAnimators[i], hash, trim, out AnimationClip clip)) continue;
             _bossTrimAt = _glitchTime;
+            ClockLog($"보스 피격 애니 끝 자르기 도달(클립 {trim:0.000}s)");
             Edit.Log($"[BossVictory] 보스 피격 애니 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, clip.frameRate)}({clip.name}) 에서 정지 (글리치 t {_glitchTime:0.00})", this);
             return;
         }
@@ -609,8 +705,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // 타임라인(설정 SO 클립·마커)이 정하는 것은 전부 시각 t 의 상태로 맞춘다(되감아도 맞다 — 창 스크럽 미리보기).
     void TickGlitch()
     {
+        float before = _glitchTime;
         _glitchTime += Time.deltaTime;
         float t = _glitchTime;
+        ClockLogKeys(before, t);
         BossVictoryGlitchSettings s = _settings;
         BossVictoryTimeline tl = s.timeline;
         TickCuts();
@@ -807,6 +905,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             else if (!_crtPending)
             {
                 _crtPending = true;
+                ClockLog($"TV 꺼짐 시작 {crt.start:0.000}s");
                 _crtRoutine = StartCoroutine(BeginCrtOff());
             }
         }
@@ -816,6 +915,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (end == _finished) return;
         _finished = end;
         if (!end) return;
+        ClockLog($"로비 전환 {tl.lobbyTransitionTime:0.000}s");
         Edit.Log($"[BossVictory] 연출 끝(로비 전환 마커) — 회차 {_sequence} · t {_glitchTime:0.00}", this);
         PresentationFinished?.Invoke(_state);
     }
@@ -928,6 +1028,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (shownChanged) _overlay.SetDimFocus(BossVictoryCameraCuts.AnchorPoint(cut.anchor, shownSubjects));
         if (!cut.hideWalls || rewound) ShowWalls();
         if (cut.hideWalls) HideWalls(pos, rot * Vector3.forward);
+        if (shownChanged && incoming >= 0) ClockLog($"카메라 컷 #{incoming + 1} 블렌드 시작");
+        if (changed && index >= 0) ClockLog($"카메라 컷 #{index + 1} 시작 {tl.cameraCut[index].start:0.000}s");
         if (shownChanged && incoming >= 0)
             Edit.Log($"[BossVictory] 컷 {incoming} 블렌드 시작 {tl.CameraCutBlendSeconds(incoming):0.##}초 {tl.CameraCutShot(incoming).blendCurve} — {(index >= 0 ? $"컷 {index}" : "게임 카메라")}에서 (t {_glitchTime:0.00})", this);
         if (changed && index >= 0)
