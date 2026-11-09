@@ -21,6 +21,89 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("캐릭터 Variant 에 PlayerVictoryFinisher 가 없을 때 쓰는 스킬 칸. 그 스킬의 애니·이펙트를 표시로만 재생하고 클립 End 이벤트에서 처치자·보스가 느려진다.")]
     public PlayerSkillSlot defaultFinisherSlot = PlayerSkillSlot.Ultimate;
 
+    [Header("글리치 타임라인(3단계 — t = 글리치 시작 = 처치 연출 스킬 End, 초)")]
+    [Tooltip("타임라인 길이(초). 이 뒤로는 마지막 값으로 정지 화면(유지 시간은 5단계).")]
+    [Min(0.1f)] public float glitchDuration = 3.5f;
+    [Tooltip("전체 세기(0 = 원래 화면). 0 이면 렌더 패스를 아예 건너뛴다.")]
+    public AnimationCurve master = Ramp(0.08f, 0.15f);
+    [Tooltip("화면 흑백(~0.17 부터 끝까지).")]
+    public AnimationCurve desaturate = Ramp(0.1f, 0.2f);
+    [Tooltip("배경 호박색 틴트(플레이어 제외 — 캐릭터는 흑백 유지). 와이드 컷(~0.33)부터.")]
+    public AnimationCurve amber = Ramp(0.3f, 0.45f);
+    [Tooltip("CRT 주사선(끝까지 유지).")]
+    public AnimationCurve scanline = Ramp(0.1f, 0.2f);
+    [Tooltip("가로줄 물결 왜곡.")]
+    public AnimationCurve wave = Pulses(0.17f, 0.12f, 2.5f, 0.12f);
+    [Tooltip("계단식 세로 어긋남.")]
+    public AnimationCurve stepShift = Pulses(0.22f, 0.12f, 2.52f, 0.1f);
+    [Tooltip("가로 늘어남.")]
+    public AnimationCurve stretch = Pulses(0.22f, 0.1f);
+    [Tooltip("블록 모자이크 — 컷 전환을 가린다(0.33 · 1.67 · 2.6).")]
+    public AnimationCurve block = Pulses(0.33f, 0.08f, 1.67f, 0.06f, 2.58f, 0.1f);
+    [Tooltip("가로 스미어.")]
+    public AnimationCurve smear = Pulses(0.24f, 0.08f);
+    [Tooltip("슬라이스.")]
+    public AnimationCurve slice = Pulses(1.52f, 0.08f, 2.55f, 0.1f);
+    [Tooltip("RGB 분리.")]
+    public AnimationCurve rgbSplit = Pulses(1.52f, 0.08f, 2.55f, 0.1f);
+    [Tooltip("흑백 플래시.")]
+    public AnimationCurve flash = Pulses(1.34f, 0.06f);
+    [Tooltip("플레이어 실루엣 가로 흔들림(캐릭터 글리치 1회).")]
+    public AnimationCurve characterGlitch = Pulses(0.95f, 0.05f);
+    [Tooltip("보스 노이즈 세기(보스 실루엣 안).")]
+    public AnimationCurve bossNoise = Ramp(0.12f, 0.17f);
+    [Tooltip("보스 외곽 가로 지글.")]
+    public AnimationCurve bossJiggle = Ramp(0.12f, 0.17f, 0.5f);
+    [Tooltip("HUD 숨김(0.5 넘으면 숨김).")]
+    public AnimationCurve hudHide = Ramp(0.08f, 0.12f);
+
+    [Header("글리치 색·모양")]
+    [Tooltip("배경 호박색(sRGB).")]
+    public Color amberColor = new Color32(0xD2, 0xA6, 0x4E, 0xFF);
+    [Min(1f)] public float scanlineCount = 360f;
+    [Min(0f)] public float waveFrequency = 60f;
+    [Tooltip("블록 모자이크 블록 크기(px).")]
+    [Min(1f)] public float blockPixelSize = 48f;
+    [Tooltip("슬라이스 가로 띠 수.")]
+    [Min(1f)] public float sliceCount = 40f;
+
+    public enum NoiseSpace { Screen, Boss }
+
+    [Header("보스 노이즈(실루엣 안 흑백 노이즈 UV 애니메이션 — 흰 = 밝은 색, 검 = 어두운 색)")]
+    public Texture2D bossNoiseTexture;
+    [Tooltip("Screen = 화면 공간(띠 굵기가 화면 기준 일정 — 레퍼런스 추천) · Boss = 보스 기준(보스 화면 높이 = 1, 보스와 같이 움직이고 클로즈업에서 커진다).")]
+    public NoiseSpace bossNoiseSpace = NoiseSpace.Screen;
+    [Tooltip("타일링(화면 세로 또는 보스 화면 높이 1 당 반복 수).")]
+    public Vector2 bossNoiseTiling = new Vector2(1f, 1f);
+    [Tooltip("스크롤(초당 UV) — 주 흐름 가로.")]
+    public Vector2 bossNoiseScroll = new Vector2(0.6f, 0f);
+    public Color bossNoiseBrightColor = new Color32(0xFF, 0xF6, 0xEA, 0xFF);
+    [Tooltip("밝은 색 배율(과노출 느낌 — 블룸이 받는다).")]
+    [Min(0f)] public float bossNoiseBrightIntensity = 1.6f;
+    public Color bossNoiseDarkColor = new Color32(0x3A, 0x17, 0x12, 0xFF);
+
+    [Header("셰이더(빌드 포함용 참조 — 비우면 Shader.Find)")]
+    public Shader maskShader;
+    public Shader compositeShader;
+
+    // 기본 곡선 — a 에서 b 까지 0 → peak, 이후 유지.
+    static AnimationCurve Ramp(float a, float b, float peak = 1f) =>
+        new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(a, 0f), new Keyframe(b, peak), new Keyframe(10f, peak));
+
+    // 기본 곡선 — (중심, 반폭) 쌍마다 0 → 1 → 0 펄스.
+    static AnimationCurve Pulses(params float[] centerHalf)
+    {
+        var keys = new System.Collections.Generic.List<Keyframe> { new Keyframe(0f, 0f) };
+        for (int i = 0; i + 1 < centerHalf.Length; i += 2)
+        {
+            float c = centerHalf[i], h = centerHalf[i + 1];
+            keys.Add(new Keyframe(c - h, 0f));
+            keys.Add(new Keyframe(c, 1f));
+            keys.Add(new Keyframe(c + h, 0f));
+        }
+        return new AnimationCurve(keys.ToArray());
+    }
+
     static BossVictoryGlitchSettings _cached;
 
     /// <summary>Resources 에셋, 없으면 코드 기본값 인스턴스.</summary>

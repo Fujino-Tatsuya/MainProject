@@ -9,7 +9,9 @@ using UnityEngine;
 ///
 /// <para><b>2단계(지금)</b> — 처치 판정 즉시: 이 피어의 스킬 이펙트·장판 표시·투사체 소거(Q11) · 대상별 시간 배율(전역 timeScale 아님):
 /// 처치자 1 · 그 외 플레이어 0.05 · 보스 0. 처치자 캐릭터에 처치 연출 스킬(Q9, 칸 = <see cref="PlayerVictoryFinisher"/>)을 표시로만 재생하고,
-/// 그 클립 End 이벤트(이 피어 화면 기준, Q12)에서 처치자·보스 0.1 → <see cref="FinisherEnded"/>(글리치 시작 — 3단계가 구독).</para>
+/// 그 클립 End 이벤트(이 피어 화면 기준, Q12)에서 처치자·보스 0.1 → <see cref="FinisherEnded"/>(글리치 시작).</para>
+/// <para><b>3단계</b> — End 순간부터 화면 글리치(<see cref="BossVictoryGlitchRender"/>, 세기 = 설정 SO 타임라인 곡선, 시계 <see cref="GlitchTime"/>) ·
+/// 플레이어 흑백·보스 노이즈(렌더링 레이어 비트) · HUD 숨김.</para>
 /// </summary>
 [DefaultExecutionOrder(10001)]   // PlayerAttackSpeedAnimator(10000)가 Update 에서 쓰는 animator.speed 를 그 뒤에 덮는다
 [DisallowMultipleComponent]
@@ -50,6 +52,17 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     readonly List<float> _animatorLastSet = new List<float>();    // 이 연출이 마지막으로 쓴 속도(다르면 다른 계통이 바꾼 것)
     readonly List<bool> _animatorOverridden = new List<bool>();
     readonly Dictionary<ParticleSystem, float> _particleSpeeds = new Dictionary<ParticleSystem, float>();
+
+    // 3단계 — 화면 글리치(처치 연출 스킬 End 부터)
+    bool _glitchOn;
+    bool _renderOn;
+    float _glitchTime;
+    bool _hudHidden;
+    CinematicOverlay _overlay;
+    readonly List<Renderer> _tagged = new List<Renderer>();
+
+    /// <summary>[이 피어] 글리치 시작 뒤 초(글리치 전엔 -1). 컷·글자(4·5단계)가 같은 시계를 읽는다.</summary>
+    public float GlitchTime => _glitchOn ? _glitchTime : -1f;
 
     public Phase CurrentPhase => _phase;
 
@@ -92,6 +105,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (!_running) return;
         if (_finisherPending) TryStartFinisher();
         TickAnimators();
+        if (_glitchOn) TickGlitch();
     }
 
     // ── 시작 ───────────────────────────────────────────────────────────────
@@ -201,7 +215,83 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _phase = Phase.Slow;
         ApplyEffectRates();
         Edit.Log($"[BossVictory] 처치 연출 스킬 End — 처치자 ×{_settings.killerAfterFinisherScale} · 보스 ×{_settings.bossAfterFinisherScale} · 글리치 시작", this);
+        StartGlitch();
         FinisherEnded?.Invoke(_state);
+    }
+
+    // ── 화면 글리치(3단계) ─────────────────────────────────────────────────
+
+    void StartGlitch()
+    {
+        _glitchOn = true;
+        _glitchTime = 0f;
+        _renderOn = BossVictoryGlitchRender.Enable(_settings);
+        if (!_renderOn)
+        {
+            Edit.LogWarning($"[BossVictory] 셰이더({BossVictoryGlitchRender.MaskShaderName}·{BossVictoryGlitchRender.CompositeShaderName})가 없어 글리치 없이 돈다.", this);
+            return;
+        }
+        // 흑백 = 플레이어(처치자·팀원, 렌더링 레이어 비트) · 노이즈 = 보스.
+        if (_killer != null) BossVictoryGlitchRender.Tag(_killer.gameObject, BossVictoryGlitchRender.PlayerMask, _tagged);
+        for (int i = 0; i < _others.Count; i++) BossVictoryGlitchRender.Tag(_others[i], BossVictoryGlitchRender.PlayerMask, _tagged);
+        if (_boss != null) BossVictoryGlitchRender.Tag(_boss, BossVictoryGlitchRender.BossMask, _tagged);
+    }
+
+    // 글리치 시계 = 게임 시간(랩 배속·일시정지에 같이 멈춘다). 실게임은 timeScale 1.
+    void TickGlitch()
+    {
+        _glitchTime += Time.deltaTime;
+        float t = Mathf.Min(_glitchTime, _settings.glitchDuration);
+        BossVictoryGlitchSettings s = _settings;
+
+        bool hide = s.hudHide.Evaluate(t) > 0.5f;
+        if (hide && !_hudHidden)
+        {
+            _overlay ??= new CinematicOverlay("BossVictoryGlitch", null);
+            _overlay.HideHud();
+            _hudHidden = true;
+        }
+
+        if (!_renderOn) return;
+        var frame = new BossVictoryGlitchRender.Frame
+        {
+            Master = s.master.Evaluate(t),
+            Time = _glitchTime,
+            Desaturate = s.desaturate.Evaluate(t),
+            Amber = s.amber.Evaluate(t),
+            Scanline = s.scanline.Evaluate(t),
+            Wave = s.wave.Evaluate(t),
+            Step = s.stepShift.Evaluate(t),
+            Stretch = s.stretch.Evaluate(t),
+            Block = s.block.Evaluate(t),
+            Smear = s.smear.Evaluate(t),
+            Slice = s.slice.Evaluate(t),
+            RgbSplit = s.rgbSplit.Evaluate(t),
+            Flash = s.flash.Evaluate(t),
+            CharGlitch = s.characterGlitch.Evaluate(t),
+            BossNoise = s.bossNoise.Evaluate(t),
+            BossJiggle = s.bossJiggle.Evaluate(t),
+        };
+        BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
+        BossVictoryGlitchRender.SetFrame(frame);
+    }
+
+    // 보스 화면 위치·높이(뷰포트) — 노이즈 "보스 기준" 공간용. 못 구하면 화면 가운데·높이 1.
+    void BossScreenRect(out Vector2 center, out float height)
+    {
+        center = new Vector2(0.5f, 0.5f);
+        height = 1f;
+        Camera cam = Camera.main;
+        if (cam == null || _boss == null) return;
+        Bounds b = new Bounds(_boss.transform.position, Vector3.zero);
+        foreach (Renderer r in _boss.GetComponentsInChildren<Renderer>())
+            if (r != null && !(r is ParticleSystemRenderer)) b.Encapsulate(r.bounds);
+        Vector3 top = cam.WorldToViewportPoint(b.center + Vector3.up * b.extents.y);
+        Vector3 bottom = cam.WorldToViewportPoint(b.center - Vector3.up * b.extents.y);
+        Vector3 mid = cam.WorldToViewportPoint(b.center);
+        if (mid.z <= 0f) return;
+        center = new Vector2(mid.x, mid.y);
+        height = Mathf.Max(0.05f, Mathf.Abs(top.y - bottom.y));
     }
 
     // ── 시간 배율 ──────────────────────────────────────────────────────────
@@ -313,6 +403,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             main.simulationSpeed = pair.Value;
         }
         _particleSpeeds.Clear();
+
+        _glitchOn = false;
+        BossVictoryGlitchRender.Untag(_tagged);
+        if (_renderOn) { BossVictoryGlitchRender.Disable(); _renderOn = false; }
+        if (_hudHidden) { _overlay?.RestoreHud(); _hudHidden = false; }
 
         _killer = null;
         _killerSkills = null;

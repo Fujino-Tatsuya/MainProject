@@ -114,3 +114,13 @@
   - UV 공간: **화면 공간 기본**(레퍼런스에서 와이드·클로즈업 모두 띠 굵기가 화면 기준으로 거의 같다) + **오브젝트(보스 기준) 토글 칸**으로 둘 다 지원.
   - 외곽 가로 지글(실루엣 가장자리 가로 흔들림)은 글리치 패스가 같이 처리.
 - 흰 링(충격파)은 넣지 않는다(그대로).
+
+### 3단계 — 화면 글리치 렌더 패스·플레이어 흑백·보스 노이즈·SO 타임라인 (11-09)
+- **렌더** `Rendering/BossVictory/BossVictoryGlitchRender`(static) — 렌더러 에셋 무수정, 연출 동안만 `beginCameraRendering` 에서 게임 카메라에 패스 2개(옛 BossVictoryRender 방식). 마스터 세기 0 이면 비용 0.
+  1. 마스크(반투명 전): 렌더링 레이어 비트 4 = 플레이어(처치자·팀원·랩 복제본), 6 = 보스 → ID 텍스처(R 플레이어 · B 보스). 셰이더 `Hidden/Rendering/BossVictoryGlitchMask`(깊이 비교 + 여유 8cm).
+  2. 합성(반투명 뒤, 후처리 전): `Hidden/Rendering/BossVictoryGlitch` — 가로 늘어남·물결·계단·슬라이스·블록 모자이크(마스크도 같은 왜곡 UV) → RGB 분리·스미어 → 흑백 → 배경만 호박색(플레이어는 흑백 유지) → 보스 노이즈 → 흑백 플래시 → CRT 주사선.
+- **보스 노이즈** = `Assets/3.Materials/BossVictory/BossNoise_Stripes.png`(사용자 제공 1024², Repeat·선형·밉맵) — 실루엣 안에서 흑백을 밝은 색(`bossNoiseBrightColor` × `bossNoiseBrightIntensity` 1.6 — 과노출)·어두운 적갈색(`bossNoiseDarkColor` #3A1712)으로. 스크롤 `bossNoiseScroll`(기본 가로 0.6/초)·타일링. 공간 `bossNoiseSpace` = **Screen(기본 — 화면 세로 1)** / Boss(보스 화면 중심·높이 기준 — 보스와 같이 움직이고 클로즈업에서 커짐). 외곽 가로 지글 `bossJiggle`.
+- **SO 타임라인**(`BossVictoryGlitchSettings` "글리치 타임라인") — 곡선 16개(master·desaturate·amber·scanline·wave·stepShift·stretch·block·smear·slice·rgbSplit·flash·characterGlitch·bossNoise·bossJiggle·hudHide), 길이 `glitchDuration` 3.5초(뒤로는 마지막 값 정지). 기본 곡선은 위 "타임라인 갱신" 표에 맞춘 코드 기본값(에셋에 곡선을 안 써 둬서 인스펙터에서 처음 고치는 순간 저장된다). 블록 펄스가 컷 전환 시각(0.33·1.67·2.6)을 가린다(컷은 4단계).
+- 시계 = 표시의 `GlitchTime`(게임 시간 — 랩 배속·일시정지에 같이 멈춤, 실게임은 timeScale 1). HUD 숨김 = `CinematicOverlay.HideHud`(hudHide > 0.5), 정리 때 복구.
+- 셰이더 2개·텍스처는 설정 에셋이 참조(빌드 포함).
+- 알려진 한계: 셰이더는 오프라인 컴파일 불가(Unity 에서만 확인) · 기본 곡선 세기는 레퍼런스를 눈으로 맞춘 첫 값.
