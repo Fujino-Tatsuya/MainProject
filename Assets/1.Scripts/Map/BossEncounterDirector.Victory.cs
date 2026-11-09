@@ -67,7 +67,7 @@ public sealed partial class BossEncounterDirector
 
     // [서버]
     private bool _spawnedVictoryVariant;    // 이번에 스폰한 보스가 B(raidBossPrefab) — 전역 선택값이 아니라 실제 인스턴스 기준(C13)
-    private double _victoryMinResultAt;     // 결과 화면 전환 하한(0 = 없음)
+    private bool _victoryResultReady;       // 서버(호스트) 화면의 처치 연출이 끝났다(CRT 꺼짐 끝) — 그 전엔 결과 전환을 붙잡는다
 
     /// <summary>
     /// [서버] 이 보스의 사망 표현이 지금 흐르는 배율 — 승리 연출 대상이 아니면 1. 사망 연출 대기(<c>MonsterBase.DeathPresentationTimeScale</c>)가 읽는다.
@@ -158,7 +158,7 @@ public sealed partial class BossEncounterDirector
         GlobalTimeScale.Instance?.ServerForceReset();
         int despawned = DespawnCombatObjectsServer();
 
-        _victoryMinResultAt = 0d;
+        _victoryResultReady = false;
 
         Edit.Log($"[BossVictory] 시작 — 막타 client {killer.OwnerClientId}(기록 {(killer.OwnerClientId == hitClientId ? "있음" : "없음 → 대체")}) · 장판·투사체 디스폰 {despawned}", this);
     }
@@ -182,18 +182,26 @@ public sealed partial class BossEncounterDirector
         return count;
     }
 
-    // [서버] Update — 승리 연출 진행(ZZZ 글리치 교체 중 — 결과 전환 시각은 5단계에서 붙인다).
+    // [서버] Update — 서버(호스트) 피어의 처치 연출이 끝나는 순간(유지 → CRT 꺼짐 끝, 화면 검정) 결과 전환을 지금으로 당긴다(PLAN-boss-victory-glitch 6단계).
+    // 연출 시계는 처치 판정부터 게임 시간으로 흘러 처치 연출 스킬 End 와 무관하게 반드시 끝난다(스킬 End 가 빠져도 붙잡히지 않는다).
     private void TickVictoryServer()
     {
+        VictoryState v = _victory.Value;
+        if (!v.Active || _victoryResultReady) return;
+        BossVictoryGlitchPresentation presentation = BossVictoryGlitchPresentation.Instance;
+        if (presentation == null || presentation.Sequence != v.Sequence || !presentation.Finished) return;
+        _victoryResultReady = true;
+        _resultTransitionAt = NetworkManager.ServerTime.Time;
+        Edit.Log("[BossVictory] 호스트 화면 연출 끝 — 로비(결과 패널)로 전환", this);
     }
 
     // 디버그 랩(244, DebugBossVictory 씬) 진입점 — 구현은 BossEncounterDirector.Dev.cs(UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS).
     // 구현이 없으면 C# 이 호출째 지운다 → 릴리스 동작 불변.
     partial void DevBlockResultTransition(ref bool block);
 
-    // 결과 화면 전환을 지금 막아야 하는가(승리 연출이 끝나기 전).
+    // 결과 화면 전환을 지금 막아야 하는가 — 승리 연출 중이고 호스트 화면 연출이 아직 안 끝났다(표시가 없으면 붙잡지 않는다).
     private bool HoldsResultForVictory() =>
-        _victoryMinResultAt > 0d && NetworkManager.ServerTime.Time < _victoryMinResultAt;
+        _victory.Value.Active && !_victoryResultReady && BossVictoryGlitchPresentation.Instance != null;
 
     private static bool IsAliveForVictory(Player p)
     {

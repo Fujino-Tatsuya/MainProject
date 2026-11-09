@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 — ZZZ 글리치(PLAN-boss-victory-glitch) 수치. 정본 에셋: <c>Resources/BossVictory/BossVictoryGlitchSettings.asset</c>
-/// (없으면 코드 기본값). 단계가 늘 때마다 칸을 더한다 — 2단계 = 대상별 시간 배율·처치 연출 스킬 · 3단계 = 글리치 타임라인 · 4단계 = 카메라 컷 · 5단계 = Rectify 글자.
+/// (없으면 코드 기본값). 단계가 늘 때마다 칸을 더한다 — 2단계 = 대상별 시간 배율·처치 연출 스킬 · 3단계 = 글리치 타임라인 · 4단계 = 카메라 컷 · 5단계 = Rectify 글자 · 6단계 = 유지·CRT 꺼짐.
 /// </summary>
 [CreateAssetMenu(menuName = "MainProject/Boss Victory Glitch Settings", fileName = "BossVictoryGlitchSettings")]
 public sealed class BossVictoryGlitchSettings : ScriptableObject
@@ -123,9 +123,19 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     public AnimationCurve textJitter = Pulses(0.33f, 0.06f, 1.52f, 0.08f, 2.55f, 0.1f);
     [Min(0f)] public float textJitterPixels = 24f;
 
+    [Header("끝 — 유지 → CRT 꺼짐 암전 → 로비 결과(6단계)")]
+    [Tooltip("글리치 타임라인(glitchDuration)이 끝난 뒤 정지 화면 유지(초).")]
+    [Min(0f)] public float holdSeconds = 1f;
+    [Tooltip("CRT 꺼짐 길이(초) — 타이틀 → 로비 꺼짐(Title/CRTOff)과 같은 연출. 끝 = 검정, 호스트 화면에서 끝나면 서버가 로비(결과 패널)로 넘긴다.")]
+    [Min(0.05f)] public float crtOffSeconds = 1.1f;
+    [Tooltip("CRT 꺼짐 발광 색(타이틀과 같은 파랑이 기본).")]
+    public Color crtOffGlowColor = new Color(0.25f, 0.62f, 1f, 1f);
+
     [Header("셰이더(빌드 포함용 참조 — 비우면 Shader.Find)")]
     public Shader maskShader;
     public Shader compositeShader;
+    [Tooltip("Title/CRTOff(UI/Title/Shaders/TitleCRTOff.shader).")]
+    public Shader crtOffShader;
 
     // 기본 곡선 — a 에서 b 까지 0 → peak, 이후 유지.
     static AnimationCurve Ramp(float a, float b, float peak = 1f) =>

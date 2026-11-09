@@ -1364,7 +1364,7 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         if (_resultTransitionAt <= 0d || NetworkManager.ServerTime.Time < _resultTransitionAt)
             return;
 
-        // 승리 연출(3.20초)이 끝나기 전엔 넘어가지 않는다 — 짧은 사망 클립·FX 누락에서도 연출이 잘리지 않게(C6).
+        // 승리 연출(처치 연출 → 유지 → CRT 꺼짐)이 호스트 화면에서 끝나기 전엔 넘어가지 않는다(PLAN-boss-victory-glitch 6단계).
         if (HoldsResultForVictory())
             return;
 

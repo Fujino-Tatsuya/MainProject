@@ -147,3 +147,9 @@
 - 문구 = 코드 키 `UiStrings.BossVictoryRectify`(`UI.BossVictory.Rectify`, ko 폴백 "Rectify") — 시트 행은 다음 Export 때 붙는다(그 전엔 폴백). 글꼴 = 설정 `textFont` = **서울알림 Heavy SDF**(`Assets/50.Art/UI/Fonts/SeoulAlrimTTF-Heavy SDF.asset`, 정적 아틀라스에 R·e·c·t·i·f·y 있음), 비면 디렉터 `introFont`.
 - 두 겹: 외곽선 글자(면 투명·노란 외곽선 `textOutlineWidth` 0.18, 세기 곡선 `textOutline` 0.15~0.2) + 채움 글자(글자마다 꼭짓점 색 — 앞머리 `textFill` 0.3→0.6 이 왼쪽부터 지나며 띠 `textFillBand` 0.35 안 글자는 `textFillPalette` 4색으로 24fps 깜빡, 다 지나면 `textColor` 노랑) · 흰 섬광 `textFlash`(0.67, 크기 +5%) · 가로 흔들림 `textJitter`(블록·슬라이스 펄스와 같은 시각, ±24px).
 - 위치·크기 = `textViewportPosition`(0.5, 0.5)·`textSize` 220·자간 6.
+
+### 6단계 — 유지 → CRT 꺼짐 암전 → 로비 결과 패널 (11-09)
+- 표시: 글리치 시각이 `glitchDuration`(3.5) + `holdSeconds`(1) 를 넘으면 그 프레임 끝 화면을 캡처(`ScreenCapture.CaptureScreenshotAsTexture`, WaitForEndOfFrame)해 맨 위 캔버스(정렬 900)에 `Title/CRTOff`(타이틀 → 로비 꺼짐과 같은 셰이더·수식) 로 띄우고 `_Progress` 0 → 1(`crtOffSeconds` 1.1, 게임 시간). 끝 = 불투명 검정 → `Finished`·`PresentationFinished`. 클래스 `Map/BossVictory/BossVictoryCrtOff`, 셰이더 참조 = 설정 `crtOffShader`(빌드 포함), 발광 색 `crtOffGlowColor`(타이틀 파랑).
+- 서버: `_victoryMinResultAt`(시각 하한) → `_victoryResultReady`. `TickVictoryServer` 가 **호스트 피어 표시가 같은 회차를 끝낸 순간** `_resultTransitionAt = 지금` → 기존 `TickResultTransition` → `MapSceneManager.GoToResult()`(로비 + 결과 패널, 기존 흐름). 그 전엔 `HoldsResultForVictory` 가 처치 안전망(12초)도 붙잡는다. 연출 시계는 처치 판정부터 게임 시간으로 흘러 스킬 End 와 무관하게 반드시 끝난다.
+- 클라 화면은 자기 시계로 꺼지고, 호스트가 먼저 끝나면 꺼지는 도중 로비로 넘어갈 수 있다(피어 간 미세 차이 허용).
+- 총 길이(기본) ≈ 3.5 + 1 + 1.1 = 5.6초(처치 판정부터).

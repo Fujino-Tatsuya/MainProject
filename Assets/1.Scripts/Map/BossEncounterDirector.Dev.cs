@@ -119,7 +119,7 @@ public sealed partial class BossEncounterDirector
 
         _defeatHandled = false;
         _resultTransitionAt = 0d;
-        _victoryMinResultAt = 0d;
+        _victoryResultReady = false;
         _devResultHeldRaised = false;
 
         foreach (KeyValuePair<ulong, NetworkClient> pair in NetworkManager.ConnectedClients)

@@ -67,6 +67,21 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     readonly List<Renderer> _tagged = new List<Renderer>();
     BossVictoryRectifyText _text;   // 5단계
 
+    // 6단계 — 유지 → CRT 꺼짐
+    BossVictoryCrtOff _crt;
+    Coroutine _crtRoutine;
+    bool _crtPending;
+    bool _finished;
+
+    /// <summary>[이 피어] 연출이 끝났다(CRT 꺼짐 끝 = 화면 검정). 서버(호스트)는 이 순간 로비 결과로 넘긴다.</summary>
+    public static event Action<BossEncounterDirector.VictoryState> PresentationFinished;
+
+    /// <summary>[이 피어] 지금 회차 연출이 끝났는가(CRT 꺼짐 끝).</summary>
+    public bool Finished => _running && _finished;
+
+    /// <summary>[이 피어] 지금 표시 중인 회차(<see cref="BossEncounterDirector.VictoryState.Sequence"/>).</summary>
+    public int Sequence => _sequence;
+
     // 4단계 — 카메라 컷
     int _cutIndex = -1;
     bool _cutSuppressed;
@@ -270,6 +285,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         BossVictoryGlitchSettings s = _settings;
         TickCuts();
         _text?.Tick(t, _glitchTime, s);
+        TickEnd(s);
 
         bool hide = s.hudHide.Evaluate(t) > 0.5f;
         if (hide && !_hudHidden)
@@ -301,6 +317,39 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         };
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
         BossVictoryGlitchRender.SetFrame(frame);
+    }
+
+    // ── 끝: 유지 → CRT 꺼짐(6단계) ─────────────────────────────────────────
+
+    // 타임라인 끝 + 유지 시간이 지나면 이 프레임 끝 화면을 캡처해 꺼짐을 시작한다. 시계 = 게임 시간(랩 일시정지에 같이 멈춤).
+    void TickEnd(BossVictoryGlitchSettings s)
+    {
+        if (_crt == null)
+        {
+            if (!_crtPending && _glitchTime >= s.glitchDuration + s.holdSeconds)
+            {
+                _crtPending = true;
+                _crtRoutine = StartCoroutine(BeginCrtOff());
+            }
+            return;
+        }
+        if (_finished) return;
+        _crt.Tick(Time.deltaTime, s.crtOffSeconds);
+        if (!_crt.Finished) return;
+        _finished = true;
+        Edit.Log($"[BossVictory] 연출 끝(CRT 꺼짐) — 회차 {_sequence} · t {_glitchTime:0.00}", this);
+        PresentationFinished?.Invoke(_state);
+    }
+
+    System.Collections.IEnumerator BeginCrtOff()
+    {
+        yield return new WaitForEndOfFrame();
+        _crtRoutine = null;
+        if (!_running) yield break;
+        Shader shader = _settings.crtOffShader != null ? _settings.crtOffShader : Shader.Find(BossVictoryCrtOff.ShaderName);
+        if (shader == null)
+            Edit.LogWarning($"[BossVictory] 셰이더 {BossVictoryCrtOff.ShaderName} 가 없어 CRT 꺼짐 대신 검정 페이드.", this);
+        _crt = new BossVictoryCrtOff("BossVictory", shader, _settings.crtOffGlowColor);
     }
 
     // ── 카메라 컷(4단계) ───────────────────────────────────────────────────
@@ -589,6 +638,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _hudHidden = false;
         _text?.Dispose();
         _text = null;
+        if (_crtRoutine != null) { StopCoroutine(_crtRoutine); _crtRoutine = null; }
+        _crt?.Dispose();
+        _crt = null;
+        _crtPending = false;
+        _finished = false;
         RestoreCuts();
         _overlay?.Dispose();   // HUD 복구 · 컷 카메라 나감(블렌드 없음) · 디밍 기준점 복구
         _overlay = null;
