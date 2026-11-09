@@ -70,3 +70,22 @@
 - `VictoryState` 의 구도 칸(Final/End/Fov)·`PreludeSeconds`·`StageTime` 은 Legacy 표시가 컴파일되도록 남겨 둔 빈 칸이다(새 코드는 안 씀).
 - 랩: 카메라 구도 슬라이더·라이브·프리셋·회색 원 슬라이더·점프·시계 밀기 삭제. 남은 것 = 배치·팀원·처음부터·일시정지·배속(Time.timeScale)·자동 반복. 랩 규칙 테스트 3개(단계 이름·점프·시계) 삭제.
 - 레퍼런스 프레임 시트는 저장소 밖 `C:UnityProject_lane-artifactsWork2zzz_sheet*.png`(4MB — git 에 안 넣음).
+
+### 2단계 — 대상별 시간 배율·이펙트 소거·처치 연출 스킬 (11-09)
+사용자 결정(11-09): 처치 연출 = **스킬 재생**(표시 전용 — 판정·쿨다운·자원·RPC 없음) · End 는 그 클립 이벤트에서만(대체 분기·안전망 타이머 없음, End 없으면 EditMode 테스트·실행 오류) · 시간 배율·소거를 2단계로 · 소거 1차 범위 = 추천안.
+- **표시 컴포넌트** `Map/BossVictory/BossVictoryGlitchPresentation`(디렉터가 런타임 부착, 모든 피어) — 복제 상태(막타·보스·처치 시각)만 읽는다.
+- **처치 판정 즉시**
+  - 서버(`TryStartVictoryServer`): 전원 무적 · 전원 연출 잠금(`PlayerEncounterLock.SetCinematicInputLockServer` — 실행 중 스킬·평타 취소 + 입력 차단) · `AreaZone`·`MonsterProjectile` 전부 디스폰.
+  - 각 피어: `EffectManager.ReleaseAllImmediate()`(새 API — 전 이펙트 즉시 반납) · 23호 `StopPresentationEffectsLocal()` · `DefaultAttackProjectile` 파괴 · 입력 보류(`PlayerLifeInputPolicy.SetVictoryInputHeld`).
+- **처치 연출 스킬(Q9)** 칸 = 캐릭터 Variant 의 `PlayerVictoryFinisher.finisherSlot`(지금 아무 Variant 에도 안 붙임) → 없으면 설정 `defaultFinisherSlot`(기본 **R 궁극기**). 각 피어가 막타 캐릭터의 실행 중 스킬이 없어진 뒤(서버 취소가 닿은 뒤) `PlayerSkillController.PlayPresentationOnly(skill, 보스 방향)` — 그 스킬의 `AnimatorStateName` CrossFade + `OnClientPlay`(이펙트). 애니 이벤트는 표시 경로(`OnLocalAnimationEvent`)만, End 에서 `OnEnd(Completed)` + `PresentationSkillEnded`.
+- **대상별 시간 배율**(각 피어 로컬 — Animator.speed 를 실행 순서 10001 에서 덮음 + 몸 아래 파티클 simulationSpeed + `EffectManager.SetPlayRateForTarget`)
+  | 대상 | 처치 판정 ~ End | End 이후 |
+  |---|---|---|
+  | 처치자 | 1(덮지 않음) | `killerAfterFinisherScale` 0.1 |
+  | 그 외 플레이어(랩 팀원 복제본 포함) | `otherPlayersScale` 0.05 | 0.05 |
+  | 보스(웰즈 포함) | 0 | `bossAfterFinisherScale` 0.1 |
+  서버 사망 표현 대기도 호스트 화면의 보스 배율로 흐른다(`VictoryDeathTimeScaleFor` → `BossTimeScale`).
+- End 순간 = `BossVictoryGlitchPresentation.FinisherEnded`(static event) — **글리치 시작 신호**(3단계가 구독).
+- 설정 SO `Resources/BossVictory/BossVictoryGlitchSettings.asset`(클래스 `BossVictoryGlitchSettings`) — 단계마다 칸을 더한다.
+- 검증 `BossVictoryFinisherTests`(필터 ^BossVictoryFinisher) — 팔라딘·거너·어쌔신 처치 연출 스킬 시작 상태 클립에 Skill End.
+- 알려진 위험: 스킬 `OnClientPlay` 가 오너 화면에서 이동(돌진류)까지 하면 처치자가 움직인다(오너 권위 복제라 전 피어 같은 모습) · 평타 취소의 자세 복귀가 처치 연출 시작보다 늦게 닿으면 덮을 수 있다(스킬 취소는 기다리지만 평타는 안 기다림) — Play 에서 확인.

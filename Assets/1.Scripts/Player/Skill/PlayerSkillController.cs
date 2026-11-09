@@ -907,11 +907,59 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         }
 
         activeSkill?.OnLocalAnimationEvent(eventType);
+        if (activeSkill == null && presentationSkill != null)
+            HandlePresentationOnlyEvent(eventType);
 
         if (IsNetworkActive && !IsServer)
             return;
 
         activeSkill?.OnAnimationEvent(eventType);
+    }
+
+    // ── 표시 전용 재생(보스 처치 연출 — PLAN-boss-victory-glitch Q9) ──
+    // 각 피어가 자기 화면의 막타 캐릭터에 스킬 애니·이펙트만 튼다. 서버 승인·판정·쿨다운·자원·RPC 없음 —
+    // activeSkill 장부에 올리지 않고, 애니 이벤트는 표시 경로(OnLocalAnimationEvent)만 받는다. End 이벤트에서 끝(OnEnd Completed)을 알린다.
+    private PlayerSkillBase presentationSkill;
+
+    /// <summary>[이 피어] 표시 전용으로 재생 중인 스킬(없으면 null).</summary>
+    public PlayerSkillBase PresentationSkill => presentationSkill;
+
+    /// <summary>[이 피어] 표시 전용 스킬이 자기 클립의 End 이벤트에 닿았다(인자 = 그 스킬).</summary>
+    public event System.Action<PlayerSkillBase> PresentationSkillEnded;
+
+    /// <summary>
+    /// [이 피어·표시 전용] <paramref name="skill"/> 의 애니(<see cref="PlayerSkillData.AnimatorStateName"/>)와 이펙트(<see cref="PlayerSkillBase.OnClientPlay"/>)만 재생한다.
+    /// 실행 중인 스킬이 있으면 false(먼저 끝나야 한다). 끝 = 그 클립의 Skill End 이벤트 → <see cref="PresentationSkillEnded"/>.
+    /// </summary>
+    public bool PlayPresentationOnly(PlayerSkillBase skill, Vector3 direction)
+    {
+        if (skill == null || skill.Data == null || activeSkill != null) return false;
+        presentationSkill = skill;
+        if (movement != null && direction.sqrMagnitude > 0.0001f)
+            movement.RotateImmediately(direction);
+        player?.SetAnimatorMoving(false);
+        if (animator != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName))
+            animator.CrossFadeInFixedTime(Animator.StringToHash(skill.Data.AnimatorStateName), 0.05f);
+        skill.OnClientPlay(direction);
+        return true;
+    }
+
+    /// <summary>[이 피어] 표시 전용 재생을 끝 이벤트 없이 접는다(연출 정리). End 알림은 올리지 않는다.</summary>
+    public void StopPresentationOnly()
+    {
+        PlayerSkillBase skill = presentationSkill;
+        presentationSkill = null;
+        skill?.OnEnd(SkillEndReason.Cancelled);
+    }
+
+    private void HandlePresentationOnlyEvent(SkillAnimationEventType eventType)
+    {
+        PlayerSkillBase skill = presentationSkill;
+        skill.OnLocalAnimationEvent(eventType);
+        if (eventType != SkillAnimationEventType.End || presentationSkill != skill) return;
+        presentationSkill = null;
+        skill.OnEnd(SkillEndReason.Completed);
+        PresentationSkillEnded?.Invoke(skill);
     }
 
     // ── 서버 처리 ──

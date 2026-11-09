@@ -465,6 +465,23 @@ public class EffectManager : MonoBehaviour
         return released;
     }
 
+    /// <summary>
+    /// 지금 재생 중인 이펙트를 전부 outro 없이 즉시 반납한다(이 피어). 반납한 수.
+    /// 보스 처치 연출(PLAN-boss-victory-glitch Q11)이 처치 판정 순간 모든 스킬 이펙트·장판 표시를 걷는 데 쓴다 — 그 뒤 처치자 처치 연출 이펙트만 새로 뜬다.
+    /// </summary>
+    public int ReleaseAllImmediate()
+    {
+        int released = 0;
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            ActiveEffect active = _slots[i];
+            if (!active.inUse) continue;
+            Recycle(active);
+            released++;
+        }
+        return released;
+    }
+
     #endregion
 
     #region 히트스톱

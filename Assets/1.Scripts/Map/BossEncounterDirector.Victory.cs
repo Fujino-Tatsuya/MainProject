@@ -71,9 +71,15 @@ public sealed partial class BossEncounterDirector
 
     /// <summary>
     /// [서버] 이 보스의 사망 표현이 지금 흐르는 배율 — 승리 연출 대상이 아니면 1. 사망 연출 대기(<c>MonsterBase.DeathPresentationTimeScale</c>)가 읽는다.
-    /// (ZZZ 글리치 교체 1단계: 옛 슬로모션 배율은 Legacy — 대상별 시간 배율은 다음 단계에서 붙인다.)
+    /// 값 = 서버(호스트) 피어의 표시가 정한 보스 배율(처치 연출 스킬 End 전 0 · 뒤 0.1 — <see cref="BossVictoryGlitchPresentation.BossTimeScale"/>).
+    /// 각 피어가 자기 화면 애니 이벤트로 판단하므로(Q12) 서버도 자기 화면 기준이다.
     /// </summary>
-    public float VictoryDeathTimeScaleFor(NetworkBehaviour boss) => 1f;
+    public float VictoryDeathTimeScaleFor(NetworkBehaviour boss)
+    {
+        if (!IsVictoryBoss(boss)) return 1f;
+        BossVictoryGlitchPresentation presentation = BossVictoryGlitchPresentation.Instance;
+        return presentation != null ? presentation.BossTimeScale : 1f;
+    }
 
     /// <summary>[서버] 이 보스가 승리 연출(보스 B) 대상인가 — 디졸브·디스폰 없이 사망 자세로 남는다(할 일 200 G).</summary>
     public bool IsVictoryBoss(NetworkBehaviour boss)
@@ -142,14 +148,38 @@ public sealed partial class BossEncounterDirector
             HitPoint = hitPoint,
         };
 
-        // 처치 순간: 피해 무시(D3) · 전역 슬로모션 강제 해제(C11). 입력은 각 오너가 상태를 보고 막는다(Q1).
+        // 처치 순간: 피해 무시(D3) · 전역 슬로모션 강제 해제(C11) · 전원 연출 잠금(실행 중 스킬·평타 취소 + 입력 차단 — 처치 연출 스킬은
+        // 각 피어가 표시로만 새로 튼다) · 서버 판정 장판·투사체 디스폰(Q11 — 표시 소거는 각 피어 BossVictoryGlitchPresentation).
         for (int i = 0; i < players.Count; i++)
+        {
             players[i].GetComponent<PlayerInvulnerability>()?.AddServerToken(InvulnerabilityCause.BossVictory, 0.0);
+            players[i].GetComponent<PlayerEncounterLock>()?.SetCinematicInputLockServer(true);
+        }
         GlobalTimeScale.Instance?.ServerForceReset();
+        int despawned = DespawnCombatObjectsServer();
 
         _victoryMinResultAt = 0d;
 
-        Edit.Log($"[BossVictory] 시작 — 막타 client {killer.OwnerClientId}(기록 {(killer.OwnerClientId == hitClientId ? "있음" : "없음 → 대체")})", this);
+        Edit.Log($"[BossVictory] 시작 — 막타 client {killer.OwnerClientId}(기록 {(killer.OwnerClientId == hitClientId ? "있음" : "없음 → 대체")}) · 장판·투사체 디스폰 {despawned}", this);
+    }
+
+    // [서버] 처치 판정 즉시 서버 판정 장판(AreaZone)·몬스터 투사체를 전부 디스폰한다(Q11 1차 범위 — 빠진 종류는 Play 에서 보이면 더한다).
+    private static int DespawnCombatObjectsServer()
+    {
+        int count = 0;
+        foreach (AreaZone zone in FindObjectsByType<AreaZone>(FindObjectsSortMode.None))
+        {
+            if (zone == null || zone.NetworkObject == null || !zone.NetworkObject.IsSpawned) continue;
+            zone.Despawn();
+            count++;
+        }
+        foreach (MonsterProjectile projectile in FindObjectsByType<MonsterProjectile>(FindObjectsSortMode.None))
+        {
+            if (projectile == null || projectile.NetworkObject == null || !projectile.NetworkObject.IsSpawned) continue;
+            projectile.NetworkObject.Despawn();
+            count++;
+        }
+        return count;
     }
 
     // [서버] Update — 승리 연출 진행(ZZZ 글리치 교체 중 — 결과 전환 시각은 5단계에서 붙인다).
