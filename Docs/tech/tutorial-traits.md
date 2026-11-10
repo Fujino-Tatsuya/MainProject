@@ -36,7 +36,7 @@ TraitDirector (씬 상주 NetworkBehaviour, 서버 권한) ──NetworkList─�
 | `TraitSelectionModel` | Unity 비의존 규칙 — 고정 후보 제시·선택 검증·자동 획득·라운드 완료·이탈자 제외·선택 창 무적 계획 |
 | `TraitWindowModel` | Unity 비의존 창 판정. 입력은 **내** 제시 번호(`OfferSeq` — §9) |
 | `TraitDirector` | 상태 소유자. 라운드 제시·선택 RPC 검증·효과 적용(장부)·무적 토큰·목록 버전 복제 |
-| `TraitSelectionView` | 로컬 UI — 중앙 모달(창 루트 `UiModalBlocker`) · 카드 · 도움말 줄 · 상충 확인창 · 획득 토스트 · 좌상단 획득 아이콘 + 호버 툴팁 · 초기화 팝업(§9) |
+| `TraitSelectionView` | 로컬 UI — 중앙 모달(창 루트 `UiModalBlocker`) · 카드 · 도움말 줄 · 상충 확인창 · 획득 토스트 · 왼쪽 가운데 획득 아이콘 벌집(253) + 호버 툴팁 · 초기화 팝업(§9) |
 | `TraitTextTable` | 창 문구 ID → 문자열(`TraitTexts.asset`). 에셋·행 없으면 `TraitTexts` 상수 |
 
 ### 1.1 ID·후보·버전(할 일 125 1/5)
@@ -136,6 +136,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 | — | `TraitStatEffect` | 수치 | PlayerStats 기본%·전체%·가하는 피해% |
 
 - **모드 변경 7개**(돌파의 방패·집속 연사·그림자 회귀·한계 돌파·축열 포격·정온 운용·절제된 분노)는 효과 클래스가 아니다 — 스킬이 `PlayerTraitModifiers.HasTrait(TraitModeIds.…)` 로 묻고 자기 코드 안에서 분기한다.
+  - 그림자 회귀(ASN_2_RETURN) 복귀 거리 = **사거리 제한 없음**(할 일 243) — 창(`ASN_Q_RETURN_WINDOW`, 3초) 안이면 거리 상관없이 저장된 출발점까지 전부 돌진(속도 = 원래 Q `dashSpeed`, 벽·낭떠러지 앞 정지만 이동 규칙). 규칙 `AssassinShadowReturnRules.Resolve`(최대 거리 인자 없음), 경로가 클립 End 보다 길면 서버가 End 를 경로 끝 + 0.1초까지 미룬다(`AssassinDashStrikeSkill.HoldsEndUntilPathDone`), 오너 벽 정지 보고 검증 상한 = 이 단계 경로 길이(`serverCap`). 별도 회귀 사거리 칸은 없다.
   - 절제된 분노 HUD: 머리 위 분노 줄·`AssassinHUD` 분노 줄은 숨기고, 공용 스킬 바 R 칸은 **숨기지 않고 아이콘만 회색조**(할 일 237 — 133 의 칸 숨김 대체). 규칙 `AssassinRestraintRules.GraysHudSlot`, `SkillCooldownHUD` 가 R 아이콘·쿨타임 마스크 안 사본에 재질 `Assets/3.Materials/UI/MA_UIGrayscale.mat`(셰이더 `UI/Grayscale` = UI/Default + 채도 0·밝기 0.85, 스텐실·RectMask2D 지원)을 끼우고 풀리면 원래 재질로. 프레임·키 글자·툴팁은 그대로.
 - **사건**: `AttackLanded` 는 `Player.ServerAttackLanded` 에서 자동(시전 ID·형태 포함). `GuardSucceeded`·`PassiveProc`·`SkillCompleted`·`BasicAttackFired` 는
   스킬이 `PlayerTraitEffects.RaiseServer(trigger, skill)` 로 알린다(캐릭터 레인 몫). 거름 = `TraitTriggerFilter`(시전당 1회·간격, `TraitProcGate`).
@@ -254,6 +255,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
   - 배정(SVN r594, 12개 — 근거표 `_lane-artifacts/Work1/208/tag-plan.md`): 팔라딘 `PAL_1_PASSIVE_HEAL` Heal · `PAL_2_DASH` Knockback · `PAL_2_SHARE_HEAL` Heal · `PAL_3_E_SHIELD` Shield · `PAL_3_Q_STUN` Stun · `PAL_4_E_PUSH` Knockback · `PAL_4_HEAL_SHIELD` Heal, Shield / 거너 `GUN_2_COOL_MODE`·`GUN_2_HEAT_SHOT`·`GUN_2_OVERDRIVE` Overheat · `GUN_3_Q_PUSH` Knockback / 어쌔신 `ASN_4_NORMAL_E_PUSH` Knockback. 나머지 24개 = 수치 강화만이라 칩 없음. 정의 에셋 `tags` 칸도 같은 값(인스펙터 모드용).
   - 프리팹 반영 = `Tools/Tutorial/특성 선택 UI — 태그 칩 줄 추가 (분류 아래)`(멱등 — 칩 원본 = `CombatHUD.prefab` 스킬 툴팁 `tagChipTemplate` 복제, 카드 칸 `tagRow`·`tagChipTemplate`·`tagStyles`). 카드 C1 아트 적용도 같은 함수를 부른다. 테스트 `TraitCardTagTests`(정의 tags 문법·프리팹 연결).
 - 획득 아이콘 호버 툴팁(`AcquiredTooltip`, 폭 380 · `ContentSizeFitter` 로 높이가 글자에 맞음 · 여백 14 상하 같음)의 `Name`·`Description` = `MidlineLeft`(할 일 177). 글자 칸 높이 = 글자 높이라 `Left`(Middle)는 `TopLeft` 와 똑같이 보여서, 글자 모양 기준 Midline 으로 상자 안 세로 가운데에 놓는다. 레이아웃(childAlignment UpperLeft·여백)은 그대로.
+- **획득 아이콘 벌집(할 일 253)**: `AcquiredList` = 왼쪽 가운데 앵커(0,0.5)·피벗 왼쪽 아래 — 화면 위치는 이 RectTransform 으로 조절하고 코드는 안쪽 칸만 놓는다(레이아웃 그룹 없음). 칸 = 평평한 윗변 육각형 2열 지그재그(`TraitIconHoneycomb.CellCenter` — 획득 순서 i 의 열 = i%2·행 = i/2, 오른쪽 열 반 칸 위, 아래에서 위로), 칸 = 화면 육각형 크기 `honeycombCellSize`(64×57.2)·간격 `honeycombGap`(0 = 변끼리 맞물림)·그림 배율 `iconSizePerCellWidth`(1.447) — 모두 `TraitSelectionView` 칸. 아이콘 아트(`50.Art/UI/HUD/TraitIcon`)가 이미 평평한 윗변 육각형이라 테두리·마스크 없이 그림만 그린다: png 136×136 안 육각형 = 94×84px(가운데, 윗변 48px — 키캡은 아래로 최대 9px 더 내려옴) → 그림 한 변 = 칸 폭 × 136/94, `IconTemplate` 루트 = 투명 Image(육각형 칸 크기, 호버 판정). 호버 툴팁 = 벌집 오른쪽(x 156)·높이는 호버한 칸에 맞춤. EditMode `TraitIconHoneycombTests`.
 
 #### 11.1.1 카드 C1 아트 (할 일 165)
 

@@ -8,6 +8,19 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-11-09 · 경석(Claude) · **사운드 2차 정리 — 재생 경로 통일·3D 거리 완화·다른 플레이어 30%·루프 끊기·미연결 20개·믹스**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-sound-mix.md](PLAN-sound-mix.md) ✅ 승인(Q1~Q6 · Codex 교차검증) · ⏳ 구현
+- 수정 예정: `Sound/AudioManager.cs` · `Effects/EffectManager.cs` · `Effects/EffectPart.cs` · `Effects/EffectSocketPlayer.cs` · 미연결 훅(보스·플레이어 호출부 한 줄씩) · xlsx Sound 시트(SVN) · VFX 엔트리 소리 파트(SVN)
+- 11-09 진행: 1~3단계 구현 · 컴파일 0 · 미커밋(git·SVN). Sound 시트 행 번호 불일치 760행(11-06 r615·r618 추가분) 같이 정리. **시트 볼륨 배율은 전부 1(Q7 — 크기는 클립으로 맞춘다, 담당 요청 = 경석)**.
+- 경석 1차 청취 후 수정: 스피너 돌진 소리 카운터 후 남음 → `SpinnerBot.StopClipLoopsOnAttackExit` + `FX_Mob_Spin_Entry` stopOnRelease · 23호 돌진 짧아도 남음 → `FX_BossDash_Trail_Entry` stopOnRelease · 23호 패턴 끊김(정상 종료·카운터·그로기·사망) → `AbortAttackChain` 에서 돌진·잡기·점프 시작 소리 `StopAttackSoundsClientRpc`. 23호 훅·어퍼는 소리 없음(바람 이펙트에 소리 없음, `Left/RightHitSpark` 소켓은 아무도 안 부름 — `S1_Punch_Hit` 은 건틀릿봇 전용).
+- 전수 조사 후: 팔라딘 E 막기 없이 끝남 = 실패음(`FX_GuardianWill_BlockFail_Entry` 새 엔트리 · 소켓 `GuardianRelease` 연결 변경) · 간파 벽(`PlayVulnerableWallSoundClientRpc`, 취약 넉백 외곽 벽 첫 충돌) · 거너 Q 시작음 stopOnRelease · **저체력 경고 `PlayerLowHealthAudio`**(내 캐릭터만, 체력 30% 이하 심장 루프 `S1_Vignetting`=VoiceOver 타입 + Music·SFX·Ambience 로우패스 1000Hz, 회복 시 0.5초 페이드·사망 즉시, 끄기 옵션 없음 — 수치는 명세 대기). ⏳ Play 미확인.
+- **곁가지 — MortarBot 포격 안 나감 수정**: 원인 = 10-19 `2d9efa34`(attackWindup → `AttackAnticipation` 상태 재생 속도, 대상 Chomp·Humanoid)가 MortarBot 조준 루프(상태 이름 같음, 0.27초 반복)에도 걸려 7월부터 있던 미사용 값 3.5 가 적용 → 루프 3.5초 → 커밋 이벤트가 `attackDuration` 4초 안전 타이머를 넘겨 공격 강제 종료(= 앉았다 이동 반복). 수정 = MortarBot `attackWindup` 0(xlsx Monster!F35 · `MortarBotData.asset`) + 필드 Tooltip 경고. Play 확인: 커밋 1.21s · 히트 1.47s · 포격 발사.
+
+## ▶▶ 작업 세션 (2026-11-06 · 민경(Claude) · **거너 R 다른 클라 화면 알파(낙뢰 빔·장판 바닥 선 × 0.6) + EffectManager 머티리얼 알파 재생**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 · ⏳ 컴파일·EditMode·MPPM · 미커밋 · **은희 영역(`GunnerTrackingLaserSkill`) 한 줄** · 핸드오프 [handoff-gunner-ult-ally-alpha.md](Docs/tech/handoff-gunner-ult-ally-alpha.md)
+- 수정 파일: `Effects/EffectMaterialAlpha.cs`(새) · `Effects/EffectManager.cs` · `Player/Gunner/GunnerTrackingLaserView.cs` · `GunnerTrackingLaserSkill.cs` · `2.Prefabs/Player/Gunner/GunnerTrackingLaser.prefab` · 새 테스트 `Player/Editor/GunnerUltOtherClientAlphaTests.cs`
+
+## ▶▶ 작업 세션 (2026-11-06 · 민경(Claude) · **거너 좌클릭·Q 벽까지 거리 = 접촉 거리 + 부서지는 프롭 Hurtbox +0.1m**, 브랜치 `feature/VFX`) — ✅ 구현·커밋 · ⏳ 컴파일·EditMode·Play(Unity 꺼져 있었음) · 미병합 · **은희 영역(`GunnerBeamAttack`) 수정** · `PF_box_3stack`·`PF_box2stack` 자식 Hurtbox 구조로 변환 · 핸드오프 [handoff-gunner-beam-contact-length.md](Docs/tech/handoff-gunner-beam-contact-length.md)
+- 수정 파일: `Player/Gunner/GunnerBeamAttack.cs` · `GunnerBeamView.cs`(주석) · `Dev/TraitLab/TraitLabAttackGizmos.cs` · 새 테스트 `Player/Editor/GunnerBeamContactDistanceTests.cs` · 프롭 8개(`2.Prefabs/Environment/Props/Containers/`)
+
 ## ▶▶ 작업 세션 (2026-11-04 · 경석(Claude) · **간파 표시(보라색) = 판정 창 일치**, 브랜치 `feature/SettingsDdol`) — ✅ 커밋·development 병합 · 컴파일 0 · Codex 검수 지적 0 · ✅ 경석 Play 확인(11-04)
 - 받기: development fast-forward `1720a428`(191 간파 클라 판정 포함) · SVN r583. 내 `GameData.xlsx`(현지화 A, r579 기반) → ✅ r583 위로 다시 넣음(내 변경 = Strings 145칸만, r580~583 = SlowMotion 만 — 겹침 0, 병합본 작업본에 반영, 백업 볼트 `_local/backup-l10nA-20261104/`). `StringTable 갱신` 다시 돌림 → 키 553·오류 0(경고 6 = 그림자 회귀 툴팁 키 주인 못 찾음, {필드} 검사만 생략) · 에셋이 xlsx 의 11-02 ko 교체(클리어·패시브·준비 중…)를 이제 반영.
 - 원인: 후속 돌진(HookHookDash 3타·JumpDash 2타)은 0.7초 창을 알렸지만 돌진 클립에 이벤트가 없어 대체값(≈1.5초)에서 발사 → 191 클라 판정이 0.7초 뒤 간파를 보라색인데 실패(신고 없음). 로그 10/10 재현.

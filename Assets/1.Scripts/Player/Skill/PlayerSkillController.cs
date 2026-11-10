@@ -1885,6 +1885,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // 레이어 상태·가중치는 NetworkAnimator 가 복제). 0층은 대시 끝에 CompleteDashInterruptHandOff 가 이어받는다.
     private void PlaySkillPresentation(PlayerSkillBase skill, Vector3 direction, bool dashInterrupt = false)
     {
+        // 간파 시작 소리(11-09, PLAN-sound-mix) — 세 캐릭터가 OnClientPlay 를 각자 덮어써서 공통 지점인 여기서 1회(대시 간파 포함, 전 피어).
+        if (skill is PlayerInterruptSkillBase && AudioManager.Instance != null)
+            AudioManager.Instance.Play("S1_Interrupt_Start", transform.position, this);
+
         hasNotifiedRelease = false;
         nextAimSendTime = 0f;
         // 로컬 조작자의 설정만 의미가 있다 — 이 값을 읽는 TickOwnerHoldInput은 오너/오프라인에서만 돈다.

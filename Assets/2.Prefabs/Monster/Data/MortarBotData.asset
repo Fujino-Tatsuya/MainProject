@@ -49,7 +49,7 @@ MonoBehaviour:
   retreatMinDuration: 1.2
   repositionMinDuration: 1.2
   attackDuration: 4
-  attackWindup: 3.5
+  attackWindup: 0
   cancelWindupIfTargetLeavesRange: 1
   engageAttackDelay: 0
   maxGroggyCount: 0

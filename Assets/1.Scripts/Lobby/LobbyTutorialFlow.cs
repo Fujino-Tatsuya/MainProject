@@ -30,7 +30,8 @@ public enum LobbyTutorialAdvanceResult : byte
 /// 참여자 0 이면 전이하지 않는다.</item>
 /// <item>모든 기록(명단·라커 방문)은 clientId 기준 — 캐릭터 교체(PlayerObject 디스폰·재스폰)로 지워지지 않는다(PLAN §10.2). 연결 종료만 지운다.</item>
 /// <item>라커 방문: LockerVisit 단계 동안 참여자만, 1인 1회 누적(나갔다 와도 유지). 회차 = 모델 인스턴스 — 새 회차는 새 인스턴스.
-/// 완료 = 스폰 완료 참여자 전원 방문(<see cref="AllSpawnedParticipantsVisitedLocker"/>, 커밋 ③).</item>
+/// 완료 = 스폰 완료 참여자 전원 방문(<see cref="AllSpawnedParticipantsVisitedLocker"/>, 커밋 ③).
+/// 할 일 251: 방문 = 볼륨 안에 행 holdSeconds(기본 2초, 서버 시각) 연속 머묾(<see cref="ReportLockerPresence"/>) — 그 전에 나가면 그 사람 타이머만 리셋.</item>
 /// <item>출격 확정: <see cref="TryCommitLaunch"/> 회차마다 1회. 확정 뒤엔 로딩 행으로만 전이한다(<see cref="LobbyTutorialAdvanceResult.LaunchLocked"/>).</item>
 /// <item>재접속(할 일 157 ⑩, Q-T2 A): 연결 종료 때 <see cref="RemoveClient"/> 에 사용자 키(playerId)를 넘기면 그 사람의 명단 소속·라커 방문을 회차 안에 보관하고,
 /// 같은 키로 새 clientId 가 접속하면 <see cref="TryRebind"/> 가 새 clientId 로 옮긴다(훈련 처음부터 재실행·다른 사람 기록 초기화 없음). 키가 없거나 보관 기록이 없으면 늦은 참가자.</item>
@@ -47,6 +48,7 @@ public sealed class LobbyTutorialFlow
     readonly List<ulong> _connected = new List<ulong>();
     readonly List<ulong> _roster = new List<ulong>();
     readonly List<ulong> _lockerVisited = new List<ulong>();
+    readonly Dictionary<ulong, double> _lockerEnteredAt = new Dictionary<ulong, double>();
     readonly List<ulong> _cleared = new List<ulong>();
     readonly List<ulong> _openParticipants = new List<ulong>();
     readonly Dictionary<string, DepartedRecord> _departed = new Dictionary<string, DepartedRecord>(StringComparer.Ordinal);
@@ -139,6 +141,7 @@ public sealed class LobbyTutorialFlow
         var removed = _connected.Remove(clientId);
         removed |= _roster.Remove(clientId);
         _lockerVisited.Remove(clientId);
+        _lockerEnteredAt.Remove(clientId);
         _cleared.Remove(clientId);
         return removed;
     }
@@ -212,6 +215,31 @@ public sealed class LobbyTutorialFlow
 
         _lockerVisited.Add(clientId);
         return true;
+    }
+
+    /// <summary>
+    /// [서버 매 프레임] 라커 볼륨 안/밖 보고(할 일 251). 안에 <paramref name="dwellSeconds"/> 연속 머물면 <see cref="MarkLockerVisited"/> — 확정한 호출만 true.
+    /// 밖·스폰 전·LockerVisit 단계 아님·참여자 아님·이미 방문이면 그 사람 타이머를 지운다(다시 들어오면 처음부터). 0 이하 = 들어간 즉시.
+    /// </summary>
+    public bool ReportLockerPresence(ulong clientId, bool inside, double now, double dwellSeconds)
+    {
+        if (!inside || CurrentKind != LobbyTutorialStepKind.LockerVisit || !IsParticipant(clientId) || _lockerVisited.Contains(clientId))
+        {
+            _lockerEnteredAt.Remove(clientId);
+            return false;
+        }
+
+        if (!_lockerEnteredAt.TryGetValue(clientId, out var enteredAt))
+        {
+            enteredAt = now;
+            _lockerEnteredAt[clientId] = now;
+        }
+
+        if (now - enteredAt < dwellSeconds)
+            return false;
+
+        _lockerEnteredAt.Remove(clientId);
+        return MarkLockerVisited(clientId);
     }
 
     public bool HasVisitedLocker(ulong clientId) => _lockerVisited.Contains(clientId);

@@ -26,3 +26,19 @@
   - ⚠️ 정정(10-26): 메뉴·설정창·다이브는 없어졌다. 지금 = Press 캡슐 → 아무 키 → 3초 접근 → 모니터 CRT 꺼짐 → 검정 페이드 → 로비(접근 중 ESC = 바로 페이드).
   - ⚠️ 정정(11-04, 할 일 218): Press 캡슐은 없어지고 문구(`Text`)만 캔버스 바로 아래에 있다. 대기 중 문구 밖 화면은 블러 + 흑백, 아무 키 → 문구 꺼짐 + 1초 선형 원복 → 3초 접근 … (`TitleFlowDirector` 「Press 대기 블러·흑백 (218)」 칸, 블러 경로는 [panel-backdrop-blur.md §5](panel-backdrop-blur.md)).
   - 11-05(218 후속): 대기 블러·흑백 위에 TV 글리치(가로 찢김·RGB 어긋남·주사선·잡음, 상시 은은 + 가끔 강한 버스트)가 얹힌다. 문구는 선명, 1초 원복 때 블러와 같이 0. 칸 = `TitleFlowDirector` 「Press 대기 TV 글리치 (218 후속)」, 경로 [panel-backdrop-blur.md §5.1](panel-backdrop-blur.md).
+
+## 벽 모니터 존 투어 영상 (11-09, 할 일 254)
+
+- **어디**: `TitleScreenFeed`(1.TitleScene) 「존 투어 영상 (할 일 254)」 칸. 원래 이미지 모드(`_liveFeed` 꺼짐)에서만 동작.
+  - `_videoScreens` = 영상 모니터 화면 Renderer — 기본 **TitleOffice 의 `monitor (4)`·`monitor (8)`·`monitor (11)` 의 `monitor_screen`**(게임오브젝트 이름 번호).
+    `_wallScreens` 배열 번호가 아니다 — 그 배열은 10-06 오피스 재배치로 13칸 중 5칸이 비었고(`monitor (4)` 는 씬에서 새로 만든 모니터라 배열 밖), 원소 번호로는 4·8·11 을 셀 수 없다.
+    대략 위치(TitleOffice 기준): (4) 왼쪽 위 1.8배 · (8) 가운데 맨 뒤 아래쪽 2.83배(가장 큼) · (11) 오른쪽 아래.
+  - `_videoClips` = `Assets/50.Art/Video/Title/01~05_*_Zone_Tour.mp4`(SVN r641, 원래 r639 `Lobby/` 에 올라온 것을 옮김).
+- **겹침 없음**: `TitleWallVideoPlaylist`(순수 함수, `TitleWallVideoPlaylistTests`) — 시작은 무작위 시작점부터 연속 3개, 끝나면 그 다음 번호부터 순환하며 다른 모니터가 지금 틀지 않는 첫 영상.
+- **룩**: 영상 모니터 전용 재질 **`Assets/3.Materials/title/MA_TitleWallVideo.mat`**(`TitleScreenFeed._videoMaterial`, 11-09 사용자 Play 튜닝값 — Brightness 1.36·Glow 1.03·Tint 9FFFD6·지직 표현 `_Flicker` 0.739·`_Roll` 0·`_SeamBlend` 0.05)을
+  모니터마다 복제해 `_MainTex` 텍스처만 영상 RT(640×360)로 바꾼다. **값은 이 재질을 고친다**(Play 중 `TitleWallVideoN (Instance)` 를 고친 값은 사라진다). 늘어나 보이면 이 재질 `_MainTex` Tiling/Offset 으로 가운데 자르기.
+  칸이 비면 벽 재질 복제 + `_Roll` 0·`_SeamBlend` 0.05 만 덮는다.
+  - 코드가 런타임에 덮는 것(재질 값 무시): `_MainTex` 텍스처(RT) · `_FxTime`·`_Glitch`·`_Tear`(`TitleCrtFx` 가 매 프레임 — 인스펙터 Glitch 칸은 상시 버스트 값) · MPB `_WallRoll` 0·`_WallGlitch`(모니터별 지직, `_glitchRate` 빈도 — 인스펙터에 안 보이는 칸).
+- **임포트**: `TitleWallVideoImport`(AssetPostprocessor) 가 `Video/Title/` 영상을 **절반 해상도 640×360 트랜스코드·소리 끔**으로 강제한다(.meta 는 SVN 이라 손으로 안 박음). 설정을 바꾸면 `Version` 을 올린다.
+- **정리**: 씬을 떠나면(OnDisable) VideoPlayer 오브젝트·RT·머티리얼을 지우고 원래 머티리얼로 되돌린다. 중앙 모니터 CRT 꺼짐·페이드 흐름은 건드리지 않는다.
+- **빌드 포함**: 영상은 씬 참조로만 들어간다(Addressables·Resources 아님).

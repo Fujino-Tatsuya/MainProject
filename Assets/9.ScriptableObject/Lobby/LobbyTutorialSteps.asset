@@ -26,7 +26,7 @@ MonoBehaviour:
     countdownObjectiveKey: 
     countdownProgressKey: 
     gatherPoint: 0
-    holdSeconds: 0.3
+    holdSeconds: 2
     pathId: PATH_LOCKER
     targetWallId: 
     dialogueId: 

@@ -1,3 +1,61 @@
+# ▶▶▶ 계획 = **그림자 회귀 표식에 검은 오러** (2026-11-09 · grill 확정 · ✅ 민경 "추천대로" · ✅ 구현 · ⏳ Play)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-09). 대상 `FX_ShadowReturn_Marker_Shadow.prefab`(SVN) + `AssassinShadowReturnView.cs`(git, 민경 VFX 코드).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 레이어 | `FX_Assassin_BladeVortex` 의 검은 오러 + 붉은 불티(11-09 추가, HDR 가산 새 재질 `M_ShadowReturn_Ember`) — 어두운 연기 2개(`Smoke_burst_sim_4_alpha_Soft` 고리, `Smoke_loop_sim_fb_10_alpha_soft` 몸통) + 검은 퍼지(`FuzzAlpha_Soft`) + 불티(`Flecks_Shiny_Additive` 기반). 붉은 바람·퍼지 가산 레이어는 제외 |
+| 모양 | 그림자 웅덩이에서 낮게(~1m) 피어오르며 단검을 감싸는 기둥, 위로 옅어짐 |
+| 색 | BladeVortex 그대로 검붉은 틴트 |
+| 세기 | BladeVortex 의 약 절반(알파 ½, 방출 ~0.6배), 표식 크기에 맞춰 축소 |
+| 재질 | BladeVortex 와 같은 PilotoStudio 재질 공유 — 새 텍스처·재질 없음 |
+| 단검 림 | 11-09 추가 — `Mesh/Rim` + `M_ShadowReturn_Rim`(VFX/RimOverlay, 빨강 HDR), 연보라 `Edge` 끔, `_Fade` 연동 |
+| 페이드 | 메시는 기존대로(_BaseColor 알파·끝 깜빡임). 파티클은 그 블록·렌더러 끄기에서 제외 — 사라질 때 방출만 멈추고 남은 입자가 흩어진 뒤 표식 파괴 |
+
+## 작업
+1. 프리팹: 루트 아래 `Aura` 묶음 + 레이어 3개(BladeVortex 에서 복사, 새 fileID). FuzzAlpha 는 1회 버스트 → 짧은 주기 루프(숨 쉬는 검은 후광).
+2. `AssassinShadowReturnView`: `Apply` 가 ParticleSystemRenderer 를 건너뜀 · `Hide` 때 표식 파티클 방출 정지 · 파괴 = 메시 알파 0 **그리고** 살아 있는 입자 0.
+
+## 검증
+- Play: Q 후 출발점에 오러가 서서히 차오름 / 복귀·만료 때 메시는 페이드, 연기는 흩어지며 끝 / 끝 1초 깜빡임은 메시만.
+
+---
+
+# ▶▶▶ 계획 = **거너 R — 다른 클라 화면에서 낙뢰 빔·장판 바닥 선 알파 낮추기** (2026-11-06 · grill 확정 · ✅ 민경 승인 · ✅ 구현 · ⏳ 컴파일·MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-06). 스폰 코드 한 줄 = **은희 영역**(`GunnerTrackingLaserSkill`) → 핸드오프.
+
+## 사실
+- `M_GUlt_StrikeBeam`(`Shader_IntegratedEffect`, 알파 = `_BaseColor.a`) → `FX_GunnerUlt_Strike`(낙뢰 원샷, 렌더러 1개). `GunnerUlt_FloorLine`(`HS_Blend_CG`, 알파 = `_Opacity`) → `FX_GunnerUlt_Zone2`(장판 루프 `FX_GunnerUlt_Zone_Entry`, 렌더러 1개). 둘 다 지연 파트 없음, `EffectManager` 풀 재사용.
+- R 레이저는 서버 스폰(소유자 = 서버), 시전자는 서버만 안다(`GunnerTrackingLaser.caster`).
+- 한계 돌파 색(`EffectRecolor`)은 파티클 색 + 채도 있는 재질 색 MaterialPropertyBlock, 반납 때 빈 블록으로 원복. 흰 재질에 블록을 걸면 이 셰이더들이 다르게 그려지는 기록 있음([handoff-overdrive-vfx.md](Docs/tech/handoff-overdrive-vfx.md)).
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 범위(Q1) | 위 두 머티리얼을 쓰는 렌더러만. 목록 형태라 나중에 추가 가능 |
+| 알파(Q2) | 곱하기 — 원래 값 × 배율 |
+| 값 위치(Q3·Q8) | `GunnerTrackingLaserView` 목록 {머티리얼, 속성 이름, 배율}. Color 속성 = a 에, Float = 값에 곱함. 기본 2줄: (`M_GUlt_StrikeBeam`, `_BaseColor`, 0.6) · (`GunnerUlt_FloorLine`, `_Opacity`, 0.6) |
+| 기준(Q4) | R 을 쏜 거너 본인 화면만 원래대로, 나머지 전부 배율 적용. 호스트 시전 = 호스트 원래대로, 오프라인 = 본인 취급 |
+| 한계 돌파 색(Q5) | 그대로 칠하고 알파만 낮춤 |
+| 시전자 복제(Q6) | `GunnerTrackingLaserView` 에 NetworkVariable 1개(시전자 ClientId) — 서버가 스폰 전에 씀(한계 돌파 단계와 같은 경로). 새 RPC 없음, 판정 무변경 |
+| 방식(Q7) | **머티리얼 교체** — `EffectManager` 공용 기능(핸들에 머티리얼 알파 규칙, 재생·지연 파트 적용, 반납 때 원래 머티리얼로). 복사본은 (원본, 속성, 배율)마다 1번 만들어 캐시 |
+| 도중 변화(Q10) | 시전자 끊김·사망에도 그대로(스폰 순간 결정) |
+
+## 작업
+1. `EffectManager`: 머티리얼 알파 규칙 지정 API(`SetMaterialAlpha(handle, rules)`), 활성 이펙트에 저장 → 인스턴스·이후 파트 적용, 반납 직전 원래 sharedMaterials 복원. 복사본 캐시.
+2. `GunnerTrackingLaserView`: 알파 목록 칸 + `netCasterClientId`(+오프라인 로컬값) + `ServerSetCaster(clientId)` · 장판(`zone`)·낙뢰(`PlayStrikes`, 항상 핸들 재생)에 "내가 시전자가 아니면" 규칙 적용.
+3. `GunnerTrackingLaserSkill`(은희): 스폰 전 `view.ServerSetCaster(owner.OwnerClientId)` 한 줄.
+4. `Player_Gunner` R 레이저 프리팹에 기본 2줄 연결.
+5. 테스트(순수 규칙: 배율 계산·시전자 판정) · 핸드오프 `Docs/tech/handoff-gunner-ult-ally-alpha.md` · CONTEXT.
+
+## 리스크·검증
+- 리스크: 반납 원복 누락 시 다른 시전에 흐린 머티리얼이 남음 → 반납 경로에서 복원, 테스트. 셰이더 그래프 `_Opacity` 가 실제 알파에 쓰이는지 Play 확인.
+- 검증: 컴파일 0 · EditMode · MPPM 2인(거너 클라 = 원래, 다른 클라·호스트 = 0.6) · 한계 돌파 색 함께 · 연속 R 시 원복.
+
+---
+
 # ▶▶▶ 계획 = **23호 잡기 — 끌려갈 대상 표식 + 끌려갈 때 VFX** (2026-11-05 · grill 확정 · ✅ 민경 "추천대로" · ✅ Codex 파일 제작·연결·오프라인 검증 · ⏳ 민경 Play·MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-11-05). **기획 = Claude, 제작·연결 = Codex 세션 "Add Blender MCP server"**(Unity·Codex 앱 끈 상태).

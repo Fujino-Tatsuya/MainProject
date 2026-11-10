@@ -110,7 +110,7 @@ public class PlayerDashVfx : BaseNetworkBehaviour
     private void PlayDashSound()
     {
         if (AudioManager.Instance != null)
-            AudioManager.Instance.Play(DashSoundKey, transform.position);
+            AudioManager.Instance.Play(DashSoundKey, transform.position, this);   // 남의 대시 = 30%(Q6)
     }
 
     /// <summary>[전 피어] 잔상 생성을 멈춘다. 이미 떠 있는 조각은 제 수명대로 사라진다.</summary>

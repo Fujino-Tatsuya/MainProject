@@ -1166,7 +1166,6 @@ GameObject:
   m_Component:
   - component: {fileID: 4509088818531277874}
   - component: {fileID: 2824800692962895580}
-  - component: {fileID: 5224000000000000020}
   m_Layer: 0
   m_Name: tripo_part_0
   m_TagString: Untagged
@@ -1215,7 +1214,6 @@ SkinnedMeshRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: fb66ffd6f43a8f543b0197f9f548c533, type: 2}
-  - {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720117, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1308,22 +1306,6 @@ SkinnedMeshRenderer:
     m_Center: {x: -0.002985984, y: -0.015378982, z: -0.06531663}
     m_Extent: {x: 0.42493984, y: 0.84612525, z: 0.4174919}
   m_DirtyAABB: 0
---- !u!114 &5224000000000000020
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2106135556701087399}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
-  overlayMaterialIndex: 1
-  fadeInDuration: 0.25
-  fadeOutDuration: 0.4
-  shown: 0
 --- !u!1 &2198372857792199672
 GameObject:
   m_ObjectHideFlags: 0
@@ -4039,7 +4021,6 @@ MonoBehaviour:
   data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
   hitboxAnchor: {fileID: 0}
   skillVfx: {fileID: 5224000000000000001}
-  superArmorOverlay: {fileID: 5224000000000000020}
 --- !u!114 &6032877627005329180
 MonoBehaviour:
   m_ObjectHideFlags: 0

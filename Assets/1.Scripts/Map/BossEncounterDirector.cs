@@ -312,6 +312,10 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         if (GetComponent<BossVictoryGlitchPresentation>() == null)
             gameObject.AddComponent<BossVictoryGlitchPresentation>();
 
+        // 보스 BGM(PLAN-sound-mix 3단계) — 복제 단계를 모든 피어가 보고 각자 튼다. 늦게 들어와도 지금 단계로 맞춘다.
+        phase.OnValueChanged += HandlePhaseBgm;
+        HandlePhaseBgm(BossEncounterPhase.Idle, phase.Value);
+
         if (!IsServer)
             return;
 
@@ -333,8 +337,23 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         ValidateSetup();
     }
 
+    // 보스 BGM 키 — xlsx Sound 시트(Sound_2/BGM/Boss/BGM_Boss_001.wav).
+    private const string BossBgmKey = "BGM_Boss";
+
+    /// <summary>전투 시작 → 보스 BGM, 대기로 돌아감(전멸·중단) → 씬 BGM. 승리·패배 연출 동안은 보스 BGM 유지(씬 전환이 바꾼다).</summary>
+    private void HandlePhaseBgm(BossEncounterPhase previous, BossEncounterPhase next)
+    {
+        SceneBgmSwitcher bgm = SceneBgmSwitcher.Instance;
+        if (bgm == null || previous == next && next != BossEncounterPhase.Combat) return;
+
+        if (next == BossEncounterPhase.Combat) bgm.PlayOverride(BossBgmKey);
+        else if (next == BossEncounterPhase.Idle && previous != BossEncounterPhase.Idle) bgm.RestoreSceneBgm();
+    }
+
     public override void OnNetworkDespawn()
     {
+        phase.OnValueChanged -= HandlePhaseBgm;
+
         // 씬 전환 중 콜백이 남으면 사라진 오브젝트를 만지게 된다 — 반드시 대칭 해제.
         if (_teleportManager != null)
         {

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using static EffectCatalog;
 using static EffectHitPoint;
 
 /// <summary>
@@ -30,13 +29,10 @@ public static class HitVFXPlayback
     /// <param name="hitVFXCollider">피격자 표면. 비어 있으면 경고 1회 후 조용히 건너뛴다.</param>
     /// <param name="sourcePosition">공격자 위치(서버가 RPC로 넘겨준 값).</param>
     /// <remarks>
-    /// <c>hitPointMode</c>는 인자로 받지 않는다 — 전 유닛 공통이라 <see cref="EffectManager"/>가
-    /// 들고 있고 여기서 직접 읽는다. 반면 <paramref name="hitVFXType"/>은 유닛마다 다를 수 있어
-    /// 호출자가 넘긴다(디버그 오버라이드는 <c>GetHitEffect</c> 안에서 적용된다).
+    /// 이펙트(<see cref="EffectManager.HitEffect"/>)와 <c>hitPointMode</c>는 인자로 받지 않는다 —
+    /// 둘 다 전 유닛 공통(일반 몹·보스 같음)이라 <see cref="EffectManager"/>에서 직접 읽는다.
     /// </remarks>
-    public static void Play(
-        Component context, Collider hitVFXCollider,
-        HitVFXType hitVFXType, Vector3 sourcePosition)
+    public static void Play(Component context, Collider hitVFXCollider, Vector3 sourcePosition)
     {
         if (EffectManager.Instance == null) return;
 
@@ -53,8 +49,7 @@ public static class HitVFXPlayback
             return;
         }
 
-        // ⚠️ 엔트리를 캐시하지 말 것 — 매번 물어봐야 디버그 HUD의 런타임 교체가 다음 피격부터 반영된다.
-        EffectEntry entry = EffectManager.Instance.GetHitEffect(hitVFXType);
+        EffectEntry entry = EffectManager.Instance.HitEffect;
         if (entry == null) return;
 
         HitPointInfo hitPointInfo = new HitPointInfo(

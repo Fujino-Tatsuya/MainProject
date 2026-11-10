@@ -54,7 +54,7 @@
 | Main | `smashLoop`·`trailLoop` → 같은 이름 | `OnClientPlay` `BeginSmashHold` / `OnEnd` `EndSmashHold` |
 | Sub | `shieldGlow` → `shieldGlow` · `barrierLoop`·`auraLoop`·`chargeLoop` → `guardBarrierLoop`·`guardAuraLoop`·`guardChargeLoop` | `OnClientPlay` `BeginGuardVfx` / `OnEnd` `EndGuardVfx` |
 | Interrupt | `shieldGlow`(Sub 와 같은 컴포넌트 → 한 칸) · `glowLoop`·`chargeLoop` → `interruptGlowLoop`·`interruptChargeLoop` | B1 `PlayCue`(디렉터가 스킬을 sink 로 되부름 — 메서드는 스킬에 남김) → `BeginInterruptGlow` / `OnEnd` `EndInterruptVfx` |
-| Ultimate | `superArmorOverlay`·`stickVfx` → 같은 이름 | `ShowSuperArmor`·`HideSuperArmor`·`SetStickPlayRate` |
+| Ultimate | `stickVfx` → 같은 이름 (`superArmorOverlay` 는 2026-11-09 삭제 — 아래 절) | `SetStickPlayRate` |
 | Passive | `bladeGlow` → 같은 이름 · `additionalHit*` 5칸 → `passiveHit*` · `ProcVfxRpc` → `PassiveProcRpc` | 버프 엣지 `SetBladeGlow(bool)` · 발동 `ServerPlayPassiveProc(target, healed > 0)` |
 - **은희 영역**: `FirstMelee*` 5개는 연출 호출만 바뀌었다. 판정·타이밍·데이터 무변경. 패시브의 데이터 테이블 열(`[DataTableIgnore]` 연출 배율)은 원래 시트에 없던 칸이라 시트 영향 없음.
 - 프리팹: 값을 그대로 옮겼다(점검 스크립트로 27칸·스킬 5개 `skillView` 확인). 레거시 프리팹(`Paladin_VFX`·`Legacy/Paladin`)은 칸이 비게 된다(스폰 안 됨).
@@ -74,3 +74,10 @@
 ## SVN / git
 - SVN: `Shared/Shield/`(이동분 — 옛 `Players/Shield/` 삭제 + 금색 4종 `Player1/ESkill/` → 이동) 커밋.
 - git: `Effects/PlayerShieldVfxSet.cs`(+meta) · `Player/PlayerShieldVfx.cs` · `9.ScriptableObject/Effects/PlayerShieldVfxSet.asset`(+meta) · `Player_Paladin/Gunner/Assassin.prefab` · `0.Scenes/Debug/DebugTraitLab.unity` · 문서.
+
+## 팔라딘 R 슈퍼아머 오버레이 제거 (2026-11-09 민경)
+- **슈퍼아머 기능은 그대로** — `FirstMeleeUltimateSkill` 의 `StatusEffects` 추가(OnServerStart)·제거(OnEnd)는 손대지 않았다. 몸에 덮이던 푸른 육각 막(연출)만 뺐다.
+- 코드: `FirstMeleeUltimateSkill.OnClientPlay`·`OnEnd` 의 `ShowSuperArmor`/`HideSuperArmor` 호출, `PaladinSkillView` 의 `superArmorOverlay` 칸과 두 메서드 삭제.
+- 프리팹: `Paladin_Armature`·`Paladin_VFX`(보관) 의 `tripo_part_0` 에서 `DissolveOverlay` 컴포넌트와 Materials 1번 칸 삭제, `Player_Paladin`·`Legacy/Paladin` 의 `superArmorOverlay` 줄 삭제.
+- 머티리얼: `50.Art/VFX/Common/Players/Player1/RSkill/HexOverlay.mat`(+meta) 삭제(SVN). 쓰던 텍스처 `VFX/Textures/HexShield.png` 는 다른 사용처가 없지만 남겨 두었다.
+- **남긴 것**: 셰이더 `VFX/DissolveOverlay` 와 컴포넌트 `DissolveOverlay` — 몬스터 카운터 창(`Interrupt.mat` · 23호·Gauntlet·Spinner·Wall)이 쓴다.

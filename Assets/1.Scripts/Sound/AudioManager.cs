@@ -18,6 +18,14 @@ public class AudioManager : MonoBehaviour
     [Tooltip("모든 SoundID를 모아둔 SoundCatalog 에셋")]
     [SerializeField] private SoundCatalog catalog;
 
+    [Header("플레이어 소리 (PLAN-sound-mix Q6)")]
+    [Tooltip("다른 플레이어의 스킬·공격·발소리·대시 볼륨 배율. 내 소리는 1. 팀 합의 11-09 = 0.3")]
+    [SerializeField, Range(0f, 1f)] private float remotePlayerVolume = 0.3f;
+    [Tooltip("이 접두사로 시작하는 키는 '플레이어 소리'로 본다 — 주인을 모르는 VFX 원샷은 재생 위치에서 가장 가까운 플레이어로 주인을 판정한다")]
+    [SerializeField] private string[] playerSoundKeyPrefixes = { "S1_Paladin", "S1_Gunner", "S1_Assassin" };
+    [Tooltip("위치로 주인을 찾을 때 플레이어까지 허용 거리(m). 이 안에 내 캐릭터가 있으면 내 소리로 본다")]
+    [SerializeField, Min(0f)] private float ownerSearchRadius = 2f;
+
     [Header("BGM")]
     [SerializeField] private Transition bgmTransition = Transition.CrossFade;
     [Tooltip("BGM 페이드 인 / 크로스페이드 시간(초)")]
@@ -31,6 +39,8 @@ public class AudioManager : MonoBehaviour
     private readonly SoundPlaybackLimiter _playbackLimiter = new SoundPlaybackLimiter();
     private SoundCatalogLookup _catalogLookup;
     private SoundCatalog _lookupSource;
+    // VFX 소리(SoundID 직접 재생)를 시트 키로 되찾는 역조회 — SoundID 동등성 = 엔티티 참조(PLAN-sound-mix 1단계)
+    private readonly Dictionary<SoundID, SoundEntry> _entryById = new Dictionary<SoundID, SoundEntry>();
 
     private void Awake()
     {
@@ -99,7 +109,21 @@ public class AudioManager : MonoBehaviour
         return PlayEntry(entry, entry.Is3D ? worldPos : (Vector3?)null);
     }
 
-    /// <summary>위치 무관(2D/전역) 사운드를 한 번 재생한다.</summary>
+    /// <summary>
+    /// 주인이 있는 소리(발소리·대시·스킬). <paramref name="source"/> 가 다른 플레이어 소유면
+    /// <see cref="remotePlayerVolume"/> 을 곱한다(PLAN-sound-mix Q6).
+    /// </summary>
+    public IAudioPlayer Play(string key, Vector3 worldPos, Component source)
+    {
+        if (!TryGetEntry(key, out SoundEntry entry))
+        {
+            return null;
+        }
+
+        return PlayEntry(entry, entry.Is3D ? worldPos : (Vector3?)null, VolumeForSource(source));
+    }
+
+    /// <summary>위치 무관(2D/전역) 사운드를 한 번 재생한다. 카탈로그에 있으면 시트 설정을 적용한다.</summary>
     public IAudioPlayer PlayOneShot(SoundID id)
     {
         if (!id.IsValid())
@@ -107,21 +131,110 @@ public class AudioManager : MonoBehaviour
             Edit.LogWarning($"[AudioManager] 유효하지 않은 SoundID 재생 시도. ({id})");
             return null;
         }
+
+        if (TryGetEntry(id, out SoundEntry entry))
+        {
+            if (entry.Is3D)
+            {
+                Edit.LogWarning($"[AudioManager] 3D 사운드 '{entry.Key}'를 위치 없이 재생 — 2D 로 낸다.", this);
+            }
+            return PlayEntry(entry, null);
+        }
+
         return BroAudio.Play(id);
     }
 
-    /// <summary>월드 좌표에서 3D 사운드를 한 번 재생한다.</summary>
-    public IAudioPlayer PlayOneShot(SoundID id, Vector3 worldPos)
+    /// <summary>월드 좌표에서 3D 사운드를 한 번 재생한다. 카탈로그에 있으면 시트 설정을 적용한다.</summary>
+    public IAudioPlayer PlayOneShot(SoundID id, Vector3 worldPos) => PlayOneShot(id, worldPos, null);
+
+    /// <summary>
+    /// VFX 소리 재생 창구(<c>EffectManager.Fire</c>). 카탈로그에 있으면 시트의 볼륨·동시 수·3D 거리·피치를 적용하고,
+    /// 플레이어 소리면 주인 판정으로 다른 플레이어 배율을 곱한다. <paramref name="sourceHint"/> = 따라가는 대상(소켓 루프) — 없으면 위치로 찾는다.
+    /// 카탈로그에 없는 SoundID 는 예전처럼 BroAudio 로 바로 낸다.
+    /// </summary>
+    public IAudioPlayer PlayOneShot(SoundID id, Vector3 worldPos, Transform sourceHint)
     {
         if (!id.IsValid())
         {
             Edit.LogWarning($"[AudioManager] 유효하지 않은 SoundID 재생 시도. ({id})");
             return null;
         }
-        return BroAudio.Play(id, worldPos);
+
+        if (!TryGetEntry(id, out SoundEntry entry))
+        {
+            return BroAudio.Play(id, worldPos);
+        }
+
+        float scale = 1f;
+        if (IsPlayerSoundKey(entry.Key))
+        {
+            Player owner = sourceHint != null ? sourceHint.GetComponentInParent<Player>() : null;
+            if (owner == null)
+            {
+                // 위치만 아는 원샷 — 가장 가까운 플레이어가 주인. 내 캐릭터가 반경 안이면 내 소리로 본다(겹쳐 서 있을 때 100%).
+                Player nearest = PlayerSoundRegistry.Nearest(worldPos, ownerSearchRadius, out bool localIsNear);
+                if (!localIsNear) owner = nearest;
+            }
+            scale = VolumeForPlayer(owner);
+        }
+
+        return PlayEntry(entry, entry.Is3D ? worldPos : (Vector3?)null, scale);
     }
 
-    private IAudioPlayer PlayEntry(SoundEntry entry, Vector3? worldPos)
+    /// <summary>
+    /// 이 키로 재생 중인 소리를 전부 끈다(이 피어). 패턴이 끊길 때(카운터·그로기·사망) 남는 공격 소리 정리용.
+    /// 동시 수 제한은 Stop → OnEnd 가 반납한다.
+    /// </summary>
+    public void StopKey(string key, float fadeOut = 0.1f)
+    {
+        if (TryGetSound(key, out SoundID id)) BroAudio.Stop(id, fadeOut);
+    }
+
+    /// <summary>키의 SoundID(BGM 전환 캐시 등). 없으면 false — 경고는 내지 않는다.</summary>
+    public bool TryGetSound(string key, out SoundID id)
+    {
+        id = SoundID.Invalid;
+        if (catalog == null || string.IsNullOrEmpty(key)) return false;
+        if (_catalogLookup == null || _lookupSource != catalog) RebuildCatalogLookup();
+        if (!_catalogLookup.TryGet(key, out SoundEntry entry) || !entry.Sound.IsValid()) return false;
+        id = entry.Sound;
+        return true;
+    }
+
+    /// <summary><paramref name="source"/> 의 부모 플레이어가 원격이면 <see cref="remotePlayerVolume"/>, 아니면 1.</summary>
+    public float VolumeForSource(Component source) =>
+        VolumeForPlayer(source != null ? source.GetComponentInParent<Player>() : null);
+
+    private float VolumeForPlayer(Player player)
+    {
+        // 오프라인(스폰 전·비네트워크 테스트)이나 내 캐릭터는 1. 스폰된 남의 캐릭터만 줄인다.
+        if (player == null || !player.IsSpawned || player.IsOwner) return 1f;
+        return remotePlayerVolume;
+    }
+
+    private bool IsPlayerSoundKey(string key)
+    {
+        if (string.IsNullOrEmpty(key) || playerSoundKeyPrefixes == null) return false;
+        for (int i = 0; i < playerSoundKeyPrefixes.Length; i++)
+        {
+            string prefix = playerSoundKeyPrefixes[i];
+            if (!string.IsNullOrEmpty(prefix) && key.StartsWith(prefix, System.StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    private bool TryGetEntry(SoundID id, out SoundEntry entry)
+    {
+        entry = null;
+        if (catalog == null) return false;
+        if (_catalogLookup == null || _lookupSource != catalog)
+        {
+            RebuildCatalogLookup();
+        }
+        return _entryById.TryGetValue(id, out entry);
+    }
+
+    private IAudioPlayer PlayEntry(SoundEntry entry, Vector3? worldPos, float volumeScale = 1f)
     {
         string key = entry.Key;
         if (!entry.Sound.IsValid())
@@ -149,20 +262,32 @@ public class AudioManager : MonoBehaviour
             return null;
         }
 
-        // SetVolume은 BroAudio의 track 배율이라 엔티티/클립 볼륨을 보존한 채 곱해진다.
-        player.SetVolume(entry.VolumeMultiplier * RandomMultiplier(entry.VolumeRandomMin, entry.VolumeRandomMax));
+        // 반납 예약은 재생기를 얻은 즉시 — 아래 설정이 실패해도 동시 수가 새지 않는다.
+        player.OnEnd(_ => _playbackLimiter.Release(key));
 
-        // Play가 반환될 때는 엔티티 피치 랜덤화까지 AudioSource에 반영돼 있으므로 그 값에 배율을 곱한다.
+        // SetVolume은 BroAudio의 track 배율이라 엔티티/클립 볼륨을 보존한 채 곱해진다. 1 초과도 믹서에서 증폭된다(+20dB까지).
+        player.SetVolume(entry.VolumeMultiplier * RandomMultiplier(entry.VolumeRandomMin, entry.VolumeRandomMax) * volumeScale);
+
+        // 🔴 피치·거리는 OnStart 에서 — BroAudio 재생은 큐에 들어갔다 LateUpdate 에 시작하며, 그때 엔티티 피치(SetInitialPitch)와
+        //    공간 설정(SetSpatial)을 덮어쓴다. 여기서 바로 넣으면 지워진다(Codex 교차검증 11-09, AudioPlayer.Playback.cs 114·115 → 169).
         float pitchMultiplier = entry.PitchMultiplier * RandomMultiplier(entry.PitchRandomMin, entry.PitchRandomMax);
-        player.SetPitch(player.AudioSource.pitch * pitchMultiplier);
-
-        if (entry.Is3D)
+        bool is3D = entry.Is3D && worldPos.HasValue;
+        if (!Mathf.Approximately(pitchMultiplier, 1f) || is3D)
         {
-            player.AudioSource.minDistance = entry.MinDistance;
-            player.AudioSource.maxDistance = Mathf.Max(entry.MinDistance, entry.MaxDistance);
+            float minDistance = entry.MinDistance;
+            float maxDistance = Mathf.Max(entry.MinDistance, entry.MaxDistance);
+            player.OnStart(p =>
+            {
+                if (p == null || !p.IsActive) return;
+                if (!Mathf.Approximately(pitchMultiplier, 1f)) p.SetPitch(p.AudioSource.pitch * pitchMultiplier);
+                if (is3D)
+                {
+                    p.AudioSource.minDistance = minDistance;
+                    p.AudioSource.maxDistance = maxDistance;
+                }
+            });
         }
 
-        player.OnEnd(_ => _playbackLimiter.Release(key));
         return player;
     }
 
@@ -208,6 +333,18 @@ public class AudioManager : MonoBehaviour
         foreach (string duplicate in _catalogLookup.DuplicateKeys)
         {
             Edit.LogWarning($"[AudioManager] SoundCatalog 키 '{duplicate}'가 중복되어 첫 엔트리만 사용합니다.", catalog);
+        }
+
+        _entryById.Clear();
+        foreach (SoundEntry entry in catalog.Entries)
+        {
+            if (entry == null || !entry.Sound.IsValid() || string.IsNullOrEmpty(entry.Key)) continue;
+            if (_entryById.TryGetValue(entry.Sound, out SoundEntry existing))
+            {
+                Edit.LogWarning($"[AudioManager] 엔티티 하나를 키 '{existing.Key}'·'{entry.Key}'가 같이 쓴다 — VFX 소리는 '{existing.Key}' 설정을 쓴다.", catalog);
+                continue;
+            }
+            _entryById.Add(entry.Sound, entry);
         }
     }
 

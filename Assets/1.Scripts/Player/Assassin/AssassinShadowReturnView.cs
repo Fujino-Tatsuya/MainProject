@@ -8,7 +8,10 @@ using UnityEngine;
 /// - 복귀 돌진이 시작되면(그 피어의 복귀 단계가 출발점을 가져감) <see cref="fadeOutReturn"/> 로, 칸이 그냥 닫히면(만료·R·사망) <see cref="fadeOutExpire"/> 로 사라진다.
 /// - 남은 시간은 복제되지 않아 근사한다 — 창 시작 = 칸 열림 + 첫 돌진 시간(준비 + 거리/속도), 길이 = 원래 Q 의 창 길이.
 ///   마지막 <see cref="warnTime"/>초는 흐려지며 깜빡인다.
-/// 페이드는 표식 재질 <c>_BaseColor</c> 알파에 배율을 곱한다(MaterialPropertyBlock). 비어 있는 칸은 연출이 빠진다.
+/// 페이드는 표식 <b>메시</b> 재질 <c>_BaseColor</c> 알파에 배율을 곱한다(MaterialPropertyBlock). 비어 있는 칸은 연출이 빠진다.
+/// 단검 림(<c>Mesh/Rim</c>, <c>VFX/RimOverlay</c>)은 <c>_BaseColor</c> 가 없어 같은 배율을 <c>_Fade</c> 로 받는다(다른 재질엔 무시되는 값).
+/// 검은 오러(파티클, 2026-11-09 민경 — PLAN.md 「그림자 회귀 표식에 검은 오러」)는 그 페이드·깜빡임에서 빠진다 —
+/// 표식이 나오면 방출로 차오르고, 사라질 때 방출만 멈춰 남은 연기가 흩어진 뒤 표식을 파괴한다.
 /// </summary>
 public sealed class AssassinShadowReturnView : MonoBehaviour
 {
@@ -30,11 +33,13 @@ public sealed class AssassinShadowReturnView : MonoBehaviour
     [SerializeField, Min(0f)] private float dashPrepare = 0.1f;
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+    private static readonly int FadeId = Shader.PropertyToID("_Fade");
 
     private PlayerSkillController controller;
     private Player owner;
     private AssassinDashStrikeSkill source;   // 지금 보이는 표식을 연 원래 Q
     private GameObject marker;
+    private ParticleSystem[] markerParticles;   // 검은 오러 — 메시 페이드에서 빠지고 방출 정지로 사라진다
     private MaterialPropertyBlock block;
     private float alpha, target, fadeLength;
     private float windowEnd = -1f;
@@ -54,6 +59,7 @@ public sealed class AssassinShadowReturnView : MonoBehaviour
         if (marker != null)
             Destroy(marker);
         marker = null;
+        markerParticles = null;
         shown = hidden = false;
         source = null;
         alpha = target = 0f;
@@ -103,6 +109,7 @@ public sealed class AssassinShadowReturnView : MonoBehaviour
         if (marker != null)
             Destroy(marker);
         marker = markerPrefab != null ? Instantiate(markerPrefab, origin, rotation) : null;
+        markerParticles = marker != null ? marker.GetComponentsInChildren<ParticleSystem>(true) : null;
 
         AssassinDashStrikeSkillData data = dash.DashData;
         float dashTime = dashPrepare + (data != null ? data.DashDuration : 0f);
@@ -119,6 +126,11 @@ public sealed class AssassinShadowReturnView : MonoBehaviour
         windowEnd = -1f;
         target = 0f;
         fadeLength = length;
+
+        // 오러는 방출만 멈춘다 — 이미 나온 연기는 자기 수명대로 흩어진다.
+        if (markerParticles != null)
+            foreach (ParticleSystem ps in markerParticles)
+                if (ps != null) ps.Stop(false, ParticleSystemStopBehavior.StopEmitting);
     }
 
     private void TickMarker()
@@ -128,11 +140,23 @@ public sealed class AssassinShadowReturnView : MonoBehaviour
         if (!Mathf.Approximately(alpha, target))
             alpha = fadeLength <= 0f ? target : Mathf.MoveTowards(alpha, target, Time.deltaTime / fadeLength);
         Apply();
-        if (alpha <= 0f && target <= 0f)
+        // 메시가 다 흐려지고 남은 오러 입자도 다 흩어졌을 때 파괴한다.
+        if (alpha <= 0f && target <= 0f && !AnyParticleAlive())
         {
             Destroy(marker);
             marker = null;
+            markerParticles = null;
         }
+    }
+
+    private bool AnyParticleAlive()
+    {
+        if (markerParticles == null)
+            return false;
+        foreach (ParticleSystem ps in markerParticles)
+            if (ps != null && ps.IsAlive(false))
+                return true;
+        return false;
     }
 
     private void Apply()
@@ -144,11 +168,14 @@ public sealed class AssassinShadowReturnView : MonoBehaviour
         block ??= new MaterialPropertyBlock();
         foreach (Renderer r in marker.GetComponentsInChildren<Renderer>(true))
         {
+            if (r is ParticleSystemRenderer)
+                continue;   // 오러 — 페이드·깜빡임·렌더러 끄기 없음(방출 정지로 사라진다)
             Material m = r.sharedMaterial;
             Color c = m != null && m.HasProperty(BaseColorId) ? m.GetColor(BaseColorId) : Color.white;
             c.a *= k;
             r.GetPropertyBlock(block);
             block.SetColor(BaseColorId, c);
+            block.SetFloat(FadeId, k);   // 림(VFX/RimOverlay)은 _BaseColor 가 없고 _Fade 로 흐려진다
             r.SetPropertyBlock(block);
             r.enabled = k > 0.001f;
         }

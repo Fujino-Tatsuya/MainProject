@@ -3198,6 +3198,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         //    사망으로 끊기면 궤적과 보호막이 safetyTimeout(5초)까지 보스에 남는다.
         if (IsSpawned) StopDashTrailClientRpc();
         if (IsSpawned) StopNormalShieldClientRpc();
+        // 패턴이 끊기면 공격 소리도 끊는다(11-09 경석 Play — 카운터·취약으로 끊겨도 돌진·잡기 소리가 남았다).
+        if (IsSpawned) StopAttackSoundsClientRpc();
 
         // 자기장은 시작만 코드고 종료는 클립 이벤트다 — 여기는 그 종료 이벤트를
         // 지나가지 못한 경우(카운터·그로기·사망·타임아웃)의 비상 정지만 한다.
@@ -4157,6 +4159,19 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// 부르는 곳은 둘뿐이다 — <c>FinishChain</c>(정상) · <c>AbortAttackChain</c>(그 외 전부).
     /// 일반 돌진과 레이지가 같은 길목으로 끝나므로 이 한 쌍이 두 공격을 다 덮는다.
     /// </summary>
+    // 공격 상태를 벗어날 때(AbortAttackChain — 정상 종료·카운터·그로기·사망 모두) 끊을 23호 공격 소리.
+    // 착지·던지기 착지·펀치 같은 짧은 원샷은 끝 무렵에 나서 잘리면 안 되므로 넣지 않는다. 드론·송전탑은 패턴 밖.
+    static readonly string[] AttackSoundKeys = { "S1_23_Rush", "S1_23_Grab_Electric", "S1_23_Grab_Start", "S1_23_Jump_Start" };
+
+    /// <summary>[전 피어] 끊긴 패턴의 공격 소리를 짧게 페이드하며 끈다. Reliable — 놓치면 소리가 끝까지 남는다.</summary>
+    [ClientRpc]
+    void StopAttackSoundsClientRpc()
+    {
+        AudioManager audio = AudioManager.Instance;
+        if (audio == null) return;
+        for (int i = 0; i < AttackSoundKeys.Length; i++) audio.StopKey(AttackSoundKeys[i], 0.1f);
+    }
+
     [ClientRpc]
     void StopLimbElectricClientRpc()
     {
@@ -4301,6 +4316,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void CrossFadeJumpTakeoffClientRpc()
     {
+        // 점프 시작 소리(PLAN-sound-mix 3단계) — 이륙 연출과 같은 순간, 애니메이터 검사보다 먼저(전 피어).
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("S1_23_Jump_Start", transform.position);
+
         if (animator == null || _boss == null) return;
 
         string state = _boss.jumpTakeoffState;
@@ -6564,6 +6582,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     }
 
     // 벽·벤트 공통. 칸 −1 → 0 이면 제압, 아니면 일반 복귀(취약만 끝).
+    /// <summary>[전 피어] 취약 넉백으로 외곽 벽에 닿은 순간 소리(키 = Sound 시트 S1_Interrupt_Wall).</summary>
+    [ClientRpc]
+    void PlayVulnerableWallSoundClientRpc(Vector3 point)
+    {
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("S1_Interrupt_Wall", point);
+    }
+
     void ApplyEnvironmentInteraction(string reason)
     {
         int step = _boss != null ? _boss.environmentSegmentStep : 1;
@@ -6669,6 +6694,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         {
             _environmentConsumed = true;
             ApplyEnvironmentInteraction("외곽 벽 충돌");
+            // 간파 벽 소리(11-09 경석 — 취약 보스를 간파·CC 로 밀어 벽에 닿게 했을 때). 서버 판정이라 전 피어 RPC.
+            PlayVulnerableWallSoundClientRpc(transform.position + delta);
             // 방 안쪽으로 0.5m / 0.3초 반동(§6.2). 제압으로 넘어갔어도 반동 이동은 마친다.
             _kbRebound = true;
             _kbDir = -_kbDir;
@@ -6809,7 +6836,13 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                   "(목표 ≈1.5 · 몸 반경 초과 시 취약 벽 판정 불가)", this);
     }
 
-    void OnVulnerableVisualChanged(bool previous, bool next) => ApplyVulnerableTint(next);
+    void OnVulnerableVisualChanged(bool previous, bool next)
+    {
+        ApplyVulnerableTint(next);
+        // 취약 진입 소리(PLAN-sound-mix 3단계) — 복제값 변경이라 전 피어. 최초 스냅샷은 OnValueChanged 가 안 불려 입장 때 안 난다.
+        if (!previous && next && AudioManager.Instance != null)
+            AudioManager.Instance.Play("S1_23_Vulnerable", transform.position);
+    }
 
     // 임시 표시(코드 틴트) — 최종 VFX 는 민경(D10). HitFlash 는 Unit 이 전 피어에서 자동으로 붙인다.
     void ApplyVulnerableTint(bool on)

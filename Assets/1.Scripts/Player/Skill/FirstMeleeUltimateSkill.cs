@@ -110,11 +110,6 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     //    그래서 시작은 OnOwnerAimStart 로 올라가 있고, 여기는 시전 고유 연출 자리로 비워 둔다.
     public override void OnClientPlay(Vector3 direction)
     {
-        // 🔴 RPC 가 필요 없다. 슈퍼아머를 거는 것은 OnServerStart(서버 전용)지만,
-        //    그 '구간'은 스킬이 활성인 동안 그 자체라 OnClientPlay~OnEnd 로 정확히 같은 창을 그린다.
-        //    두 콜백 모두 전 피어에서 돈다.
-        skillView?.ShowSuperArmor();
-
         // 🔴 여기도 전 피어다(서버는 TryStartSkillServer, 클라는 PlaySkillClientRpc → PlaySkillPresentation).
         //    방금 CrossFade 한 같은 프레임이라 첫 프레임부터 이 속도로 돈다. 원격 피어도 각자 같은 값을 넣는다.
         //    Animator 는 시전마다 찾는다 — 캐릭터 교체로 Armature 가 바뀔 수 있다.
@@ -225,11 +220,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)
-            owner.StatusEffects.Remove(StatusEffectType.SuperArmor, SourceId);
-
-        // 🔴 종료 사유를 가리지 않는다 — 취소·사망·안전망 만료 어느 쪽으로 끝나도 오버레이가 남지 않는다.
-        skillView?.HideSuperArmor();
-    }
+            owner.StatusEffects.Remove(StatusEffectType.SuperArmor, SourceId);    }
 
     // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.
     private float AnimationSpeed => Data is FirstMeleeUltimateSkillData ult ? ult.AnimationSpeed : 1f;

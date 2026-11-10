@@ -22,16 +22,10 @@ public class EffectCatalog : ScriptableObject
 {
     // ── 공용 ────────────────────────────────────────────────────────────
 
-    [Header("공용 — 피격 슬롯")]
-    // 🔴 이름을 내용으로 바꾸지 말 것(Hit_Flash 등). 이 다섯은 "무엇이 나오는가"가 아니라
-    // "몇 번 슬롯인가"다 — HitVFXType 열거형과 1:1이고, 몹 프리팹은 그 값을 정수(hitVFXType: 1)로
-    // 직렬화해 들고 있다. 슬롯에 다른 이펙트를 꽂는 순간 내용 기반 이름은 거짓말이 된다.
-    // 지금 무엇이 꽂혀 있는지는 F2 디버그 HUD(HitVFXDebugHUD)로 런타임에 돌려 보면 된다.
-    [field: SerializeField] public EffectEntry HitEffect1 { get; private set; }
-    [field: SerializeField] public EffectEntry HitEffect2 { get; private set; }
-    [field: SerializeField] public EffectEntry HitEffect3 { get; private set; }
-    [field: SerializeField] public EffectEntry HitEffect4 { get; private set; }
-    [field: SerializeField] public EffectEntry HitEffect5 { get; private set; }
+    [Header("공용 — 피격")]
+    // 일반 몹·보스 공통 피격 이펙트 하나(2026-11-06). 예전의 슬롯 5개(HitEffect1~5)·몹별 hitVFXType·
+    // F1 런타임 교체는 삭제했다. 재생 위치는 HitVFXPlayback(타격점 방식 = EffectManager.HitPointMode).
+    [field: SerializeField] public EffectEntry HitEffect { get; private set; }
 
     // ── 플레이어 ────────────────────────────────────────────────────────
     // 전부 Paladin_VFX 프리팹이 EffectSocketPlayer / 직접 참조로 물고 있다. 코드 룩업은 쓰지 않지만
@@ -266,38 +260,6 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Frag_PalletStack_02 { get; private set; }
 
     private List<EffectEntry> _all;
-    // 피격 이펙트 테스트용 enum
-    public enum HitVFXType
-    {
-        HitEffect1,
-        HitEffect2,
-        HitEffect3,
-        HitEffect4,
-        HitEffect5
-    }
-
-    public EffectEntry GetHitEffect(HitVFXType hitVFX)
-    {
-        EffectEntry effectEntry = HitEffect1;
-        switch (hitVFX)
-        {
-            case HitVFXType.HitEffect1:
-                break;
-            case HitVFXType.HitEffect2:
-                effectEntry = HitEffect2;
-                break;
-            case HitVFXType.HitEffect3:
-                effectEntry = HitEffect3;
-                break;
-            case HitVFXType.HitEffect4:
-                effectEntry = HitEffect4;
-                break;
-            case HitVFXType.HitEffect5:
-                effectEntry = HitEffect5;
-                break;
-        }
-        return effectEntry;
-    }
 
     /// <summary>
     /// 이 카탈로그가 들고 있는 모든 엔트리(중복·null 제거). 프리워밍이 이 목록을 쓴다.

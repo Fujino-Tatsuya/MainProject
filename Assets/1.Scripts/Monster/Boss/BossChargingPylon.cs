@@ -173,6 +173,14 @@ public class BossChargingPylon : Unit
         _state = PylonState.Rising;
         SetColliderEnabled(false);
         _outlined.Value = false;   // 올라오는 동안은 맞지 않는다 — 다 올라온 뒤에 켠다
+        PlayRiseSoundRpc();
+    }
+
+    /// <summary>송전탑 상승 소리(PLAN-sound-mix 3단계). 상승 시작은 서버만 알아서 전 피어 RPC 1개.</summary>
+    [Rpc(SendTo.ClientsAndHost)]
+    void PlayRiseSoundRpc()
+    {
+        if (AudioManager.Instance != null) AudioManager.Instance.Play("S1_23_Pylon_Up", transform.position);
     }
 
     /// <summary>서버 전용·멱등. 어느 상태에서든 숨김 위치로 되돌린다.</summary>

@@ -26,6 +26,13 @@ public sealed class DebugZeroCooldown : MonoBehaviour
     [Tooltip("Q·E·R 쿨 0 — 특성 랩용. 간파 랩은 끈다(기본).")]
     [SerializeField] bool skills;
 
+    /// <summary>Q·E·R 쿨 0 켜고 끄기 — 대시 관통 랩 패널 토글(할 일 243). 끄면 평소 쿨(남은 쿨은 그대로 흐른다).</summary>
+    public bool Skills
+    {
+        get => skills;
+        set => skills = value;
+    }
+
     void OnEnable() => PlayerDashController.ServerDashApproved += HandleDashApprovedServer;
 
     void OnDisable() => PlayerDashController.ServerDashApproved -= HandleDashApprovedServer;

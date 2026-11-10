@@ -3583,7 +3583,6 @@ MonoBehaviour:
   data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
   hitboxAnchor: {fileID: 0}
   skillVfx: {fileID: 0}
-  superArmorOverlay: {fileID: 0}
 --- !u!114 &6032877627005329180
 MonoBehaviour:
   m_ObjectHideFlags: 0

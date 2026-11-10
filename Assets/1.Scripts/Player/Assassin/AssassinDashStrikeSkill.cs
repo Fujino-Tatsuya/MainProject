@@ -49,6 +49,10 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
     private float serverCap;
     private bool isServerDashPending; // 승인 ~ Custom0(준비)
     private bool isServerSweeping;    // Custom0 ~ 경로 끝
+    private bool isServerEndHeld;     // 243: 클립 End 가 왔지만 경로가 남아 종료를 미룸(HoldsEndUntilPathDone)
+    private float serverHeldEndAt;    // 243: 미룬 종료 시각 = 경로 끝 + HeldEndGrace (0 = 아직 경로 중)
+    // 243: 미룬 종료는 서버 경로 끝에서 이만큼 더 기다린다 — 원격 오너 이동(승인 RTT/2 늦게 출발)이 종료 도착 전에 끝나게 하는 여유(데이터 칸 아님).
+    private const float HeldEndGrace = 0.1f;
     private bool hasSuperArmor;
     // 이 돌진 단계의 기준 피해 — 출발 = 시전 Dref, 복귀 = 복귀 실행 때 Dref × 비율. 경로 판정과 그 단계 궤적이 같이 쓴다.
     private int serverStageDref;
@@ -78,7 +82,7 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
     // 돌진 거리·시간은 고정(할 일 91 D7) — 클립만 빨라지면 End 가 이동보다 먼저 와 돌진이 잘린다.
     public override bool ScalesWithAttackSpeed => false;
 
-    // 돌진 설계값 — 복귀 스킬은 자기를 연 원래 Q 의 값(현재 Q 최대 거리·속도·폭)을 쓴다.
+    // 돌진 설계값 — 복귀 스킬은 자기를 연 원래 Q 의 값(속도·폭)을 쓴다. 복귀 거리는 출발점까지(243 — 사거리 제한 없음).
     internal virtual AssassinDashStrikeSkillData DashData => Data as AssassinDashStrikeSkillData;
     internal AssassinDashHitLedger Ledger => ledger;
     internal AssassinShadowReturnOrigin ServerReturnOrigin => serverReturnOrigin;
@@ -165,6 +169,12 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
             localReturnOrigin.Save(owner.transform.position);
     }
 
+    /// <summary>
+    /// 클립 End 가 와도 서버 경로가 남았으면 경로 끝까지 마친 뒤 종료하는가. 출발 Q = false(거리 고정이라 End 전에 끝난다),
+    /// 그림자 회귀 = true(할 일 243 — 출발점까지 거리 제한 없음, 경로가 End 보다 길 수 있다). 안전망은 컨트롤러(클립 길이 + padding).
+    /// </summary>
+    protected virtual bool HoldsEndUntilPathDone => false;
+
     // 변신 Q 적중 쿨 차감을 받을 스킬 — 복귀 단계는 원래 Q.
     protected virtual PlayerSkillBase CooldownRewardSkill => this;
 
@@ -209,6 +219,16 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
 
     public override void OnTick()
     {
+        // 243: 미룬 종료(그림자 회귀 긴 경로) — 경로 끝 + 여유가 지나면 마친다.
+        if (isServerEndHeld && !isServerSweeping)
+        {
+            if (serverHeldEndAt <= 0f)
+                serverHeldEndAt = Time.time + HeldEndGrace;
+            if (Time.time >= serverHeldEndAt)
+                CompleteServerStage();
+            return;
+        }
+
         if (!isServerSweeping)
             return;
 
@@ -218,7 +238,12 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
 
         // 경로 끝 — 이후 종료 단계는 제자리(궤적 이펙트가 늦게 따라와 속도감을 준다). 종료는 클립 End 가 정한다.
         if (serverTraveled >= serverCap)
+        {
             isServerSweeping = false;
+            // 243: End 가 먼저 와서 미뤄 둔 종료 — 경로 끝 + 여유 뒤에 마친다(위 분기).
+            if (isServerEndHeld)
+                serverHeldEndAt = Time.time + HeldEndGrace;
+        }
     }
 
     // 전 피어 — 이 피어 애니메이터의 Custom0 = 준비 끝, 시뮬레이션 피어는 여기서 출발한다(판정 없음).
@@ -228,12 +253,13 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
             isLocalDashReleased = true;
     }
 
-    // 서버 전용 — 오너가 벽에 막혀 멈춘 실제 이동 거리. 0~최대 거리로 검증해 경로 상한만 줄인다(늘리지 않음).
+    // 서버 전용 — 오너가 벽에 막혀 멈춘 실제 이동 거리. 0~지금 경로 상한으로 검증해 상한만 줄인다(늘리지 않음).
+    // 243: 상한 = 이 단계 경로 길이(serverCap — 출발 Q = dashDistance, 그림자 회귀 = 출발점까지). Q 거리로 자르지 않는다.
     public override void OnOwnerResultReported(float value)
     {
         AssassinDashStrikeSkillData data = DashData;
         if ((!isServerSweeping && !isServerDashPending) || data == null ||
-            !AssassinDashStrikeRules.TryValidateReportedDistance(value, data.DashDistance, out float reported))
+            !AssassinDashStrikeRules.TryValidateReportedDistance(value, serverCap, out float reported))
         {
             return;
         }
@@ -257,13 +283,29 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
 
             // 종료. 클립 End 가 경로 끝보다 이르게 튜닝돼도 출발한 경로의 판정은 끝까지 마친다(출발 전이면 훑지 않는다).
             case SkillAnimationEventType.End:
+                // 243: 그림자 회귀는 경로가 남았으면 경로 끝(OnTick)까지 종료를 미룬다 — 이동·판정을 자르지 않는다.
+                if (HoldsEndUntilPathDone && isServerSweeping && serverTraveled < serverCap)
+                {
+                    isServerEndHeld = true;
+                    serverHeldEndAt = 0f;
+                    break;
+                }
+
                 if (isServerSweeping)
                     SweepServerTo(serverCap);
-                // 출발 돌진 단계 정상 종료(벽 앞 정지 포함) — 추격의 궤적. 출발 전이면 이동 0 이라 없다.
-                ServerEndDashStage(SkillEndReason.Completed, serverOrigin, dashDirection, serverTraveled, serverStageDref);
-                EndSelf(SkillEndReason.Completed);
+                CompleteServerStage();
                 break;
         }
+    }
+
+    // [서버] 돌진 단계 정상 종료(벽 앞 정지 포함) — 추격의 궤적 + 스킬 종료. 출발 전이면 이동 0 이라 궤적 없음.
+    private void CompleteServerStage()
+    {
+        isServerEndHeld = false;
+        serverHeldEndAt = 0f;
+        isServerSweeping = false;
+        ServerEndDashStage(SkillEndReason.Completed, serverOrigin, dashDirection, serverTraveled, serverStageDref);
+        EndSelf(SkillEndReason.Completed);
     }
 
     public override void OnEnd(SkillEndReason reason)
@@ -271,6 +313,8 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
         // 사망·강제 종료면 아직 훑지 않은 경로의 타격은 버린다(§12.2-3).
         isServerDashPending = false;
         isServerSweeping = false;
+        isServerEndHeld = false;
+        serverHeldEndAt = 0f;
         StopLocalDash();
         // 전 피어 — 완료·벽 조기 종료·강제 중단 공통
         if (DashData is AssassinTransformedDashStrikeSkillData)

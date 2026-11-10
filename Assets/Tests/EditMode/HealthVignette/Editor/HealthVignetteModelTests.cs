@@ -134,6 +134,34 @@ public sealed class HealthVignetteModelTests
     }
 
     [Test]
+    public void FlashAlpha_DefaultCurveMatchesLinear()
+    {
+        AnimationCurve curve = HealthVignetteModel.DefaultFlashCurve();
+        foreach (float elapsed in new[] { -0.01f, 0f, 0.03f, 0.05f, 0.1f, 0.15f, 0.199f, 0.2f, 1f, float.MaxValue })
+        {
+            Assert.That(HealthVignetteModel.FlashAlpha(elapsed, 0.2f, 0.7f, curve),
+                Is.EqualTo(HealthVignetteModel.FlashAlpha(elapsed, 0.2f, 0.7f)).Within(Tolerance), $"elapsed={elapsed}");
+        }
+        Assert.That(HealthVignetteModel.FlashAlpha(0f, 0f, 0.7f, curve), Is.EqualTo(0f));
+    }
+
+    [Test]
+    public void FlashAlpha_EmptyCurveFallsBackToLinear()
+    {
+        Assert.That(HealthVignetteModel.FlashAlpha(0.1f, 0.2f, 0.7f, null), Is.EqualTo(0.35f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.FlashAlpha(0.1f, 0.2f, 0.7f, new AnimationCurve()), Is.EqualTo(0.35f).Within(Tolerance));
+    }
+
+    [Test]
+    public void FlashAlpha_CustomCurveScalesPeakAndClampsNegative()
+    {
+        // 0.5 지점까지 1 유지 후 -1 로 — 앞 구간은 peak 그대로, 음수 배율은 0 으로 잘림.
+        var hold = new AnimationCurve(new Keyframe(0f, 1f, 0f, 0f), new Keyframe(0.5f, 1f, 0f, 0f), new Keyframe(1f, -1f, 0f, 0f));
+        Assert.That(HealthVignetteModel.FlashAlpha(0.1f, 1f, 0.7f, hold), Is.EqualTo(0.7f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.FlashAlpha(0.99f, 1f, 0.7f, hold), Is.EqualTo(0f));
+    }
+
+    [Test]
     public void Compose_FlashOverridesColorWhileStrongerThanVignette()
     {
         Color composed = HealthVignetteModel.Compose(Color.red, 0.2f, Color.white, 0.8f, 0f);
@@ -148,6 +176,55 @@ public sealed class HealthVignetteModelTests
         Color composed = HealthVignetteModel.Compose(Color.red, 0.4f, Color.white, 0f, 0f);
 
         Assert.That(composed, Is.EqualTo(new Color(1f, 0f, 0f, 0.4f)));
+    }
+
+    // 셰이더 전환 — 기본값(사각 0·보정 0·세기 1)이 옛 방사형 텍스처(CreateRadial)와 같은 모양인지.
+    private static float OldRadialAlpha(Vector2 uv, float inner, float outer)
+    {
+        float dx = uv.x * 2f - 1f;
+        float dy = uv.y * 2f - 1f;
+        float distance = Mathf.Sqrt(dx * dx + dy * dy);
+        return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(inner, outer, distance));
+    }
+
+    [Test]
+    public void EdgeMask_DefaultsMatchOldRadialTexture()
+    {
+        Vector2[] samples =
+        {
+            new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 1f), new Vector2(0f, 0f),
+            new Vector2(0.05f, 0.3f), new Vector2(0.9f, 0.85f), new Vector2(0.97f, 0.5f), new Vector2(0.2f, 0.02f),
+        };
+        foreach (Vector2 uv in samples)
+        {
+            float expected = OldRadialAlpha(uv, 0.9f, 1.2f);
+            float actual = HealthVignetteModel.EdgeMask(uv, 0.9f, 1.2f, 0f, 1f, 16f / 9f, 0f);
+            Assert.That(actual, Is.EqualTo(expected).Within(1e-3f), $"uv {uv}");
+        }
+    }
+
+    [Test]
+    public void EdgeMask_CenterClearEdgesOpaqueAndStrengthScales()
+    {
+        Assert.That(HealthVignetteModel.EdgeMask(new Vector2(0.5f, 0.5f), 0.9f, 1.2f, 0.5f, 1f, 16f / 9f, 1f), Is.EqualTo(0f));
+        Assert.That(HealthVignetteModel.EdgeMask(new Vector2(0f, 0f), 0.9f, 1.2f, 0f, 1f, 16f / 9f, 0f), Is.EqualTo(1f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.EdgeMask(new Vector2(0f, 0f), 0.9f, 1.2f, 0f, 0.5f, 16f / 9f, 0f), Is.EqualTo(0.5f).Within(Tolerance));
+    }
+
+    [Test]
+    public void EdgeMask_AspectCorrectionNarrowsSideBandToTopBandWidth()
+    {
+        // 보정 1: 좌우 끝에서 세로 기준 같은 픽셀 거리의 점은 위아래 끝의 대응점과 같은 마스크(사각 1 이면 변을 따라 고르게).
+        float aspect = 16f / 9f;
+        float fromTop = 0.05f;                       // 세로 uv 거리
+        float fromSide = fromTop / aspect;          // 같은 픽셀 거리의 가로 uv 거리
+        float top = HealthVignetteModel.EdgeMask(new Vector2(0.5f, 1f - fromTop), 0.8f, 1.0f, 1f, 1f, aspect, 1f);
+        float side = HealthVignetteModel.EdgeMask(new Vector2(1f - fromSide, 0.5f), 0.8f, 1.0f, 1f, 1f, aspect, 1f);
+        Assert.That(side, Is.EqualTo(top).Within(1e-3f));
+
+        // 보정 0(옛 방식)은 좌우 띠가 더 넓다 — 같은 픽셀 거리에서 좌우가 더 진하다.
+        float sideOld = HealthVignetteModel.EdgeMask(new Vector2(1f - fromSide, 0.5f), 0.8f, 1.0f, 1f, 1f, aspect, 0f);
+        Assert.That(sideOld, Is.GreaterThan(top));
     }
 
     [Test]

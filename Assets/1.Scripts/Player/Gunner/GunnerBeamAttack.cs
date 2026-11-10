@@ -21,6 +21,26 @@ public class GunnerBeamAttack : BaseAttack
     private static readonly Comparison<RaycastHit> ByDistance = (a, b) => a.distance.CompareTo(b.distance);
     private Player owner;
 
+    /// <summary>
+    /// SphereCast 한 건의 <b>실제 접촉 거리</b> — 출발점에서 빔 축을 따라 잰, 구 표면이 콜라이더에 닿은 지점까지(2026-11-06).
+    ///
+    /// <c>RaycastHit.distance</c> 는 구 <b>중심</b>이 이동한 거리라 접촉점보다 최대 반경만큼 짧다. 그 값을 그대로 벽까지 거리로 쓰면
+    /// 판정(Q 사각형)·빔·조준선이 벽 표면보다 반경(Q 0.6m·평타 0.3m)만큼 앞에서 끝났다 — Q 가 차단 박스를 가진 상자를 정면에서 못 맞히던 원인.
+    /// 접촉점(<paramref name="point"/>)을 빔 축에 투영한 값을 쓴다 — 정면 접촉 = 중심 거리 + 반경, 모서리를 스치면 그보다 짧다.
+    /// [중심 거리, 중심 거리 + 반경] 으로 자른다. 시작부터 겹친 접촉(중심 거리 0 — Unity 는 접촉점을 0 으로 준다)은 0.
+    /// </summary>
+    public static float ContactDistance(float sweepDistance, Vector3 point, Vector3 origin, Vector3 direction, float radius)
+    {
+        if (sweepDistance <= 0f)
+            return 0f;
+
+        float along = Vector3.Dot(point - origin, direction);
+        return Mathf.Clamp(along, sweepDistance, sweepDistance + Mathf.Max(0f, radius));
+    }
+
+    private static float ContactDistance(in RaycastHit hit, Vector3 origin, Vector3 direction, float radius) =>
+        ContactDistance(hit.distance, hit.point, origin, direction, radius);
+
     private void Awake()
     {
         owner = GetComponent<Player>();
@@ -58,8 +78,8 @@ public class GunnerBeamAttack : BaseAttack
             if (owner != null && col.transform.IsChildOf(owner.transform))
                 continue;
 
-            // SphereCast 가 시작부터 겹친 대상은 distance 0 · point 0 으로 온다 — 시작점으로 본다.
-            Vector3 point = hits[i].distance > 0f ? origin + direction * hits[i].distance : origin;
+            // 끝점 = 구 표면이 닿은 접촉 거리(빔·착탄 연출이 벽·대상 표면까지 간다). 시작부터 겹친 대상은 시작점.
+            Vector3 point = origin + direction * ContactDistance(hits[i], origin, direction, radius);
 
             if (!IsInTargetLayer(col))
             {
@@ -109,7 +129,10 @@ public class GunnerBeamAttack : BaseAttack
 
         int count = Physics.SphereCastNonAlloc(origin, radius, direction, hits, range, hittable | blocking,
                                                QueryTriggerInteraction.Collide);
+        // wall = 벽까지 구 중심 거리 — 후보(구 중심 거리)와 같은 잣대로 "벽 앞인가"를 가른다.
+        // wallContact = 그 벽의 접촉 거리 — 끝점(연출)만 쓴다.
         float wall = float.PositiveInfinity;
+        float wallContact = float.PositiveInfinity;
         rawCandidates.Clear();
         candidateColliders.Clear();
 
@@ -123,7 +146,10 @@ public class GunnerBeamAttack : BaseAttack
             {
                 // Fire 와 같은 지형 규칙 — 실제 막힘(비트리거)만.
                 if (!col.isTrigger && (blocking.value & (1 << col.gameObject.layer)) != 0 && hits[i].distance < wall)
+                {
                     wall = hits[i].distance;
+                    wallContact = ContactDistance(hits[i], origin, direction, radius);
+                }
                 continue;
             }
 
@@ -137,7 +163,7 @@ public class GunnerBeamAttack : BaseAttack
         }
 
         if (!float.IsPositiveInfinity(wall))
-            end = wall > 0f ? origin + direction * wall : origin;
+            end = origin + direction * wallContact;
 
         GunnerPierceRules.Order(rawCandidates, wall, orderedCandidates);
 
@@ -196,20 +222,26 @@ public class GunnerBeamAttack : BaseAttack
 
     /// <summary>
     /// 지형(비트리거 blocking)에 닿기까지의 거리. 굵은 직선(SphereCast)으로 잰다. 자기 콜라이더는 무시.
+    /// 값 = 구 표면이 벽에 닿은 <b>접촉 거리</b>(<see cref="ContactDistance(float, Vector3, Vector3, Vector3, float)"/>) —
+    /// Q 판정 사각형·빔·조준선이 벽 표면까지 간다(2026-11-06, 예전엔 구 중심 거리라 반경만큼 짧았다). 최대 <paramref name="range"/>.
     /// </summary>
     public float CastLength(Vector3 origin, Vector3 direction, float range, float radius, LayerMask blocking)
     {
         int count = Physics.SphereCastNonAlloc(origin, radius, direction, hits, range, blocking, QueryTriggerInteraction.Ignore);
+        float sweep = range;
         float length = range;
         for (int i = 0; i < count; i++)
         {
             Collider col = hits[i].collider;
             if (col == null || (owner != null && col.transform.IsChildOf(owner.transform)))
                 continue;
-            if (hits[i].distance > 0f && hits[i].distance < length)
-                length = hits[i].distance;
+            if (hits[i].distance > 0f && hits[i].distance < sweep)
+            {
+                sweep = hits[i].distance;
+                length = ContactDistance(hits[i], origin, direction, radius);
+            }
         }
-        return length;
+        return Mathf.Min(length, range);
     }
 
     /// <summary>
