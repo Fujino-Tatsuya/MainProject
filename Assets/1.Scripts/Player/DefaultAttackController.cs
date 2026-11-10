@@ -98,7 +98,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     // ─── 평타 베기 연출 ────────────────────────────────────────────────
     // 🔴 명중과 헛스윙을 **가른다.** 애니메이션 이벤트로는 못 가른다 — 클립은 맞았는지 모른다.
-    //    판정은 서버만 하므로(HandleAnimationEvent 가 IsServer 로 막혀 있다) RPC 로 내보낸다.
+    //    판정은 서버만 하므로(오너 판정 요청 RequestHitRpc → 서버 판정, 할 일 256) RPC 로 내보낸다.
     //    소켓이 필요해서 카탈로그 룩업이 아니라 EffectSocketPlayer 직접 참조다(보스 연출과 같은 규약).
     // 🔴 **타마다 소켓이 다르다**(2026-09-16). 4타는 스윙 궤적이 전부 달라서 검기가 나가는
     //    자리·각도도 다르다. 그래서 칼에 소켓 하나를 붙여 공용으로 쓰던 방식을 버리고,
@@ -145,10 +145,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private float moveRemaining;
     private float moveSpeed;
     private float attackEndFallbackTime;
-    private bool isRequestingAttack;
     private bool isComboWindowOpen;
     private bool hasQueuedNextAttack;
-    // 스킬 입력 때문에 지금 타로 마무리 중(할 일 77 후속) — 오너·서버가 각자 들고, 공격이 끝나면(ResetAttackRuntime) 풀린다.
+    // 스킬 입력 때문에 지금 타로 마무리 중(할 일 77 후속) — 오너가 들고(체인은 오너가 주도, 할 일 256), 공격이 끝나면(ResetAttackRuntime) 풀린다.
     private bool isFinishingChain;
     private bool hasStartedAttack;
     // End에서 콤보로 안 이어질 때, 입력은 바로 풀어주되(EndAttackState) 화면에 남은
@@ -165,11 +164,27 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     private bool wasInAttackAnimationState;
     // 다 돈 뒤 공격(할 일 43): SnapOnStart 단이 크게 꺾으면 TurnToward 가 도는 동안 클립 시작을 늦춘다.
     // 판정·콤보 창·End 는 클립 이벤트라 같이 늦춰지고, 전진은 아래 플래그로 막는다.
-    // 지연은 서버가 정해 PlayDefaultAttackClientRpc 로 전 피어에 싣는다 — 첫 타는 오너가 잰 값(RequestStartAttackRpc).
+    // 지연은 오너가 정해(할 일 256 — 서버 상한 자르기 없음, 길면 보낸 쪽만 손해) 타 시작 통지 → PlayDefaultAttackRpc 로 다른 피어에 싣는다.
     private bool hasPendingAttackClip;
     private float pendingAttackClipTime;
     private bool pendingTriggerAttack;
     private float pendingCrossFadeStartTime;
+
+    // ─── 오너 예측(할 일 256) ──────────────────────────────────────────
+    // 오너 = 체인 주도(창·다음 타·End). 타마다 일련번호를 매겨 서버에 시작·판정·종료를 알린다.
+    private byte swingSerial;
+    private byte comboStartSerial;
+    private int hitNumber;
+    // 서버(원격 오너를 따라가는 쪽) — 따라가는 휘두름 번호·2차 검증·끊은 콤보의 뒤늦은 이어짐 무시·통지가 끊겼을 때의 안전망.
+    private byte serverSwingSerial;
+    private bool serverIgnoreContinues;
+    private float serverFollowFallbackTime;
+    private readonly BasicAttackServerVerifier verifier = new BasicAttackServerVerifier();
+    private BasicAttackStepTiming[] stepTimings;
+    // 서버 안전망 — 오너 End 시각 + 이만큼 지나도 종료 통지가 없으면 서버가 혼자 끝낸다(오너 끊김·패킷 유실).
+    private const float ServerFollowGraceSeconds = 1f;
+    // 판정 요청의 오너 위치가 서버가 보는 위치(NT)와 이만큼(수평 m) 넘게 다르면 경고만 남긴다.
+    private const float OwnerPositionWarnDistance = 2f;
 
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     // 판정 단계(읽기 전용) — 특성 랩 공격 범위 기즈모(할 일 152)가 단계의 판정 도형(HitArea)을 그린다.
@@ -183,20 +198,21 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     public bool StartsOnHold => false;
     public bool ReservesSkillAfterAttack => false;
 
-    // 버퍼의 스킬 입력 때문에 다음 타를 잇지 않는다(할 일 77 후속) — 오너가 예약 요청을 멈추고, 서버는 이미 받은 예약을
-    // 지우고 이후 예약을 거절한다. 이 타는 End 이벤트에서 기존 정상 종료(EndAttackServer)로 끝난다.
+    // 체인(창·다음 타·End)을 주도하는 쪽 — 오너(호스트 오너 포함)·오프라인. 서버(원격 오너)·관전자는 통지를 따라간다.
+    private bool IsChainAuthority => !IsNetworkActive || IsOwner;
+    // 서버 처리(데미지 스냅샷·판정·튜토리얼 훅)를 이 인스턴스가 직접 하는가 — 호스트·오프라인.
+    private bool HasServerAuthority => !IsNetworkActive || IsServer;
+
+    // 버퍼의 스킬 입력 때문에 다음 타를 잇지 않는다(할 일 77 후속) — 체인은 오너가 주도하므로(할 일 256) 오너 래치만 세운다.
+    // 이 타는 End 이벤트에서 기존 정상 종료로 끝난다.
     public void FinishWithoutChaining()
     {
-        if (!IsAttacking || isFinishingChain || (IsNetworkActive && !IsOwner))
+        if (!IsAttacking || isFinishingChain || !IsChainAuthority)
             return;
 
         isFinishingChain = true;
         hasQueuedNextAttack = false;
-        // 호스트 오너·오프라인은 같은 인스턴스가 서버라 위 두 줄로 끝난다.
-        if (IsNetworkActive && !IsServer)
-            RequestFinishChainRpc();
     }
-    private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
     {
@@ -279,31 +295,46 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         }
     }
 
+    /// <summary>
+    /// 서버 2차 검증용 타별 클립 이벤트 시각(공속 1 기준 — 콤보 상태 Speed Multiplier 는 AttackSpeed 파라미터뿐이라 상태 속도 1).
+    /// 루프백 진입은 단 데이터 LoopBackEntryTime. 데이터가 바뀌면(ApplyData) 다시 만든다.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<BasicAttackStepTiming> StepTimings
+    {
+        get
+        {
+            if (stepTimings == null || stepTimings.Length != (attackSteps?.Length ?? 0))
+            {
+                int count = attackSteps?.Length ?? 0;
+                stepTimings = new BasicAttackStepTiming[count];
+                for (int i = 0; i < count; i++)
+                {
+                    DefaultAttackStep step = attackSteps[i];
+                    stepTimings[i] = BasicAttackStepTiming.FromClip(step?.Clip, nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent),
+                        (int)DefaultAttackAnimationEventType.Hit, (int)DefaultAttackAnimationEventType.End, 1f,
+                        step != null ? step.LoopBackEntryTime : 0f);
+                }
+            }
+
+            return stepTimings;
+        }
+    }
+
     public bool IsOutOfResource => false;
 
+    // 오너 1차 판단 후 즉시 재생(할 일 256) — 서버 승인을 기다리지 않는다. 서버는 시작 통지를 받고 상태만 따라간다.
     public bool TryStart()
     {
-        if (IsAttacking || isRequestingAttack || player == null || !CanRequestStart)
-        {
+        if (IsAttacking || player == null || !CanRequestStart || !IsChainAuthority)
             return false;
-        }
+
+        if (stateController != null && !stateController.CanAttack)
+            return false;
 
         Vector3 requestedDirection = GetCurrentAimDirection();
-        // 첫 타의 회전 지연은 오너의 몸 방향으로 잰다 — 서버 쪽 몸 방향은 NT 로 받은 늦은 값이다.
+        // 회전 지연은 오너의 몸 방향으로 잰다(오너가 정한다 — 할 일 256).
         float turnDelay = GetTurnDelay(0, requestedDirection);
-
-        if (!IsNetworkActive)
-        {
-            StartAttackServer(0, requestedDirection, true, 0f, turnDelay);
-            return true;
-        }
-
-        if (!IsOwner)
-            return false;
-
-        isRequestingAttack = true;
-        RequestStartAttackRpc(requestedDirection, turnDelay, player.CreateStatReport());
-        return true;
+        return StartSwingAsChainAuthority(0, requestedDirection, true, 0f, turnDelay, false);
     }
 
     private void Update()
@@ -317,7 +348,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     public void BeginFromState()
     {
-        // Attack state entry is driven by StartAttackServer/PlayAttackClientRpc.
+        // 공격 상태 진입은 StartSwingAsChainAuthority(오너)·NotifySwingStartRpc(서버)·PlayDefaultAttackRpc(관전자)가 연다.
     }
 
     public void ApplyData(DefaultAttackData data)
@@ -329,6 +360,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         chainPolicy = data.ChainPolicy;
         attackSteps = data.AttackSteps;
         hittableLayers = data.HittableLayers;
+        stepTimings = null;
 
         if (playerDefaultAttack != null)
             playerDefaultAttack.Configure(hittableLayers, data.MaxHitResults);
@@ -357,15 +389,21 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     public void Tick()
     {
-        if ((!IsNetworkActive || IsOwner) && IsAttacking)
-            TryQueueNextAttackFromInput();
+        if (IsChainAuthority)
+        {
+            if (IsAttacking)
+            {
+                TryQueueNextAttackFromInput();
+                TickChainFallback();
+            }
 
-        if (HasGameplayAuthority && IsAttacking)
-            TickServerFallbacks();
-
-        // 회전은 렌더 틱에서 최신 에임을 따른다. 전진은 FixedTickMovement에서 별도로 제출한다.
-        if (!IsNetworkActive || IsOwner)
+            // 회전은 렌더 틱에서 최신 에임을 따른다. 전진은 FixedTickMovement에서 별도로 제출한다.
             TickRotation();
+            return;
+        }
+
+        if (IsNetworkActive && IsServer && IsAttacking)
+            TickServerFollowFallback();
     }
 
     public void FixedTickMovement()
@@ -380,9 +418,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     public void CancelCurrentAttack()
     {
-        bool hadActiveAttack = IsAttacking || hasStartedAttack || isRequestingAttack;
+        bool hadActiveAttack = IsAttacking || hasStartedAttack;
 
-        // EndAttackServer/EndDefaultAttackClientRpc가 player.EndAttackState()를 부르면
+        // 정상 종료(EndAttackAsChainAuthority·EndAttackFollowServer·EndDefaultAttackRpc)가 player.EndAttackState()를 부르면
         // PlayerAttackState.Exit(Idle)이 여기로 다시 캐스케이드된다(Attack→다른 상태 전이는
         // 전부 이 메서드를 거치게 돼 있어서). isFinishingAttackTail이 이미 true라는 건
         // "우리가 방금 그 정상 종료 시퀀스를 스스로 시작했다"는 뜻이라, 이때는 이미
@@ -390,6 +428,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         // 끊으면 안 된다. 진짜 외부 인터럽트(넉백/구속/연출잠금/대시 등)일 때만
         // 즉시 Idle로 끊는다.
         bool isGracefulEndCascade = isFinishingAttackTail;
+        byte ownerSerial = swingSerial;
+        byte followedSerial = serverSwingSerial;
 
         ResetAttackRuntime();
 
@@ -399,11 +439,28 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         isFinishingAttackTail = false;
         finishingAttackIndex = -1;
 
-        if (hadActiveAttack && animator != null)
+        if (!hadActiveAttack)
+            return;
+
+        if (animator != null)
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
 
-        if (hadActiveAttack && IsNetworkActive && IsServer)
-            EndDefaultAttackClientRpc();
+        if (!IsNetworkActive)
+            return;
+
+        if (IsServer)
+        {
+            // 서버가 끊는 경로(넉백·구속·연출 잠금·숨김·대시) — 오너(원격이면)·관전자 모두 즉시 멈춘다.
+            verifier.EndCombo();
+            if (!IsOwner)
+                serverIgnoreContinues = true;
+            CancelAttackRpc(IsOwner ? ownerSerial : followedSerial);
+        }
+        else if (IsOwner)
+        {
+            // 원격 오너가 스스로 끊었다(대시 등) — 서버가 따라 끝낸다(이미 끊었으면 무시).
+            NotifyAttackEndRpc(ownerSerial);
+        }
     }
 
     /// <summary>
@@ -437,9 +494,11 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
             animator.CrossFadeInFixedTime(MoveHash, tailToMovementBlendSeconds);
     }
 
+    // 애니 이벤트는 체인 주도 쪽(오너·오프라인)만 쓴다(할 일 256). 서버(원격 오너)·관전자의 애니메이터도 같은 클립을 돌려
+    // 이벤트가 늦게 또 터지므로 무시한다 — 서버 판정은 오너 판정 요청(RequestHitRpc)으로만 난다.
     public void HandleAnimationEvent(DefaultAttackAnimationEventType eventType)
     {
-        if (IsNetworkActive && !IsServer)
+        if (!IsChainAuthority)
             return;
 
         // 회전 대기 중 이벤트는 이 단이 아니라 직전 클립의 것이다.
@@ -451,7 +510,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         switch (eventType)
         {
             case DefaultAttackAnimationEventType.Hit:
-                FireHitAndPlayVfx();
+                FireOwnerHit();
                 break;
 
             case DefaultAttackAnimationEventType.ComboWindowOpen:
@@ -470,29 +529,43 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     public void EndCurrentAttack()
     {
-        if (HasGameplayAuthority)
+        if (IsChainAuthority)
             CompleteCurrentAttackStep();
     }
 
     public void HitCurrentAttack()
     {
-        if (HasGameplayAuthority)
-            FireHitAndPlayVfx();
+        if (IsChainAuthority && IsAttacking)
+            FireOwnerHit();
+    }
+
+    // [체인 주도] Hit 시점 — 호스트·오프라인은 바로 판정, 원격 오너는 자기 위치·방향으로 판정 요청(Reliable).
+    private void FireOwnerHit()
+    {
+        if (HasServerAuthority)
+            FireHitAndPlayVfx(transform.position, attackDirection);
+        else
+            RequestHitRpc(swingSerial, (byte)currentAttackIndex, (byte)Mathf.Clamp(hitNumber, 0, 255), transform.position, attackDirection);
+
+        hitNumber++;
     }
 
     /// <summary>
-    /// 판정 1회 + 그 결과에 맞는 베기 연출. 판정 지점이 둘(<see cref="HandleAnimationEvent"/> ·
-    /// <see cref="HitCurrentAttack"/>)이라 한 곳으로 모은다 — 갈라 두면 한쪽만 고쳐 어긋난다.
+    /// [서버] 판정 1회 + 그 결과에 맞는 베기 연출. 판정 지점이 셋(애니 이벤트 · 구형 경로 · 오너 판정 요청)이라 한 곳으로 모은다.
     /// </summary>
-    private void FireHitAndPlayVfx()
+    private void FireHitAndPlayVfx(Vector3 casterPosition, Vector3 direction)
     {
-        bool hit = playerDefaultAttack.HitCurrentStep();
+        bool hit = playerDefaultAttack.HitCurrentStep(casterPosition, direction);
+        PlaySlashVfxAllPeers(currentAttackIndex, hit);
+    }
 
+    private void PlaySlashVfxAllPeers(int attackIndex, bool hit)
+    {
         // 🔴 여기서 직접 재생하면 안 된다. 이 경로는 서버에서만 돈다 — 호스트 화면에만 나온다.
         if (IsNetworkActive)
-            PlaySlashVfxRpc(currentAttackIndex, hit);
+            PlaySlashVfxRpc(attackIndex, hit);
         else
-            PlaySlashVfx(currentAttackIndex, hit);   // 오프라인(단독 실행) 경로
+            PlaySlashVfx(attackIndex, hit);   // 오프라인(단독 실행) 경로
     }
 
     /// <summary>
@@ -622,62 +695,243 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         return false;
     }
 
+    // ─── 체인 주도(오너·오프라인) ─────────────────────────────────────
+
+    /// <summary>
+    /// [체인 주도] 한 타를 지금 시작한다 — 자기 상태·연출을 바로 열고, 호스트·오프라인이면 서버 처리도 여기서, 원격 오너면 시작 통지.
+    /// <paramref name="continuesCombo"/> = 직전 타의 창 안 입력으로 이은 타(서버 순서 검증: 직전 +1·루프 0).
+    /// </summary>
+    private bool StartSwingAsChainAuthority(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime,
+        float turnDelay, bool continuesCombo)
+    {
+        if (!HasAttackStep(attackIndex) || attackSteps[attackIndex].MotionDuration <= 0f)
+            return false;
+
+        if (player != null && !player.BeginAttackState())
+            return false;
+
+        swingSerial++;
+        if (!continuesCombo)
+            comboStartSerial = swingSerial;
+
+        BeginSwingRuntime(attackIndex, direction, turnDelay);
+
+        if (HasServerAuthority)
+            ServerOnSwingStarted(swingSerial, attackIndex, triggerAttack, crossFadeStartTime, turnDelay, continuesCombo);
+
+        StartAttackPresentation(attackIndex, attackDirection, triggerAttack, crossFadeStartTime, turnDelay);
+
+        if (IsNetworkActive && !IsServer)
+            NotifySwingStartRpc(swingSerial, (byte)attackIndex, attackDirection, triggerAttack, crossFadeStartTime, turnDelay,
+                continuesCombo, player.CreateStatReport());
+
+        return true;
+    }
+
+    private void CompleteCurrentAttackStep()
+    {
+        if (!IsChainAuthority || !IsAttacking || !hasStartedAttack)
+            return;
+
+        if (ShouldStartNextAttack(out int nextIndex, out Vector3 nextDirection))
+        {
+            // 대부분의 스텝은 LoopBackEntryTime이 0이라 처음부터 재생된다 — 체인이
+            // 마지막 스텝에서 첫 스텝으로 되감길 때(0번 스텝)만 0이 아니라서 윈드업을 건너뛴다.
+            // 루프백 오프셋은 PlayDefaultAttackRpc 로 다른 피어도 같은 클립 시각에서 들어간다(각자 자기 AttackSpeed 로 나눔).
+            StartSwingAsChainAuthority(nextIndex, nextDirection, false, attackSteps[nextIndex].LoopBackEntryTime,
+                GetTurnDelay(nextIndex, nextDirection), true);
+            return;
+        }
+
+        EndAttackAsChainAuthority();
+    }
+
+    private bool ShouldStartNextAttack(out int nextIndex, out Vector3 nextDirection)
+    {
+        nextDirection = queuedAttackDirection;
+
+        if (!DefaultAttackChainRules.TryResolveNextStep(
+                currentAttackIndex, attackSteps.Length, chainPolicy, hasQueuedNextAttack, out nextIndex))
+            return false;
+
+        return HasAttackStep(nextIndex);
+    }
+
+    private void EndAttackAsChainAuthority()
+    {
+        byte serial = swingSerial;
+        isFinishingAttackTail = true;
+        finishingAttackIndex = currentAttackIndex;
+
+        ResetAttackRuntime();
+        if (HasServerAuthority)
+            verifier.EndCombo();
+
+        // 콤보로 안 이어질 때는 조작(이동/스킬/대시)만 바로 풀어주고, 지금 재생 중인
+        // 클립은 억지로 Idle로 끊지 않는다 — 애니메이터에 이미 있는 exitTime=1 → Idle
+        // 자동전이가 자연스럽게 마무리하거나, 새 입력이 들어오면 그쪽이 알아서 덮어쓴다.
+        player?.EndAttackState();
+
+        if (!IsNetworkActive)
+            return;
+
+        if (IsServer)
+            EndDefaultAttackRpc();
+        else
+            NotifyAttackEndRpc(serial);
+    }
+
+    private void TickChainFallback()
+    {
+        // End 이벤트가 빠졌을 때의 안전망 — 체인 주도 쪽이 스스로 이 타를 마무리한다.
+        if (hasStartedAttack && attackEndFallbackTime > 0f && Time.time >= attackEndFallbackTime)
+            CompleteCurrentAttackStep();
+    }
+
+    private void TryQueueNextAttackFromInput()
+    {
+        // 콤보 윈도우 안에서 한 순간이라도 눌려 있었으면 예약되는 래치. 창은 오너 자기 애니 이벤트다(할 일 256) —
+        // 서버 왕복이 없어 창 끝 탭도 오너 화면 그대로 이어진다.
+        // 스킬 입력으로 마무리 중이면 누르고 있어도 잇지 않는다(할 일 77 후속, FinishWithoutChaining).
+        if (!PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(
+                inputReader.AttackHeld, inputReader.AttackPressed, isFinishingChain))
+            return;
+
+        if (!isComboWindowOpen)
+            return;
+
+        hasQueuedNextAttack = true;
+        queuedAttackDirection = GetCurrentAimDirection();
+        // 예약에 쓴 입력은 선입력 버퍼에서 지운다(할 일 44). 창 밖 입력은 남겨 공격이 끝난 뒤 새 평타로 실행한다.
+        inputReader.ConsumeBufferedInput(PlayerBufferedInput.Attack);
+    }
+
+    // ─── 서버 ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// [서버] 한 타가 시작됐다(호스트 오너는 직접, 원격 오너는 시작 통지로) — 2차 검증 상태·데미지 스냅샷·튜토리얼 훅,
+    /// 그리고 오너를 뺀 피어에 기존 재생 RPC 로 전달(NetworkAnimator 에 기대지 않는다).
+    /// </summary>
+    private void ServerOnSwingStarted(byte serial, int attackIndex, bool triggerAttack, float crossFadeStartTime, float turnDelay,
+        bool continuesCombo)
+    {
+        DefaultAttackStep step = attackSteps[attackIndex];
+        verifier.RecordAttackSpeed(Time.unscaledTimeAsDouble, AttackSpeed);
+        verifier.BeginSwing(serial, attackIndex, attackSteps.Length, chainPolicy == DefaultAttackChainPolicy.Loop, continuesCombo);
+
+        int damageSnapshot = CalculateDamageSnapshot(step);
+        playerDefaultAttack.PrepareStep(step, damageSnapshot, attackDirection);
+        player?.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 타 시작(적중 무관)
+
+        if (IsNetworkActive)
+            PlayDefaultAttackRpc(attackIndex, attackDirection, triggerAttack, crossFadeStartTime, turnDelay);
+    }
+
+    // [서버] 원격 오너의 타 시작 통지 — 거부하지 않고 공격 상태를 따라간다. 서버가 상태에 못 들어가면(넉백·구속 중 등) 끊기 경로로 돌려보낸다.
     [Rpc(SendTo.Server)]
-    private void RequestStartAttackRpc(Vector3 requestedDirection, float requestedTurnDelay, PlayerStatReport statReport, RpcParams rpcParams = default)
+    private void NotifySwingStartRpc(byte serial, byte attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime,
+        float turnDelay, bool continuesCombo, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 시작");
+        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 타 시작");
 
-        bool canApprove = CanApproveServerAttack();
-        if (!canApprove)
+        // 서버가 끊은 콤보의 뒤늦은 '이어짐' — 오너는 끊기 RPC 로 이미 멈췄거나 곧 멈춘다. 따라가지 않는다.
+        if (continuesCombo && serverIgnoreContinues)
+            return;
+        if (!continuesCombo)
+            serverIgnoreContinues = false;
+
+        int index = attackIndex;
+        if (!HasAttackStep(index) || attackSteps[index].MotionDuration <= 0f)
+            return;
+
+        if (player == null || !player.BeginAttackState())
         {
-            RejectStartAttackClientRpc(CreateOwnerClientRpcParams());
+            verifier.EndCombo();
+            serverIgnoreContinues = true;
+            CancelAttackRpc(serial);
             return;
         }
 
-        // 각은 다시 재지 않고 상한만 자른다 — 지연이 길면 보낸 쪽만 손해다.
-        float turnDelay = attackSteps[0].RotationType == DefaultAttackRotationType.SnapOnStart
-            ? movement.ClampAttackTurnDelay(requestedTurnDelay)
-            : 0f;
-        StartAttackServer(0, requestedDirection, true, 0f, turnDelay);
+        serverSwingSerial = serial;
+        BeginSwingRuntime(index, direction, turnDelay);
+        ServerOnSwingStarted(serial, index, triggerAttack, crossFadeStartTime, turnDelay, continuesCombo);
+        StartAttackPresentation(index, attackDirection, triggerAttack, crossFadeStartTime, turnDelay);
     }
 
+    // [서버] 원격 오너 Hit 시점 판정 요청(Reliable). 오너가 보낸 위치·방향으로 판정, 2차 검증에 걸리면 데미지만 없다(모션은 그대로).
     [Rpc(SendTo.Server)]
-    private void RequestQueueNextAttackRpc(Vector3 requestedDirection, PlayerStatReport statReport, RpcParams rpcParams = default)
+    private void RequestHitRpc(byte serial, byte attackIndex, byte hit, Vector3 casterPosition, Vector3 direction,
+        RpcParams rpcParams = default)
     {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId || !IsAttacking)
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "기본 공격 다음 타");
-
-        if (!isComboWindowOpen || isFinishingChain)
+        if (!IsAttacking || !hasStartedAttack)
             return;
 
-        hasQueuedNextAttack = true;
-        queuedAttackDirection = ResolveAttackDirection(requestedDirection);
+        BasicAttackHitVerdict verdict = verifier.VerifyHit(Time.unscaledTimeAsDouble, serial, attackIndex, hit, StepTimings, AttackSpeed,
+            BasicAttackVerifySettings.Current);
+        if (verdict != BasicAttackHitVerdict.Accepted)
+        {
+            Edit.LogWarning($"[평타 검증] {name} {attackIndex + 1}타 히트{hit} 데미지 없음 — {verdict}", this);
+            PlaySlashVfxAllPeers(attackIndex, false);
+            return;
+        }
+
+        Vector3 offset = casterPosition - transform.position;
+        offset.y = 0f;
+        if (offset.sqrMagnitude > OwnerPositionWarnDistance * OwnerPositionWarnDistance)
+            Edit.LogWarning($"[평타 검증] {name} 판정 위치가 서버가 보는 위치와 {offset.magnitude:0.00}m 다르다(경고만, 오너 위치로 판정).", this);
+
+        FireHitAndPlayVfx(casterPosition, ResolveAttackDirection(direction));
     }
 
-    // 오너가 스킬 입력으로 마무리를 정했다 — 받은 예약을 지우고 이 공격이 끝날 때까지 새 예약을 거절한다.
-    // 서버가 이미 다음 타를 시작했으면(도착 전 End) 그 타에서 마무리된다 — 오너 래치도 그 타 끝까지 남아 둘이 같다.
+    // [서버] 원격 오너의 공격 종료(정상 종료·스스로 끊음). 지금 따라가는 휘두름이 아니면 무시(이미 끊었다).
     [Rpc(SendTo.Server)]
-    private void RequestFinishChainRpc(RpcParams rpcParams = default)
+    private void NotifyAttackEndRpc(byte serial, RpcParams rpcParams = default)
     {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId || !IsAttacking)
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        isFinishingChain = true;
-        hasQueuedNextAttack = false;
+        if (!IsAttacking || serial != serverSwingSerial)
+            return;
+
+        EndAttackFollowServer();
     }
 
-    [ClientRpc]
-    private void PlayDefaultAttackClientRpc(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime, float turnDelay)
+    private void EndAttackFollowServer()
+    {
+        isFinishingAttackTail = true;
+        finishingAttackIndex = currentAttackIndex;
+
+        ResetAttackRuntime();
+        verifier.EndCombo();
+        player?.EndAttackState();
+
+        if (IsNetworkActive)
+            EndDefaultAttackRpc();
+    }
+
+    private void TickServerFollowFallback()
+    {
+        if (!hasStartedAttack || serverFollowFallbackTime <= 0f || Time.time < serverFollowFallbackTime)
+            return;
+
+        Edit.LogWarning($"[평타] {name} 종료 통지가 오지 않아 서버가 공격 상태를 끝낸다(안전망).", this);
+        EndAttackFollowServer();
+    }
+
+    // ─── 다른 피어 ────────────────────────────────────────────────────
+
+    // [오너 뺀 피어] 타 재생. 오너는 이미 자기 화면에서 틀었다. 서버(원격 오너)는 통지 처리에서 직접 튼다.
+    [Rpc(SendTo.NotOwner)]
+    private void PlayDefaultAttackRpc(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime, float turnDelay)
     {
         if (IsServer)
             return;
-
-        isRequestingAttack = false;
 
         if (player != null && !player.BeginAttackState())
         {
@@ -688,8 +942,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         StartAttackPresentation(attackIndex, direction, triggerAttack, crossFadeStartTime, turnDelay);
     }
 
-    [ClientRpc]
-    private void EndDefaultAttackClientRpc()
+    // [오너 뺀 피어] 정상 종료 — 남은 클립은 자연 재생.
+    [Rpc(SendTo.NotOwner)]
+    private void EndDefaultAttackRpc()
     {
         if (IsServer)
             return;
@@ -702,48 +957,42 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         player?.EndAttackState();
     }
 
-    [ClientRpc]
-    private void RejectStartAttackClientRpc(ClientRpcParams clientRpcParams = default)
+    // [서버 뺀 피어] 서버가 끊었다 — 오너(원격)·관전자 즉시 멈춤. 오너는 끊긴 콤보 뒤에 새로 시작한 콤보면 무시한다.
+    [Rpc(SendTo.NotServer)]
+    private void CancelAttackRpc(byte serial)
     {
         if (IsOwner)
-            isRequestingAttack = false;
+        {
+            if (!IsAttacking && !hasStartedAttack)
+                return;
+
+            // 일련번호가 지금 콤보 시작보다 앞이면(바이트 순환 비교) 이미 끝난 옛 콤보에 대한 끊기다.
+            if ((byte)(serial - comboStartSerial) >= 128)
+                return;
+        }
+
+        isFinishingAttackTail = false;
+        if (IsAttacking)
+            player.EndAttackState();   // Exit → CancelCurrentAttack(Idle 로 끊기)
+        else
+            CancelCurrentAttack();
     }
 
-    private void StartAttackServer(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime, float turnDelay)
+    // ─── 공용 ────────────────────────────────────────────────────────
+
+    // 한 타의 진행 상태(체인 주도·서버 공용). 데미지 스냅샷·튜토리얼 훅은 ServerOnSwingStarted.
+    private void BeginSwingRuntime(int attackIndex, Vector3 direction, float turnDelay)
     {
-        if (!HasAttackStep(attackIndex))
-        {
-            return;
-        }
-
         DefaultAttackStep step = attackSteps[attackIndex];
-        if (step.MotionDuration <= 0f)
-        {
-            return;
-        }
-
-        isRequestingAttack = false;
         hasStartedAttack = true;
         hasQueuedNextAttack = false;
         isComboWindowOpen = false;
+        hitNumber = 0;
         currentAttackIndex = attackIndex;
         attackDirection = ResolveAttackDirection(direction);
         queuedAttackDirection = attackDirection;
         attackEndFallbackTime = Time.time + turnDelay + GetPlaybackDuration(step) + Mathf.Max(0f, endFallbackPadding);
-
-        int damageSnapshot = CalculateDamageSnapshot(step);
-        playerDefaultAttack.PrepareStep(step, damageSnapshot, attackDirection);
-
-        if (player != null)
-        {
-            player.BeginAttackState();
-            player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 타 시작(적중 무관)
-        }
-
-        StartAttackPresentation(attackIndex, attackDirection, triggerAttack, crossFadeStartTime, turnDelay);
-
-        if (IsNetworkActive)
-            PlayDefaultAttackClientRpc(attackIndex, attackDirection, triggerAttack, crossFadeStartTime, turnDelay);
+        serverFollowFallbackTime = attackEndFallbackTime + ServerFollowGraceSeconds;
     }
 
     private void StartAttackPresentation(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime, float turnDelay)
@@ -755,7 +1004,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         currentAttackIndex = attackIndex;
         // 새 공격이 직전 공격의 꼬리를 대신한다. 꼬리 플래그가 남으면(같은 스텝 클립을 다시 틀면
         // HandleAnimatorMove 가 영영 못 내린다) 이번 공격을 대시로 끊을 때 CancelCurrentAttack 이
-        // 정상 종료 캐스케이드로 오인해 Idle 전환·EndDefaultAttackClientRpc 를 건너뛴다.
+        // 정상 종료 캐스케이드로 오인해 Idle 전환·끊기 RPC 를 건너뛴다.
         isFinishingAttackTail = false;
         finishingAttackIndex = -1;
         attackDirection = ResolveAttackDirection(direction);
@@ -797,57 +1046,6 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
                 DefaultAttackChainRules.LoopBackFixedTimeOffset(crossFadeStartTime, AttackSpeed));
     }
 
-    private void CompleteCurrentAttackStep()
-    {
-        if (!HasGameplayAuthority || !IsAttacking || !hasStartedAttack)
-            return;
-
-        if (ShouldStartNextAttack(out int nextIndex, out Vector3 nextDirection))
-        {
-            // 대부분의 스텝은 LoopBackEntryTime이 0이라 처음부터 재생된다 — 체인이
-            // 마지막 스텝에서 첫 스텝으로 되감길 때(0번 스텝)만 0이 아니라서 윈드업을 건너뛴다.
-            // 다음 단의 회전 지연은 서버가 잰다 — 이 단 내내 몸이 이 단 방향에 고정돼 있어 NT 값도 이미 따라와 있다.
-            StartAttackServer(nextIndex, nextDirection, false, attackSteps[nextIndex].LoopBackEntryTime,
-                GetTurnDelay(nextIndex, nextDirection));
-            return;
-        }
-
-        EndAttackServer();
-    }
-
-    private bool ShouldStartNextAttack(out int nextIndex, out Vector3 nextDirection)
-    {
-        nextDirection = queuedAttackDirection;
-
-        if (!DefaultAttackChainRules.TryResolveNextStep(
-                currentAttackIndex, attackSteps.Length, chainPolicy, hasQueuedNextAttack, out nextIndex))
-            return false;
-
-        return HasAttackStep(nextIndex);
-    }
-
-    private void EndAttackServer()
-    {
-        isFinishingAttackTail = true;
-        finishingAttackIndex = currentAttackIndex;
-
-        ResetAttackRuntime();
-
-        // 콤보로 안 이어질 때는 조작(이동/스킬/대시)만 바로 풀어주고, 지금 재생 중인
-        // 클립은 억지로 Idle로 끊지 않는다 — 애니메이터에 이미 있는 exitTime=1 → Idle
-        // 자동전이가 자연스럽게 마무리하거나, 새 입력이 들어오면 그쪽이 알아서 덮어쓴다.
-        player?.EndAttackState();
-
-        if (IsNetworkActive)
-            EndDefaultAttackClientRpc();
-    }
-
-    private void TickServerFallbacks()
-    {
-        if (hasStartedAttack && attackEndFallbackTime > 0f && Time.time >= attackEndFallbackTime)
-            CompleteCurrentAttackStep();
-    }
-
     private void TickRotation()
     {
         if (!HasAttackStep(currentAttackIndex))
@@ -864,56 +1062,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         if (!HasAttackStep(currentAttackIndex))
             return;
 
-        DefaultAttackStep step = attackSteps[currentAttackIndex];
-
         if (moveRemaining <= 0f || hasPendingAttackClip)
             return;
 
         float moveDistance = Mathf.Min(moveSpeed * Time.fixedDeltaTime, moveRemaining);
         moveRemaining -= moveDistance;
         motor.AddDisplacement(attackDirection * moveDistance);
-    }
-
-    private void TryQueueNextAttackFromInput()
-    {
-        // 콤보 윈도우 안에서 한 순간이라도 눌려 있었으면 예약되는 래치.
-        // 윈도우 밖 입력은 아래 가드(오프라인)와 서버 RPC 가드에서 걸러진다.
-        // 스킬 입력으로 마무리 중이면 누르고 있어도 잇지 않는다(할 일 77 후속, FinishWithoutChaining).
-        if (!PlayerBasicAttackInputRules.ShouldRequestNextMeleeAttack(
-                inputReader.AttackHeld, inputReader.AttackPressed, isFinishingChain))
-            return;
-
-        Vector3 direction = GetCurrentAimDirection();
-
-        if (!IsNetworkActive)
-        {
-            if (!isComboWindowOpen)
-                return;
-
-            hasQueuedNextAttack = true;
-            queuedAttackDirection = direction;
-            // 예약에 쓴 입력은 선입력 버퍼에서 지운다(할 일 44). 창 밖 입력은 남겨 공격이 끝난 뒤 새 평타로 실행한다.
-            inputReader.ConsumeBufferedInput(PlayerBufferedInput.Attack);
-            return;
-        }
-
-        RequestQueueNextAttackRpc(direction, player.CreateStatReport());
-
-        // 창은 서버만 안다(애니 이벤트가 서버 전용). 호스트 오너만 같은 판단으로 지운다 —
-        // 원격 클라 오너는 창 여부를 몰라 버퍼를 그대로 둔다(체인이 이어지는 동안 0.2초 안에 만료된다).
-        if (IsServer && isComboWindowOpen)
-            inputReader.ConsumeBufferedInput(PlayerBufferedInput.Attack);
-    }
-
-    private bool CanApproveServerAttack()
-    {
-        if (!HasAttackStep(0))
-            return false;
-
-        if (player == null || stateController == null || !stateController.CanAttack)
-            return false;
-
-        return true;
     }
 
     private int CalculateDamageSnapshot(DefaultAttackStep step)
@@ -950,12 +1104,13 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
         moveRemaining = 0f;
         moveSpeed = 0f;
         attackEndFallbackTime = 0f;
+        serverFollowFallbackTime = 0f;
         currentAttackIndex = 0;
+        hitNumber = 0;
         hasQueuedNextAttack = false;
         isFinishingChain = false;
         isComboWindowOpen = false;
         hasStartedAttack = false;
-        isRequestingAttack = false;
         hasPendingAttackClip = false;
     }
 
@@ -966,17 +1121,6 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
             return 0f;
 
         return movement.GetAttackTurnDelay(ResolveAttackDirection(direction));
-    }
-
-    private ClientRpcParams CreateOwnerClientRpcParams()
-    {
-        return new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams
-            {
-                TargetClientIds = new[] { OwnerClientId }
-            }
-        };
     }
 
     private bool HasAttackSteps => attackSteps != null && attackSteps.Length > 0;
@@ -1000,6 +1144,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     // 종료 안전망(attackEndFallbackTime)과 ScriptedForwardDistance 전진 속도(거리 ÷ 재생 시간 — 거리는 배율과 무관하게 같다)가 이 값을 쓴다.
     private float GetPlaybackDuration(DefaultAttackStep step) => step.MotionDuration / AttackSpeed;
 }
+
 
 [Serializable]
 public class DefaultAttackStep
