@@ -183,14 +183,8 @@ MonoBehaviour:
         curve: 0
     crtOff: []
     cameraCut:
-    - start: 1.03
-      length: 4.5699997
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
-      keys: []
-    - start: 0.31
-      length: 0.71999997
+    - start: 0.96
+      length: 4.64
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -199,38 +193,14 @@ MonoBehaviour:
     - anchor: 0
       keys:
       - u: 0
-        position: {x: 0.70313674, y: 0.56469953, z: -6.1380944}
-        rotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
-        fov: 60.000004
-        curve: 1
-      - u: 1
-        position: {x: 0.71563476, y: 0.56469953, z: -6.1611843}
-        rotation: {x: -0.101200655, y: 0.019297486, z: 0.0018662212, w: 0.9946771}
-        fov: 60.000004
-        curve: 1
-      smoothPath: 1
-      hideWalls: 1
-      blendSeconds: 0
-      blendCurve: 0
-      startPosition: {x: 0.70313674, y: 0.56469953, z: -6.1380944}
-      startRotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
-      startFov: 60.000004
-      hasEnd: 0
-      endPosition: {x: 0.70313674, y: 0.56469953, z: -6.1380944}
-      endRotation: {x: -0.10119941, y: 0.01995035, z: 0.0019326451, w: 0.99466425}
-      endFov: 60.000004
-      ease: 1
-    - anchor: 0
-      keys:
-      - u: 0
-        position: {x: 1.1093352, y: 1.5867021, z: -4.795919}
-        rotation: {x: -0.04253631, y: -0.042586945, z: -0.001902293, w: 0.99818504}
+        position: {x: 1.6458317, y: 0.7546348, z: -5.37314}
+        rotation: {x: -0.027950438, y: -0.12646225, z: -0.0036580502, w: 0.9915709}
         fov: 60.000004
         curve: 1
       smoothPath: 0
       hideWalls: 1
       blendSeconds: 0
-      blendCurve: 0
+      blendCurve: 1
       startPosition: {x: 0, y: 0, z: 0}
       startRotation: {x: 0, y: 0, z: 0, w: 0}
       startFov: 0
@@ -251,8 +221,8 @@ MonoBehaviour:
     lobbyTransitionTime: 5.6
     backDashStartTime: 0.2
     finisherStartTime: 0.65
-    finisherTrimSeconds: 0
-    slowStartTime: 0
+    finisherTrimSeconds: 4.9333334
+    slowStartTime: 1.83
     bossHitAnimTime: 0.2
     bossHitTrimSeconds: 0
     bossFreezeTime: 0
