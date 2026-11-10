@@ -66,6 +66,7 @@ public sealed class CharacterSelectHudHider
         // 월드 표식 — 안내.
         HideRenderersOf<LobbyFloorArrowPath>();
         HideRenderersOf<LobbyFloorArrowStrip>();
+        HideRenderersOf<LobbyFloorDashBelt>();
         HideRenderersOf<LobbyTutorialWallTarget>();
         HideRenderersOf<LobbyGatherZoneBorders>();
         // 월드 표식 — 조준·스킬 범위(내 것·팀원 것). PlayerAimIndicator 는 플레이어 루트에 붙어 있어 쿼드 오브젝트만.
