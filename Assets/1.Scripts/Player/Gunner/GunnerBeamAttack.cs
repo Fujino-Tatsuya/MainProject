@@ -245,6 +245,45 @@ public class GunnerBeamAttack : BaseAttack
     }
 
     /// <summary>
+    /// [오너] 발사 연출 예측(할 일 256) — 피해 없이 <see cref="Fire"/>(관통이면 <see cref="FireThrough"/>)와 같은 굵은 직선으로 끝점만 잰다.
+    /// 관통이 아니면 첫 유효 대상에서, 관통이면 지형(비트리거 blocking)에서 멈춘다. 판정은 서버가 따로 한다 — 원격 오너의 즉시 연출용.
+    /// </summary>
+    /// <param name="hitUnit">유효 대상에 닿았는가(착탄 연출)</param>
+    public Vector3 PredictEnd(Vector3 origin, Vector3 direction, float range, float radius, LayerMask hittable, LayerMask blocking,
+                              bool pierce, out bool hitUnit)
+    {
+        hitUnit = false;
+        Vector3 end = origin + direction * range;
+        int count = Physics.SphereCastNonAlloc(origin, radius, direction, hits, range, hittable | blocking,
+                                               QueryTriggerInteraction.Collide);
+        Array.Sort(hits, 0, count, Comparer<RaycastHit>.Create(ByDistance));
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = hits[i].collider;
+            if (col == null || (owner != null && col.transform.IsChildOf(owner.transform)))
+                continue;
+
+            Vector3 point = origin + direction * ContactDistance(hits[i], origin, direction, radius);
+            if ((hittable.value & (1 << col.gameObject.layer)) == 0)
+            {
+                if (!col.isTrigger && (blocking.value & (1 << col.gameObject.layer)) != 0)
+                    return point;
+                continue;
+            }
+
+            if (!TryResolveTarget(col, out _, out _))
+                continue;
+
+            hitUnit = true;
+            if (!pierce)
+                return point;
+        }
+
+        return end;
+    }
+
+    /// <summary>
     /// [서버] 판정 도형(<paramref name="area"/> — 충전·지형 차단·광폭을 바른 복사본, 할 일 153) 안의 모든 유효 대상에게 1회씩 피해(관통).
     /// 적·공격 가능한 오브젝트 모두. 질의 = <see cref="AttackShapeQuery.Collect"/>(대상 키 = Unit, 없으면 Hurtbox — 자기 자신·시체 제외).
     /// </summary>
