@@ -8,7 +8,7 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-11-10 · 경석(Claude) · **Sound_2 사운드 적용 명세 v0.1 반영**(기획 명세 기준 — 사건 이동 24건·직전 제외·타수별·BGM 규칙), 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-sound-spec-apply.md](PLAN-sound-spec-apply.md) ✅ grill Q1~Q11 · ✅ Codex 대조·계획 검수 반영 · ✅ 승인(11-10, 거너 Q 취소 = 거너 전용 RPC 1개) · ✅ 구현(Unity 끈 상태 — 컴파일·사운드 동기화·Play 미확인) · 미커밋(git·SVN) · 핸드오프 [handoff-sound-spec-apply.md](Docs/tech/handoff-sound-spec-apply.md)
+## ▶▶ 작업 세션 (2026-11-10 · 경석(Claude) · **Sound_2 사운드 적용 명세 v0.1 반영**(기획 명세 기준 — 사건 이동 24건·직전 제외·타수별·BGM 규칙), 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-sound-spec-apply.md](PLAN-sound-spec-apply.md) ✅ grill Q1~Q11 · ✅ Codex 대조·계획 검수 반영 · ✅ 승인(11-10, 거너 Q 취소 = 거너 전용 RPC 1개) · ✅ 구현 · 컴파일 0 · 사운드 동기화 · EditMode 5955 통과(실패 12 = 사운드 무관 기존) · ✅ 커밋 41740d42 → development · SVN r652(핀 652) · 경석 Play 일부 확인(발소리·거너 Q 취소·빗맞힘 평타·플레이어 피격음 / 몬스터 피격음 동시 2→4 · 저체력 30% 원복) · ⏳ 나머지 Play·MPPM · 핸드오프 [handoff-sound-spec-apply.md](Docs/tech/handoff-sound-spec-apply.md)
 - 수정 예정: xlsx `Sound` 시트·`SoundCatalog`·`Sound1Library` 엔티티·BGM 엔티티(SVN) · VFX 엔트리 소리 파트 약 15개(SVN, 민경 영역) · `Assets/BroAudio/.../ShuffleClipStrategy.cs` · `Sound/AudioManager.cs` · 플레이어 스킬·뷰 훅(은희 영역, 한 줄 위주) · `TwentyThreeBoss`·`MonsterBase`·`SpinnerBot`·`GauntletBot`·`WellsDroneAttack`·`BossEncounterDirector` · 핸드오프 `Docs/tech/handoff-sound-spec-apply.md`
 - 11-09 계획과 다른 점: 간파 시작음 = 보스 간파 창 열림(플레이어 시전 아님) · 미사용 클립 랜덤 후보 제거 · 보스 BGM 미재생(`SceneBgmSwitcher` 배선 없음) 수정.
 
