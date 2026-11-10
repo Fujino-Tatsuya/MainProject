@@ -298,11 +298,13 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorArrow.prefab` — 루트 `LobbyFloorArrowStrip`, 자식 `Visual`(Quad + `M_LobbyFloorArrow`). 셰이더 `Lobby/FloorArrow` 가 `_Time` 으로 UV 를 민다. 늘 켜져 있다.
 - 루트 위치 = 띠 시작점, +Z = 진행 방향. 필드 `length` 4 · `width` 1 · `arrowSpacing` 1 · `heightOffset` 0.02 · `color` 하늘색 · `flowSpeed` 1.5 · `endFade` 0.15. `Visual` 트랜스폼은 손으로 고치지 말 것(값이 덮인다).
 
-### 대시 벨트 — `LobbyFloorDashBelt.prefab` (할 일 257)
+### 대시 벨트(경로형) — `LobbyFloorDashBelt.prefab` (할 일 257)
 
-- `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorDashBelt.prefab` — 직선 띠와 같은 구조: 루트 `LobbyFloorDashBelt`, 자식 `Visual`(Quad + `M_LobbyFloorDashBelt`), 셰이더 `Lobby/FloorDashBelt`(새 셰이더 — 기존 `Lobby/FloorArrow` 는 그대로). 옅은 띠 바탕 위에 대시 아이콘 `50.Art/UI/HUD/Common_Skillicon/Common_DashIcon.png`(**참조만**)이 길이 방향으로 반복돼 맥동(밝기·크기)하며 아주 느리게 앞으로 흐른다. **프리팹만** — 씬 배치·튜토리얼 연결은 아직 없다. 캐릭터 선택 화면에선 다른 바닥 표식처럼 숨는다(`CharacterSelectHudHider`).
-- 반복은 셰이더 `frac`(텍스처 임포트는 Clamp 그대로, SVN `.meta` 안 건드림). 칸 수 = `length / iconSpacing`, 아이콘 크기는 m 단위(`iconSize`)라 띠를 늘리면 아이콘이 늘어나지 않고 **개수가 는다**. 원본 » 는 진행 방향(+Z)을 가리켜 `iconRotation` 0 — 그림이 바뀌면 이 값만. 맥동은 칸마다 위상을 `pulsePhasePerIcon` 씩 밀어 앞으로 번지는 물결, 흘러가도 같은 아이콘은 같은 위상.
-- 필드 기본: `length` 6 · `width` 1 · `iconSpacing` 1 · `iconSize` 1(원본 여백 포함) · `heightOffset` 0.02 · `iconColor` 하늘색 α0.9(HDR) · `beltColor` 하늘색 α0.12(0 = 바탕 없음) · `flowSpeed` 0.15 m/초 · `endFade` 0.1 · `pulseSpeed` 0.6 회/초 · `pulsePhasePerIcon` 0.12 · `pulseBrightness` 0.5 · `pulseScale` 0.12. 수치는 컴포넌트가 `MaterialPropertyBlock` 으로 넣는다(머티리얼 값은 기본값일 뿐). `Visual` 트랜스폼은 손으로 고치지 말 것.
+- `Assets/2.Prefabs/Lobby/FloorArrow/LobbyFloorDashBelt.prefab` — 루트 `LobbyFloorDashBelt`, 자식 `Start`·`Waypoint1`·`End` = 경로 점(편집 방식은 경로형 화살표와 같다 — 점을 옮기고, 꺾이는 점이 더 필요하면 빈 자식을 `waypoints` 에 순서대로). 머티리얼 `M_LobbyFloorDashBelt`, 셰이더 `Lobby/FloorDashBelt`(새 셰이더 — 기존 `Lobby/FloorArrow` 는 그대로). 꺾은선을 따라 **하나로 이어진 띠**(폭 일정)를 깔고, 옅은 바탕 위에 대시 아이콘 `50.Art/UI/HUD/Common_Skillicon/Common_DashIcon.png`(**참조만**)이 경로 방향으로 반복돼 맥동(밝기·크기)하며 아주 느리게 흐른다. **프리팹만** — 씬 배치·튜토리얼 연결은 아직 없다. 캐릭터 선택 화면에선 다른 바닥 표식처럼 숨는다(`CharacterSelectHudHider`).
+- **띠 메시**(`LobbyFloorDashBeltLayout`, EditMode `LobbyFloorDashBeltLayoutTests`): 꺾임 = 반지름 `cornerRadius` 원호(10° 마다 꼭짓점, 인접 구간 절반·양 끝 구간 전체까지만 — 짧으면 반지름이 줄어듦), 0 = 마이터(뾰족, 상한 4배). UV 의 U = 누적 경로 길이 ÷ 전체 길이, V = 폭(오른쪽 0~왼쪽 1). 그래서 아이콘이 꺾임을 지나 계속 흐르고 그 자리 진행 방향을 가리킨다. 점 2개(직선) = 예전 직선 띠(눕힌 Quad)와 같은 꼭짓점·UV.
+- **메시 수명**: 켜질 때 한 번 + 에디터에서 점·폭·반지름·높이가 바뀔 때만(기즈모 그리기에서 해시 비교) 다시 만든다 — 매 프레임 생성 없음. 메시와 그것을 그리는 자식 `__DashBeltMesh` 는 **저장하지 않는다**(HideAndDontSave, 하이어라키에 안 보임) — 씬·프리팹에 구운 메시가 안 남는다. 숨은 자식이라 씬 뷰에서 띠를 클릭해 고를 수 없으니 루트나 점을 고른다(선택 시 띠 윤곽 기즈모). 런타임에 점을 움직여도 다시 만들지 않는다.
+- 반복은 셰이더 `frac`(텍스처 임포트는 Clamp 그대로, SVN `.meta` 안 건드림). 칸 수 = 경로 길이 ÷ `iconSpacing`, 아이콘 크기는 m 단위(`iconSize`)라 경로를 늘리면 아이콘이 늘어나지 않고 **개수가 는다**. 원본 » 는 진행 방향을 가리켜 `iconRotation` 0 — 그림이 바뀌면 이 값만. 맥동은 칸마다 위상을 `pulsePhasePerIcon` 씩 밀어 앞으로 번지는 물결, 흘러가도 같은 아이콘은 같은 위상. 둥근 모서리 안쪽은 아이콘이 살짝 눌린다(바깥은 늘어남).
+- 필드 기본: `width` 1 · `cornerRadius` 0.5 · `heightOffset` 0.02 · `iconSpacing` 1 · `iconSize` 1(원본 여백 포함) · `iconColor` 하늘색 α0.9(HDR) · `beltColor` 하늘색 α0.12(0 = 바탕 없음) · `flowSpeed` 0.15 m/초 · `endFade` 0.1(경로 길이 비율) · `pulseSpeed` 0.6 회/초 · `pulsePhasePerIcon` 0.12 · `pulseBrightness` 0.5 · `pulseScale` 0.12. 수치는 컴포넌트가 `MaterialPropertyBlock` 으로 넣는다(머티리얼 값은 기본값일 뿐).
 
 ### 안내 스텝 — `LobbyGuideSteps.prefab` (과도기)
 
