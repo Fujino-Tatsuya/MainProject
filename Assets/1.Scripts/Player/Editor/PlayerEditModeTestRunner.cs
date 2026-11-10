@@ -56,6 +56,7 @@ internal static class PlayerEditModeTestRunner
         "^DashDirectionRulesTests$", // 할 일 25 — 대시 방향 옵션(캐릭터 정면 기본 / 마우스 방향) 선택 규칙
         "^PlayerInputBufferTests$", // 할 일 44 — 선입력 버퍼 기록·만료·덮어쓰기·거부 사유별 보관/버림
         "^PlayerInputBufferDiagnosticsTests$", // 할 일 44 후속 — 선입력 버퍼 진단: 즉시·버퍼 실행·만료·놓친 간격·중앙값/90%
+        "^BasicAttackVerifyTests$", // 할 일 256 ① — 평타 오너 예측 서버 2차 검증: 순서·기대 간격(클립 이벤트)·여유·최근 최대 공속·중복·새 콤보·거너 고정 간격
         "^DefaultAttackChainRulesTests$", // 할 일 122 — 팔라딘 평타 End 다음 타 규칙(Loop 4→1·Once 종료·예약 없음 종료)·팔라딘 SO Loop·스텝 창 열림 < End
         "^PlayerBasicAttackInputRulesTests$", // 할 일 44 5차 — 거너 홀드 시작·공격 중 스킬 입력은 지금 발 마무리 뒤 예약(다음 발 금지·만료 없음·마지막 1개·연타 1회)
         "^AssassinHairClipRulesTests$", // 할 일 47 — 머리카락 구동기: 클립 → 보정 종류(회피 v15·v16·v13), 클립 안 초, trailing 재설정(전환·루프·되감기·리셋)

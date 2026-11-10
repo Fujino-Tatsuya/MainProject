@@ -79,6 +79,15 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
     [Tooltip("창의 첫 승인 뒤 이 시간(초) 안에 도착한 승인 = 동시 성공(연출·성공 기록만, 보스 효과 없음). 그 뒤는 선착순 패배.")]
     float simultaneousSeconds = 0.05f;
 
+    [Header("평타 서버 2차 검증 (할 일 256 — 간파와 무관, 같은 시트에 둔다)")]
+    [SerializeField, Min(0f)]
+    [Tooltip("평타 간격 여유(초) — 오너 판정 요청의 실제 간격에 더해 클립 이벤트 기반 기대 간격과 비교한다. 모자라면 그 히트는 데미지만 없다.")]
+    float basicAttackIntervalSlack = BasicAttackVerifySettings.DefaultIntervalSlack;
+
+    [SerializeField, Min(0f)]
+    [Tooltip("평타 공속 창(초) — 기대 간격을 나누는 공속 = 이 시간 안의 최대 공속(공속 버프가 막 풀린 순간에도 관대).")]
+    float basicAttackSpeedWindow = BasicAttackVerifySettings.DefaultAttackSpeedWindow;
+
     // ---- 검증 결과 이벤트(연출 cue 는 CueRouter — 4단계) ----
 
     /// <summary>[서버] 신고 하나를 처리했다(승인·거부 모두).</summary>
@@ -113,6 +122,9 @@ public sealed class InterruptManager : MonoBehaviour, IInterruptJudgeWorld
         AngleSlack = verifyAngleSlack,
         SimultaneousSeconds = simultaneousSeconds,
     };
+
+    /// <summary>평타 서버 2차 검증 수치(할 일 256).</summary>
+    public BasicAttackVerifySettings BasicAttackVerify => new BasicAttackVerifySettings(basicAttackIntervalSlack, basicAttackSpeedWindow);
 
     // ---- 플레이어 등록(정적 — 매니저보다 플레이어가 먼저 스폰될 수 있다) ----
 
