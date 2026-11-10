@@ -17,5 +17,9 @@ namespace Ami.BroAudio
         /// </summary>
         /// <param name="time">The delay duration in seconds.</param>
         internal IAudioPlayer SetDelay(float time);
+
+        // MainProject(2026-11-10, PLAN-sound-spec-apply Q11): 클립 앞부분을 건너뛰고 재생한다 — 완성음(낙하→충돌)의 충돌을
+        // 실제 사건에 맞추려는데 그만큼 일찍 시작할 사건이 없을 때. 엔티티 클립의 StartPosition 에 더해진다. 재생 시작 전에만 유효.
+        internal IAudioPlayer SetStartOffset(float seconds);
     }
 }

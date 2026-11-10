@@ -182,6 +182,7 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
     public override void OnClientPlay(Vector3 direction)
     {
         AssassinDashStrikeSkillData data = DashData;
+        departureSoundPlayed = false;
         ResolveLocalStage(direction, data, out dashDirection, out float stageDistance);
 
         // 일반 Q = 관통 일섬(시작점 기억 → OnEnd 에서 경로 위로 긋기), 변신 Q = Storm Slash 루프. 데이터 타입으로 가른다
@@ -249,9 +250,20 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
     // 전 피어 — 이 피어 애니메이터의 Custom0 = 준비 끝, 시뮬레이션 피어는 여기서 출발한다(판정 없음).
     public override void OnLocalAnimationEvent(SkillAnimationEventType eventType)
     {
+        // 출발음(사운드 명세 Assassin_Q_Skill — 일반·변신 Q·특성 복귀 돌진 모두 "실제 출발하는 순간" 1회, PLAN-sound-spec-apply 3.11).
+        // 🔴 이동 권한 조건(isLocallyDashing) **밖** — 그 값은 시뮬레이션 피어에서만 켜져서 안에 두면 관찰자가 못 듣는다.
+        // 그림자 회귀(AssassinShadowReturnSkill)도 이 메서드를 물려받는다.
+        if (eventType == SkillAnimationEventType.Custom0 && !departureSoundPlayed && owner != null)
+        {
+            departureSoundPlayed = true;
+            GameSoundHooks.Play(GameSoundHooks.AssassinQ, owner.transform.position, owner);
+        }
+
         if (eventType == SkillAnimationEventType.Custom0 && isLocallyDashing)
             isLocalDashReleased = true;
     }
+
+    private bool departureSoundPlayed;   // 이번 시전에 출발음을 냈나(이 피어)
 
     // 서버 전용 — 오너가 벽에 막혀 멈춘 실제 이동 거리. 0~지금 경로 상한으로 검증해 상한만 줄인다(늘리지 않음).
     // 243: 상한 = 이 단계 경로 길이(serverCap — 출발 Q = dashDistance, 그림자 회귀 = 출발점까지). Q 거리로 자르지 않는다.

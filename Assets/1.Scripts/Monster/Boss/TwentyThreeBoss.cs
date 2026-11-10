@@ -529,6 +529,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _vulnerableVisual.OnValueChanged += OnVulnerableVisualChanged;
         ApplyVulnerableTint(_vulnerableVisual.Value);   // 늦게 합류한 클라도 지금 값으로
         ResolveTelegraphs();
+        // 이미 죽은 채 합류 — 보스 곡을 새로 시작하지 않는다(BGM 은 AudioManager 가 무음 유지, PLAN-sound-spec-apply 4).
+        if (State == MonsterState.Dead)
+            AudioManager.Instance?.SetBossBgmState(AudioManager.BossBgmState.Defeated);
 
         // Wells 는 모든 피어에서 로컬 애니메이터를 구동한다(상태는 이 NetworkObject 가 복제).
         _wells = GetComponentInChildren<BossWells>(true);
@@ -2581,9 +2584,14 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     /// 초당 여러 번 나가 한 대 분이 빠져도 묻히지만, 벽 충돌은 <b>돌진 한 번에 많아야 한 번</b>이라
     /// 유실되면 그 사건이 통째로 사라진다. 빈도가 낮아 Reliable 비용도 무시할 만하다.
     /// </summary>
+    /// <param name="endsDash">벽에 박아 돌진이 <b>끝나는</b> 충돌인가(일반 돌진). 레이지 돌진은 벽에 닿아도 타이머까지 이어져 false.</param>
     [ClientRpc]
-    void PlayDashHitClientRpc()
+    void PlayDashHitClientRpc(bool endsDash)
     {
+        // 벽 충돌음(사운드 명세 Interrupt_Wall_01 ② — 23호가 돌진 중 벽에 박아 돌진이 끝나는 순간, 3.21). 레이지 연타는 제외.
+        if (endsDash)
+            GameSoundHooks.Play(GameSoundHooks.InterruptWall, transform.position);
+
         if (dashHit == null)
         {
             WarnNoDashHitOnce();
@@ -3436,6 +3444,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
         if (!string.IsNullOrEmpty(state))
             SafeCrossFade(state);
+
+        // 내려치기 1타(사운드 명세 23_Grab_Floor — 내려치기마다 충돌 순간 1회, 3.20). 서버 피해도 이 순간(ApplyGrabSlamDamage).
+        // 2·3타는 ReplayGrabSlamClientRpc. 예전 ThrowMini 애니 이벤트(클립 0.935)는 한 타 길이(≈0.46초)보다 뒤라 안 터졌다.
+        if (stage == GrabCycleState.Slam)
+            GameSoundHooks.Play(GameSoundHooks.No23GrabFloor, transform.position);
     }
 
     /// <summary>
@@ -3445,6 +3458,8 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void ReplayGrabSlamClientRpc()
     {
+        GameSoundHooks.Play(GameSoundHooks.No23GrabFloor, transform.position);   // 2·3타 내려치기(3.20)
+
         if (_boss == null || animator == null || animator.runtimeAnimatorController == null) return;
         if (string.IsNullOrEmpty(_boss.grabThrowState)) return;
 
@@ -4047,6 +4062,10 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     [ClientRpc]
     void StartGrabPulseClientRpc()
     {
+        // 잡기 시작음(사운드 명세 23_Grab_Start — 팔을 뻗으며 빨아들이는 VFX 가 시작되는 순간 1회, 루프 아님, 3.19).
+        // 펄스 VFX 는 0.3초마다 반복 생성되므로 엔트리가 아니라 이 RPC 에서 1번. 끊기면 AttackSoundKeys 가 정지. VFX 배선과 무관하게 먼저.
+        GameSoundHooks.Play(GameSoundHooks.No23GrabStart, transform.position);
+
         if (grabPulse == null)
         {
             WarnNoGrabPulseOnce();
@@ -5113,7 +5132,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
                 && DashDestinationReached(_rageDashDir))
             {
                 _rageDashHitPlayed = true;
-                PlayDashHitClientRpc();
+                PlayDashHitClientRpc(endsDash: false);   // 레이지 — 벽에 닿아도 돌진은 이어진다(벽 충돌음 없음)
             }
 
             if (_attackPhaseTimer > 0f) return;
@@ -5276,7 +5295,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         StopDashTrailClientRpc();
         StopNormalShieldClientRpc();
         // 벽에 처박았을 때만. 거리를 소진하고 멈춘 것은 충돌이 아니다(라인하르트 규칙 ②와 같은 기준).
-        if (hitWall) PlayDashHitClientRpc();
+        if (hitWall) PlayDashHitClientRpc(endsDash: true);
         meleeAttack?.EndHitWindow();
         EndDashMove();
         ReleaseDashCarry(applyImpact: hitWall);
@@ -7027,6 +7046,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     protected override void OnMonsterStateChanged(MonsterState previous, MonsterState next)
     {
         base.OnMonsterStateChanged(previous, next);
+
+        // 보스 사망 = BGM 2초 아웃(사운드 명세 — 일반 씬 전환 1초 아웃보다 우선, PLAN-sound-spec-apply 4). 🔴 서버 가드 **앞**(전 피어).
+        // 이미 죽은 채 합류한 클라는 이 콜백을 안 거친다(스폰 때 현재값 적용) — 보스 곡이 새로 켜지지도 않는다(phase 는 Combat 일 수 있음 → 아래 OnNetworkSpawn 보정).
+        if (previous != MonsterState.Dead && next == MonsterState.Dead)
+            AudioManager.Instance?.SetBossBgmState(AudioManager.BossBgmState.Defeated);
+
         if (!IsServer) return;
 
         TickSuppressExit(previous, next);
@@ -7151,7 +7176,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     }
     [ClientRpc] void DroneLockClientRpc(Vector3 pos, float radius, float lockTime, bool fromRight) { if (_drone != null) _drone.ClientLock(pos, radius, lockTime, fromRight); }
     [ClientRpc] void DroneImpactClientRpc(Vector3 pos, float radius) { if (_drone != null) _drone.ClientImpact(pos, radius); }
-    [ClientRpc] void DroneCancelClientRpc() { if (_drone != null) _drone.ClientCancel(); }
+    [ClientRpc] void DroneCancelClientRpc() { if (_drone != null) _drone.ClientAbort(); }   // 실제 취소 — 미리 시작한 드론 소리도 끈다(3.22)
     #endregion
 
     /// <summary>총 제압 칸(SO — 전 피어 같은 값). HUD 칸 줄이 칸 개수로 쓴다.</summary>
@@ -7294,6 +7319,11 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
     // 모든 피어에서 호출된다(서버 포함) — 표현만 담당. 붙어 있는 텔레그래프 **전부**를 구동한다.
     void OnCounterWindowChanged(bool previous, bool next)
     {
+        // 간파 시작음(사운드 명세 Interrupt_Start_01, PLAN-sound-spec-apply 3.1) — 창이 열리는 복제 전이에서 1번, 텔레그래프 반복문 밖.
+        // 스폰·늦은 합류는 ResolveTelegraphs 가 현재값을 직접 칠하므로 이 콜백을 안 거친다(소리 없음).
+        if (!previous && next)
+            GameSoundHooks.Play(GameSoundHooks.InterruptStart, transform.position);
+
         if (_telegraphs == null || _telegraphs.Length == 0) ResolveTelegraphs();
         if (_telegraphs == null) return;
 

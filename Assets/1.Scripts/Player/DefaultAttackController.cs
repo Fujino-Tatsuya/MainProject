@@ -508,6 +508,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
 
     private void PlaySlashVfx(int attackIndex, bool hit)
     {
+        // 휘두름 소리(사운드 명세 Paladin_Attack_01~04 — 타수별 해당 파일, 빗맞혀도 재생. PLAN-sound-spec-apply 3.7).
+        // 1~3타가 같은 VFX 엔트리라 엔트리 소리로는 타수를 못 가른다 — 여기서 타수 키로 직접 낸다. VFX 배선과 무관하게 먼저.
+        GameSoundHooks.Play(GameSoundHooks.PaladinAttackKey(attackIndex), transform.position, this);
+
         EffectSocketPlayer[] players = hit ? slashHit : slashMiss;
 
         // 배열이 콤보 길이보다 짧게 저작돼 있어도 조용히 빠진다 — 연출이 없는 것이

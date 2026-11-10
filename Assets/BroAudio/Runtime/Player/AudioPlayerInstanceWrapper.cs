@@ -74,6 +74,7 @@ namespace Ami.BroAudio
         IAudioPlayer ISchedulable.SetScheduledStartTime(double dspTime) => IsAvailable() ? Wrap(Instance.SetScheduledStartTime(dspTime)) : Empty.AudioPlayer;
         IAudioPlayer ISchedulable.SetScheduledEndTime(double dspTime) => IsAvailable() ? Wrap(Instance.SetScheduledEndTime(dspTime)) : Empty.AudioPlayer;
         IAudioPlayer ISchedulable.SetDelay(float time) => IsAvailable() ? Wrap(Instance.SetDelay(time)) : Empty.AudioPlayer;
+        IAudioPlayer ISchedulable.SetStartOffset(float seconds) => IsAvailable() ? Wrap(((ISchedulable)Instance).SetStartOffset(seconds)) : Empty.AudioPlayer;   // MainProject
 
         public void GetOutputData(float[] samples, int channels) => Instance?.GetOutputData(samples, channels);
         public void GetSpectrumData(float[] samples, int channels, FFTWindow window) => Instance?.GetSpectrumData(samples, channels, window);

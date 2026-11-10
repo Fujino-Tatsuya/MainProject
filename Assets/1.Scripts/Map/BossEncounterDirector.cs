@@ -337,17 +337,35 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         ValidateSetup();
     }
 
-    // 보스 BGM 키 — xlsx Sound 시트(Sound_2/BGM/Boss/BGM_Boss_001.wav).
-    private const string BossBgmKey = "BGM_Boss";
-
-    /// <summary>전투 시작 → 보스 BGM, 대기로 돌아감(전멸·중단) → 씬 BGM. 승리·패배 연출 동안은 보스 BGM 유지(씬 전환이 바꾼다).</summary>
+    /// <summary>
+    /// [전 피어] 보스 단계 → BGM(사운드 명세 BGM 규칙, PLAN-sound-spec-apply 4단계 — 경석 Q3).
+    /// 연출 시작(Preparing~Dialogue) = 스테이지 곡 1초 아웃·무음 / 전투(Combat) = 보스 곡 2초 인 /
+    /// 대기 복귀(전멸·중단)·안전 중단(FailedSafe) = 스테이지 곡으로. 보스 사망 2초 아웃은 23호 상태(TwentyThreeBoss)가 낸다.
+    /// 예전엔 SceneBgmSwitcher 를 찾았는데 그 컴포넌트가 어느 씬에도 없어 보스 곡이 안 났다(11-10 확인).
+    /// 판단은 AudioManager 한 곳 — 같은 상태 재요청은 무시되므로 늦은 합류의 현재값 적용도 그대로 부른다.
+    /// </summary>
     private void HandlePhaseBgm(BossEncounterPhase previous, BossEncounterPhase next)
     {
-        SceneBgmSwitcher bgm = SceneBgmSwitcher.Instance;
-        if (bgm == null || previous == next && next != BossEncounterPhase.Combat) return;
+        AudioManager audio = AudioManager.Instance;
+        if (audio == null) return;
 
-        if (next == BossEncounterPhase.Combat) bgm.PlayOverride(BossBgmKey);
-        else if (next == BossEncounterPhase.Idle && previous != BossEncounterPhase.Idle) bgm.RestoreSceneBgm();
+        switch (next)
+        {
+            case BossEncounterPhase.Preparing:
+            case BossEncounterPhase.Descending:
+            case BossEncounterPhase.Impact:
+            case BossEncounterPhase.Dialogue:
+                audio.SetBossBgmState(AudioManager.BossBgmState.Intro);
+                break;
+            case BossEncounterPhase.Combat:
+                audio.SetBossBgmState(AudioManager.BossBgmState.Combat);
+                break;
+            case BossEncounterPhase.Idle:
+            case BossEncounterPhase.FailedSafe:
+                audio.SetBossBgmState(AudioManager.BossBgmState.None);
+                break;
+            // AwaitingArrival(텔레포트 도착 대기)은 아직 연출 전 — 스테이지 곡 유지.
+        }
     }
 
     public override void OnNetworkDespawn()

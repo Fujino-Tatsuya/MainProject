@@ -466,6 +466,11 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         if (HasAuthority)
         {
+            // 취소음(사운드 명세 Gunner_Q_Skill_End02 — 충전이 발사 없이 취소되는 순간, PLAN-sound-spec-apply 3.15).
+            // 서버가 fired 로 확정해 전 피어에 1번. 사망으로 끝나면 무음(경석 Q4).
+            if (!fired && reason != SkillEndReason.CasterDied)
+                view?.ServerChargeCancelled();
+
             if (!fired && reason == SkillEndReason.DashCancelled)
             {
                 // 대시로 끊으면 쿨타임 적용(D2 — "Q 는 취소 불가" 의도를 지킨다)

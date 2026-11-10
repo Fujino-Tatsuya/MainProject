@@ -422,7 +422,55 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     // ═════════════════════════════════════════════════════════════════
 
     /// <summary>[전 피어] E 시작 — 방패 발광. 단계별 연출은 클립 이벤트 몫이다.</summary>
-    public void BeginGuardVfx() => shieldGlow?.FadeIn();
+    public void BeginGuardVfx()
+    {
+        shieldGlow?.FadeIn();
+        BeginGuardFailSound();
+    }
+
+    // ── E 실패음(사운드 명세 Paladin_E_Skill_Fail, PLAN-sound-spec-apply 3.9) ──
+    // "방어 성공 없이 방패를 내릴 때" 1번: ① 해제 클립 이벤트 GuardianRelease(홀드 만료·키 놓음·재입력)
+    // ② 그 이벤트 전에 강제로 끝남(대시·경직 등 — 경석 Q4 사망만 무음). 두 경로를 이 한 곳에 모아 시전당 1번만 낸다.
+    // 방어 성공은 반격 자세 전환(PlayGuardCounterPoseLocal) 으로 각 피어가 안다 — 서버 전용 model.Blocked 는 안 쓴다.
+    private const string GuardReleaseEffectId = "GuardianRelease";
+    private static readonly int GuardCounterStateHash = Animator.StringToHash("SubSkillCounter");   // FirstMeleeSubSkill.CounterStateName
+    private bool _guardSoundActive;
+    private bool _guardBlocked;
+    private bool _guardFailPlayed;
+    private EffectAnimEvents _guardClipEvents;
+
+    private void BeginGuardFailSound()
+    {
+        _guardSoundActive = true;
+        _guardBlocked = false;
+        _guardFailPlayed = false;
+
+        // 캐릭터 교체로 Armature 가 바뀔 수 있어 시전마다 다시 찾는다.
+        EffectAnimEvents events = GetComponentInChildren<EffectAnimEvents>();
+        if (events == _guardClipEvents) return;
+        if (_guardClipEvents != null) _guardClipEvents.Played -= OnGuardClipEffect;
+        _guardClipEvents = events;
+        if (_guardClipEvents != null) _guardClipEvents.Played += OnGuardClipEffect;
+    }
+
+    private void OnGuardClipEffect(string id)
+    {
+        if (id == GuardReleaseEffectId) PlayGuardFailSound();
+    }
+
+    /// <summary>[전 피어] E 종료(<c>FirstMeleeSubSkill.OnEnd</c>) — 해제 이벤트 전에 끊겼으면 여기서 실패음(사망 제외).</summary>
+    public void FinishGuardFailSound(SkillEndReason reason)
+    {
+        if (reason != SkillEndReason.CasterDied) PlayGuardFailSound();
+        _guardSoundActive = false;
+    }
+
+    private void PlayGuardFailSound()
+    {
+        if (!_guardSoundActive || _guardBlocked || _guardFailPlayed) return;
+        _guardFailPlayed = true;
+        GameSoundHooks.Play(GameSoundHooks.PaladinEFail, transform.position, this);
+    }
 
     /// <summary>
     /// [전 피어] E 종료(사유 무관) — 끊기면 클립의 Stop 이벤트가 안 오므로 루프를 여기서 회수한다(이미 꺼져 있으면 no-op).
@@ -633,6 +681,10 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         // Player·PlayerSkillController 와 같은 해석(미지정이면 자식의 첫 Animator).
         if (_animator == null)
             _animator = GetComponentInChildren<Animator>();
+
+        // 반격 자세 = 이번 E 는 방어 성공 — 이후 실패음 없음(3.9).
+        if (stateHash == GuardCounterStateHash)
+            _guardBlocked = true;
 
         if (_animator != null)
             _animator.CrossFadeInFixedTime(stateHash, fadeSeconds);

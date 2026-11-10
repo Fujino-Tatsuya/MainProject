@@ -2,7 +2,7 @@ using Ami.BroAudio;
 using UnityEngine;
 
 /// <summary>
-/// 저체력 경고음(11-09 경석 — 자세한 명세는 추후). <b>내 캐릭터만</b>, 체력 <see cref="threshold"/> 이하에서
+/// 저체력 경고음(11-09 경석). <b>내 캐릭터만</b>, 체력 <see cref="threshold"/> 이하에서
 /// 심장 소리 루프(<c>S1_Vignetting</c>)를 또렷하게 틀고, 나머지 효과음·BGM·환경음에는 먹먹한 효과(로우패스)를 건다.
 /// <para>
 /// 심장 소리는 엔티티 타입을 <b>VoiceOver</b> 로 둬서(Sound 시트) 로우패스 대상(Music·SFX·Ambience)에서 빠진다.
@@ -53,6 +53,8 @@ public class PlayerLowHealthAudio : MonoBehaviour
             return;
         }
 
+        // 기준 = 경석이 정한 30%(11-09). 11-10 에 HUD 빨간 경고 비율(startRatio 0.8)을 따르게 바꿨다가 80% 에서 켜져 되돌렸다(경석 11-10).
+        float threshold = this.threshold;
         int max = Mathf.Max(1, _player.FinalMaxHp);
         float ratio = Mathf.Clamp01((float)_player.CurrentHealth / max);
         bool low = ratio <= threshold && _player.CurrentHealth > 0;

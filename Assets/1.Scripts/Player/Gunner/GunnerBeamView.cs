@@ -690,6 +690,26 @@ public class GunnerBeamView : BaseNetworkBehaviour
             PlayChargeLaser(origin, end, width, stopped, hitPoints, echoTargetIds, stage);
     }
 
+    /// <summary>
+    /// [서버] Q 충전이 발사 없이 취소됐다 — 전 피어에 취소음 1번(사운드 명세 Gunner_Q_Skill_End02, PLAN-sound-spec-apply 3.15, 경석 11-10 안 A).
+    /// 🔴 서버가 확정한 결과로만 낸다. 원격 오너는 대시로 로컬 OnEnd 를 먼저 타서, 클라가 스스로 "발사 안 함"을 판정하면
+    /// 서버가 이미 쏜 발과 겹쳐 발사음·취소음이 둘 다 날 수 있다. 공용 EndSkillClientRpc 는 오너가 건너뛰므로 거너 전용 RPC 를 둔다.
+    /// </summary>
+    public void ServerChargeCancelled()
+    {
+        if (IsNetworkActive)
+            ChargeCancelledRpc();
+        else
+            PlayChargeCancelSound();
+    }
+
+    // Unreliable — 소리 1번뿐, 상태를 싣지 않는다.
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    private void ChargeCancelledRpc() => PlayChargeCancelSound();
+
+    private void PlayChargeCancelSound() =>
+        GameSoundHooks.Play(GameSoundHooks.GunnerQCancel, transform.position, this);
+
     // Reliable — 연출뿐 아니라 Focus → Skill 상태 전환도 싣는다(빠지면 그 피어만 집중 상태에 남는다).
     [Rpc(SendTo.ClientsAndHost)]
     private void ChargeLaserFiredRpc(Vector3 origin, Vector3 end, float width,

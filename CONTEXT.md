@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-11-10 · 경석(Claude) · **Sound_2 사운드 적용 명세 v0.1 반영**(기획 명세 기준 — 사건 이동 24건·직전 제외·타수별·BGM 규칙), 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-sound-spec-apply.md](PLAN-sound-spec-apply.md) ✅ grill Q1~Q11 · ✅ Codex 대조·계획 검수 반영 · ✅ 승인(11-10, 거너 Q 취소 = 거너 전용 RPC 1개) · ✅ 구현(Unity 끈 상태 — 컴파일·사운드 동기화·Play 미확인) · 미커밋(git·SVN) · 핸드오프 [handoff-sound-spec-apply.md](Docs/tech/handoff-sound-spec-apply.md)
+- 수정 예정: xlsx `Sound` 시트·`SoundCatalog`·`Sound1Library` 엔티티·BGM 엔티티(SVN) · VFX 엔트리 소리 파트 약 15개(SVN, 민경 영역) · `Assets/BroAudio/.../ShuffleClipStrategy.cs` · `Sound/AudioManager.cs` · 플레이어 스킬·뷰 훅(은희 영역, 한 줄 위주) · `TwentyThreeBoss`·`MonsterBase`·`SpinnerBot`·`GauntletBot`·`WellsDroneAttack`·`BossEncounterDirector` · 핸드오프 `Docs/tech/handoff-sound-spec-apply.md`
+- 11-09 계획과 다른 점: 간파 시작음 = 보스 간파 창 열림(플레이어 시전 아님) · 미사용 클립 랜덤 후보 제거 · 보스 BGM 미재생(`SceneBgmSwitcher` 배선 없음) 수정.
+
 ## ▶▶ 작업 세션 (2026-11-09 · 경석(Claude) · **사운드 2차 정리 — 재생 경로 통일·3D 거리 완화·다른 플레이어 30%·루프 끊기·미연결 20개·믹스**, 브랜치 `feature/SettingsDdol`) — 계획 [PLAN-sound-mix.md](PLAN-sound-mix.md) ✅ 승인(Q1~Q6 · Codex 교차검증) · ⏳ 구현
 - 수정 예정: `Sound/AudioManager.cs` · `Effects/EffectManager.cs` · `Effects/EffectPart.cs` · `Effects/EffectSocketPlayer.cs` · 미연결 훅(보스·플레이어 호출부 한 줄씩) · xlsx Sound 시트(SVN) · VFX 엔트리 소리 파트(SVN)
 - 11-09 진행: 1~3단계 구현 · 컴파일 0 · 미커밋(git·SVN). Sound 시트 행 번호 불일치 760행(11-06 r615·r618 추가분) 같이 정리. **시트 볼륨 배율은 전부 1(Q7 — 크기는 클립으로 맞춘다, 담당 요청 = 경석)**.

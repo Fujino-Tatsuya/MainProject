@@ -213,6 +213,11 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
         if (animator != null && !animator.TryGetComponent(out MonsterAnimationEventRelay _))
             animator.gameObject.AddComponent<MonsterAnimationEventRelay>();
 
+        // 피격음(사운드 명세 Hit_Monster — PLAN-sound-spec-apply 3.2·3.4): 피해 RPC 1개 = 타격 1건당 1번, 전 피어.
+        ClientDamagedAttributed += _hitSound.OnDamaged;
+        ClientHitAttributed += OnHitAttributedForSound;
+        SubscribeClipSoundEvents();
+
         _state.OnValueChanged += OnStateChanged;
         _counterVisual.OnValueChanged += OnCounterVisualChanged;
         _vulnerable.OnValueChanged += OnVulnerableChanged;
@@ -252,8 +257,42 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
 
     MonsterStatusEffectVfxPresenter _statusVfx;
 
+    readonly MonsterHitSoundTracker _hitSound = new MonsterHitSoundTracker();
+
+    void OnHitAttributedForSound(ulong attackerClientId) => _hitSound.OnHit(attackerClientId, this);
+
+    // 주먹 휘두름 소리(사운드 명세 Punch_01~12 — 23호·건틀릿이 주먹을 휘두르는 타이밍, 적중 무관, 직전 제외 랜덤, 3.17).
+    // 펀치 클립의 StartEffect(Wind_L/R) 1번 = 휘두름 1번 — 전 피어 로컬 애니 이벤트. 적중 스파크(FX_Punch_Hit_Spark)에서 옮겼다.
+    // 이 id 를 가진 몹은 23호·건틀릿봇뿐이다(프리팹 PunchWind_L/R).
+    EffectAnimEvents _soundClipEvents;
+
+    void SubscribeClipSoundEvents()
+    {
+        EffectAnimEvents events = animator != null ? animator.GetComponent<EffectAnimEvents>() : null;
+        if (events == null) events = GetComponentInChildren<EffectAnimEvents>(true);
+        if (events == _soundClipEvents) return;
+        UnsubscribeClipSoundEvents();
+        _soundClipEvents = events;
+        if (_soundClipEvents != null) _soundClipEvents.Played += OnClipEffectForSound;
+    }
+
+    void UnsubscribeClipSoundEvents()
+    {
+        if (_soundClipEvents != null) _soundClipEvents.Played -= OnClipEffectForSound;
+        _soundClipEvents = null;
+    }
+
+    void OnClipEffectForSound(string id)
+    {
+        if (id == "Wind_L" || id == "Wind_R")
+            GameSoundHooks.Play(GameSoundHooks.Punch, transform.position);
+    }
+
     public override void OnNetworkDespawn()
     {
+        ClientDamagedAttributed -= _hitSound.OnDamaged;
+        ClientHitAttributed -= OnHitAttributedForSound;
+        UnsubscribeClipSoundEvents();
         _state.OnValueChanged -= OnStateChanged;
         _counterVisual.OnValueChanged -= OnCounterVisualChanged;
         _vulnerable.OnValueChanged -= OnVulnerableChanged;
@@ -2463,6 +2502,11 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
         if (IsServer && (next == MonsterState.Dead || next == MonsterState.Idle))
             _aimGate?.CancelAiming();
 
+        // 사망음(사운드 명세 Dead_Monster — 일반 몬스터·중간보스가 죽는 순간, 최종 보스 제외, 3.23). 복제 전이 1회, 전 피어.
+        // 예전엔 사망 VFX(FX_Death_Explosion_01)에 붙어 사망 클립이 끝난 뒤에야 났고, 중간보스(Death_02)는 무음이었다.
+        if (next == MonsterState.Dead && previous != MonsterState.Dead && Rank != MonsterRank.Boss)
+            GameSoundHooks.Play(GameSoundHooks.MonsterDead, transform.position);
+
         // 몸 콜라이더 — 서버(EnterDead)만 끄면 이동 권한이 있는 원격 플레이어가 디졸브 동안 시체에 막힌다(점검 10-14).
         if (next == MonsterState.Dead && bodyCollider != null)
             bodyCollider.enabled = false;
@@ -2622,6 +2666,11 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
 
     void OnCounterVisualChanged(bool previous, bool next)
     {
+        // 간파 시작음(사운드 명세 Interrupt_Start_01 — 보스가 간파 가능해져 몸 색이 바뀌는 순간, 3.1). 복제 전이에서만 —
+        // 스폰·늦은 합류의 현재값 적용(ApplyCounterWindowVisual 직접 호출)은 이 콜백을 안 거치므로 소리가 안 난다.
+        if (!previous && next)
+            GameSoundHooks.Play(GameSoundHooks.InterruptStart, transform.position);
+
         ApplyCounterWindowVisual(next);
         // 창이 닫히며 지운 베이스 틴트를 취약 색으로 다시 칠한다 — 간파 성공은 창 닫힘·그로기가 같은 틱에 오고
         // 두 복제 콜백의 순서는 정해져 있지 않다.

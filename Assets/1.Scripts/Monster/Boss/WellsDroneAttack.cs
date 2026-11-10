@@ -326,6 +326,9 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _view = View.Lock;
         _vStart = Time.time;
         _vDur = Mathf.Max(0.01f, lockTime);
+        // 새 드론 — 이전 드론의 소리(이미 터졌거나 취소됨)는 손대지 않고 이 드론의 소리를 새로 센다.
+        _droneSound = null;
+        _droneSoundStarted = false;
         _vPos = pos;
         _vRadius = radius;
         _vFloorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.07f;
@@ -358,10 +361,46 @@ public sealed class WellsDroneAttack : MonoBehaviour
         }
     }
 
+    // ── 드론 소리(사운드 명세 23_Drone — 낙하음+폭발음 한 파일, 실제 폭발 약 0.5초 전 시작·폭발 때 다시 안 냄, PLAN-sound-spec-apply 3.22) ──
+    // 각 피어가 Lock 을 받은 시각부터 자기 시계로 센다(폭발 시각 = lockTime 뒤 — 서버 Impact 와 같은 길이). 새 RPC 없음.
+    // 🔴 ClientCancel 은 정상 폭발(ClientImpact)·다음 표식에서도 불리는 "화면 정리"다 — 소리는 거기서 끄지 않는다.
+    //    끄는 곳은 실제 취소(ClientAbort = DroneCancelClientRpc)와 비활성화뿐(경석 Q5 — 0.1초 페이드).
+    Ami.BroAudio.IAudioPlayer _droneSound;
+    bool _droneSoundStarted;
+    bool _suppressDroneSound;   // 로딩 예열(PrewarmClientPath) 중엔 소리 없음
+
+    void TickDroneSound()
+    {
+        if (_droneSoundStarted || _suppressDroneSound) return;
+        float remaining = _vDur - (Time.time - _vStart);
+        if (remaining > GameSoundHooks.DroneLeadSeconds) return;
+        StartDroneSound(remaining);
+    }
+
+    // remaining = 지금부터 폭발까지(초). 파일 안 폭발음(= DroneLeadSeconds 지점)이 그때 울리게 — 늦었으면 앞부분을 건너뛴다(Q11).
+    void StartDroneSound(float remaining)
+    {
+        _droneSoundStarted = true;
+        _droneSound = GameSoundHooks.PlayAligned(GameSoundHooks.No23Drone, _vPos, null,
+            Mathf.Max(0f, remaining), GameSoundHooks.DroneLeadSeconds);
+    }
+
+    /// <summary>[전 피어] 서버가 드론을 취소했다(보스 사망·송전기 진입·제압·각본 정지) — 화면 정리 + 미리 시작한 소리 정지.</summary>
+    public void ClientAbort()
+    {
+        GameSoundHooks.Stop(_droneSound, 0.1f);
+        _droneSound = null;
+        ClientCancel();
+    }
+
     public void ClientImpact(Vector3 pos, float radius)
     {
         EnsureView();
-        ClientCancel();   // 예고 원·드론을 거둔다
+        // 프레임이 낮아 미리 시작 전에 폭발이 먼저 왔다 — 폭발음 지점부터 지금 재생(앞부분 생략).
+        if (_view == View.Lock && !_droneSoundStarted && !_suppressDroneSound) StartDroneSound(0f);
+        // 이미 터졌다 — 이 소리는 더는 취소 대상이 아니다(서버는 폭발 단계에서도 제압·사망에 취소 RPC 를 보낸다, 꼬리까지 둔다).
+        _droneSound = null;
+        ClientCancel();   // 예고 원·드론을 거둔다(소리는 끝까지 둔다)
 
         // 🔴 폭발은 EffectCatalog.Wells_Drone_Explosion 의 EffectManager 일회 재생이다(2026-10-08 민경).
         //    수명은 엔트리가 정하고 풀이 회수한다 — 핸들을 쥐지 않으므로 뒤이은 제압·사망 취소에도
@@ -397,6 +436,13 @@ public sealed class WellsDroneAttack : MonoBehaviour
     /// 첫 그리기와 풀 반납까지 게임 메서드를 그대로 한 번씩 돈다. 판정·RPC·서버 상태는 건드리지 않는다.
     /// </summary>
     internal void PrewarmClientPath(Transform target)
+    {
+        _suppressDroneSound = true;
+        try { PrewarmClientPathCore(target); }
+        finally { _suppressDroneSound = false; }
+    }
+
+    void PrewarmClientPathCore(Transform target)
     {
         ClientMark(target, 1f);
         _vStart = Time.time - 0.5f;
@@ -437,6 +483,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 break;
 
             case View.Lock:
+                TickDroneSound();
                 if (_paintedStyleVersion != TelegraphStyleSO.Version) PaintLockCircle();   // Play 중 스타일 조절 — 진행은 그대로
                 PlaceDisc(_fill, _vRadius * k, 0.01f);   // 안쪽 진한 원이 1초 동안 차오른다(§7)
                 if (_droneGo != null)
@@ -507,7 +554,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _fill = BossPatternVisuals.CreateFlat("CircleFill", _viewRoot);
     }
 
-    void OnDisable() => ClientCancel();
+    void OnDisable() => ClientAbort();
 
     void OnDestroy()
     {

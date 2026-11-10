@@ -97,6 +97,10 @@ namespace Ami.BroAudio
         public static IAudioPlayer SetDelay(this IAudioPlayer player, float time)
             => player?.SetDelay(time);
 
+        /// <inheritdoc cref="ISchedulable.SetStartOffset(float)"/>
+        public static IAudioPlayer SetStartOffset(this IAudioPlayer player, float seconds)   // MainProject(2026-11-10)
+            => player?.SetStartOffset(seconds);
+
         #region Velocity
         /// <summary>
         /// Set the velocity and use it to determine which audio clip to play

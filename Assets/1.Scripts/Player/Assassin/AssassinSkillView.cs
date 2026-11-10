@@ -105,7 +105,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     {
         state = GetComponent<AssassinState>();
         if (state != null)
-            state.TransformChanged += HandleTransformChanged;
+            state.TransformChanged += HandleTransformEvent;
         player = GetComponent<Player>();
         animEvents = GetComponent<EffectAnimEvents>();
         if (animEvents != null)
@@ -124,7 +124,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     public override void OnDestroy()
     {
         if (state != null)
-            state.TransformChanged -= HandleTransformChanged;
+            state.TransformChanged -= HandleTransformEvent;
         if (animEvents != null)
             animEvents.Played -= HandleAnimEffectPlayed;
         // 디스폰·씬 언로드 — 아웃트로 없이 바로 반납(추종 대상이 사라지므로).
@@ -442,6 +442,28 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     }
 
     // ── 루프 ──
+
+    // 변신 시작·해제 소리(사운드 명세 Assassin_R_Skill_Start/End, PLAN-sound-spec-apply 3.14) — 실제 전이 이벤트에서만.
+    // 예전엔 루프 엔트리(BladeVortex)의 파트·outro 에 붙어 있어 늦은 접속 복원(SyncLoops)에서도 시작음이 났다.
+    // 해제음은 직접·자동·쓰러짐 모두 내되 **사망으로 풀릴 때는 안 낸다**(경석 11-10 — 죽으면 사망 쪽 소리만).
+    // 해제 사유는 복제되지 않아 이 피어가 본 그 플레이어의 생사로 가른다(복제 순서로 드물게 어긋나도 허용).
+    private void HandleTransformEvent(bool on)
+    {
+        if (on)
+            GameSoundHooks.Play(GameSoundHooks.AssassinRStart, transform.position, this);
+        else if (!IsDeadForSound())
+            GameSoundHooks.Play(GameSoundHooks.AssassinREnd, transform.position, this);
+
+        HandleTransformChanged(on);
+    }
+
+    private bool IsDeadForSound()
+    {
+        if (player == null) return false;
+        if (player.CurrentHealth <= 0) return true;
+        PlayerLifeCycleController life = player.GetComponent<PlayerLifeCycleController>();
+        return life != null && life.State != PlayerLifeState.Alive;
+    }
 
     // 변신 루프 — 켜면 차오르고(프리팹이 0.5초 안에 스스로 채운다), 끄면 엔트리의 outro 로 흩어진다
     // (End 원샷 + 남은 입자 ×outroPlayRate). 쓰러짐·사망도 같은 이벤트로 온다.

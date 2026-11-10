@@ -266,6 +266,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _flowId++;
         _phase = NetworkLoadingPhase.LoadingScene;
         _minimumTimerStartedAt = Time.unscaledTime;
+        AudioManager.Instance?.BeginSceneTransition();   // [서버] 전환 시작 = 로딩 씬 올리기 전 — BGM 1초 아웃(PLAN-sound-spec-apply 4)
         _sourceSceneName = SceneManager.GetActiveScene().name;
         _sourceIsNetworkScene = _networkLoadedScenes.Contains(_sourceSceneName);
 
@@ -328,6 +329,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _flowId++;
         _phase = NetworkLoadingPhase.LoadingScene;
         _minimumTimerStartedAt = Time.unscaledTime;
+        AudioManager.Instance?.BeginSceneTransition();   // [서버] 전환 시작 = 로딩 씬 올리기 전 — BGM 1초 아웃(PLAN-sound-spec-apply 4)
         _sourceSceneName = targetSceneName; // 소스 = 타깃 → 로컬 소스 언로드는 건너뛰고 아래 재시작 분기가 언로드한다
         _restartingTargetScene = true;
 
@@ -1071,6 +1073,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         _phase = NetworkLoadingPhase.LoadingGame;
         _localLoadOperation = sceneEvent.AsyncOperation;
+        // 로비 → 맵 전환 시작(전 피어 — 서버는 클라마다 여러 번 오지만 멱등) — BGM 1초 아웃(PLAN-sound-spec-apply 4)
+        AudioManager.Instance?.BeginSceneTransition();
 
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.HandleLoadStarted target scene={sceneEvent.SceneName} clientId={sceneEvent.ClientId}");
         LogDebug($"Target load started. clientId={sceneEvent.ClientId}, asyncOperation={_localLoadOperation != null}.");
@@ -1598,6 +1602,12 @@ public class NetworkLoadingFlowController : MonoBehaviour
             // 첫 진입(_phase=Idle)은 건드리지 않는다 — 로딩 씬 이벤트가 먼저 와서 로비를 잡아 뒀을 수 있다.
             _sourceSceneName = string.Empty;
         }
+
+        // [클라] 새 흐름의 로딩 씬 단계를 처음 받은 순간 = 전환 시작 — BGM 1초 아웃(PLAN-sound-spec-apply 4).
+        // 🔴 LoadingScene 단계만 — 뒤 단계 상태는 맵 BGM(MainGameReady) 뒤에도 오므로 거기서 끄면 맵 곡이 꺼진다.
+        if ((NetworkLoadingPhase)phaseValue == NetworkLoadingPhase.LoadingScene &&
+            (flowId != _flowId || _phase != NetworkLoadingPhase.LoadingScene))
+            AudioManager.Instance?.BeginSceneTransition();
 
         _flowId = flowId;
         _phase = (NetworkLoadingPhase)phaseValue;

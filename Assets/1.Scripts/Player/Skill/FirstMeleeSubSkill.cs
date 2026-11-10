@@ -332,6 +332,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         // 🔴 종료 사유를 가리지 않는다 — 끊기면 클립의 Stop 이벤트가 안 오므로 루프를 여기서 회수한다(이미 꺼져 있으면 no-op).
         //    소켓 safetyTimeout 은 이 경로가 실패했을 때의 그물이다.
         skillView?.EndGuardVfx();
+        skillView?.FinishGuardFailSound(reason);   // 해제 이벤트 전에 끊긴 실패면 실패음(사망 제외) — PLAN-sound-spec-apply 3.9
         // 홀드 방식 정리 — 다음 시전(탭 방식일 수 있다)의 방어중 자동 해제를 막지 않게 오너·서버에서 내린다(관찰자는 동기로 따라온다).
         if (ownerHoldMode || IsServerPeer)
             SetGuardHoldParam(false);

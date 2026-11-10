@@ -34,6 +34,7 @@ namespace Ami.BroAudio.Runtime
             ID = id;
             _pref = pref;
             _clip = clip;
+            _startOffset = 0f;   // MainProject: SetStartOffset 은 이번 재생에만
         }
 
         public void Play()
@@ -110,7 +111,9 @@ namespace Ami.BroAudio.Runtime
             {
                 AudioSource.clip = audioClip;
                 AudioSource.priority = _pref.Entity.Priority;
-                AudioSource.timeSamples = GetSample(audioClip.frequency, _clip.StartPosition);
+                // MainProject: + SetStartOffset(클립 길이 안으로 자른다)
+                AudioSource.timeSamples = Mathf.Min(GetSample(audioClip.frequency, _clip.StartPosition + _startOffset),
+                    Mathf.Max(0, audioClip.samples - 1));
                 SetInitialPitch(_pref.Entity, audioTypePref);
                 SetSpatial(_pref);
                 SetupAudioTrack(audioTypePref);

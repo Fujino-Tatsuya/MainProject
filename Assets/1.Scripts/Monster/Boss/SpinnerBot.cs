@@ -513,9 +513,30 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
     /// </summary>
     void StopSpinEffect()
     {
+        StopSpinSound(0.1f);   // 소리는 VFX 배선과 무관하게 먼저 끈다(아래 조기 반환 앞)
         if (_effects == null && !TryGetComponent(out _effects)) return;
         _effects.StopEffect(spinEffectId);
     }
+
+    // 회전 공격 소리(사운드 명세 Spinner_Interrupt_Attack — 인터럽트 예고가 끝나고 실제 회전을 시작할 때 ~ 회전 공격 종료, 루프, 3.18).
+    // 시작 = PlaySpinLoopClientRpc(BeginDash, 전 피어), 끝 = StopSpinEffect(공격 이탈 = 정상·그로기·사망·리쉬 공통) · 디스폰.
+    // 예전엔 회전 VFX(FX_Mob_Spin, 시작 클립 32.7% 이벤트)에 붙어 예고가 끝나기 직전에 시작했다.
+    Ami.BroAudio.IAudioPlayer _spinSound;
+
+    void StopSpinSound(float fadeOut)
+    {
+        GameSoundHooks.Stop(_spinSound, fadeOut);
+        _spinSound = null;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        StopSpinSound(0f);
+        base.OnNetworkDespawn();
+    }
+
+    // 디스폰 없이 꺼지는 경우(풀 반납·씬 정리) — 오디오 재생기는 이 오브젝트와 따로라 루프가 남는다.
+    void OnDisable() => StopSpinSound(0f);
 
     // ─── 준비 동작 늘이기(팀장 10-16: 예고가 다 차야 그때부터 회전) ───
     // 시작 클립은 앞부분이 준비 동작이고 StartEffect(Spin) 이벤트 지점부터 회전한다(A_Spinner_AttackStart 32.7%).
@@ -566,6 +587,8 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
     {
         _spinWindupAnimScale = 1f;
         SafeCrossFade(spinLoopState);
+        StopSpinSound(0f);
+        _spinSound = GameSoundHooks.Play(GameSoundHooks.SpinnerSpin, transform.position);
     }
 
     [ClientRpc]

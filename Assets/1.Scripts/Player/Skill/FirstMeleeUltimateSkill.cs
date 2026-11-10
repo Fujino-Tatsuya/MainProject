@@ -118,7 +118,20 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
         // Stick 은 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.
         skillView?.SetStickPlayRate(VfxPlayRate);
+
+        // 소리(사운드 명세 Paladin_R_Skill — R 시전 때 1회, 파일 안 낙하·충돌음을 실제 착탄에 맞춘다. PLAN-sound-spec-apply 3.8).
+        // 승인된 시전 시작(전 피어)에서 피해(Hit)까지 남은 실제 시간으로 정렬 — 지금 값이면 파일 앞 약 0.2초를 건너뛴다.
+        GameSoundHooks.Stop(castSound, 0f);
+        // 실제 배속 = 스킬 속도 파라미터(UltimateSpeed) × Animator.speed(공격속도 — PlayerAttackSpeedAnimator). 시전 중 공속 변화는 무시.
+        float animatorSpeed = animator != null ? Mathf.Max(0.01f, animator.speed) : 1f;
+        float hitSeconds = GameSoundHooks.PaladinRHitClipTime / Mathf.Max(0.01f, AnimationSpeed * BeforeHitSpeedMultiplier * animatorSpeed);
+        castSound = owner != null
+            ? GameSoundHooks.PlayAligned(GameSoundHooks.PaladinR, owner.transform.position, owner, hitSeconds, GameSoundHooks.PaladinRFileImpact)
+            : null;
     }
+
+    // 이번 시전의 R 소리(이 피어). 완주 못 하고 끝나면 칼 연출과 같이 걷는다.
+    private Ami.BroAudio.IAudioPlayer castSound;
 
     /// <summary>[오너] R 을 눌러 조준에 들어갔다. 낙뢰를 바로 떨어뜨리고, 이어서 칼날에 전기가 흐른다.</summary>
     public override void OnOwnerAimStart()
@@ -202,7 +215,11 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // Custom0 에서 쏜 칼이 떨어지는 중에 완주 못 하고 끝났다 — 피해가 없으니 걷는다. 완주면 끝까지 재생한다.
         // 안전망 종료(MaxDurationReached)도 걷는다 — End 이벤트가 안 온 경우라 피해가 났어도 여기는 사유만 안다.
         if (FinalStrikeVfxSchedule.ShouldRecall(reason))
+        {
             skillView?.StopTargetStrikeLocal();
+            GameSoundHooks.Stop(castSound, 0.1f);
+        }
+        castSound = null;
 
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)

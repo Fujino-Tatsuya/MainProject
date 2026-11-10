@@ -209,6 +209,12 @@ public class GunnerTrackingLaserView : BaseNetworkBehaviour
     private void PlayStrikes(Vector3[] positions)
     {
         phaseStart = Time.time;   // 원이 0 이 되는 순간 = 지금
+
+        // 광선 발사음(사운드 명세 Gunner_R_Skill — 설정 간격마다 광선을 실제로 쏠 때마다, PLAN-sound-spec-apply 3.16).
+        // 이 RPC 1번 = 낙뢰가 보이는 틱 1번 — 맞은 대상 수와 무관하게 1번(경석 Q6). 빈 틱은 서버가 RPC 를 안 보내 무음. VFX 배선과 무관하게 먼저.
+        if (positions != null && positions.Length > 0)
+            GameSoundHooks.Play(GameSoundHooks.GunnerR, positions[0]);
+
         if (strikeEffect == null || !EffectManager.TryGet(out EffectManager effects, this)) return;
 
         EffectTint tint = OverdriveTint;

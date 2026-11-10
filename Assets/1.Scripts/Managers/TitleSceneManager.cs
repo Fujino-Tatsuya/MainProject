@@ -36,6 +36,7 @@ public class TitleSceneManager : NemoSceneManager
             return;
         }
 
+        AudioManager.Instance?.BeginSceneTransition();   // BGM 1초 아웃(사운드 명세 BGM 규칙 — PLAN-sound-spec-apply 4)
         StartCoroutine(FadeThenInvoke(GoToLobbyOrBeginDemo));
     }
 

@@ -179,7 +179,20 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         // 연출은 권위와 무관하다 — 모든 피어가 각자 켠다.
         // Play 는 이미 재생 중이면 먼저 회수하므로 두 번 불려도 겹치지 않는다.
         skillView?.BeginSmashHold();
+
+        // 소리(사운드 명세, PLAN-sound-spec-apply 3.5·3.6) — 전 피어. 일반 Q = 달리기 루프(OnEnd 에서 끔),
+        // 돌파의 방패(한 번에 훅 대시) = 루프 대신 Character_Dash 1회. 피해마다의 Paladin_Q 는 MonsterHitSoundTracker 가 낸다.
+        GameSoundHooks.Stop(qLoopSound, 0f);
+        qLoopSound = null;
+        if (owner != null)
+        {
+            if (shieldDash) GameSoundHooks.Play(GameSoundHooks.Dash, owner.transform.position, owner);
+            else qLoopSound = GameSoundHooks.Play(GameSoundHooks.PaladinQLoop, owner.transform.position, owner);
+        }
     }
+
+    // 일반 Q 달리기 루프(이 피어). OnEnd 가 사유를 가리지 않고 끈다.
+    private Ami.BroAudio.IAudioPlayer qLoopSound;
 
     public override void OnAimUpdated(Vector3 direction)
     {
@@ -310,6 +323,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         // 🔴 종료 사유를 가리지 않는다. 취소·사망·안전망 만료 어느 쪽으로 끝나도 여기를 지나므로
         //    루프가 남는 경로가 없다. (Stop 은 재생 중이 아니면 조용한 no-op 이다)
         skillView?.EndSmashHold();
+        GameSoundHooks.Stop(qLoopSound, 0.05f);
+        qLoopSound = null;
 
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)

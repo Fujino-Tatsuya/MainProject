@@ -52,6 +52,7 @@ namespace Ami.BroAudio.Runtime
             IAudioPlayer ISchedulable.SetScheduledStartTime(double dspTime) => this;
             IAudioPlayer ISchedulable.SetScheduledEndTime(double dspTime) => this;
             IAudioPlayer ISchedulable.SetDelay(float time) => this;
+            IAudioPlayer ISchedulable.SetStartOffset(float seconds) => this;   // MainProject
             float IAudioPlayer.GetVolume() => 0f;
         }
 

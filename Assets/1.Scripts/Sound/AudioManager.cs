@@ -5,7 +5,7 @@ using Ami.BroAudio;
 /// <summary>
 /// 사운드 재생·BGM·볼륨의 중앙 창구(싱글톤). 기존 FMOD의 SoundManager를 대체한다.
 /// BroAudio 파사드(<see cref="BroAudio"/>) 위에 게임 의미의 메서드를 얹기만 하며,
-/// 씬↔BGM 전환은 <see cref="SceneBgmSwitcher"/>가 담당한다.
+/// BGM 전환(씬·보스 단계)도 여기서 판단한다(11-10 PLAN-sound-spec-apply 4 — <see cref="SceneBgmSwitcher"/> 는 배선이 없어 쓰지 않는다).
 ///
 /// 이름은 BroAudio 내부의 Ami.BroAudio.Runtime.SoundManager와 혼동을 피하려 AudioManager로 둔다.
 /// (BroAudio 런타임은 최초 사용 시 자동 초기화되므로 별도 초기화 호출은 불필요하다.)
@@ -352,15 +352,105 @@ public class AudioManager : MonoBehaviour
 
     #region BGM
 
+    // ── BGM 공통 규칙(사운드 명세 v0.1 원칙 10 · PLAN-sound-spec-apply 4단계, 11-10) ──
+    // · 같은 곡 반복 = 엔티티 Seamless 2초(끝 2초 전 같은 파일을 겹쳐 시작 — BroAudio 엔티티 TransitionTime 2).
+    // · 곡이 바뀔 때 = 지금 곡을 페이드아웃 → **끝난 뒤** 새 곡 2초 페이드인. 서로 다른 곡은 겹치지 않는다(로딩 중 공백 허용).
+    // · 씬 전환 시작 = 1초 아웃(BeginSceneTransition). 씬 로딩은 음악을 기다리지 않는다(여기는 소리만).
+    // · 보스: 연출 시작(Preparing) = 스테이지 곡 1초 아웃 → 연출 중 무음 → 전투 시작 = 보스 곡 2초 인 →
+    //   보스 사망 = 2초 아웃이 이긴다(그 뒤 오는 일반 아웃은 진행 중 아웃을 줄이지 못한다).
+    // 판단은 이 한 곳 — "씬이 원하는 곡"과 "보스 상태"를 보고 지금 틀 곡을 고른다(EvaluateBgm). 요청은 멱등.
+    // 🔴 개별 재생기 핸들 대신 SoundID 로 끈다 — Seamless 반복은 회차마다 재생기가 바뀌어 옛 핸들은 이미 끝나 있을 수 있다.
+    //    BroAudio Stop(id) 은 완료 콜백이 없어 페이드 시간을 직접(실시간) 센다.
+    public enum BossBgmState { None, Intro, Combat, Defeated }
+
+    public const string BossBgmKey = "BGM_Boss";
+    private const float BgmSceneFadeOut = 1f;
+    private const float BgmBossDeathFadeOut = 2f;
+    private const float BgmFadeIn = 2f;
+
+    private string _sceneBgmKey;            // 이 씬이 원하는 곡(없으면 null)
+    private BossBgmState _bossBgm;          // 같은 씬 안 보스 단계
+    private string _bgmKey;                 // 지금 울리는(또는 끄는 중인) 곡
+    private SoundID _bgmId = SoundID.Invalid;
+    private bool _bgmStopping;
+    private int _bgmGeneration;
+
     /// <summary>
-    /// 카탈로그 키로 BGM을 재생한다. 엔트리의 볼륨 배율을 적용하고, 재생 제한(동시 수·쿨다운)은 쓰지 않는다.
+    /// [이 피어] 이 씬의 BGM 을 정한다(Title·Lobby <c>Start</c>, Map <c>MainGameReady</c>). 지금 곡과 다르면 아웃 → 끝난 뒤 2초 인.
+    /// 보스 단계는 건드리지 않는다(보스전 중 늦게 와도 보스 상태가 이긴다).
     /// </summary>
     public void PlayBGM(string key)
     {
-        if (!TryGetEntry(key, out SoundEntry entry))
+        _sceneBgmKey = key;
+        // 씬 진입(Title·Lobby Start, Map MainGameReady)이다 — 이전 씬의 보스 상태는 남기지 않는다
+        // (보스전 중 ESC → 타이틀처럼 BeginSceneTransition 을 안 거친 이탈도 여기서 풀린다). 보스는 MainGameReady 뒤에 나온다.
+        _bossBgm = BossBgmState.None;
+        EvaluateBgm(BgmSceneFadeOut);
+    }
+
+    /// <summary>[이 피어] 씬 전환이 시작됐다 — 지금 곡 1초 아웃(보스 사망 아웃 중이면 그대로 둔다). 새 씬이 PlayBGM 으로 다시 정한다.</summary>
+    public void BeginSceneTransition()
+    {
+        _sceneBgmKey = null;
+        _bossBgm = BossBgmState.None;
+        EvaluateBgm(BgmSceneFadeOut);
+    }
+
+    /// <summary>[이 피어] 보스 단계(복제값을 각 피어가 본다). 사망 = 2초 아웃, 나머지 전환 = 1초 아웃.</summary>
+    public void SetBossBgmState(BossBgmState state)
+    {
+        if (_bossBgm == state) return;
+        // 사망 뒤엔 보스 단계(Combat·Idle 등)가 늦게 와도 곡을 되살리지 않는다 — 씬 전환(BeginSceneTransition)만 푼다.
+        // (늦은 합류는 23호 Dead 보정과 보스 단계 현재값 적용의 순서가 정해져 있지 않다.)
+        if (_bossBgm == BossBgmState.Defeated) return;
+        _bossBgm = state;
+        EvaluateBgm(state == BossBgmState.Defeated ? BgmBossDeathFadeOut : BgmSceneFadeOut);
+    }
+
+    private string TargetBgmKey => _bossBgm switch
+    {
+        BossBgmState.Intro => null,
+        BossBgmState.Combat => BossBgmKey,
+        BossBgmState.Defeated => null,
+        _ => _sceneBgmKey,
+    };
+
+    private void EvaluateBgm(float fadeOut)
+    {
+        string target = TargetBgmKey;
+        if (_bgmStopping) return;   // 끄는 중 — 끝나면 FinishBgmStop 이 다시 고른다(진행 중 아웃은 늘이거나 줄이지 않는다)
+        if (_bgmKey == target) return;
+
+        // 🔴 "울리는 중" 판정에 HasAnyPlayingInstances 를 쓰지 않는다 — BroAudio.Play 는 LateUpdate 큐에 넣으므로
+        //    같은 프레임에 곡이 바뀌면(무음 → Combat → Defeated) 아직 큐에 있는 곡을 못 끄고 사망 뒤에 보스 곡이 시작된다.
+        //    우리가 튼 곡(_bgmKey)이 있으면 무조건 SoundID 로 끄고 페이드 시간을 기다린다(큐에 있던 것도 같은 ID 라 같이 멈춘다).
+        if (_bgmKey != null && _bgmId.IsValid())
         {
+            _bgmStopping = true;
+            int generation = ++_bgmGeneration;
+            BroAudio.Stop(_bgmId, fadeOut);
+            StartCoroutine(FinishBgmStopAfter(fadeOut, generation));
             return;
         }
+
+        StartBgm(target);
+    }
+
+    private System.Collections.IEnumerator FinishBgmStopAfter(float seconds, int generation)
+    {
+        yield return new WaitForSecondsRealtime(seconds);
+        if (generation != _bgmGeneration) yield break;
+        _bgmStopping = false;
+        _bgmKey = null;
+        _bgmId = SoundID.Invalid;
+        StartBgm(TargetBgmKey);
+    }
+
+    private void StartBgm(string key)
+    {
+        _bgmKey = null;
+        _bgmId = SoundID.Invalid;
+        if (string.IsNullOrEmpty(key) || !TryGetEntry(key, out SoundEntry entry)) return;
 
         if (!entry.Sound.IsValid())
         {
@@ -368,10 +458,9 @@ public class AudioManager : MonoBehaviour
             return;
         }
 
-        BroAudio.Play(entry.Sound)
-            .AsBGM()
-            .SetTransition(bgmTransition, bgmFadeTime)
-            .SetVolume(entry.VolumeMultiplier);
+        BroAudio.Play(entry.Sound, BgmFadeIn).SetVolume(entry.VolumeMultiplier);
+        _bgmKey = key;
+        _bgmId = entry.Sound;
     }
 
     /// <summary>
@@ -391,10 +480,11 @@ public class AudioManager : MonoBehaviour
             .SetTransition(bgmTransition, bgmFadeTime);
     }
 
-    /// <summary>현재 재생 중인 BGM(Music 카테고리)을 정지한다.</summary>
+    /// <summary>이 씬의 BGM 을 끈다(곡 없음). 보스 단계가 곡을 원하면 그쪽이 남는다.</summary>
     public void StopBGM(float fadeOut = 1f)
     {
-        BroAudio.Stop(BroAudioType.Music, fadeOut);
+        _sceneBgmKey = null;
+        EvaluateBgm(fadeOut);
     }
 
     #endregion

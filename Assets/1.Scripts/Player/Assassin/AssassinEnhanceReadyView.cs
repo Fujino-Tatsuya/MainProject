@@ -68,13 +68,15 @@ public sealed class AssassinEnhanceReadyView : MonoBehaviour
         {
             if (bladeGlow != null)
                 bladeGlow.FadeIn();
+            // 강화 소리(사운드 명세 Assassin_E_Skill_Common_Buff — E 입력으로 강화가 시작될 때 1번, 11-10 3.13).
+            // 실제 전이(playCharge)에서만 — 늦은 접속·Armature 재활성 복원(Update)은 무음.
+            // 강화 공격음(Common_Start)은 여기서 내지 않는다 — 강화 좌클릭 실행 때 AssassinBasicAttack 이 낸다(3.12).
             if (playCharge)
             {
                 ForEach(charges, c => c.PlayOnce());
-                PlaySound(ChargeSoundKey);
+                PlaySound(AuraSoundKey);
             }
             ForEach(auras, a => { if (!a.IsPlaying) a.Play(); });
-            PlaySound(AuraSoundKey);
             return;
         }
 
@@ -85,7 +87,6 @@ public sealed class AssassinEnhanceReadyView : MonoBehaviour
     }
 
     // 소리는 양손 소켓 수와 무관하게 1번(11-06 경석) — 엔트리(E_Charge·E_Aura)에는 소리를 달지 않는다. 키 = Sound 시트.
-    private const string ChargeSoundKey = "S1_Assassin_E_Start";
     private const string AuraSoundKey = "S1_Assassin_E_Buff";
 
     private void PlaySound(string key)

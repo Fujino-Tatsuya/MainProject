@@ -200,6 +200,15 @@ namespace Ami.BroAudio.Runtime
             return this.SetScheduledStartTime(AudioSettings.dspTime + delay);
         }
 
+        // MainProject(2026-11-10): ISchedulable.SetStartOffset — SetPlaybackData 가 매 재생 0 으로 되돌린다.
+        private float _startOffset;
+
+        IAudioPlayer ISchedulable.SetStartOffset(float seconds)
+        {
+            _startOffset = Mathf.Max(0f, seconds);
+            return this;
+        }
+
         private void SetClipDelayIfNotScheduled()
         {
             if (_pref.ScheduledStartTime <= 0 && _clip != null && _clip.Delay > 0)

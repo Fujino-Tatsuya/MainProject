@@ -317,6 +317,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
                 comboWindowOpen = false;
         }
 
+        // 휘두름 소리(사운드 명세 Assassin_Attack_01~04 · E_Skill_Common_Start, PLAN-sound-spec-apply 3.10·3.12) — 🔴 서버 가드 **앞**(전 피어).
+        // 일반 = 타수별 해당 파일, 변신 = 매 Hit(묶음당 4회) 직전 제외 랜덤, 강타(E 강화 후 좌클릭) = 강화 공격음만(기본 공격음 없음).
+        // 적중 여부와 무관 — 판정이 아니라 이 피어 클립의 Hit 이벤트다.
+        if (active && eventType == DefaultAttackAnimationEventType.Hit)
+            PlaySwingSound();
+
         if (IsNetworkActive && !IsServer)
             return;
         if (!active)
@@ -331,6 +337,27 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
                 CompleteCurrentStep();
                 break;
         }
+    }
+
+    // 이번 타에 낸 휘두름 소리 수(이 피어). 일반·강타는 타당 1번, 변신은 Hit 마다.
+    private int swingSoundsPlayed;
+
+    private void PlaySwingSound()
+    {
+        Vector3 position = transform.position;
+        switch (currentMode)
+        {
+            case AssassinBasicAttackMode.Transformed:
+                GameSoundHooks.Play(GameSoundHooks.AssassinAttackTransformed, position, this);
+                break;
+            case AssassinBasicAttackMode.Enhanced:
+                if (swingSoundsPlayed == 0) GameSoundHooks.Play(GameSoundHooks.AssassinEStart, position, this);
+                break;
+            default:
+                if (swingSoundsPlayed == 0) GameSoundHooks.Play(GameSoundHooks.AssassinAttackKey(currentStepIndex + 1), position, this);
+                break;
+        }
+        swingSoundsPlayed++;
     }
 
     public void HandleAnimatorMove(Vector3 deltaPosition, Vector3 animatorForward) { }
@@ -661,6 +688,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         comboWindowOpen = false;
         rageClaimed = false;
         hitsFired = 0;
+        swingSoundsPlayed = 0;
         currentStepIndex = stepIndex;
         currentMode = mode;
         attackDirection = Flatten(direction);

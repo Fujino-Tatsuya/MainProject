@@ -99,6 +99,7 @@ public class MapSceneManager : NemoSceneManager
         }
 
         GameMenuController.Instance?.Close();
+        AudioManager.Instance?.BeginSceneTransition();   // BGM 1초 아웃 — 보스 사망 2초 아웃 중이면 그대로 둔다(PLAN-sound-spec-apply 4)
         StartCoroutine(FadeThenInvoke(_gameManager.GoToResult));
     }
 
