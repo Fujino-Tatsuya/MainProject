@@ -25,6 +25,7 @@ MonoBehaviour:
     hitCount: 1
     comboWindowOpen: 0.05
     comboWindowClose: 0.3
+    animatorStateSpeed: 1.2
   - clip: {fileID: 7400000, guid: 1ca7a6b60353a274dacf546765f091f0, type: 2}
     attackDamageMultiplier: 1
     hitArea:
@@ -37,6 +38,7 @@ MonoBehaviour:
     hitCount: 1
     comboWindowOpen: 0.05
     comboWindowClose: 0.25
+    animatorStateSpeed: 1.2
   - clip: {fileID: 7400000, guid: ff2fe3801b995ba43873937b01578e9a, type: 2}
     attackDamageMultiplier: 1
     hitArea:
@@ -49,6 +51,7 @@ MonoBehaviour:
     hitCount: 1
     comboWindowOpen: 0.05
     comboWindowClose: 0.25
+    animatorStateSpeed: 1.2
   - clip: {fileID: 7400000, guid: ea72c7918b158e3408e3d1c4dda5e5c3, type: 2}
     attackDamageMultiplier: 1.3
     hitArea:
@@ -61,6 +64,7 @@ MonoBehaviour:
     hitCount: 1
     comboWindowOpen: 0.05
     comboWindowClose: 0.71
+    animatorStateSpeed: 1.2
   normalLungeDistance: 0.5
   normalLungeDuration: 0.1
   enhancedStep:
@@ -76,6 +80,7 @@ MonoBehaviour:
     hitCount: 1
     comboWindowOpen: 0.4
     comboWindowClose: 0.95
+    animatorStateSpeed: 2
   enhancedLungeDistance: 1.2
   enhancedLungeDuration: 0.2
   transformedStep:
@@ -91,6 +96,7 @@ MonoBehaviour:
     hitCount: 4
     comboWindowOpen: 0.75
     comboWindowClose: 0.95
+    animatorStateSpeed: 1.25
   comboContinuationSeconds: 0
   hittableLayers:
     serializedVersion: 2

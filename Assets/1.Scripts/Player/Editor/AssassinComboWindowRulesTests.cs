@@ -113,9 +113,7 @@ public sealed class AssassinComboWindowRulesTests
     }
 
     // ── 할 일 47 정정 — End 순간 다음 타 = 창 예약 || 눌림(거너와 같은 홀드 + 창) ──
-
-    private const float StaleAfter = 0.5f;      // AssassinBasicAttack.HoldStaleSeconds
-    private const float HoldSignalGap = 0.1f;   // AssassinBasicAttack.HoldSignalInterval
+    // 할 일 256 부터 눌림은 오너가 End 순간 자기 입력으로 본다(서버 눌림 신호·신선도 검사 없음).
 
     [Test]
     public void HeldAtEndContinues()
@@ -150,36 +148,126 @@ public sealed class AssassinComboWindowRulesTests
             now += 0.35f;
             model.Complete(step, now);
 
-            bool held = AssassinComboWindowRules.IsHoldFresh(true, now - HoldSignalGap, now, StaleAfter);
-            Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(false, held), Is.True, "눌림 — 다음 타");
+            Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(false, true), Is.True, "눌림 — 다음 타");
             step = model.Begin(now);
         }
     }
 
-    // 예전 홀드 방식의 "처음 누른 입력을 떼지 않아야" 조건은 없다 — 뗐다 다시 눌러 들고 있으면 End 순간 눌림으로 잇는다.
+    // ── 할 일 256 — 오너 예측: 상태 Speed 복제·모드 확인·2차 검증 시각표 ──
+
+    // 데이터의 상태 Speed 복제값 = 컨트롤러 상태 Speed(원본). 컨트롤러만 고치면 서버 기대 간격이 틀어진다.
     [Test]
-    public void ReleasedThenRepressedAndHeldContinues()
+    public void DataStateSpeedMatchesControllerStateSpeed()
     {
-        // 0.05 누름 → 0.12 뗌 → 0.2 다시 누름(각각 변경 즉시 신호). 서버가 아는 상태 = 마지막 변경(눌림, 0.2).
-        const float end = 0.3f;
-        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(
-            false, AssassinComboWindowRules.IsHoldFresh(true, 0.2f, end, StaleAfter)), Is.True);
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        Assert.That(controller, Is.Not.Null, ControllerPath);
+
+        foreach ((string label, AssassinBasicAttackStepData step) in Steps())
+        {
+            float controllerSpeed = StateSpeedOf(controller, step.Clip);
+            Assert.That(controllerSpeed, Is.GreaterThan(0f), $"{label} 클립을 쓰는 상태가 없다");
+            Assert.That(step.AnimatorStateSpeed, Is.EqualTo(controllerSpeed).Within(1e-4f),
+                $"{label} AssassinBasicAttackData 상태 Speed 복제 {step.AnimatorStateSpeed} ≠ 컨트롤러 {controllerSpeed}");
+        }
     }
 
     [Test]
-    public void ReleasedBeforeEndWithoutQueueEnds()
+    public void ClaimedModeMustMatchServer_NormalOverServerEnhancedAccepted()
     {
-        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(
-            false, AssassinComboWindowRules.IsHoldFresh(false, 0.29f, 0.3f, StaleAfter)), Is.False);
+        var normal = AssassinBasicAttackMode.Normal;
+        var enhanced = AssassinBasicAttackMode.Enhanced;
+        var transformed = AssassinBasicAttackMode.Transformed;
+
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(normal, normal, true), Is.True);
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(enhanced, enhanced, true), Is.True);
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(transformed, transformed, true), Is.True);
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(normal, enhanced, true), Is.True, "복제 지연 — 일반으로 수락, 강화는 남음");
+
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(enhanced, normal, true), Is.False, "서버엔 강화 없음(이미 소모)");
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(transformed, normal, true), Is.False);
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(normal, transformed, true), Is.False);
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(enhanced, transformed, true), Is.False);
+        Assert.That(AssassinOwnerPredictionRules.AcceptsClaimedMode(transformed, transformed, false), Is.False, "변신 종료 대기");
     }
 
-    // 주기 신호가 끊기면(뗌 신호 유실 등) 안 눌림으로 본다 — 무한히 이어지지 않게. 경계는 포함.
     [Test]
-    public void StaleHoldSignalCountsAsReleased()
+    public void VerifyContinuesOnlyWithinSameMode()
     {
-        Assert.That(AssassinComboWindowRules.IsHoldFresh(true, 1f, 1.5f, StaleAfter), Is.True, "경계");
-        Assert.That(AssassinComboWindowRules.IsHoldFresh(true, 1f, 1.51f, StaleAfter), Is.False, "끊김");
-        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(
-            false, AssassinComboWindowRules.IsHoldFresh(true, 1f, 2f, StaleAfter)), Is.False);
+        var normal = AssassinBasicAttackMode.Normal;
+        var enhanced = AssassinBasicAttackMode.Enhanced;
+        Assert.That(AssassinOwnerPredictionRules.ContinuesForVerify(true, true, normal, normal), Is.True);
+        Assert.That(AssassinOwnerPredictionRules.ContinuesForVerify(true, true, normal, enhanced), Is.False);
+        Assert.That(AssassinOwnerPredictionRules.ContinuesForVerify(true, false, normal, normal), Is.False);
+        Assert.That(AssassinOwnerPredictionRules.ContinuesForVerify(false, true, normal, normal), Is.False);
+        Assert.That(AssassinOwnerPredictionRules.VerifyStepCount(normal, 4), Is.EqualTo(4));
+        Assert.That(AssassinOwnerPredictionRules.VerifyStepCount(enhanced, 4), Is.EqualTo(1));
+        Assert.That(AssassinOwnerPredictionRules.VerifyStepCount(AssassinBasicAttackMode.Transformed, 4), Is.EqualTo(1));
+    }
+
+    // 정상 홀드 순환(일반 4타 ×2 + 1, 변신 묶음 3번 = 히트 4개씩)은 기대 간격 그대로 들어와도 전부 통과한다(공속 1, 여유 0).
+    // 기대 간격보다 0.05초 빠른 히트는 걸린다.
+    [Test]
+    public void NormalAndTransformedLoops_PassAtExpectedInterval_FailWhenFaster()
+    {
+        AssassinBasicAttackData data = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
+        Assert.That(data, Is.Not.Null, BasicAttackDataPath);
+
+        var normal = new BasicAttackStepTiming[data.NormalSteps.Length];
+        for (int i = 0; i < normal.Length; i++)
+            normal[i] = Timing(data.NormalSteps[i]);
+        var transformed = new[] { Timing(data.TransformedStep) };
+        Assert.That(transformed[0].HitCount, Is.EqualTo(data.TransformedStep.HitCount), "변신 묶음 Hit 이벤트 수 = hitCount");
+
+        RunLoop(normal, 9, "일반");
+        RunLoop(transformed, 3, "변신 묶음");
+
+        // 2타 히트를 기대 간격보다 0.05초 일찍 — 데미지 없음.
+        var verifier = new BasicAttackServerVerifier();
+        var settings = new BasicAttackVerifySettings(0f, 0.5f);
+        verifier.BeginSwing(1, 0, normal.Length, true, false);
+        Assert.That(verifier.VerifyHit(0, 1, 0, 0, normal, 1f, settings), Is.EqualTo(BasicAttackHitVerdict.Accepted));
+        verifier.BeginSwing(2, 1, normal.Length, true, true);
+        double early = BasicAttackVerifyRules.ExpectedInterval(normal[0], 0, normal[1], 0, false, false) - 0.05;
+        Assert.That(verifier.VerifyHit(early, 2, 1, 0, normal, 1f, settings), Is.EqualTo(BasicAttackHitVerdict.TooFast));
+    }
+
+    private static void RunLoop(BasicAttackStepTiming[] timings, int swings, string label)
+    {
+        var verifier = new BasicAttackServerVerifier();
+        var settings = new BasicAttackVerifySettings(0f, 0.5f);
+        double now = 0;
+        byte serial = 0;
+        int previous = -1;
+        int previousHit = 0;
+        for (int n = 0; n < swings; n++)
+        {
+            int index = n % timings.Length;
+            serial++;
+            Assert.That(verifier.BeginSwing(serial, index, timings.Length, true, n > 0), Is.True, $"{label} {n + 1}번째 타 순서");
+            for (int h = 0; h < timings[index].HitCount; h++)
+            {
+                if (previous >= 0)
+                    now += BasicAttackVerifyRules.ExpectedInterval(timings[previous], previousHit, timings[index], h, h > 0, false) + 1e-4;
+                Assert.That(verifier.VerifyHit(now, serial, index, h, timings, 1f, settings), Is.EqualTo(BasicAttackHitVerdict.Accepted),
+                    $"{label} {n + 1}번째 타 히트 {h}");
+                previous = index;
+                previousHit = h;
+            }
+        }
+    }
+
+    private static BasicAttackStepTiming Timing(AssassinBasicAttackStepData step) =>
+        BasicAttackStepTiming.FromClip(step.Clip, nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent),
+            (int)DefaultAttackAnimationEventType.Hit, (int)DefaultAttackAnimationEventType.End, step.AnimatorStateSpeed);
+
+    private static IEnumerable<(string, AssassinBasicAttackStepData)> Steps()
+    {
+        AssassinBasicAttackData data = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
+        Assert.That(data, Is.Not.Null, BasicAttackDataPath);
+
+        for (int i = 0; i < data.NormalSteps.Length; i++)
+            yield return ($"{i + 1}타", data.NormalSteps[i]);
+        yield return ("강타", data.EnhancedStep);
+        yield return ("변신 묶음", data.TransformedStep);
     }
 }
