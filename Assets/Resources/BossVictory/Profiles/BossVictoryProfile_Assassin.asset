@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: BossVictoryProfile_Assassin
   m_EditorClassIdentifier: Assembly-CSharp::BossVictoryProfile
   killerCurrentActionScale: 0.5
-  killerAfterFinisherScale: 0.1
+  killerAfterFinisherScale: 0.07
   otherPlayersScale: 0.05
   bossAfterFinisherScale: 0.1
   finisherSlot: 3
@@ -39,6 +39,13 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     amber:
     - start: 0.3
       length: 5.3
@@ -55,6 +62,13 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     scanline:
     - start: 0.105
       length: 5.495
@@ -71,6 +85,13 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     bossNoise:
     - start: 0.12
       length: 5.48
@@ -87,6 +108,13 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     tear:
     - start: 0.09
       length: 0.16
@@ -106,6 +134,13 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     - start: 0.32
       length: 0.09
       fadeIn: 0
@@ -124,6 +159,38 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 1.33
+      length: 0.2
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     smear:
     - start: 0.09
       length: 0.16
@@ -143,6 +210,13 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     - start: 0.32
       length: 0.09
       fadeIn: 0
@@ -161,6 +235,13 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     hudHide:
     - start: 0.08
       length: 5.52
@@ -177,14 +258,41 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     crtOff: []
     cameraCut:
     - start: 0.96
-      length: 4.64
+      length: 4.61
       fadeIn: 0
       fadeOut: 0
       weight: 1
       keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 5.57
+      length: 0.1
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     cameraCutShots:
     - anchor: 0
       keys:
@@ -205,6 +313,25 @@ MonoBehaviour:
       endRotation: {x: 0, y: 0, z: 0, w: 0}
       endFov: 0
       ease: 0
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 0.7309832, y: 0.7548896, z: -5.6136727}
+        rotation: {x: -0.03416963, y: -0.028053746, z: -0.0010535398, w: 0.9990217}
+        fov: 60.000004
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 3.711
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
     killerAction:
     - start: 0
       length: 0.2
@@ -212,13 +339,109 @@ MonoBehaviour:
       fadeOut: 0
       weight: 1
       keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    noiseScrollV:
+    - start: 0.5
+      length: 1.01
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 1
+      uvTo: 0
+      uvEase: 1
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    cameraBob:
+    - start: 1.23
+      length: 4.3700004
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.037735853
+        value: 1
+        curve: 0
+      - u: 0.9433962
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0.3
+      bobPeriod: 1
+      bobPhase: 0.25
+      bobDamping: 0
+    rectify:
+    - start: 1.42
+      length: 4.18
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.023809526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    rectifySeeded: 1
+    cameraBobSeeded: 1
+    groundCircle:
+    - start: 0.3
+      length: 5.2999997
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.11320756
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    groundCircleSeeded: 1
     focusKillerTime: 0.2
     hideOthersTime: 0.2
     lobbyTransitionTime: 5.6
     backDashStartTime: 0.2
     finisherStartTime: 0.65
     finisherTrimSeconds: 4.9333334
-    slowStartTime: 1.83
+    slowStartTime: 1.85
     bossHitAnimTime: 0.2
     bossHitTrimSeconds: 0
     bossFreezeTime: 0
