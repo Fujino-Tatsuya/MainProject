@@ -202,7 +202,7 @@ public sealed class PlayerBasicAttackInputRulesTests
             if (PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, skillAlive, true, false, false))
             {
                 finishingChain = true;
-                queued = false; // 서버가 받은 예약도 지운다(RequestFinishChainRpc)
+                queued = false; // 오너 래치가 받은 예약도 지운다(FinishWithoutChaining — 할 일 256부터 체인은 오너 주도)
             }
 
             bool inWindow = t >= windowOpen && t <= windowClose;

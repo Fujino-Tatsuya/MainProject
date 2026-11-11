@@ -458,8 +458,8 @@
 - **비주얼 v18(2026-10-17 은희 승인)** = 형상 v18g + 텍스처 T3H · 재질 Flat Kit(가붕이·거너와 같은 부모 `FK_Paladin_Toon`) · 키 ×1.25(FBX 임포트 배율, 1.252 → 약 1.565m). **판정 박스·스킬 수치·클립은 그대로**(몸만 커짐 — 판정 거리를 몸에 맞출지는 기획 확인 대기). 단검 루트 ×1.25 · 머리카락 길이 값 ×1.25 · 달리기 루프 재생 0.8. 상세 [player-prefabs.md §14](../../tech/player-prefabs.md) · [PLAN-assassin.md](../../history/PLANS/PLAN-assassin.md) §9.
 - **일반 평타 순서 유지(§5.1 "0.8초")** = **0초**(10-06 은희 Play): End 순간 눌림·창 예약으로 이어지지 않고 타가 끝나면 다음 입력은 항상 1타. `AssassinBasicAttackData.comboContinuationSeconds`.
 - **다음 타 연결(2026-10-16 할 일 47 연장·정정)** = 거너 기본 공격과 같은 **홀드 + 입력 창**. End 순간 "창 예약 또는 눌림"이면 다음 타(`AssassinComboWindowRules.ShouldContinueAtEnd`). 창만 쓰던 직전 구현(꾹 누르면 1타에서 멈춤)은 사양 오해라 정정. 구 홀드 방식의 "처음 누른 좌클릭을 떼지 않아야" 조건은 폐기 — End 순간 눌려 있기만 하면 된다.
-  - 창 = 단별 클립 정규화 시간(가붕이 ComboWindowOpen~Close 클립 이벤트와 같은 의미 — 재생 속도에 같이 비례), 서버가 자기 애니 진행으로 판정.
-  - 눌림 = 오너가 바뀔 때 즉시(`SetHoldRpc`) + 눌린 동안 0.1초 주기(`HoldSignalRpc`, 조준 포함). 주기 신호는 홀드를 켜지 않고 시각·조준만 갱신(거너와 같음). 0.5초 넘게 끊기면 서버가 안 눌림으로 봄(`IsHoldFresh`). 오프라인도 같은 경로.
+  - 창 = 단별 클립 ComboWindowOpen~Close 이벤트(가붕이와 같은 의미 — 재생 속도에 같이 비례). 할 일 256 부터 오너가 자기 애니 진행으로 판정(오너 예측 — [owner-predicted-basic-attack.md](../../tech/owner-predicted-basic-attack.md)).
+  - 눌림 = End 순간 오너 자기 입력(할 일 256 — 예전 서버 눌림 신호 `SetHoldRpc`·`HoldSignalRpc`·`IsHoldFresh` 는 삭제). 오프라인도 같은 경로.
 - **분노 게이지(§4.2, 2026-10-09 은희 grill)** = R 스택 완전 대체. 수치(최대 100·최소 변신량 40·충전 기본 공격 3/Q 5/강타 15·변신 중 감소 10/초)는 `GameData.xlsx` Assassin 시트로 노출. 게이지 = 서버 권한 `NetworkVariable`, 오너는 읽기만. HUD = `AssassinHUD` 의 스택 표시 자리를 가로 게이지 바로 교체 + 최소 변신량 눈금, 최소량 이상이면 바 색 변경, 변신 중엔 줄어드는 바. 쓰러짐·사망 0 / 스테이지 이동 유지 / R 쿨 8초 유지. 변신 Q 쿨감·백어택·종료 대기(§10.3) 규칙은 그대로이며, "시간 만료" = 게이지 0.
 - **머리 위 특성 게이지(할 일 18, 2026-10-09 은희 grill)** = 캐릭터 특성 게이지를 머리 위 체력바(`UI/Combat/UnitOverheadHealthBar`·`2.Prefabs/UI/OverheadHealthBar.prefab`)의 HP 바 바로 아래 얇은 줄(HP 바 두께의 1/3)로 통합. 항상 표시(0이어도 빈 줄), 모든 클라에서 모든 플레이어의 게이지가 보인다.
   - 암살자 = 분노 게이지. 최소 변신량 미만 흰색 / 이상 초록 / 변신 중 보라(줄어드는 줄). 최소 변신량 눈금 표시.

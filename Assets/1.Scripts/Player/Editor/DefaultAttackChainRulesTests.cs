@@ -115,6 +115,51 @@ public class DefaultAttackChainRulesTests
         }
     }
 
+    [Test]
+    public void PaladinSteps_VerifyTimings_HitBeforeEnd_LoopEntryBeforeHit()
+    {
+        // 할 일 256 — 서버 2차 검증 기대 간격은 클립 Hit·End 시각에서 온다. 타마다 Hit 가 End 앞이고, 루프백 1타는 Hit 앞에서 들어가야 한다.
+        var data = AssetDatabase.LoadAssetAtPath<DefaultAttackData>(PaladinDataPath);
+        Assert.That(data, Is.Not.Null);
+
+        string function = nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent);
+        var timings = new BasicAttackStepTiming[data.AttackSteps.Length];
+        for (int i = 0; i < data.AttackSteps.Length; i++)
+        {
+            DefaultAttackStep step = data.AttackSteps[i];
+            timings[i] = BasicAttackStepTiming.FromClip(step.Clip, function, (int)DefaultAttackAnimationEventType.Hit,
+                (int)DefaultAttackAnimationEventType.End, 1f, step.LoopBackEntryTime);
+            Assert.That(timings[i].HitCount, Is.GreaterThanOrEqualTo(1), $"{i + 1}타 Hit 없음");
+            Assert.That(timings[i].HitTime(timings[i].HitCount - 1), Is.LessThan(timings[i].EndTime), $"{i + 1}타 마지막 Hit < End");
+        }
+
+        Assert.That(timings[0].LoopBackEntryTime, Is.LessThan(timings[0].HitTime(0)), "1타 loopBackEntryTime < Hit");
+
+        // 정상 홀드 4타 순환은 기대 간격 그대로 들어와도 전부 통과한다(공속 1, 여유 0).
+        var verifier = new BasicAttackServerVerifier();
+        var settings = new BasicAttackVerifySettings(0f, 0.5f);
+        double now = 0;
+        byte serial = 0;
+        int previous = -1;
+        int previousHit = 0;
+        for (int n = 0; n < 9; n++)
+        {
+            int index = n % timings.Length;
+            serial++;
+            Assert.That(verifier.BeginSwing(serial, index, timings.Length, true, n > 0), Is.True, $"{n + 1}번째 타 순서");
+            for (int h = 0; h < timings[index].HitCount; h++)
+            {
+                if (previous >= 0)
+                    now += BasicAttackVerifyRules.ExpectedInterval(timings[previous], previousHit, timings[index], h, h > 0,
+                        h == 0 && index == 0) + 1e-4;
+                Assert.That(verifier.VerifyHit(now, serial, index, h, timings, 1f, settings), Is.EqualTo(BasicAttackHitVerdict.Accepted),
+                    $"{n + 1}번째 타 히트 {h}");
+                previous = index;
+                previousHit = h;
+            }
+        }
+    }
+
     // ─── 제압 가속 중 순환 끊김(할 일 122 후속) ─────────────────────────────
     // 가붕이 콤보 상태는 Speed Multiplier = AttackSpeed 파라미터라, CrossFadeInFixedTime 의 오프셋(초)은 상태 시간이다 —
     // 클립 시각으로는 오프셋 × 속도가 된다. 되감기 진입 시각(클립 타임라인)을 그대로 넘기면 가속(1.2 × 2 = 2.4) 때

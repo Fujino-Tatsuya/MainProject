@@ -7,23 +7,22 @@ using UnityEngine;
 /// 거너 기본 공격 — 준비 동작 → 레이저 1발. 버튼을 누르고 있거나(홀드) 입력 창 안에서 클릭하면 다음 발을 잇는다
 /// (character_gunner.md §4, PLAN-gunner.md G3).
 ///
-/// 흐름: 오너가 시작 요청(조준 포함) → 서버 승인(준비 동작 1회) → 준비가 끝나면 오너가 첫 발을 요청 →
-/// 서버가 간격·과열·상태를 검사해 판정(첫 대상 1체)·과열 증가 → 전 피어 연출.
-/// 이어지는 발의 조건은 둘 중 하나다(2026-10-09). 허락은 서버가, 발사 요청 시점과 방향은 오너가 정한다(2026-10-12).
-///  · 홀드: 오너가 버튼 눌림/뗌을 서버에 알리고, 눌림 동안 직전 발사 + 발사 간격마다 오너가 다음 발을 요청한다.
-///  · 입력 창: 팔라딘 콤보(DefaultAttackController 의 ComboWindowOpen~Close)와 같은 구조 — 오너가 클릭을 보내면
-///    서버가 자기 시각으로 창(직전 발사 + ComboWindowOpen~Close) 안인지 보고 예약한다. 오너도 같은 창으로 자기 예약을 들고
-///    발사 간격이 차면 요청한다. 서버는 눌림·예약이 없는 요청을 버린다(창 우회 방지).
+/// 오너 예측(할 일 256): 오너가 시작·발사·종료를 주도하고 누르는 즉시 준비 동작, 발사 순간 즉시 발사 연출(상체 Fire·레이저 — 끝점은
+/// 피해 없는 예측 직선)을 낸다. 서버는 시작 통지(NotifyStartRpc)로 공격 상태를 따라가고, 발마다 발사 요청(FireShotRpc — 총구 위치·방향)을
+/// 공용 2차 검증(<see cref="BasicAttackServerVerifier.VerifyFixedInterval"/> — 첫 발은 준비 동작, 그 뒤는 발사 간격 ÷ 최근 최대 공속 + 여유)과
+/// 과열(<see cref="GunnerHeat"/> 원본)로 거른 뒤 판정(첫 대상 1체·특성)·과열 증가 → 오너 뺀 피어 연출(ShotRpc). 걸린 발은 레이저만, 데미지 없음.
+/// 과열은 오너가 1차 예측한다(복제 기준점 + 서버 미반영 자기 발, <see cref="GunnerHeatPrediction"/>) — 예측상 과열이면 쏘지 않는다.
+/// 이어지는 발의 조건(오너 판단): 누르고 있거나, 입력 창(직전 발사 + ComboWindowOpen~Close) 안에서 클릭해 예약했을 때.
 /// 어느 쪽이든 준비 동작은 첫 발만이다. 둘 다 아니거나 과열되면 후속 동작(ShotRecovery)까지 마무리하고 끝난다.
-/// 창은 애니 이벤트가 아니라 데이터의 시간 값이다(판정도 시간 기반이라 한 곳에서 맞춘다).
-/// 공격 중 이동 불가. 스킬 입력(Q·E·R·우클릭)은 공격을 끊지 않는다 — 상태기계가 '공격 뒤 스킬'로 예약하고
-/// <see cref="FinishWithoutChaining"/> 을 부르면 현재 발은 끝까지 가고 다음 발만 잇지 않아(뗀 것처럼) 정상 종료한다.
+/// 창은 애니 이벤트가 아니라 데이터의 시간 값이다. 공격 중 이동 불가. 스킬 입력(Q·E·R·우클릭)은 공격을 끊지 않는다 — 상태기계가 '공격 뒤 스킬'로
+/// 예약하고 <see cref="FinishWithoutChaining"/> 을 부르면 현재 발은 끝까지 가고 다음 발만 잇지 않아(뗀 것처럼) 정상 종료한다.
 /// 끝나면 Idle/Move 첫 틱에 예약 스킬이 기존 경로로 요청된다(<see cref="ReservesSkillAfterAttack"/>, 할 일 44).
 /// 홀드 시작(<see cref="StartsOnHold"/>): 스킬 등으로 공격이 끝난 뒤에도 좌클릭을 누르고 있으면 Idle/Move 에서 다시 시작한다.
 /// 방향(할 일 27, <see cref="GunnerAttackFacingModel"/>): 발 잠금 중에는 몸이 돌지 않고, 그 밖에는 커서 쪽으로
 /// <see cref="GunnerBasicAttackData.BetweenShotTurnSpeed"/> 로 돈다. 발 잠금 = 첫 발은 공격 시작 ~ 발사 + ShotLockTail,
 /// 이어지는 발은 발사 − ShotLockLead ~ 발사 + ShotLockTail(잠근 순간의 몸 방향). 🔴 잠금은 오너 시계만으로 돈다 —
 /// 오너가 방향을 발사 요청에 실어 보내고 서버는 그대로 쏘기만 한다(서버는 몸을 돌리거나 잠금을 검증하지 않는다, 2026-10-13).
+/// 문서: Docs/tech/owner-predicted-basic-attack.md.
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(GunnerHeat))]
@@ -34,19 +33,17 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private static readonly int EmptyHash = Animator.StringToHash("Empty");
     private static readonly int FireSpeedHash = Animator.StringToHash("FireSpeed");
 
-    // 오너 요청 간격이 네트워크 지터로 조금 당겨져 와도 받아 준다.
-    private const float IntervalTolerance = 0.75f;
-    // 오너 신호가 끊겼을 때(연결 문제 등) 서버가 스스로 끝내는 여유(발사 간격 배수).
-    // 첫 발 요청이 안 오면 공격을 끝내고, 홀드 중 조준 갱신이 끊기면 뗀 것으로 본다.
+    // 오너 발사 요청이 끊겼을 때(연결 문제 등) 서버가 스스로 끝내는 여유(발사 간격 배수) — 첫 발 대기.
     private const float StallIntervals = 3f;
-    // 홀드 중 오너가 "아직 누르고 있다"를 보내는 주기(발사 간격 배수). 방향은 발사 요청에 싣는다.
-    private const float HoldSignalIntervals = 0.5f;
+    // 서버 안전망 — 마지막 발 + 후속 동작 + 이만큼 지나도 종료 통지가 없으면 서버가 혼자 끝낸다(오너 끊김·패킷 유실).
+    private const float ServerFollowGraceSeconds = 1f;
+    // 발사 요청의 총구 위치가 서버가 보는 총구와 이만큼(m) 넘게 다르면 경고만 남긴다.
+    private const float OwnerPositionWarnDistance = 2f;
 
     [SerializeField] private GunnerBasicAttackData data;
     [SerializeField] private Animator animator;
 
     private Player player;
-    private PlayerStateController stateController;
     private PlayerInputReader input;
     private PlayerMovement movement;
     private PlayerAimIndicator aim;
@@ -65,24 +62,24 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     // 전 피어 공통 런타임
     private bool active;
     private float startTime;
-    private float lastShotTime = -1f;
     private readonly GunnerAttackFacingModel facing = new GunnerAttackFacingModel();
+    private bool endingGracefully;
 
-    // 오너
-    private bool isRequesting;
+    // 오너(체인 주도)
     private bool firstShotSent;
-    private bool holdSent;         // 서버가 "누르고 있다"로 알고 있는가
-    private float nextHoldSignalTime;
-    private float ownerLastShotTime = -1f; // 오너가 마지막 발을 요청한 시각(오너 시계)
-    private bool ownerQueued;              // 오너 쪽 입력 창 예약 — 서버 예약과 같은 규칙
+    private float ownerLastShotTime = -1f; // 오너가 마지막 발을 쏜 시각(오너 시계)
+    private bool ownerQueued;              // 오너 입력 창 예약
     private bool ownerPreLocked;           // 다음 발을 위해 발사 전에 미리 잠갔는가(오너 시계)
     private bool ownerFinishing;           // 스킬 예약 — 지금 발로 마무리(누름·창 예약 무시, 할 일 44)
+    private byte comboSerial;              // 공격(시작~종료) 일련번호 — 서버 끊기·종료 통지가 옛 공격을 건드리지 않게
+    private readonly GunnerHeatPrediction heatPrediction = new GunnerHeatPrediction();
 
-    // 서버
-    private bool hasQueuedShot;
-    private bool held;
-    private float lastHoldSignalTime;
-    private bool endingGracefully;
+    // 서버(원격 오너를 따라가는 쪽)
+    private byte serverComboSerial;
+    private double serverStartUnscaled;
+    private float serverLastShotTime = -1f;
+    private float serverFollowFallbackTime;
+    private readonly BasicAttackServerVerifier verifier = new BasicAttackServerVerifier();
 
     // 특성(할 일 127) — 관통 탄도·집중 포화·이중 출력. 서버에서만 쓴다.
     private PlayerTraitEffects traitEffects;
@@ -97,7 +94,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
 
     /// <summary>
     /// 한 발의 출발점 — 총구, 비었으면 루트 + 위로 MuzzleHeight. 판정은 여기서 Range·반경 BeamWidth/2 로 훑는다.
-    /// 서버 발사(<see cref="ServerFire"/>)와 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다. data 가 있을 때만 부른다.
+    /// 오너 발사(원격 오너는 발사 요청에 실음)와 특성 랩 공격 범위 기즈모(할 일 152)가 같이 쓴다. data 가 있을 때만 부른다.
     /// </summary>
     public Vector3 ShotOrigin => muzzle != null
         ? muzzle.position
@@ -115,13 +112,18 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private bool OwnerChainsNextShot =>
         PlayerBasicAttackInputRules.ShouldChainNextShot(input.AttackHeld, ownerQueued, ownerFinishing);
 
+    // 서버 처리(판정·과열 증가·특성)를 이 인스턴스가 직접 하는가 — 호스트·오프라인.
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
-    private bool IsInputSource => !IsNetworkActive || IsOwner;
+    // 시작·발사·종료를 주도하는 쪽 — 오너(호스트 오너 포함)·오프라인.
+    private bool IsChainAuthority => !IsNetworkActive || IsOwner;
+
+    // 오너가 보는 과열 — 호스트·오프라인은 원본 그대로, 원격 오너는 1차 예측(복제 기준점 + 미반영 자기 발).
+    private bool OwnerOverheated =>
+        heat != null && (HasGameplayAuthority ? heat.IsOverheated : heat.PredictOverheated(heatPrediction));
 
     private void Awake()
     {
         player = GetComponent<Player>();
-        stateController = GetComponent<PlayerStateController>();
         input = GetComponent<PlayerInputReader>();
         movement = GetComponent<PlayerMovement>();
         aim = GetComponent<PlayerAimIndicator>();
@@ -154,6 +156,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         }
 
         extraShots.Clear();
+        heatPrediction.Clear();
     }
 
     // 사망(살아 있음 → 그 밖) — 예약한 추가 레이저 취소. 발수 카운터는 공용 장부(PlayerTraitEffects.ClearTransientServer)가 0 으로 돌린다.
@@ -165,12 +168,13 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
 
     // ── IPlayerBasicAttack ───────────────────────────────────────────────
 
-    public bool IsOutOfResource => heat != null && heat.IsOverheated;
+    // 오너는 예측 과열로 거부 입력을 버린다(할 일 44·256).
+    public bool IsOutOfResource => heat != null && (IsChainAuthority ? OwnerOverheated : heat.IsOverheated);
 
     // ── 공격속도(할 일 91 T5) ────────────────────────────────────────────
     // 거너 평타 타이밍은 클립 이벤트가 아니라 데이터 시간 값이라 그 값들을 배율로 나눈다(준비·발사 간격·후속 동작·입력 창·발 잠금).
-    // 서버·오너가 같은 배율(복제된 상태이상) — 배율이 바뀌는 순간만 복제 지연만큼 어긋나고, 서버 간격 검사(IntervalTolerance)가 받아 준다.
-    // 재생 속도는 공격 중(전 피어 StartRpc~EndRpc) Animator.speed 로 같이 탄다 — FireSpeed 는 배율 전 발사 간격 기준이라 두 번 곱하지 않는다.
+    // 서버·오너가 같은 배율(복제된 상태이상) — 배율이 바뀌는 순간만 복제 지연만큼 어긋나고, 서버 2차 검증(최근 0.5초 최대 공속 + 여유)이 받아 준다.
+    // 재생 속도는 공격 중(전 피어 시작~종료) Animator.speed 로 같이 탄다 — FireSpeed 는 배율 전 발사 간격 기준이라 두 번 곱하지 않는다.
     public bool ScalesAnimatorWithAttackSpeed => active;
 
     private float AttackSpeedRate => player != null ? player.AttackSpeedRate : 1f;
@@ -182,24 +186,24 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private float ShotLockLead => PlayerAttackSpeedRules.Duration(data.ShotLockLead, AttackSpeedRate);
     private float ShotLockTail => PlayerAttackSpeedRules.Duration(data.ShotLockTail, AttackSpeedRate);
 
+    // 오너 1차 판단 후 즉시 준비 동작(할 일 256) — 서버 승인을 기다리지 않는다. 서버는 시작 통지를 받고 따라간다.
     public bool TryStart()
     {
-        if (active || isRequesting || data == null || player == null || heat.IsOverheated)
+        if (active || data == null || player == null || heat == null || !IsChainAuthority || OwnerOverheated)
             return false;
 
         Vector3 direction = CurrentAim();
-
-        if (!IsNetworkActive)
-        {
-            StartServer(direction);
-            return true;
-        }
-
-        if (!IsOwner)
+        if (!player.BeginAttackReadyState())
             return false;
 
-        isRequesting = true;
-        RequestStartRpc(direction, player.CreateStatReport());
+        comboSerial++;
+        BeginRuntime(direction);
+
+        if (HasGameplayAuthority)
+            ServerOnStart(direction);
+        else
+            NotifyStartRpc(comboSerial, direction, player.CreateStatReport());
+
         return true;
     }
 
@@ -210,47 +214,61 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         if (!active)
             return;
 
-        if (IsInputSource)
+        if (IsChainAuthority)
+        {
             TickOwner();
+            return;
+        }
 
-        if (HasGameplayAuthority)
-            TickServer();
+        if (IsNetworkActive && IsServer && serverFollowFallbackTime > 0f && Time.time >= serverFollowFallbackTime)
+        {
+            Edit.LogWarning($"[Gunner] {name} 오너 발사·종료 통지가 끊겼다 — 서버가 기본 공격을 끝낸다(안전망).", this);
+            EndFollowServer();
+        }
     }
 
     public void FixedTickMovement() { } // 공격 중 이동 없음(§4.1)
 
     public void CancelCurrentAttack()
     {
-        // EndServer/EndRpc 가 부른 EndAttackState → PlayerAttackState.Exit 의 되돌이 호출이다 — 정상 종료라 끊지 않는다.
+        // EndLocal·CancelRpc 가 부른 EndAttackState → PlayerAttackState.Exit 의 되돌이 호출이다 — 이미 처리했다.
         if (endingGracefully)
             return;
 
-        bool hadActive = active || isRequesting;
+        bool hadActive = active;
+        byte ownerSerial = comboSerial;
+        byte followedSerial = serverComboSerial;
         ResetRuntime();
 
         if (!hadActive)
             return;
 
         ReturnToIdlePose();
+        if (!IsNetworkActive)
+            return;
 
-        if (IsNetworkActive && IsServer)
-            EndRpc();
+        if (IsServer)
+        {
+            // 서버가 끊는 경로(넉백·구속·연출 잠금·숨김·대시) — 오너(원격이면)·관전자 모두 즉시 멈춘다.
+            verifier.EndCombo();
+            CancelRpc(IsOwner ? ownerSerial : followedSerial);
+        }
+        else if (IsOwner)
+        {
+            // 원격 오너가 스스로 끊었다(대시 등) — 서버가 따라 끝낸다(이미 끊었으면 무시).
+            NotifyAttackEndRpc(ownerSerial);
+        }
     }
 
-    // 스킬 예약(할 일 44) — 끊지 않고 뗀 것처럼 마무리한다. 서버도 눌림·창 예약을 지워 이번 발(첫 발이면 준비 뒤 첫 발)의
-    // ShotRecovery 뒤 기존 정상 종료(EndServer → EndRpc)로 끝난다 — 원격 피어의 마무리·애니도 평소 종료와 같다.
+    // 스킬 예약(할 일 44) — 끊지 않고 뗀 것처럼 마무리한다. 이번 발(첫 발이면 준비 뒤 첫 발)의 ShotRecovery 뒤 기존 정상 종료로 끝난다.
+    // 체인은 오너가 주도하므로(할 일 256) 오너 래치만 세운다.
     public void FinishWithoutChaining()
     {
-        if (!active || !IsInputSource || ownerFinishing)
+        if (!active || !IsChainAuthority || ownerFinishing)
             return;
 
         ownerFinishing = true;
         ownerQueued = false;
-        holdSent = false;
-        if (IsNetworkActive)
-            FinishRpc();
-        else
-            ServerFinish();
     }
 
     public void CancelFinishingTailForMovement() { }
@@ -268,17 +286,19 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         }
     }
 
-    // ── 오너 ─────────────────────────────────────────────────────────────
+    // ── 오너(체인 주도) ──────────────────────────────────────────────────
 
     private void TickOwner()
     {
-        // 발 잠금은 오너 시계만으로 돈다(2026-10-13, 서버 왕복·검증 없음): 발사 요청 뒤 ShotLockTail 이 지나면 풀고,
+        bool overheated = OwnerOverheated;
+
+        // 발 잠금은 오너 시계만으로 돈다(2026-10-13, 서버 왕복·검증 없음): 발사 뒤 ShotLockTail 이 지나면 풀고,
         // 다음 발을 이어 쏠 거면 발사 ShotLockLead 전에 그 순간 몸 방향으로 다시 잠근다. 그 사이는 커서 쪽으로 제한 속도 회전.
         if (ownerPreLocked && !OwnerChainsNextShot)
             ownerPreLocked = false; // 미리 잠근 뒤 손을 뗐다(또는 스킬 예약) — 다음 발이 없으니 잠금도 푼다
         if (facing.IsShotLocked && firstShotSent && !ownerPreLocked && Time.time >= ownerLastShotTime + ShotLockTail)
             facing.EndShot();
-        if (firstShotSent && !ownerPreLocked && OwnerChainsNextShot && !heat.IsOverheated
+        if (firstShotSent && !ownerPreLocked && OwnerChainsNextShot && !overheated
             && Time.time >= ownerLastShotTime + FireInterval - ShotLockLead)
         {
             facing.BeginShot(movement.CurrentFacing);
@@ -288,216 +308,219 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
             movement.RotateImmediately(facing.TurnBetweenShots(
                 movement.CurrentFacing, CurrentAim(), data.BetweenShotTurnSpeed, Time.deltaTime));
 
-        // 홀드 상태는 바뀔 때만 알린다 — 뗌은 ReleaseRpc, 다시 누름은 아래 클릭 RPC 가 겸한다.
-        if (holdSent && !input.AttackHeld)
-        {
-            holdSent = false;
-            if (IsNetworkActive)
-                ReleaseRpc();
-            else
-                held = false;
-        }
-
-        // 클릭 — 누른 프레임만 보낸다. 창 안인지는 서버가 자기 시각으로 판단한다(팔라딘 RequestQueueNextAttackRpc 와 같음).
-        // 창 밖이어도 서버는 "누르고 있음"으로 받아 홀드가 이어진다. 스킬 예약 뒤 클릭은 보내지 않는다(마무리 중).
+        // 클릭 — 발사 중 클릭은 여기서 예약으로 쓴다(창 = 직전 발사 + ComboWindowOpen~Close, 오너 시계). 스킬 예약 뒤 클릭은 무시(마무리 중).
         if (input.AttackPressed && !ownerFinishing)
         {
-            // 발사 중 클릭은 여기서 홀드/예약으로 쓴다 — 공격이 끝난 뒤 새 평타로 한 번 더 나가지 않게 선입력 버퍼에서 지운다(할 일 44).
+            // 공격이 끝난 뒤 새 평타로 한 번 더 나가지 않게 선입력 버퍼에서 지운다(할 일 44).
             input.ConsumeBufferedInput(PlayerBufferedInput.Attack);
-            holdSent = true;
-            nextHoldSignalTime = Time.time + FireInterval * HoldSignalIntervals;
-            // 오너도 같은 창으로 자기 예약을 든다 — 서버 예약과 기준(각자의 직전 발사)이 같아 지터만큼만 어긋난다.
             if (firstShotSent && !ownerQueued)
             {
                 float sinceShot = Time.time - ownerLastShotTime;
                 ownerQueued = sinceShot >= ComboWindowOpen && sinceShot <= ComboWindowClose;
             }
-            if (IsNetworkActive)
-                RequestQueueShotRpc();
-            else
-                ServerQueueShot();
         }
 
-        // 첫 발 — 준비가 끝나면 한 번만 요청한다. 방향은 공격 시작 때 잠근 조준이다.
+        // 첫 발 — 준비가 끝나면 한 번만 쏜다. 방향은 공격 시작 때 잠근 조준이다. 준비 끝에 (예측) 과열이면 쏘지 않고 끝낸다.
         if (!firstShotSent)
         {
-            if (Time.time < startTime + WindupDuration || heat.IsOverheated)
+            if (Time.time < startTime + WindupDuration)
                 return;
 
+            if (overheated)
+            {
+                EndAsChainAuthority();
+                return;
+            }
+
             firstShotSent = true;
-            RequestShot(facing.Direction);
+            FireAsOwner(facing.Direction);
             return;
         }
 
-        // 이어지는 발 — 누르고 있거나 창 안에서 예약했으면 발사 간격이 찰 때 요청한다.
+        // 이어지는 발 — 누르고 있거나 창 안에서 예약했으면 발사 간격이 찰 때 쏜다.
         // 방향 = 발사 ShotLockLead 전에 잠근 몸 방향(덜 돌았으면 덜 돈 방향). 그 사이에 눌러 미리 못 잠갔으면 지금 몸 방향.
-        if (OwnerChainsNextShot && !heat.IsOverheated
-            && Time.time >= ownerLastShotTime + FireInterval)
+        if (OwnerChainsNextShot && !overheated)
         {
-            ownerQueued = false;
-            Vector3 shotDirection = ownerPreLocked ? facing.Direction : facing.BeginShot(movement.CurrentFacing);
-            ownerPreLocked = false;
-            RequestShot(shotDirection);
+            if (Time.time >= ownerLastShotTime + FireInterval)
+            {
+                ownerQueued = false;
+                Vector3 shotDirection = ownerPreLocked ? facing.Direction : facing.BeginShot(movement.CurrentFacing);
+                ownerPreLocked = false;
+                FireAsOwner(shotDirection);
+            }
             return;
         }
 
-        // 홀드 신호 — 끊기면 서버가 뗀 것으로 본다.
-        if (!holdSent || Time.time < nextHoldSignalTime)
-            return;
-
-        nextHoldSignalTime = Time.time + FireInterval * HoldSignalIntervals;
-        if (IsNetworkActive)
-            HoldSignalRpc();
-        else
-            ServerHoldSignal();
+        // 홀드도 예약도 없으면(창 밖·과열 포함) 이번 발의 후속 동작까지 마무리하고 끝낸다(§4.3·§4.4).
+        // 🔴 여기가 공격 끝이다 — 공격 잠금(이동 입력 회전 차단)도 여기서(EndLocal → ResetRuntime) 풀린다(할 일 27).
+        if (Time.time >= ownerLastShotTime + ShotRecovery)
+            EndAsChainAuthority();
     }
 
-    private void RequestShot(Vector3 direction)
+    /// <summary>
+    /// [체인 주도] 한 발 — 호스트·오프라인은 바로 서버 발사(판정 결과로 연출), 원격 오너는 예측 직선으로 즉시 연출 + 과열 예측 기록 + 발사 요청.
+    /// </summary>
+    private void FireAsOwner(Vector3 direction)
     {
         ownerLastShotTime = Time.time;
-        nextHoldSignalTime = Time.time + FireInterval * HoldSignalIntervals;
-        if (IsNetworkActive)
-            FireShotRpc(direction);
+        Vector3 origin = ShotOrigin;
+
+        if (HasGameplayAuthority)
+        {
+            if (ServerFire(origin, direction, out Vector3 end, out bool hit, out byte stage))
+                PlayShot(origin, end, hit, stage);
+            return;
+        }
+
+        GunnerHeatTraits heatTraits = heat.Traits;
+        byte overdriveStage = heatTraits.Mode == GunnerHeatMode.Overdrive
+            ? (byte)Mathf.Clamp(heat.PredictStage(heatPrediction), 0, 255)
+            : (byte)0;
+        bool pierce = GunnerTraitRules.PierceSecondaryRatioFor(player.TraitModifiers) >= 0f;
+        Vector3 predictedEnd = beam.PredictEnd(origin, direction, data.Range, data.BeamWidth * 0.5f, data.HittableLayers,
+            data.BlockingLayers, pierce, out bool predictedHit);
+
+        heatPrediction.Record(heat.ClockNow, heatTraits.HeatPerShot(data.HeatPerShot));
+        PlayShot(origin, predictedEnd, predictedHit, overdriveStage);
+        FireShotRpc(comboSerial, origin, direction);
+    }
+
+    private void EndAsChainAuthority()
+    {
+        byte serial = comboSerial;
+        EndLocal();
+        if (HasGameplayAuthority)
+            verifier.EndCombo();
+
+        if (!IsNetworkActive)
+            return;
+
+        if (IsServer)
+            EndRpc();
         else
-            ServerRequestShot(direction);
+            NotifyAttackEndRpc(serial);
     }
 
     // ── 서버 ─────────────────────────────────────────────────────────────
 
+    // [서버] 공격이 시작됐다(호스트 오너는 직접, 원격 오너는 시작 통지로) — 2차 검증 상태를 새로 열고 오너 뺀 피어에 준비 동작 전달.
+    private void ServerOnStart(Vector3 direction)
+    {
+        verifier.EndCombo();
+        verifier.RecordAttackSpeed(Time.unscaledTimeAsDouble, AttackSpeedRate);
+        if (IsNetworkActive)
+            StartRpc(direction);
+    }
+
+    // [서버] 원격 오너의 시작 통지 — 거부하지 않고 따라간다. 서버가 준비 상태에 못 들어가면(넉백·구속·과열 등) 끊기 경로로 돌려보낸다.
     [Rpc(SendTo.Server)]
-    private void RequestStartRpc(Vector3 direction, PlayerStatReport statReport, RpcParams rpcParams = default)
+    private void NotifyStartRpc(byte serial, Vector3 direction, PlayerStatReport statReport, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
         player.ValidateStatReport(statReport, rpcParams.Receive.SenderClientId, "거너 기본 공격 시작");
 
-        if (active || stateController == null || !stateController.CanAttack || heat.IsOverheated)
+        // 이전 공격을 아직 따라가는 중이면(종료 통지보다 시작이 먼저 처리될 일은 없지만 안전망 전) 조용히 정리한다.
+        if (active)
         {
-            RejectStartRpc();
-            return;
+            ResetRuntime();
+            EndAttackStateGracefully();
         }
 
-        StartServer(direction);
-    }
-
-    [Rpc(SendTo.Server)]
-    private void FireShotRpc(Vector3 direction, RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-        ServerRequestShot(direction);
-    }
-
-    // 첫 발은 준비가 끝났으면, 이어지는 발은 서버가 아는 눌림·창 예약이 있을 때만 쏜다(창 우회 방지).
-    // 방향은 오너가 잠근 몸 방향 그대로다 — 몸 회전은 오너 권한이라 서버가 따로 정하지 않는다.
-    private void ServerRequestShot(Vector3 direction)
-    {
-        if (!active || (lastShotTime >= 0f && !held && !hasQueuedShot))
-            return;
-
-        lastHoldSignalTime = Time.time;
-        if (ServerFire(direction))
-            hasQueuedShot = false;
-    }
-
-    [Rpc(SendTo.Server)]
-    private void RequestQueueShotRpc(RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-        ServerQueueShot();
-    }
-
-    [Rpc(SendTo.Server)]
-    private void ReleaseRpc(RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-        held = false;
-    }
-
-    [Rpc(SendTo.Server)]
-    private void FinishRpc(RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-        ServerFinish();
-    }
-
-    // 스킬 예약 마무리 — 눌림·창 예약을 지운다. 이미 온 발 요청은 그대로 쏘고(첫 발 포함), 그 뒤 TickServer 가 ShotRecovery 로 끝낸다.
-    private void ServerFinish()
-    {
-        held = false;
-        hasQueuedShot = false;
-    }
-
-    [Rpc(SendTo.Server)]
-    private void HoldSignalRpc(RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-        ServerHoldSignal();
-    }
-
-    // 클릭 = 버튼이 눌렸다 — 홀드를 (다시) 켠다. 다음 발 예약은 창(직전 발사 + ComboWindowOpen~Close) 안의 클릭만이다.
-    // 창 밖 클릭은 예약을 버린다 — 이월 없음. 그 뒤 계속 누르고 있으면 홀드로 이어진다.
-    private void ServerQueueShot()
-    {
-        if (!active || data == null)
-            return;
-
-        held = true;
-        lastHoldSignalTime = Time.time;
-
-        if (lastShotTime < 0f || hasQueuedShot || heat.IsOverheated)
-            return;
-
-        float sinceShot = Time.time - lastShotTime;
-        if (sinceShot < ComboWindowOpen || sinceShot > ComboWindowClose)
-            return;
-
-        hasQueuedShot = true;
-    }
-
-    // 신호 시각만 갱신한다 — 홀드를 켜지는 않는다(뗀 뒤 늦게 온 신호가 홀드를 되살리지 않게).
-    private void ServerHoldSignal()
-    {
-        if (!active || !held)
-            return;
-
-        lastHoldSignalTime = Time.time;
-    }
-
-    private void StartServer(Vector3 direction)
-    {
         if (!player.BeginAttackReadyState())
         {
-            isRequesting = false;
+            verifier.EndCombo();
+            CancelRpc(serial);
             return;
         }
 
+        serverComboSerial = serial;
         BeginRuntime(direction);
-
-        if (IsNetworkActive)
-            StartRpc(direction);
+        ServerOnStart(direction);
     }
 
-    /// <returns>실제로 쐈으면 true.</returns>
-    private bool ServerFire(Vector3 requested)
+    // [서버] 원격 오너의 발사 요청(Reliable) — 오너 총구 위치·방향. 공용 2차 검증·과열에 걸리면 레이저만(데미지·과열 증가 없음).
+    [Rpc(SendTo.Server)]
+    private void FireShotRpc(byte serial, Vector3 origin, Vector3 direction, RpcParams rpcParams = default)
     {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        if (!active || serial != serverComboSerial || data == null)
+            return;
+
+        double now = Time.unscaledTimeAsDouble;
+        BasicAttackVerifySettings settings = BasicAttackVerifySettings.Current;
+        verifier.RecordAttackSpeed(now, AttackSpeedRate);
+
+        // 첫 발은 준비 동작, 그 뒤는 발사 간격(공속 1 기준 ÷ 최근 최대 공속) + 여유. 간격 기록은 검증기가 든다.
+        bool windupOk = serverLastShotTime >= 0f ||
+            BasicAttackVerifyRules.PassesInterval((float)(now - serverStartUnscaled), data.WindupDuration, AttackSpeedRate, settings.IntervalSlack);
+        BasicAttackHitVerdict verdict = verifier.VerifyFixedInterval(now, data.FireInterval, AttackSpeedRate, settings);
+        Vector3 shotDirection = GunnerAttackFacingModel.Flatten(direction, movement.CurrentFacing);
+
+        string rejected = heat.IsOverheated ? "과열"
+            : !windupOk ? "준비 동작보다 빠름"
+            : verdict != BasicAttackHitVerdict.Accepted ? verdict.ToString()
+            : null;
+        if (rejected != null)
+        {
+            Edit.LogWarning($"[평타 검증] {name} 거너 발사 데미지 없음 — {rejected}", this);
+            NoteServerShot();
+            // 레이저만 — 오너는 이미 자기 연출을 냈다. 다른 피어에는 벽까지 빗나간 레이저.
+            Vector3 missEnd = origin + shotDirection * beam.CastLength(origin, shotDirection, data.Range, data.BeamWidth * 0.5f, data.BlockingLayers);
+            ShotRpc(origin, missEnd, false, 0);
+            return;
+        }
+
+        Vector3 offset = origin - ShotOrigin;
+        if (offset.sqrMagnitude > OwnerPositionWarnDistance * OwnerPositionWarnDistance)
+            Edit.LogWarning($"[평타 검증] {name} 발사 위치가 서버가 보는 총구와 {offset.magnitude:0.00}m 다르다(경고만, 오너 위치로 판정).", this);
+
+        ServerFire(origin, shotDirection, out _, out _, out _);
+    }
+
+    // [서버] 원격 오너의 공격 종료(정상 종료·스스로 끊음). 지금 따라가는 공격이 아니면 무시(이미 끊었다).
+    [Rpc(SendTo.Server)]
+    private void NotifyAttackEndRpc(byte serial, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        if (!active || serial != serverComboSerial)
+            return;
+
+        EndFollowServer();
+    }
+
+    private void EndFollowServer()
+    {
+        verifier.EndCombo();
+        EndLocal();
+        if (IsNetworkActive)
+            EndRpc();
+    }
+
+    // 서버가 발 하나를 처리했다(수락·거부) — 따라가기 안전망을 이 발 기준으로 미룬다.
+    private void NoteServerShot()
+    {
+        serverLastShotTime = Time.time;
+        serverFollowFallbackTime = Time.time + Mathf.Max(FireInterval, ShotRecovery) + ServerFollowGraceSeconds;
+    }
+
+    /// <summary>
+    /// [서버] 한 발 판정 — 오너가 정한 위치·방향으로 쏘기만 한다(할 일 27·256, 몸 회전·잠금은 오너 권한). 과열 증가·특성·오너 뺀 피어 연출.
+    /// 호스트·오프라인 오너는 반환값(<paramref name="end"/>·<paramref name="hit"/>·<paramref name="overdriveStage"/>)으로 자기 연출을 낸다.
+    /// </summary>
+    private bool ServerFire(Vector3 origin, Vector3 requested, out Vector3 end, out bool hit, out byte overdriveStage)
+    {
+        end = origin;
+        hit = false;
+        overdriveStage = 0;
         if (!active || data == null)
             return false;
 
-        float now = Time.time;
-        if (now < startTime + WindupDuration * IntervalTolerance)
-            return false;
-        if (lastShotTime >= 0f && now - lastShotTime < FireInterval * IntervalTolerance)
-            return false;
-        if (heat.IsOverheated)
-            return false;
-
-        // 오너가 잠근 방향으로 쏘기만 한다(할 일 27). 몸 회전·잠금은 오너 권한 — 서버는 돌리거나 검증하지 않는다(2026-10-13).
         Vector3 direction = GunnerAttackFacingModel.Flatten(requested, movement.CurrentFacing);
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
@@ -507,19 +530,16 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         int baseDamage = player.ResolveDamage(data.AttackDamageMultiplier, data.FlatDamageBonus, new TraitAttackKey(AttackType.Default));
         int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heatTraits.BasicShotScale(stage, heat.Data)));
 
-        Vector3 origin = ShotOrigin;
-        bool hit = FireBeam(origin, direction, damage, data.TriggersOnHit, TraitHitFlags.Original, out Vector3 end);
+        hit = FireBeam(origin, direction, damage, data.TriggersOnHit, TraitHitFlags.Original, out end);
 
         heat.ServerAddShot(heatTraits.HeatPerShot(data.HeatPerShot)); // 허공이어도 증가(§4.2). 최대치 제한은 모델, 정온 운용이면 증가 없음
-        lastShotTime = now;
+        NoteServerShot();
         player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 발 발사(적중 무관)
         // 한계 돌파 과열 색(2026-11-03 민경) — 이 발 피해에 쓴 단계(증가 전)를 연출에 같이 싣는다. 한계 돌파가 아니면 0(원래 색). 판정 무관.
-        byte overdriveStage = heatTraits.Mode == GunnerHeatMode.Overdrive ? (byte)Mathf.Clamp(stage, 0, 255) : (byte)0;
+        overdriveStage = heatTraits.Mode == GunnerHeatMode.Overdrive ? (byte)Mathf.Clamp(stage, 0, 255) : (byte)0;
         CommitShotForTraits(origin, direction, damage, overdriveStage);
         if (IsNetworkActive)
             ShotRpc(origin, end, hit, overdriveStage);
-        else
-            PlayShot(origin, end, hit, overdriveStage);
         return true;
     }
 
@@ -581,67 +601,15 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         }
     }
 
-    private void TickServer()
-    {
-        float now = Time.time;
+    // ── 다른 피어 ────────────────────────────────────────────────────────
 
-        // 첫 발 대기 — 준비 끝에 과열이면 쏘지 않고 끝내고, 오너 요청이 끊기면 서버가 스스로 끝낸다.
-        if (lastShotTime < 0f)
-        {
-            float fireAt = startTime + WindupDuration;
-            if (heat.IsOverheated && now >= fireAt)
-            {
-                EndServer();
-                return;
-            }
-
-            if (now > fireAt + FireInterval * StallIntervals)
-            {
-                Edit.LogWarning("[Gunner] 오너 첫 발 요청이 끊겼다 — 기본 공격을 서버에서 끝낸다.", this);
-                EndServer();
-            }
-            return;
-        }
-
-        // 홀드 중 오너 신호가 끊기면 뗀 것으로 본다 — 아래 마무리로 끝난다.
-        if (held && now > lastHoldSignalTime + FireInterval * StallIntervals)
-        {
-            Edit.LogWarning("[Gunner] 오너 홀드 신호가 끊겼다 — 뗀 것으로 보고 기본 공격을 마무리한다.", this);
-            held = false;
-        }
-
-        // 창 예약을 했는데 오너 발사 요청이 끊기면(창 경계에서 오너는 창 밖으로 본 경우 포함) 버린다 — 아래 마무리로 끝난다.
-        if (hasQueuedShot && now > lastShotTime + FireInterval * StallIntervals)
-        {
-            Edit.LogWarning("[Gunner] 창 예약 뒤 오너 발사 요청이 끊겼다 — 예약을 버리고 기본 공격을 마무리한다.", this);
-            hasQueuedShot = false;
-        }
-
-        // 다음 발 — 누르고 있거나 창 안에서 예약됐으면 오너의 발사 요청(그 발의 몸 방향)을 기다린다(ServerRequestShot).
-        // 간격은 실제 직전 발사 기준으로 ServerFire 가 검사하므로 몰아 쏘지 않는다.
-        // 과열이면 기다리지 않고 이번 발의 후속 동작까지 마무리한다(§4.4).
-        if ((held || hasQueuedShot) && !heat.IsOverheated)
-            return;
-
-        // 홀드도 예약도 없으면(창 밖·과열 포함) 이번 발의 후속 동작까지 마무리하고 끝낸다(§4.3·§4.4).
-        // 🔴 여기가 공격 끝이다 — 공격 잠금(이동 입력 회전 차단)도 여기서(EndLocal → ResetRuntime) 풀린다(할 일 27).
-        if (now >= lastShotTime + ShotRecovery)
-            EndServer();
-    }
-
-    private void EndServer()
-    {
-        EndLocal();
-        if (IsNetworkActive)
-            EndRpc();
-    }
-
-    // ── 전 피어 ──────────────────────────────────────────────────────────
-
-    [Rpc(SendTo.NotServer)]
+    // [오너 뺀 피어] 준비 동작. 오너는 이미 자기 화면에서 틀었다. 서버(원격 오너)는 통지 처리에서 직접 튼다.
+    [Rpc(SendTo.NotOwner)]
     private void StartRpc(Vector3 direction)
     {
-        isRequesting = false;
+        if (IsServer)
+            return;
+
         if (!player.BeginAttackReadyState())
         {
             ResetRuntime();
@@ -650,36 +618,50 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
         BeginRuntime(direction);
     }
 
-    [Rpc(SendTo.Owner)]
-    private void RejectStartRpc()
+    // [오너 뺀 피어] 정상 종료.
+    [Rpc(SendTo.NotOwner)]
+    private void EndRpc()
     {
-        isRequesting = false;
+        if (IsServer)
+            return;
+
+        EndLocal();
     }
 
+    // [서버 뺀 피어] 서버가 끊었다 — 오너(원격)·관전자 즉시 멈춤. 오너는 지금 공격이 아니면(옛 공격에 대한 끊기) 무시한다.
     [Rpc(SendTo.NotServer)]
-    private void EndRpc() => EndLocal();
+    private void CancelRpc(byte serial)
+    {
+        if (!active)
+            return;
 
-    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+        if (IsOwner && serial != comboSerial)
+            return;
+
+        ResetRuntime();
+        EndAttackStateGracefully();
+        ReturnToIdlePose();
+    }
+
+    // [오너 뺀 피어] 발사 연출 — 오너는 자기 발사 순간에 이미 냈다(원격 오너 = 예측 직선, 호스트 오너 = 판정 결과).
+    [Rpc(SendTo.NotOwner, Delivery = RpcDelivery.Unreliable)]
     private void ShotRpc(Vector3 origin, Vector3 end, bool hit, byte overdriveStage) => PlayShot(origin, end, hit, overdriveStage);
 
     private void BeginRuntime(Vector3 direction)
     {
         active = true;
-        isRequesting = false;
         firstShotSent = false;
-        hasQueuedShot = false;
         ownerQueued = false;
         ownerPreLocked = false;
         ownerFinishing = false;
         startTime = Time.time;
-        lastShotTime = -1f;
         ownerLastShotTime = -1f;
-        // 시작 클릭 = 눌림. 오너가 이미 뗐으면 다음 틱에 ReleaseRpc 로 바로잡는다.
-        holdSent = true;
-        held = true;
-        lastHoldSignalTime = startTime;
+        serverStartUnscaled = Time.unscaledTimeAsDouble;
+        serverLastShotTime = -1f;
+        // 첫 발 요청이 안 오면 서버가 스스로 끝낸다(따라가는 서버만 본다).
+        serverFollowFallbackTime = Time.time + WindupDuration + FireInterval * StallIntervals;
 
-        // 공격 잠금 + 첫 발 잠금 — 시작 RPC 의 조준을 바라보고 이동 입력 회전을 막는다. 풀기는 ResetRuntime(정상 종료·끊김 공통).
+        // 공격 잠금 + 첫 발 잠금 — 시작 조준을 바라보고 이동 입력 회전을 막는다. 풀기는 ResetRuntime(정상 종료·끊김 공통).
         // 발 사이의 커서 회전은 TickOwner 가 RotateImmediately 로 직접 돌린다(토큰이 막지 않는 행동 회전).
         movement.AcquireFacingLock(this, facing.Begin(direction, movement.CurrentFacing));
         player.SetAnimatorMoving(false);
@@ -688,18 +670,23 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
 
     private void EndLocal()
     {
+        ResetRuntime();
+        EndAttackStateGracefully();
+        ReturnToIdlePose();
+    }
+
+    // 정상 종료·끊기 처리를 이미 했다 — EndAttackState → PlayerAttackState.Exit → CancelCurrentAttack 되돌이를 막는다.
+    private void EndAttackStateGracefully()
+    {
         endingGracefully = true;
         try
         {
-            ResetRuntime();
             player.EndAttackState();
         }
         finally
         {
             endingGracefully = false;
         }
-
-        ReturnToIdlePose();
     }
 
     // 발사 자세(Q_charge_loop)는 루프라 스스로 빠져나오지 않는다 — Idle 로 돌려야 Idle↔Walk 전환이 다시 산다.
@@ -718,18 +705,15 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IPlay
     private void ResetRuntime()
     {
         active = false;
-        isRequesting = false;
         firstShotSent = false;
-        holdSent = false;
-        hasQueuedShot = false;
         ownerQueued = false;
         ownerPreLocked = false;
         ownerFinishing = false;
-        held = false;
-        lastShotTime = -1f;
         ownerLastShotTime = -1f;
+        serverLastShotTime = -1f;
+        serverFollowFallbackTime = 0f;
 
-        // 잠금 해제 — 정상 종료(EndLocal)·대시/상태 전이 끊김(CancelCurrentAttack)·시작 거절이 모두 여기를 지난다.
+        // 잠금 해제 — 정상 종료(EndLocal)·대시/상태 전이 끊김(CancelCurrentAttack)·서버 끊기가 모두 여기를 지난다.
         facing.End();
         movement?.ReleaseFacingLock(this);
     }

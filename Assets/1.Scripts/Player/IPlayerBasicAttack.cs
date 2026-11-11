@@ -165,7 +165,7 @@ public static class PlayerBasicAttackInputRules
 
     /// <summary>
     /// 근접 콤보(가붕이)가 이번 틱 다음 타 예약을 요청하는가 — 누르고 있거나 누른 프레임, 단 스킬 때문에 마무리 중이면 안 한다.
-    /// 창(ComboWindowOpen~Close) 판정은 따로(오프라인 = 로컬, 네트워크 = 서버)다.
+    /// 창(ComboWindowOpen~Close) 판정은 따로 — 오너 자기 애니 이벤트다(할 일 256 오너 예측, 오프라인 같음).
     /// </summary>
     public static bool ShouldRequestNextMeleeAttack(bool attackHeld, bool attackPressed, bool finishingChain) =>
         !finishingChain && (attackHeld || attackPressed);

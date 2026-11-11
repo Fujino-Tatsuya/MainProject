@@ -19,6 +19,8 @@ GameObject:
   - component: {fileID: 127159849850635136}
   - component: {fileID: 1635166641757817886}
   - component: {fileID: 4191191191191191191}
+  - component: {fileID: 191939608274332967}
+  - component: {fileID: 8352197802082181632}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -233,6 +235,7 @@ MonoBehaviour:
   targetFlash: 0
   darkAdaptation: 0
   ownerZoom: 1
+  cameraCenter: 1
   hideCombatUi: 1
   showOwnerDim: 1
   showLightGather: 0
@@ -313,3 +316,52 @@ MonoBehaviour:
   verifyDistanceSlack: 0.2
   verifyAngleSlack: 5
   simultaneousSeconds: 0.05
+  basicAttackIntervalSlack: 0.15
+  basicAttackSpeedWindow: 0.5
+--- !u!114 &191939608274332967
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98d9db9626104da59357651088226725, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Multiplayer.Tools.NetworkSimulator.Runtime::Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulator
+  m_PresetAsset: {fileID: 0}
+  m_PresetReference:
+    rid: 7422321664470024192
+  m_Scenario:
+    rid: -2
+  m_IsScenarioSettingsFolded: 0
+  AutoRunScenario: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 7422321664470024192
+      type: {class: NetworkSimulatorPreset, ns: Unity.Multiplayer.Tools.NetworkSimulator.Runtime, asm: Unity.Multiplayer.Tools.NetworkSimulator.Runtime}
+      data:
+        <Name>k__BackingField: "\uBE4C\uB4DC \uC9C0\uC5F0 25ms"
+        <Description>k__BackingField: "\uD560 \uC77C 258 \u2014 Development Build
+          \uC804\uC6A9, \uC9C0\uC5F0\uB9CC"
+        <PacketDelayMs>k__BackingField: 25
+        <PacketJitterMs>k__BackingField: 0
+        <PacketLossInterval>k__BackingField: 0
+        <PacketLossPercent>k__BackingField: 0
+--- !u!114 &8352197802082181632
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f10d70a86ad4a24eb6a01ca1cc4f893, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetSimDevBuildBoot
+  simulator: {fileID: 191939608274332967}

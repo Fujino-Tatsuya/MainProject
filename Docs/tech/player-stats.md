@@ -108,7 +108,7 @@
 - 툴팁은 같은 식 `SkillTooltipDamage.FromLinear / FromScaledSnapshot(…, dealtDamagePercent)` 를 쓴다.
   Shift 계산식에는 계수·고정값만 보이고, 가하는 피해% 는 결과 숫자에만 들어간다.
 - **서버 2차 검증.** 오너가 공격·스킬 시작 요청에 `PlayerStatReport` 를 싣는다. 내용은 5종 최종값(최종 배율까지 곱한 값)과 가하는 피해%이고, 실수 값은 천분율이다. 서버는 자기 값과 비교한다.
-  - 대상: `RequestUseSkillRpc`, Default `RequestStartAttackRpc`·`RequestQueueNextAttackRpc`, Assassin `RequestStartRpc`·`RequestQueueNextAttackRpc`, Gunner `RequestStartRpc`.
+  - 대상: `RequestUseSkillRpc`, 평타 타 시작 통지(할 일 256 — Default·Assassin `NotifySwingStartRpc`, Gunner `NotifyStartRpc`, [owner-predicted-basic-attack.md](owner-predicted-basic-attack.md)).
   - 다르면 `[PlayerStats] … 불일치` 경고만 남긴다. 판정은 서버 값이고 요청은 거절하지 않는다.
   - 서버 쪽 입력(상태이상 목록·출처)이 바뀐 뒤 `Player.statValidationGrace`(기본 0.5초) 안의 불일치는 복제 지연으로 보고 무시한다.
   - 경고가 계속 나면 피어마다 xlsx 기본값·특성 SO 가 같은지, 공식 밖에서 스탯을 바꾸는 코드가 있는지 본다.

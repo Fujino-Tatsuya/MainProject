@@ -36,8 +36,13 @@ public sealed class AssassinBasicAttackStepData
     [Tooltip("⚠️ 미사용 — 예약 창 닫힘은 클립의 ComboWindowClose 이벤트(HandleDefaultAttackEvent ComboWindowClose=2)다.")]
     [SerializeField, Range(0f, 1f)] private float comboWindowClose = 0.95f;
 #pragma warning restore CS0414
+    [Tooltip("AssassinAnimatorController 의 이 타 상태 Speed 복제(할 일 256) — 서버 2차 검증이 클립 이벤트 시각을 실제 초로 바꿀 때 쓴다(서버는 애니 이벤트를 쓰지 않는다). " +
+             "원본은 컨트롤러다 — 상태 Speed 를 바꾸면 여기도 같이(EditMode AssassinBasicAttackStateSpeedTests 가 어긋남을 잡는다). 테이블 칸 아님.")]
+    [DataTableIgnore] [SerializeField, Min(0.01f)] private float animatorStateSpeed = 1f;
 
     public AnimationClip Clip => clip;
+    /// <summary>애니메이터 상태 Speed(공격속도 배율 제외) — 컨트롤러 값 복제(할 일 256).</summary>
+    public float AnimatorStateSpeed => animatorStateSpeed > 0f ? animatorStateSpeed : 1f;
     public float AttackDamageMultiplier => attackDamageMultiplier;
     public AttackShapeSet HitArea => hitArea;
     // 필드가 생기기 전 직렬화된 스텝은 0 으로 읽힐 수 있다 — 최소 1타.
@@ -53,8 +58,10 @@ public sealed class AssassinBasicAttackStepData
         int hitCount = 1,
         float comboWindowOpen = 0.4f,
         float comboWindowClose = 0.95f,
-        AttackShape hitShape = null)
+        AttackShape hitShape = null,
+        float animatorStateSpeed = 1f)
     {
+        this.animatorStateSpeed = animatorStateSpeed;
         this.attackDamageMultiplier = attackDamageMultiplier;
         this.range = range;
         this.angle = angle;
@@ -100,10 +107,10 @@ public sealed class AssassinBasicAttackData : ScriptableObject
     // 판정·예약 창·종료는 각 클립의 Hit / ComboWindowOpen·Close / End 이벤트다(창 정규화 값 인자는 미사용 칸의 기본값일 뿐).
     [SerializeField] private AssassinBasicAttackStepData[] normalSteps =
     {
-        new AssassinBasicAttackStepData(1f, 1.5f, 90f, 3f, 1, 0.05f, 0.30f),
-        new AssassinBasicAttackStepData(1f, 1.5f, 100f, 3f, 1, 0.05f, 0.25f),
-        new AssassinBasicAttackStepData(1f, 1.6f, 100f, 3f, 1, 0.05f, 0.25f),
-        new AssassinBasicAttackStepData(1.3f, 1.7f, 120f, 2.5f, 1, 0.05f, 0.25f),
+        new AssassinBasicAttackStepData(1f, 1.5f, 90f, 3f, 1, 0.05f, 0.30f, animatorStateSpeed: 1.2f),
+        new AssassinBasicAttackStepData(1f, 1.5f, 100f, 3f, 1, 0.05f, 0.25f, animatorStateSpeed: 1.2f),
+        new AssassinBasicAttackStepData(1f, 1.6f, 100f, 3f, 1, 0.05f, 0.25f, animatorStateSpeed: 1.2f),
+        new AssassinBasicAttackStepData(1.3f, 1.7f, 120f, 2.5f, 1, 0.05f, 0.25f, animatorStateSpeed: 1.2f),
     };
 
     [Header("일반 타 전진 (할 일 96 — 4타 공용)")]
@@ -117,7 +124,7 @@ public sealed class AssassinBasicAttackData : ScriptableObject
 
     [Header("일반 E 강타 (Combo_Attack_02_01)")]
     [SerializeField] private AssassinBasicAttackStepData enhancedStep =
-        new AssassinBasicAttackStepData(2.5f, 1.8f, 120f, 2f, hitShape: AssassinBasicAttackStepData.EnhancedStrikeCircle());
+        new AssassinBasicAttackStepData(2.5f, 1.8f, 120f, 2f, hitShape: AssassinBasicAttackStepData.EnhancedStrikeCircle(), animatorStateSpeed: 2f);
 
     [Tooltip("강타가 시작될 때 조준 방향으로 전진하는 거리(m). 벽·몸 콜라이더 있는 적에 막힌다. 0 = 전진 없음.")]
     [SerializeField, Min(0f)] private float enhancedLungeDistance = 1.2f;
@@ -127,7 +134,7 @@ public sealed class AssassinBasicAttackData : ScriptableObject
 
     [Header("변신 평타 묶음 (Speed_Attack_Loop, 타당 계수)")]
     [SerializeField] private AssassinBasicAttackStepData transformedStep =
-        new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4, 0.75f);
+        new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4, 0.75f, animatorStateSpeed: 1.25f);
 
     [Header("연결")]
     [Tooltip("마지막 타가 다음 타 예약 없이 끝난 뒤 이 시간 안에 다시 누르면 다음 타부터 시작한다. " +

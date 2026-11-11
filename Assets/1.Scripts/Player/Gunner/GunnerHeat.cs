@@ -39,6 +39,20 @@ public class GunnerHeat : BaseNetworkBehaviour, IPassiveTooltipProvider
     /// <summary>현재 단계(0~3). 과열 상태면 3. 정온 운용이면 0.</summary>
     public int CurrentStage => data != null && HeatEnabled ? GunnerHeatModel.StageAt(State, Now(), data) : 0;
 
+    /// <summary>
+    /// [오너] 과열 1차 예측(할 일 256) — 복제 기준점 + 서버 미반영 자기 발(<paramref name="pending"/>). 정온 운용이면 false.
+    /// 서버가 원본이다 — 예측이 틀린 발은 서버가 2차 거부한다(레이저만, 데미지 없음).
+    /// </summary>
+    public bool PredictOverheated(GunnerHeatPrediction pending) =>
+        data != null && HeatEnabled && GunnerHeatModel.OverheatedAt(pending.Predict(State, Now(), data), Now(), data);
+
+    /// <summary>[오너] 예측 단계(0~3) — 연출(한계 돌파 색)용. 정온 운용이면 0.</summary>
+    public int PredictStage(GunnerHeatPrediction pending) =>
+        data != null && HeatEnabled ? GunnerHeatModel.StageAt(pending.Predict(State, Now(), data), Now(), data) : 0;
+
+    /// <summary>과열 시계(GameNow 도메인) — 오너 예측 발 기록용.</summary>
+    public double ClockNow => Now();
+
     /// <summary>Q·궁 시전 시작 순간의 단계 저장용(§5.6). 이후 값이 바뀌어도 호출자가 들고 있는 값은 그대로다.</summary>
     public int CaptureStage() => CurrentStage;
 

@@ -21,6 +21,8 @@ public class PlayerDefaultAttack : BaseAttack
     private System.Func<Collider, Object> resolveTarget;
     private DefaultAttackStep currentStep;
     private Vector3 attackDirection;
+    // 판정 기준 위치 — 오너 판정 요청(할 일 256)이 보낸 오너 화면의 위치. 없으면 서버가 보는 자기 위치.
+    private Vector3? casterPositionOverride;
 
     private void Awake()
     {
@@ -77,6 +79,26 @@ public class PlayerDefaultAttack : BaseAttack
     ///    투사체 평타에 명중 연출이 필요해지면 <c>DefaultAttackProjectile</c> 쪽에서 따로 내야 한다.
     /// </summary>
     /// <returns>명중 대상이 하나라도 있으면 true. 서버가 아니거나 판정이 없었으면 false.</returns>
+    /// <summary>
+    /// 오너 판정 요청(할 일 256) — 오너가 Hit 시점에 보낸 위치·방향으로 판정한다(이동이 오너 권한이라 새 구멍이 아니다).
+    /// 이 타의 대상 1회 기록(<see cref="PrepareStep"/>)은 그대로라 다단 히트도 같은 대상을 다시 때리지 않는다.
+    /// </summary>
+    public bool HitCurrentStep(Vector3 casterPosition, Vector3 direction)
+    {
+        if (direction.sqrMagnitude >= 0.001f)
+            attackDirection = direction.normalized;
+
+        casterPositionOverride = casterPosition;
+        try
+        {
+            return HitCurrentStep();
+        }
+        finally
+        {
+            casterPositionOverride = null;
+        }
+    }
+
     public bool HitCurrentStep()
     {
         if (!IsServer)
@@ -104,7 +126,7 @@ public class PlayerDefaultAttack : BaseAttack
     /// <returns>하나라도 명중했으면 true.</returns>
     private bool HitOverlap()
     {
-        AttackShapeSet area = StepArea(currentStep, transform.position, attackDirection, out AttackShapePose pose);
+        AttackShapeSet area = StepArea(currentStep, casterPositionOverride ?? transform.position, attackDirection, out AttackShapePose pose);
         if (area == null || area.IsEmpty)
         {
             Edit.LogWarning("[Player] PlayerDefaultAttack — 이 타의 판정 도형(hitArea)이 비어 있다.", this);
