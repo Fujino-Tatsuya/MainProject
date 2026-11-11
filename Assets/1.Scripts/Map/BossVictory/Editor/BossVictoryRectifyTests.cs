@@ -81,69 +81,55 @@ public class BossVictoryRectifyTests
         finally { BossVictoryRectifyText.Destroy(asset); }
     }
 
-    // ── 안쪽 색 — 원형 확장 색상 전환(267 후속) ──
-    const float Fade = 0.08f, Expand = 0.35f, NextAt = 0.6f;
+    // ── 안쪽 색 — Ring Wipe Fill(267 후속) ──
+    const float Delay = 4f / 60f, Fade = 0.15f, Expand = 0.6f;
 
     [Test]
-    public void 안쪽색_주기는_페이드_더하기_확장_곱하기_다음원비율()
+    public void 링_생성은_간격마다_페이드와_확장이_동시_easeOutCubic()
     {
-        Assert.AreEqual(0.29f, BossVictoryRectifyFill.Period(Fade, Expand, NextAt), 1e-5f);
-        Assert.AreEqual(-1, BossVictoryRectifyFill.Latest(-0.01f, 0.29f));
-        Assert.AreEqual(0, BossVictoryRectifyFill.Latest(0f, 0.29f));
-        Assert.AreEqual(0, BossVictoryRectifyFill.Latest(0.28f, 0.29f));
-        Assert.AreEqual(3, BossVictoryRectifyFill.Latest(0.88f, 0.29f));
-        Assert.AreEqual(0.01f, BossVictoryRectifyFill.Period(0f, 0f, 0f), 1e-6f, "최소 간격");
+        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(0, -0.01f, Delay, Fade, Expand).exists, "클립 전 없음");
+        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(1, Delay - 0.001f, Delay, Fade, Expand).exists, "링 1 은 4프레임 뒤");
+        BossVictoryRectifyFill.Ring r = BossVictoryRectifyFill.Evaluate(1, Delay + 0.075f, Delay, Fade, Expand);
+        Assert.IsTrue(r.exists);
+        Assert.AreEqual(0.5f, r.alpha, 1e-4f, "페이드 반");
+        Assert.AreEqual(1f - Mathf.Pow(1f - 0.075f / Expand, 3f), r.grow, 1e-5f, "페이드 동안에도 확장");
+        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Expand * 0.5f, Delay, Fade, Expand);
+        Assert.AreEqual(0.875f, r.grow, 1e-5f, "easeOutCubic(0.5) = 0.875");
+        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Expand + 0.01f, Delay, Fade, Expand);
+        Assert.AreEqual(1f, r.grow, 1e-6f);
+        Assert.AreEqual(1f, r.alpha, 1e-6f);
+        Assert.IsTrue(BossVictoryRectifyFill.Evaluate(2, 99f, Delay, Fade, Expand).exists, "마지막 링 = 끝까지 유지(반복 없음)");
+        Assert.AreEqual(3, BossVictoryRectifyFill.RingCount);
     }
 
     [Test]
-    public void 안쪽색_원은_페이드_뒤_확장_ease_out_색은_차례로_반복()
+    public void 링_Rmax_는_중심에서_단어_사각형_네_모서리까지_종횡비_보정()
     {
-        BossVictoryRectifyFill.Circle c = BossVictoryRectifyFill.Evaluate(1, 0.2f, Fade, Expand, NextAt, 5);
-        Assert.IsFalse(c.exists, "원 1 은 0.29초에 생김");
-        c = BossVictoryRectifyFill.Evaluate(1, 0.29f + 0.04f, Fade, Expand, NextAt, 5);
-        Assert.IsTrue(c.exists);
-        Assert.AreEqual(0.5f, c.alpha, 1e-4f, "페이드 반");
-        Assert.AreEqual(0f, c.grow, 1e-6f, "페이드 동안 크기 그대로");
-        c = BossVictoryRectifyFill.Evaluate(1, 0.29f + Fade + Expand * 0.5f, Fade, Expand, NextAt, 5);
-        Assert.AreEqual(1f, c.alpha, 1e-6f);
-        Assert.Greater(c.grow, 0.5f, "ease-out — 반 시간에 반보다 더 감");
-        Assert.Less(c.grow, 1f);
-        c = BossVictoryRectifyFill.Evaluate(1, 0.29f + Fade + Expand + 0.01f, Fade, Expand, NextAt, 5);
-        Assert.AreEqual(1f, c.grow, 1e-6f);
-        for (int k = 0; k < 12; k++)
-            Assert.AreEqual(k % 5, BossVictoryRectifyFill.Evaluate(k, 10f, Fade, Expand, NextAt, 5).colorIndex);
-        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(-1, 1f, Fade, Expand, NextAt, 5).exists);
+        var rects = new[] { new Vector4(0.1f, 0.4f, 0.3f, 0.6f), new Vector4(0.25f, 0.42f, 0.9f, 0.58f) };
+        Vector4 w = BossVictoryRectifyFill.WordRect(rects, 2);
+        Assert.AreEqual(new Vector4(0.1f, 0.4f, 0.9f, 0.6f), w);
+        float aspect = BossVictoryRectifyFill.WordAspect(w, 16f / 9f);
+        Assert.AreEqual(0.8f * 16f / 9f / 0.2f, aspect, 1e-4f);
+        float rMax = BossVictoryRectifyFill.MaxRadius(new Vector2(0.46f, 0.5f), aspect);
+        Assert.AreEqual(Mathf.Sqrt(0.54f * aspect * 0.54f * aspect + 0.25f), rMax, 1e-4f, "먼 쪽(오른쪽) 모서리");
+        Assert.AreEqual(rMax + 0.01f, BossVictoryRectifyFill.Radius(1f, rMax, 0.01f), 1e-6f, "다 퍼지면 경계까지 덮음");
+        Assert.AreEqual(0f, BossVictoryRectifyFill.Radius(0f, rMax, 0.01f), 1e-6f);
+        Assert.AreEqual(Vector4.zero, BossVictoryRectifyFill.WordRect(rects, 0));
     }
 
     [Test]
-    public void 안쪽색_앞앞_원은_지금_원이_생길_때_이미_다_커져_바탕이_된다()
+    public void 링_기본_설정은_사양값()
     {
-        float period = BossVictoryRectifyFill.Period(Fade, Expand, NextAt);
-        for (int latest = 2; latest < 10; latest++)
-        {
-            float t = latest * period;   // 지금 원이 막 생긴 순간
-            BossVictoryRectifyFill.Circle base2 = BossVictoryRectifyFill.Evaluate(latest - 2, t, Fade, Expand, NextAt, 5);
-            Assert.AreEqual(1f, base2.grow, 1e-6f);
-            Assert.AreEqual(1f, base2.alpha, 1e-6f);
-        }
-    }
-
-    [Test]
-    public void 안쪽색_글자_점은_시드로_고정되고_범위_안()
-    {
-        for (int k = 0; k < 50; k++)
-        {
-            int g = BossVictoryRectifyFill.GlyphFor(k, 267, 7);
-            Assert.That(g, Is.InRange(0, 6));
-            Assert.AreEqual(g, BossVictoryRectifyFill.GlyphFor(k, 267, 7), "같은 시드 = 같은 글자");
-            Vector2 p = BossVictoryRectifyFill.PointInGlyph(k, 267);
-            Assert.That(p.x, Is.InRange(0.3f, 0.7f));
-            Assert.That(p.y, Is.InRange(0.25f, 0.75f));
-            Assert.AreEqual(p, BossVictoryRectifyFill.PointInGlyph(k, 267));
-        }
-        Assert.AreEqual(0, BossVictoryRectifyFill.GlyphFor(3, 267, 0));
-        Assert.AreEqual(0.15f, BossVictoryRectifyFill.Radius(0f, 0.15f, 2f), 1e-6f);
-        Assert.AreEqual(2f, BossVictoryRectifyFill.Radius(1f, 0.15f, 2f), 1e-6f);
+        BossVictoryGlitchSettings s = BossVictoryGlitchSettings.Load();
+        Assert.IsNotNull(s);
+        Assert.AreEqual(3, s.rectifyFillColors.Length);
+        Assert.Less(Vector4.Distance((Color)new Color32(0xFF, 0x2D, 0xB4, 0xFF), s.rectifyFillColors[0]), 1e-4f, "마젠타");
+        Assert.Less(Vector4.Distance((Color)new Color32(0x8A, 0x8A, 0x8A, 0xFF), s.rectifyFillColors[2]), 1e-4f, "그레이");
+        Assert.AreEqual(0.46f, s.rectifyFillCenter.x, 1e-5f);
+        Assert.AreEqual(4f / 60f, s.rectifyFillDelay, 1e-5f);
+        Assert.AreEqual(0.15f, s.rectifyFillFade, 1e-5f);
+        Assert.AreEqual(0.6f, s.rectifyFillExpand, 1e-5f);
+        Assert.AreEqual(0.35f, s.rectifyFillGradient, 1e-5f);
     }
 
     [Test]

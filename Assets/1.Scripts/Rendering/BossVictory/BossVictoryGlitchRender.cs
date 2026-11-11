@@ -65,10 +65,11 @@ public static class BossVictoryGlitchRender
     static readonly int IdRectifyUV = Shader.PropertyToID("_RectifyUV");           // 글자마다 아틀라스 xy 시작 · zw 크기
     static readonly int IdRectifyParams = Shader.PropertyToID("_RectifyParams");   // x 알파, y 외곽선 반두께(SDF), z 글자 수
     static readonly int IdRectifyColor = Shader.PropertyToID("_RectifyColor");
-    static readonly int IdFillCircles = Shader.PropertyToID("_RectifyFillCircles");   // 원마다 xy 중심(뷰포트) · z 반지름(뷰포트 세로) · w 알파 — 오래된 순
+    static readonly int IdFillRings = Shader.PropertyToID("_RectifyFillRings");       // 링 i — x 반지름(단어 높이 단위), y 알파
     static readonly int IdFillColors = Shader.PropertyToID("_RectifyFillColors");
-    static readonly int IdFillParams = Shader.PropertyToID("_RectifyFillParams");     // x 불투명도, y 경계(뷰포트 세로), z 화면비, w 주사선 간격(px)
-    static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기
+    static readonly int IdFillRect = Shader.PropertyToID("_RectifyFillRect");         // 단어 사각형(뷰포트 min.xy · max.zw)
+    static readonly int IdFillParams = Shader.PropertyToID("_RectifyFillParams");     // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
+    static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기, y 그라데이션 세기, zw 중심(단어 UV)
     static readonly int IdCircle = Shader.PropertyToID("_GroundCircle");          // xyz 중심(월드), w 반경(m)
     static readonly int IdScanFloor = Shader.PropertyToID("_ScanFloor");          // x 벽 normal.y, y 바닥 normal.y, z 바닥 남김(267 후속)
     static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
@@ -192,53 +193,46 @@ public static class BossVictoryGlitchRender
         _composite.SetVectorArray(IdRectifyUV, _rectifyUV);
     }
 
-    // 안쪽 색(267 후속) — 설정 값 사본(ApplyLook)·원 3개 배열.
+    // 안쪽 색 Ring Wipe Fill(267 후속) — 설정 값 사본(ApplyLook)·링 3개 배열.
     static Color[] _fillColors = new Color[0];
-    static int _fillSeed;
-    static float _fillStart, _fillFade, _fillExpand = 0.35f, _fillNextAt, _fillSoft, _scanSpacing = 0.003f;
-    static readonly Vector4[] _fillCircles = new Vector4[BossVictoryRectifyFill.CirclesDrawn];
-    static readonly Vector4[] _fillCircleColors = new Vector4[BossVictoryRectifyFill.CirclesDrawn];
+    static Vector2 _fillCenter = new Vector2(0.46f, 0.5f);
+    static float _fillDelay, _fillFade, _fillExpand = 0.6f, _fillSoft, _fillGradient, _scanSpacing = 0.003f, _scanDark;
+    static readonly Vector4[] _fillRings = new Vector4[BossVictoryRectifyFill.RingCount];
+    static readonly Vector4[] _fillRingColors = new Vector4[BossVictoryRectifyFill.RingCount];
 
     static void ApplyFillLook(BossVictoryGlitchSettings s)
     {
         _fillColors = s.rectifyFillColors ?? new Color[0];
-        _fillSeed = s.rectifyFillSeed;
-        _fillStart = s.rectifyFillStartRadius;
+        _fillCenter = s.rectifyFillCenter;
+        _fillDelay = s.rectifyFillDelay;
         _fillFade = s.rectifyFillFade;
         _fillExpand = s.rectifyFillExpand;
-        _fillNextAt = s.rectifyFillNextAt;
         _fillSoft = s.rectifyFillSoftness;
+        _fillGradient = Mathf.Clamp01(s.rectifyFillGradient);
         _scanSpacing = s.rectifyScanlineSpacing;
-        _composite.SetVector(IdFillLook, new Vector4(Mathf.Clamp01(s.rectifyScanlineDark), 0f, 0f, 0f));
+        _scanDark = Mathf.Clamp01(s.rectifyScanlineDark);
     }
 
-    // 원 3개(지금 원과 앞의 둘)를 뷰포트로 — 반지름 단위 = 뷰포트 세로. 끝 반지름 = 단어 전체를 덮는 길이.
+    // 링 3개 — 단어 사각형 UV(종횡비 보정, 단위 = 단어 높이). Rmax = 중심에서 네 모서리까지.
     static void SetFillFrame(in Frame f, float aspect)
     {
         float opacity = _rectifyCount > 0 && _fillColors.Length > 0 && f.RectifyFillElapsed >= 0f ? Mathf.Clamp01(f.RectifyFill) : 0f;
-        float total = 0f;
-        for (int i = 0; i < _rectifyGlyphs.Count; i++) total += _rectifyGlyphs[i].advance;
-        float capVp = total > 0f ? _rectifyCap * _rectifyWidth / total * aspect : 0.1f;   // 대문자 높이(뷰포트 세로)
-        float endRadius = Mathf.Sqrt(_rectifyWidth * aspect * _rectifyWidth * aspect + capVp * capVp * 4f);
-        int latest = BossVictoryRectifyFill.Latest(f.RectifyFillElapsed, BossVictoryRectifyFill.Period(_fillFade, _fillExpand, _fillNextAt));
-        for (int j = 0; j < BossVictoryRectifyFill.CirclesDrawn; j++)
+        Vector4 word = BossVictoryRectifyFill.WordRect(_rectifyScreen, _rectifyCount);
+        float wordAspect = BossVictoryRectifyFill.WordAspect(word, aspect);
+        float rMax = BossVictoryRectifyFill.MaxRadius(_fillCenter, wordAspect);
+        for (int i = 0; i < BossVictoryRectifyFill.RingCount; i++)
         {
-            int k = latest - (BossVictoryRectifyFill.CirclesDrawn - 1) + j;   // 오래된 순
-            BossVictoryRectifyFill.Circle c = opacity > 0f
-                ? BossVictoryRectifyFill.Evaluate(k, f.RectifyFillElapsed, _fillFade, _fillExpand, _fillNextAt, _fillColors.Length)
+            BossVictoryRectifyFill.Ring r = opacity > 0f && i < _fillColors.Length
+                ? BossVictoryRectifyFill.Evaluate(i, f.RectifyFillElapsed, _fillDelay, _fillFade, _fillExpand)
                 : default;
-            if (!c.exists) { _fillCircles[j] = Vector4.zero; _fillCircleColors[j] = Vector4.zero; continue; }
-            int g = BossVictoryRectifyFill.GlyphFor(k, _fillSeed, _rectifyCount);
-            Vector4 r = _rectifyScreen[g];
-            Vector2 p = BossVictoryRectifyFill.PointInGlyph(k, _fillSeed);
-            _fillCircles[j] = new Vector4(Mathf.Lerp(r.x, r.z, p.x), Mathf.Lerp(r.y, r.w, p.y),
-                BossVictoryRectifyFill.Radius(c.grow, _fillStart * capVp, endRadius), c.alpha);
-            _fillCircleColors[j] = _fillColors[c.colorIndex].linear;
+            _fillRings[i] = r.exists ? new Vector4(BossVictoryRectifyFill.Radius(r.grow, rMax, _fillSoft), r.alpha, 0f, 0f) : Vector4.zero;
+            _fillRingColors[i] = i < _fillColors.Length ? (Vector4)_fillColors[i].linear : Vector4.zero;
         }
-        _composite.SetVectorArray(IdFillCircles, _fillCircles);
-        _composite.SetVectorArray(IdFillColors, _fillCircleColors);
-        _composite.SetVector(IdFillParams, new Vector4(opacity, Mathf.Max(1e-4f, _fillSoft * capVp), aspect,
-            Mathf.Max(1f, _scanSpacing * Screen.height)));
+        _composite.SetVectorArray(IdFillRings, _fillRings);
+        _composite.SetVectorArray(IdFillColors, _fillRingColors);
+        _composite.SetVector(IdFillRect, word);
+        _composite.SetVector(IdFillParams, new Vector4(opacity, Mathf.Max(0f, _fillSoft), wordAspect, Mathf.Max(1f, _scanSpacing * Screen.height)));
+        _composite.SetVector(IdFillLook, new Vector4(_scanDark, _fillGradient, _fillCenter.x, _fillCenter.y));
     }
 
     static float _noiseSpace;

@@ -18,7 +18,7 @@ public enum BossVictoryTrack
     NoiseScrollV, // 보스 노이즈 UV 수직 이동 — 클립 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함(267 후속). 노이즈 텍스처 V 오프셋(_NoiseST.w)
     GroundCircle, // 발밑 회색 원(246 복원 — 267 후속) — 세기 = 반경 비율(설정 SO groundCircleRadius × 세기). 원 안 배경은 호박색 대신 흑백
     Rectify,      // 배경 글자 'RECTIFY'(267 후속) — 세기 = 알파(들어오는 동안 가로줄이 무작위로 켜지며 찢기듯 등장). 외곽선만, 인물·보스 뒤·배경 앞
-    RectifyFill,  // RECTIFY 안쪽 색(267 후속) — 원형 확장 색상 전환. 세기 = 채움 불투명도, 원 시간표 = 클립 시작 기준
+    RectifyFill,  // RECTIFY 안쪽 색(267 후속) — Ring Wipe Fill(링 3개). 세기 = 채움 불투명도, 링 시간표 = 클립 시작 기준
     CameraBob,    // 카메라 두둥실(267 후속) — 화면 세로 흔들림 = 세기 × 진폭(화면 높이 %) × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영 행렬 세로 이동(카메라 위치는 안 건드림)
 }
 

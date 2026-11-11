@@ -105,25 +105,24 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Range(0.005f, 0.1f)] public float rectifyOutline = 0.04f;
     public Color rectifyColor = Color.white;
 
-    [Header("RECTIFY 안쪽 색 — 원형 확장 색상 전환(267 후속, 켜는 구간 = 타임라인 'RECTIFY 안쪽 색' 클립)")]
-    [Tooltip("원 색 순서(반복) — 레퍼런스: 분홍 → 파랑 → 하늘 → 회청 → 주황.")]
+    [Header("RECTIFY 안쪽 색 — Ring Wipe Fill(267 후속, 켜는 구간 = 타임라인 'RECTIFY 안쪽 색' 클립)")]
+    [Tooltip("링 색 순서(링 0·1·2) — 마젠타 → 블루 → 그레이. 마지막 링 색으로 고정된다. 3개까지 쓴다.")]
     public Color[] rectifyFillColors =
     {
-        new Color32(0xB0, 0x70, 0xB8, 0xFF), new Color32(0x5A, 0x64, 0xB0, 0xFF), new Color32(0x8C, 0xC8, 0xE8, 0xFF),
-        new Color32(0x6A, 0x7E, 0x96, 0xFF), new Color32(0xE0, 0x8A, 0x48, 0xFF),
+        new Color32(0xFF, 0x2D, 0xB4, 0xFF), new Color32(0x3A, 0x6B, 0xFF, 0xFF), new Color32(0x8A, 0x8A, 0x8A, 0xFF),
     };
-    [Tooltip("원 위치 시드 — 원마다 글자 하나를 고르고 그 안 한 점(모든 피어·스크럽 같음).")]
-    public int rectifyFillSeed = 267;
-    [Tooltip("시작 반지름(대문자 높이 비율).")]
-    [Min(0f)] public float rectifyFillStartRadius = 0.15f;
-    [Tooltip("페이드(초) — 크기 그대로 알파 0→1.")]
-    [Min(0f)] public float rectifyFillFade = 0.08f;
-    [Tooltip("확장(초, ease-out) — 단어 전체를 덮는 반지름까지.")]
-    [Min(0.01f)] public float rectifyFillExpand = 0.35f;
-    [Tooltip("다음 원이 생기는 시점(확장 진행 비율).")]
-    [Range(0f, 1f)] public float rectifyFillNextAt = 0.6f;
-    [Tooltip("원 경계 부드러움(대문자 높이 비율).")]
-    [Min(0f)] public float rectifyFillSoftness = 0.04f;
+    [Tooltip("링 공통 중심(단어 사각형 UV 0~1) — 기본 = 가운데에서 왼쪽으로 조금.")]
+    public Vector2 rectifyFillCenter = new Vector2(0.46f, 0.5f);
+    [Tooltip("링 사이 생성 간격(초) — 기본 4프레임(4/60).")]
+    [Min(0f)] public float rectifyFillDelay = 4f / 60f;
+    [Tooltip("링 페이드 인(초) — 알파 0→1(확장과 동시).")]
+    [Min(0f)] public float rectifyFillFade = 0.15f;
+    [Tooltip("링 확장(초, easeOutCubic) — 반지름 0 → 단어 사각형 네 모서리까지.")]
+    [Min(0.01f)] public float rectifyFillExpand = 0.6f;
+    [Tooltip("링 가장자리 부드러움(단어 높이 비율). 화면 픽셀보다 작으면 픽셀 기준 AA.")]
+    [Min(0f)] public float rectifyFillSoftness = 0.01f;
+    [Tooltip("링 안 방사형 그라데이션 — 가장자리 색 = 색 × (1 − 세기), 중심은 원래 색.")]
+    [Range(0f, 1f)] public float rectifyFillGradient = 0.35f;
     [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
     [Min(0.0005f)] public float rectifyScanlineSpacing = 0.003f;
     [Tooltip("안쪽 주사선 어둡기(0 = 없음).")]

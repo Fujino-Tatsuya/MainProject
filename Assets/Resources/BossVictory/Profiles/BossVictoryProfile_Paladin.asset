@@ -410,6 +410,27 @@ MonoBehaviour:
       bobPhase: 0
       bobDamping: 0
     rectifySeeded: 1
+    rectifyFill:
+    - start: 0.4
+      length: 4.1
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    rectifyFillSeeded: 1
     cameraBobSeeded: 1
     groundCircle:
     - start: 0.3

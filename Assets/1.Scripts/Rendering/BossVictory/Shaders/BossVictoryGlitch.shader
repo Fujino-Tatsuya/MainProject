@@ -79,26 +79,34 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 return half2(a, inside);
             }
 
-            float4 _RectifyFillCircles[3];   // 오래된 순 — xy 중심(뷰포트), z 반지름(뷰포트 세로), w 알파
+            float4 _RectifyFillRings[3];     // 링 i — x 반지름(단어 높이 단위), y 알파
             float4 _RectifyFillColors[3];
-            float4 _RectifyFillParams;       // x 불투명도, y 경계(뷰포트 세로), z 화면비, w 주사선 간격(px)
-            float4 _RectifyFillLook;         // x 주사선 어둡기
+            float4 _RectifyFillRect;         // 단어 사각형(뷰포트 min.xy · max.zw)
+            float4 _RectifyFillParams;       // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
+            float4 _RectifyFillLook;         // x 주사선 어둡기, y 그라데이션 세기, zw 중심(단어 UV)
 
-            // 안쪽 색 — 원을 오래된 순으로 덮는다(경계 부드럽게). rgb = 색, a = 덮인 정도.
+            // 안쪽 색 Ring Wipe Fill — 링을 생성 순으로 덮는다(painter's order). 링 안 방사형 그라데이션(중심 = 원래 색 → 가장자리 어둡게).
+            // 첫 링 전 = 비어 있음(a 0 → 외곽선만). rgb = 색, a = 덮인 정도.
             half4 RectifyFillAt(float2 uv)
             {
+                float2 size = max(_RectifyFillRect.zw - _RectifyFillRect.xy, 1e-5);
+                float2 wuv = (uv - _RectifyFillRect.xy) / size;
+                float d = length((wuv - _RectifyFillLook.zw) * float2(_RectifyFillParams.z, 1.0));
+                float soft = max(_RectifyFillParams.y, fwidth(d) * 1.5);
                 half3 col = 0.0h;
                 half cov = 0.0h;
                 [unroll] for (int i = 0; i < 3; i++)
                 {
-                    float4 c = _RectifyFillCircles[i];
-                    if (c.w <= 0.0) continue;
-                    float d = length((uv - c.xy) * float2(_RectifyFillParams.z, 1.0));
-                    half k = (half)(c.w * (1.0 - smoothstep(c.z - _RectifyFillParams.y, c.z, d)));
-                    col = lerp(col, _RectifyFillColors[i].rgb, k);
-                    cov = cov + k * (1.0h - cov);
+                    float4 ring = _RectifyFillRings[i];
+                    if (ring.y <= 0.0) continue;
+                    half m = (half)(ring.y * (1.0 - smoothstep(ring.x - soft, ring.x + soft, d)));
+                    half g = (half)saturate(d / max(ring.x, 1e-4));
+                    half3 c = _RectifyFillColors[i].rgb;
+                    c = lerp(c, c * (1.0h - (half)_RectifyFillLook.y), g);
+                    col = lerp(col, c, m);
+                    cov = cov + m * (1.0h - cov);
                 }
-                return half4(cov > 0.0001h ? col / cov : col, cov);   // 앞 덮기(premultiplied over) → 색 복원
+                return half4(cov > 0.0001h ? col / cov : col, cov);   // 비어 있는 바탕 위 덮기(premultiplied) → 색 복원
             }
 
             float4 _GroundCircle;      // xyz 중심(월드), w 반경(m)

@@ -1759,11 +1759,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     nameof(BossVictoryGlitchSettings.rectifyOutline), nameof(BossVictoryGlitchSettings.rectifyColor));
                 break;
             case BossVictoryTrack.RectifyFill:
-                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원형 확장 색상 전환 — 클립 시작부터 원이 주기마다 생겨(글자 하나 안 한 점, 시드 고정) 크기 그대로 알파 0→1 → ease-out 확장으로 이전 색을 덮는다. 색 순서 반복, 글자 안에서만, 외곽선은 위. 세기 = 채움 불투명도. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
-                DrawSettingsFields("안쪽 색 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFillColors), nameof(BossVictoryGlitchSettings.rectifyFillSeed),
-                    nameof(BossVictoryGlitchSettings.rectifyFillStartRadius), nameof(BossVictoryGlitchSettings.rectifyFillFade),
-                    nameof(BossVictoryGlitchSettings.rectifyFillExpand), nameof(BossVictoryGlitchSettings.rectifyFillNextAt),
-                    nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing),
+                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 Ring Wipe Fill — 클립 시작부터 링 3개(마젠타 → 블루 → 그레이)가 공통 중심에서 간격마다 생겨 페이드와 함께 easeOutCubic 으로 단어 전체까지 퍼진다. 나중 링이 위, 마지막 링 색으로 고정. 첫 링 전은 비어 있음(외곽선만). 글자 안에서만, 외곽선은 위. 세기 = 채움 불투명도. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
+                DrawSettingsFields("안쪽 색 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFillColors), nameof(BossVictoryGlitchSettings.rectifyFillCenter),
+                    nameof(BossVictoryGlitchSettings.rectifyFillDelay), nameof(BossVictoryGlitchSettings.rectifyFillFade),
+                    nameof(BossVictoryGlitchSettings.rectifyFillExpand), nameof(BossVictoryGlitchSettings.rectifyFillSoftness),
+                    nameof(BossVictoryGlitchSettings.rectifyFillGradient), nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing),
                     nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
                 break;
             case BossVictoryTrack.CameraBob:
