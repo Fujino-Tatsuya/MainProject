@@ -12,7 +12,7 @@ public sealed class BossVictoryBackDashTests
     const string DirectorPrefab = "Assets/2.Prefabs/Managers/BossEncounterDirector.prefab";
     const float Tolerance = 1e-4f;
 
-    static BossVictoryGlitchSettings NewSettings() => ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+    static BossVictoryProfile NewSettings() => ScriptableObject.CreateInstance<BossVictoryProfile>();
 
     [Test]
     public void 백대쉬_기본_거리_시간은_보스_등장_밀림_값과_같다()
@@ -50,7 +50,7 @@ public sealed class BossVictoryBackDashTests
     [Test]
     public void 마커_옵션_기본값은_지금_동작_즉시_컷_팀원만()
     {
-        var s = NewSettings();
+        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
         try
         {
             Assert.AreEqual(0f, s.focusKillerBlendSeconds, "0 = 즉시 컷");

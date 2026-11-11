@@ -4,7 +4,8 @@ using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 타임라인 창(PLAN-boss-victory-glitch "타임라인 에디터 창") — 영상 편집기처럼 트랙별 클립·순간 마커를 본다/고친다.
-/// 데이터 = <see cref="BossVictoryGlitchSettings.timeline"/>(런타임과 같은 SO). Unity Timeline 패키지는 쓰지 않는다(Q4).
+/// 데이터 = 캐릭터별 프로필 <see cref="BossVictoryProfile.timeline"/>(267 — 도구 막대 캐릭터 드롭다운으로 고름, Play 중엔 실제 처치자)·공용 모양 값 = <see cref="BossVictoryGlitchSettings"/>.
+/// 런타임과 같은 SO. Unity Timeline 패키지는 쓰지 않는다(Q4).
 /// </summary>
 public sealed class BossVictoryTimelineWindow : EditorWindow
 {
@@ -95,7 +96,43 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Undo.undoRedoPerformed -= OnUndoRedo;
     }
 
-    BossVictoryTimeline Timeline => _settings != null ? _settings.timeline : null;
+    // ── 캐릭터별 프로필(267) — 도구 막대 드롭다운(기본·팔라딘·거너·어쌔신). Play 중 연출이 돌면 실제 처치자 캐릭터를 따라간다. ──
+    static readonly TutorialCharacter[] Characters = { TutorialCharacter.None, TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin };
+    static readonly string[] CharacterLabels = { "기본", "팔라딘", "거너", "어쌔신" };
+    [SerializeField] TutorialCharacter _character;
+    BossVictoryProfile _profile;
+
+    static string CharacterLabel(TutorialCharacter c) => CharacterLabels[Mathf.Max(0, System.Array.IndexOf(Characters, c))];
+
+    // 실제 처치자(랩 재생 중) — 없으면 false.
+    static bool TryLiveKiller(out TutorialCharacter character, out BossVictoryProfile profile)
+    {
+        BossVictoryGlitchPresentation p = EditorApplication.isPlaying ? BossVictoryGlitchPresentation.Instance : null;
+        profile = p != null ? p.Profile : null;
+        character = profile != null ? p.KillerCharacter : TutorialCharacter.None;
+        return profile != null;
+    }
+
+    // 지금 편집할 프로필 — 실제 처치자 → 드롭다운 캐릭터 프로필(표에 없으면 기본 프로필).
+    void ResolveProfile()
+    {
+        BossVictoryProfile before = _profile;
+        if (TryLiveKiller(out TutorialCharacter live, out BossVictoryProfile liveProfile))
+        {
+            _character = live;
+            _profile = liveProfile;
+        }
+        else _profile = _settings != null ? _settings.ProfileFor(_character) : null;
+        if (_profile == before) return;
+        _finisherClipKey = _bossHitClipKey = null;
+        _finisherEstimate = null;
+        _profileSo = null;
+        if (before != null) Select(-1, -1, -1);   // 번호가 다른 타임라인 — 선택 풀기
+    }
+
+    bool ProfileIsAsset => _profile != null && EditorUtility.IsPersistent(_profile);
+
+    BossVictoryTimeline Timeline => _profile != null ? _profile.timeline : null;
 
     void OnGUI()
     {
@@ -105,7 +142,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             EditorGUILayout.HelpBox($"설정 SO 가 없다 — {DefaultAssetPath}", MessageType.Warning);
             return;
         }
-        _settings.timeline ??= BossVictoryTimeline.CreateDefault();
+        ResolveProfile();
+        if (_profile == null) return;
+        _profile.timeline ??= BossVictoryTimeline.CreateDefault();
+        DrawProfileBanner();
         if (Event.current.type == EventType.Layout && Timeline.SyncCameraCutShots()) Save();   // 컷 값 개수 = 컷 클립 개수(손으로 고친 에셋 보정)
         if (!_initialFit && Event.current.type == EventType.Layout)
         {
@@ -144,6 +184,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _inspectorScroll = EditorGUILayout.BeginScrollView(_inspectorScroll, GUILayout.Height(inspectorHeight));
         DrawInspector();
         EditorGUILayout.EndScrollView();
+        ShowPendingCopyPopup();
     }
 
     // 줄 이름 누르기 = 그 노드 선택(트랙 = 모양 값 · 마커 = 시각·옵션) — 255 후속 3.
@@ -168,6 +209,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             _settings = (BossVictoryGlitchSettings)EditorGUILayout.ObjectField(_settings, typeof(BossVictoryGlitchSettings), false,
                 GUILayout.Width(240f));
+            DrawCharacterPopup();
             GUILayout.Space(8f);
             GUILayout.Label("줌", GUILayout.Width(20f));
             _pixelsPerSecond = GUILayout.HorizontalSlider(_pixelsPerSecond, MinPixelsPerSecond, MaxPixelsPerSecond, GUILayout.Width(140f));
@@ -489,8 +531,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     float Snap(float t) => _snap ? Mathf.Round(t * 100f) / 100f : t;
 
-    bool IsSelected(BossVictoryTrack track, int index) => _selTrack == (int)track && _selIndex == index;
-    bool IsSelectedMarker(BossVictoryMarker marker) => _selMarker == (int)marker;
+    bool IsSelected(BossVictoryTrack track, int index) => (_selTrack == (int)track && _selIndex == index) || _multi.Contains(NodeRef.Clip(track, index));
+    bool IsSelectedMarker(BossVictoryMarker marker) => _selMarker == (int)marker || _multi.Contains(NodeRef.Marker(marker));
     bool HasClipSelection => _selTrack >= 0 && _selIndex >= 0 && _selIndex < Timeline.Clips((BossVictoryTrack)_selTrack).Count;
 
     bool _selFinisher;   // '처치 연출 스킬 End' 줄 노드(시간 배율 칸)
@@ -502,6 +544,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _selMarker = marker;
         _selKey = -1;
         _selFinisher = false;
+        _multi.Clear();
         GUI.FocusControl(null);
     }
 
@@ -742,13 +785,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         Undo.IncrementCurrentGroup();
         Undo.SetCurrentGroupName(label);
-        Undo.RecordObject(_settings, label);
+        Undo.RecordObject(_profile, label);
     }
 
     // 수치 칸 — 칸을 고치는 동안(슬라이더 끌기 포함)은 Unity 가 이벤트마다 묶음을 나눈다. 새 묶음을 억지로 만들지 않는다.
     void RecordField(string label)
     {
-        Undo.RecordObject(_settings, label);
+        Undo.RecordObject(_profile, label);
     }
 
     int _dragUndoGroup = -1;
@@ -761,7 +804,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             Undo.SetCurrentGroupName("처치 연출 타임라인 끌기");
             _dragUndoGroup = Undo.GetCurrentGroup();
         }
-        Undo.RecordObject(_settings, "처치 연출 타임라인 끌기");
+        Undo.RecordObject(_profile, "처치 연출 타임라인 끌기");
     }
 
     void EndDragUndo()
@@ -783,7 +826,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 되돌리기/다시 하기 뒤 — 선택 범위 보정 · 저장 · 다시 그림 · Play 중이면 연출이 바로 새 값으로 다시 평가되게 한 프레임 돌림.
     void OnUndoRedo()
     {
-        if (_settings == null) return;
+        if (_settings == null || _profile == null) return;
         if (_selIndex >= 0 && !HasClipSelection) Select(-1, -1, -1);
         if (_selMarker >= BossVictoryTimeline.Markers.Length) Select(-1, -1, -1);
         _drag = DragMode.None;
@@ -800,6 +843,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _finisherClipKey = _bossHitClipKey = null;   // 처치 연출 스킬 칸·피격 상태 이름이 바뀌었을 수 있다 — 클립 다시 찾기
         Timeline.SyncCameraCutShots();
         Timeline.FitCameraCutLengths();   // 컷 길이 = 다음 컷 시작까지(표시용 — 판정은 시작만)
+        EditorUtility.SetDirty(_profile);
+        if (ProfileIsAsset) AssetDatabase.SaveAssetIfDirty(_profile);
         EditorUtility.SetDirty(_settings);
         AssetDatabase.SaveAssetIfDirty(_settings);
     }
@@ -893,6 +938,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void BeginDrag(Rect lanes, Vector2 mouse)
     {
         _dragRecorded = false;
+        Event ev = Event.current;
+        if ((ev.control || ev.command) && TryPickNode(lanes, mouse, out NodeRef picked))   // 여러 개 선택(267 — 다른 캐릭터에 복사용)
+        {
+            ToggleMulti(picked);
+            _drag = DragMode.None;
+            return;
+        }
         _dragMouseT0 = XToTime(lanes, mouse.x);
         if (PickClipNode(lanes, mouse, out BossVictoryMarker node, out bool trimEdge))
         {
@@ -901,10 +953,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             _drag = trimEdge ? DragMode.NodeTrim : DragMode.Marker;
             return;
         }
-        if (PickMarker(lanes, mouse, out BossVictoryMarker picked))
+        if (PickMarker(lanes, mouse, out BossVictoryMarker pickedMarker))
         {
-            Select(-1, -1, (int)picked);
-            _dragMarkerOrig = Timeline.MarkerTime(picked);
+            Select(-1, -1, (int)pickedMarker);
+            _dragMarkerOrig = Timeline.MarkerTime(pickedMarker);
             _drag = DragMode.Marker;
             return;
         }
@@ -1100,6 +1152,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             if (!RowRect(lanes, MarkerRow(marker)).Contains(mouse)) continue;
             BossVictoryMarker m = marker;
+            if (!_multi.Contains(NodeRef.Marker(m))) Select(-1, -1, (int)m);   // 여러 개 선택 안의 노드면 그대로
             menu.AddItem(new GUIContent($"여기({t:0.00}초)로 옮기기"), false, () => MoveMarker(m, t));
             menu.AddItem(new GUIContent($"재생 헤드({_playhead:0.00}초)로 옮기기"), false, () => MoveMarker(m, _playhead));
             if (IsClipNode(m))
@@ -1107,6 +1160,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 if (NodeTrim(m) > 0f) menu.AddItem(new GUIContent("끝 자르기 풀기(클립 끝까지)"), false, () => SetNodeTrim(m, 0f));
                 else menu.AddDisabledItem(new GUIContent("끝 자르기 풀기(안 잘림)"));
             }
+            menu.AddSeparator("");
+            AddCopyToCharactersItem(menu, mouse);
             menu.ShowAsContext();
             return;
         }
@@ -1120,8 +1175,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 if (ClipRect(lanes, TrackRow(track), clips[i]).Contains(mouse)) hit = i;
             if (hit >= 0)
             {
-                Select((int)track, hit, -1);
+                if (!_multi.Contains(NodeRef.Clip(track, hit))) Select((int)track, hit, -1);   // 여러 개 선택 안의 노드면 그대로
                 menu.AddItem(new GUIContent("복사"), false, CopySelected);
+                AddCopyToCharactersItem(menu, mouse);
                 menu.AddItem(new GUIContent("삭제"), false, DeleteSelected);
                 if (track == BossVictoryTrack.CameraCut)
                 {
@@ -1300,7 +1356,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         using (new EditorGUILayout.HorizontalScope())
         {
             _snap = EditorGUILayout.ToggleLeft("0.01초 스냅", _snap, GUILayout.Width(100f));
-            GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 클립 양 끝 끌기 = 길이 · 우클릭 = 추가/복사/붙여넣기/삭제 · Del · Ctrl+C/V/D · Ctrl+Z 되돌리기 · Ctrl+Y·Ctrl+Shift+Z 다시 하기", EditorStyles.miniLabel);
+            GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 클립 양 끝 끌기 = 길이 · 우클릭 = 추가/복사/붙여넣기/삭제·다른 캐릭터에 복사 · Ctrl+클릭 = 여러 개 선택 · Del · Ctrl+C/V/D · Ctrl+Z 되돌리기 · Ctrl+Y·Ctrl+Shift+Z 다시 하기", EditorStyles.miniLabel);
         }
         DrawFinisherEnd();
         using (new EditorGUILayout.HorizontalScope())
@@ -1532,6 +1588,23 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (so.ApplyModifiedProperties()) Save();
     }
 
+    SerializedObject _profileSo;
+
+    // 캐릭터별 칸(267) — 지금 프로필 SO 칸. Undo 는 SerializedObject 가.
+    void DrawProfileFields(string title, params string[] names)
+    {
+        if (_profileSo == null || _profileSo.targetObject != _profile) _profileSo = new SerializedObject(_profile);
+        _profileSo.Update();
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
+        foreach (string n in names)
+        {
+            SerializedProperty p = _profileSo.FindProperty(n);
+            if (p != null) EditorGUILayout.PropertyField(p, true);
+        }
+        if (_profileSo.ApplyModifiedProperties()) Save();
+    }
+
     void DrawSettingsFields(string title, params string[] names)
     {
         SerializedObject so = SettingsObject();
@@ -1551,32 +1624,32 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         switch (marker)
         {
             case BossVictoryMarker.BackDashStart:
-                DrawSettingsFields("백대쉬(처치 연출 전용)",
-                    nameof(BossVictoryGlitchSettings.backDashDistance), nameof(BossVictoryGlitchSettings.backDashDuration),
-                    nameof(BossVictoryGlitchSettings.backDashEase), nameof(BossVictoryGlitchSettings.backDashAngle),
-                    nameof(BossVictoryGlitchSettings.backDashIdleDelay));
+                DrawProfileFields("백대쉬(처치 연출 전용 · 이 캐릭터 프로필)",
+                    nameof(BossVictoryProfile.backDashDistance), nameof(BossVictoryProfile.backDashDuration),
+                    nameof(BossVictoryProfile.backDashEase), nameof(BossVictoryProfile.backDashAngle),
+                    nameof(BossVictoryProfile.backDashIdleDelay));
                 EditorGUILayout.LabelField("방향 = 보스 반대쪽을 보정 각만큼 돌림(+ = 시계 방향). 후 대기 = 백대쉬 끝 ~ Idle 복귀. 리액션 애니는 보스 등장 밀림과 같다(등장 연출 값은 그대로). 기본값 = 보스 등장 밀림 값.", EditorStyles.wordWrappedMiniLabel);
                 if (GUILayout.Button("스킬 연출 시작 = 백대쉬 시작 + 시간 + 후 대기", GUILayout.Width(300f)))
                 {
                     Record("처치 연출 타임라인 스킬 연출 시작 맞추기");
                     Timeline.SetMarkerTime(BossVictoryMarker.FinisherStart, Snap(BossVictoryKillerSequence.DefaultFinisherStart(
-                        Timeline.backDashStartTime, _settings.backDashDuration, _settings.backDashIdleDelay)));
+                        Timeline.backDashStartTime, _profile.backDashDuration, _profile.backDashIdleDelay)));
                     Save();
                 }
                 break;
             case BossVictoryMarker.FinisherStart:
                 DrawClipNodeOptions(BossVictoryMarker.FinisherStart);
-                DrawSettingsFields("처치 연출 스킬 칸", nameof(BossVictoryGlitchSettings.defaultFinisherSlot));
+                DrawProfileFields("처치 연출 스킬 칸(이 캐릭터 프로필)", nameof(BossVictoryProfile.finisherSlot));
                 break;
             case BossVictoryMarker.SlowStart:
-                DrawSettingsFields("처치자 End 후 배율", nameof(BossVictoryGlitchSettings.killerAfterFinisherScale));
+                DrawProfileFields("처치자 End 후 배율", nameof(BossVictoryProfile.killerAfterFinisherScale));
                 break;
             case BossVictoryMarker.BossHitAnim:
                 DrawClipNodeOptions(BossVictoryMarker.BossHitAnim);
                 DrawSettingsFields("보스 피격 애니(비우면 마지막 자세)", nameof(BossVictoryGlitchSettings.bossHitStateName), nameof(BossVictoryGlitchSettings.bossHitFadeSeconds));
                 break;
             case BossVictoryMarker.BossSlow:
-                DrawSettingsFields("보스 End 후 배율", nameof(BossVictoryGlitchSettings.bossAfterFinisherScale));
+                DrawProfileFields("보스 End 후 배율", nameof(BossVictoryProfile.bossAfterFinisherScale));
                 break;
             case BossVictoryMarker.FocusKiller:
             {
@@ -1626,7 +1699,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.KillerAction:
                 EditorGUILayout.LabelField("처치 순간 하던 동작(평타·스킬 등 루프 아닌 클립)을 이 배율로 이어 가다 클립 끝에서 끊는다(먼저 끝나면 대기 · 대기·이동 중이었으면 빈 구간). 클립이 없으면 자기 클립 끝까지.", EditorStyles.wordWrappedMiniLabel);
-                DrawSettingsFields("하던 동작 배율", nameof(BossVictoryGlitchSettings.killerCurrentActionScale));
+                DrawProfileFields("하던 동작 배율", nameof(BossVictoryProfile.killerCurrentActionScale));
                 break;
             case BossVictoryTrack.CrtOff:
                 DrawSettingsFields("TV 꺼짐 모양", nameof(BossVictoryGlitchSettings.crtOffGlowColor));
@@ -1645,10 +1718,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         EditorGUILayout.LabelField("처치 연출 스킬 · 시간 배율", EditorStyles.boldLabel);
         EditorGUILayout.LabelField("처치자: 하던 동작 ×배율(처치자 평타 클립) → 백대쉬·처치 연출 스킬 ×1 → 느려짐 시작 마커(꺼짐이면 스킬 End)부터 ×End 후 배율 · 팀원: 처치 즉시 · 보스: 처치 순간 0 → 피격 애니 ×1 · 정지 0 · 슬로우 ×End 후 배율 중 시각이 가장 늦은 노드(보스 슬로우 끔 = 처치자 느려짐 순간).", EditorStyles.wordWrappedMiniLabel);
-        DrawSettingsFields("배율·스킬 칸",
-            nameof(BossVictoryGlitchSettings.killerCurrentActionScale), nameof(BossVictoryGlitchSettings.killerAfterFinisherScale),
-            nameof(BossVictoryGlitchSettings.otherPlayersScale), nameof(BossVictoryGlitchSettings.bossAfterFinisherScale),
-            nameof(BossVictoryGlitchSettings.defaultFinisherSlot));
+        DrawProfileFields("배율·스킬 칸(이 캐릭터 프로필)",
+            nameof(BossVictoryProfile.killerCurrentActionScale), nameof(BossVictoryProfile.killerAfterFinisherScale),
+            nameof(BossVictoryProfile.otherPlayersScale), nameof(BossVictoryProfile.bossAfterFinisherScale),
+            nameof(BossVictoryProfile.finisherSlot));
     }
 
     // ── 처치 연출 스킬 End 시각(읽기 전용, 255) ──────────────────────────
@@ -1679,11 +1752,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
     }
 
-    static readonly string[] FinisherVariantPaths =
+    // 캐릭터 → Variant(클립 미리보기). 기본 프로필은 팔라딘 몸으로 보여 준다.
+    static string VariantPath(TutorialCharacter c) => c switch
     {
-        "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab",
-        "Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab",
-        "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab",
+        TutorialCharacter.Gunner => "Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab",
+        TutorialCharacter.Assassin => "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab",
+        _ => "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab",
     };
 
     // 추정 = 스킬 연출 시작 마커 + 처치 연출 스킬 클립의 End 이벤트 시각(255 후속 4 — 이전 스킬을 기다리지 않아 마커 그대로). 가정: 공격 속도 100%.
@@ -1691,9 +1765,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         float dash = Timeline.finisherStartTime;
         var parts = new List<string>();
-        foreach (string path in FinisherVariantPaths)
+        // 지금 프로필의 스킬 칸으로 — 기본 프로필이면 세 캐릭터 몸, 캐릭터 프로필이면 그 캐릭터 몸만(267).
+        TutorialCharacter[] bodies = _character == TutorialCharacter.None
+            ? new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin }
+            : new[] { _character };
+        foreach (TutorialCharacter body in bodies)
         {
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath(body));
             if (prefab == null) continue;
             string name = prefab.name.Replace("Player_", "");
             AnimationClip clip = FinisherClipOf(prefab);
@@ -1723,7 +1801,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     AnimationClip FinisherClipOf(GameObject character)
     {
         if (character == null) return null;
-        PlayerSkillSlot slot = PlayerVictoryFinisher.ResolveSlot(character, _settings);
+        PlayerSkillSlot slot = _profile != null ? _profile.finisherSlot : PlayerSkillSlot.Ultimate;   // 지금 프로필 칸(267)
         PlayerSkillController controller = character.GetComponentInChildren<PlayerSkillController>(true);
         PlayerSkillBase skill = controller != null ? controller.GetSkill(slot) : null;
         Animator animator = character.GetComponentInChildren<Animator>(true);
@@ -1843,11 +1921,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 보스 피격 애니('보스 피격 애니 시작' 줄) = 23호 컨트롤러(또는 실제 보스)의 bossHitStateName 상태 클립(23호 getowned = ParryHit_InPlace 1.42초).
     // 자르기 값은 클립 시간(초) 하나 — 캐릭터마다 클립 길이가 다르면 프레임 표시도 다르다.
 
-    static readonly string[] FinisherPreviewLabels = { "팔라딘", "거너", "어쌔신" };
     static readonly Color FinisherColor = new Color(0.80f, 0.45f, 0.55f);
     static readonly Color BossHitColor = new Color(0.85f, 0.35f, 0.30f);
     const string BossHitControllerPath = "Assets/4.Animations/Wells&No.23/No.23/Controller/No23Controller.controller";
-    [SerializeField] int _finisherPreview;
     Object _finisherClipKey;
     AnimationClip _finisherClipCache;
     string _finisherWhoCache;
@@ -1884,12 +1960,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     float FinisherFull(out AnimationClip clip, out string who)
     {
         GameObject killer = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null ? BossVictoryGlitchPresentation.Instance.KillerObject : null;
-        Object key = killer != null ? killer : AssetDatabase.LoadAssetAtPath<GameObject>(FinisherVariantPaths[Mathf.Clamp(_finisherPreview, 0, FinisherVariantPaths.Length - 1)]);
+        Object key = killer != null ? killer : AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath(_character));
         if (key != _finisherClipKey)
         {
             _finisherClipKey = key;
             _finisherClipCache = FinisherClipOf(key as GameObject);
-            _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : FinisherPreviewLabels[Mathf.Clamp(_finisherPreview, 0, FinisherPreviewLabels.Length - 1)];
+            _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : _character == TutorialCharacter.None ? "기본(팔라딘 몸)" : CharacterLabel(_character);
         }
         clip = _finisherClipCache;
         who = _finisherWhoCache;
@@ -2033,18 +2109,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField($"{ClipNodeLabel(m)} 클립 · 끝 자르기", EditorStyles.miniBoldLabel);
         if (m == BossVictoryMarker.FinisherStart)
-        {
-            bool live = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null && BossVictoryGlitchPresentation.Instance.KillerObject != null;
-            using (new EditorGUI.DisabledScope(live))
-            {
-                int preview = EditorGUILayout.Popup(new GUIContent("미리보기 캐릭터", "클립 길이·프레임을 이 캐릭터 기준으로 보여 준다. 디버그 랩 재생 중이면 실제 처치자."), _finisherPreview, FinisherPreviewLabels);
-                if (preview != _finisherPreview)
-                {
-                    _finisherPreview = preview;
-                    _finisherClipKey = null;
-                }
-            }
-        }
+            EditorGUILayout.LabelField("클립 길이·프레임 = 도구 막대 캐릭터(기본 = 팔라딘 몸) · 디버그 랩 재생 중이면 실제 처치자(267 — 옛 '미리보기 캐릭터' 드롭다운 통합).", EditorStyles.wordWrappedMiniLabel);
         float full = NodeFull(m, out AnimationClip clip, out string who);
         if (clip == null)
         {
@@ -2094,6 +2159,224 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 "오른쪽 끝을 앞으로 끌면 그 프레임에서 보스가 멈춘다(배율 0). 보스 배율 규칙의 노드 하나로 시각 순 판정 — 같은 시각이면 피격 애니 < 자른 끝 < 정지 < 슬로우, " +
                 "뒤에 '보스 슬로우'(꺼짐이면 처치자 느려짐 순간)가 오면 그 배율로 자른 프레임 뒤를 다시 재생한다. 원래 끝보다 늘릴 수 없고, 끝까지 끌면 '안 자름'(지금과 같음).",
                 EditorStyles.wordWrappedMiniLabel);
+        }
+    }
+
+    // ── 캐릭터 드롭다운·프로필 안내(267) ─────────────────────────────────
+
+    void DrawCharacterPopup()
+    {
+        if (_settings == null) return;
+        bool live = TryLiveKiller(out _, out _);
+        using (new EditorGUI.DisabledScope(live))
+        {
+            int index = Mathf.Max(0, System.Array.IndexOf(Characters, _character));
+            int picked = EditorGUILayout.Popup(index, CharacterLabels, EditorStyles.toolbarPopup, GUILayout.Width(72f));
+            if (picked != index)
+            {
+                _character = Characters[picked];
+                ResolveProfile();
+                FitAll();
+            }
+        }
+        if (live) GUILayout.Label("실제 처치자", EditorStyles.miniLabel, GUILayout.Width(56f));
+    }
+
+    // 지금 편집 중인 프로필 한 줄 — 표에 없는 캐릭터는 기본 프로필을 쓴다(고치면 기본이 바뀐다) · 만들기 버튼.
+    void DrawProfileBanner()
+    {
+        bool own = _character == TutorialCharacter.None || _settings.HasOwnProfile(_character);
+        using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+        {
+            string who = _character == TutorialCharacter.None ? "기본 프로필" : $"{CharacterLabel(_character)} 프로필";
+            string text = !ProfileIsAsset
+                ? "기본 프로필 에셋이 비어 코드 기본값으로 보인다 — 고쳐도 저장되지 않는다. 'Tools/Boss Victory/캐릭터별 프로필 만들기 (267)'."
+                : own
+                    ? $"편집 중: {who} — {_profile.name}{(_character == TutorialCharacter.None ? " (표에 없는 캐릭터가 쓴다)" : "")}"
+                    : $"{CharacterLabel(_character)} 은(는) 표에 프로필이 없어 기본 프로필({_profile.name})을 쓴다 — 여기서 고치면 기본이 바뀐다.";
+            GUILayout.Label(text, EditorStyles.wordWrappedMiniLabel);
+            if (ProfileIsAsset && GUILayout.Button("선택", EditorStyles.miniButton, GUILayout.Width(40f))) EditorGUIUtility.PingObject(_profile);
+            if (!own && _settings.defaultProfile != null && GUILayout.Button("이 캐릭터 프로필 만들기(기본 복제)", EditorStyles.miniButton, GUILayout.Width(190f)))
+            {
+                BossVictoryProfileAuthoring.CreateCharacterProfile(_settings, _character);
+                ResolveProfile();
+            }
+        }
+    }
+
+    // ── 노드 여러 개 선택(Ctrl/⌘ 클릭) · 다른 캐릭터에 복사(267) ─────────────
+    // 마커(하나뿐인 노드)는 덮어쓰기, 클립은 같은 시각에 새로 추가(TV 꺼짐·처치자 평타처럼 1개뿐인 트랙은 덮어쓰기). Undo 한 번에 되돌림.
+
+    readonly struct NodeRef : System.IEquatable<NodeRef>
+    {
+        public readonly int Track;   // 클립 노드 = 트랙(마커면 -1)
+        public readonly int Index;   // 클립 번호
+        public readonly int MarkerId; // 마커(클립이면 -1)
+
+        NodeRef(int track, int index, int marker) { Track = track; Index = index; MarkerId = marker; }
+        public static NodeRef Clip(BossVictoryTrack track, int index) => new NodeRef((int)track, index, -1);
+        public static NodeRef Marker(BossVictoryMarker marker) => new NodeRef(-1, -1, (int)marker);
+        public bool IsMarker => MarkerId >= 0;
+        public bool Equals(NodeRef o) => Track == o.Track && Index == o.Index && MarkerId == o.MarkerId;
+        public override bool Equals(object o) => o is NodeRef n && Equals(n);
+        public override int GetHashCode() => (Track * 397 ^ Index) * 31 ^ MarkerId;
+    }
+
+    readonly List<NodeRef> _multi = new List<NodeRef>();
+    List<NodeRef> _pendingCopy;
+    Vector2 _pendingCopyAt;
+
+    bool TryPrimaryNode(out NodeRef node)
+    {
+        if (_selMarker >= 0) { node = NodeRef.Marker((BossVictoryMarker)_selMarker); return true; }
+        if (HasClipSelection) { node = NodeRef.Clip((BossVictoryTrack)_selTrack, _selIndex); return true; }
+        node = default;
+        return false;
+    }
+
+    // 복사할 노드 = 여러 개 선택이 있으면 그것, 없으면 지금 선택 하나.
+    List<NodeRef> CopySelection()
+    {
+        if (_multi.Count > 0) return new List<NodeRef>(_multi);
+        var one = new List<NodeRef>();
+        if (TryPrimaryNode(out NodeRef n)) one.Add(n);
+        return one;
+    }
+
+    bool TryPickNode(Rect lanes, Vector2 mouse, out NodeRef node)
+    {
+        if (PickClipNode(lanes, mouse, out BossVictoryMarker clipNode, out _)) { node = NodeRef.Marker(clipNode); return true; }
+        if (PickMarker(lanes, mouse, out BossVictoryMarker marker)) { node = NodeRef.Marker(marker); return true; }
+        foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
+        {
+            if (!RowRect(lanes, TrackRow(track)).Contains(mouse)) continue;
+            if (PickClip(lanes, track, mouse, out int index, out _)) { node = NodeRef.Clip(track, index); return true; }
+            break;
+        }
+        node = default;
+        return false;
+    }
+
+    // Ctrl/⌘ 클릭 — 노드를 여러 개 선택에 넣거나 뺀다(처음이면 지금 선택도 같이 넣는다). 끌기 없음.
+    void ToggleMulti(NodeRef node)
+    {
+        if (_multi.Count == 0 && TryPrimaryNode(out NodeRef primary) && !primary.Equals(node)) _multi.Add(primary);
+        if (!_multi.Remove(node)) _multi.Add(node);
+        _selTrack = node.IsMarker ? -1 : node.Track;
+        _selIndex = node.IsMarker ? -1 : node.Index;
+        _selMarker = node.IsMarker ? node.MarkerId : -1;
+        _selKey = -1;
+        _selFinisher = false;
+        GUI.FocusControl(null);
+    }
+
+    string NodeLabel(NodeRef n) => n.IsMarker
+        ? BossVictoryTimeline.MarkerLabel((BossVictoryMarker)n.MarkerId)
+        : $"{BossVictoryTimeline.TrackLabel((BossVictoryTrack)n.Track)} #{n.Index + 1}";
+
+    void AddCopyToCharactersItem(GenericMenu menu, Vector2 mouse)
+    {
+        List<NodeRef> nodes = CopySelection();
+        string label = nodes.Count > 1 ? $"다른 캐릭터에 복사… (노드 {nodes.Count}개)" : "다른 캐릭터에 복사…";
+        if (nodes.Count == 0 || !ProfileIsAsset) { menu.AddDisabledItem(new GUIContent(label)); return; }
+        menu.AddItem(new GUIContent(label), false, () =>
+        {
+            _pendingCopy = nodes;   // 팝업은 다음 OnGUI 에서(메뉴 콜백은 GUI 밖)
+            _pendingCopyAt = mouse;
+            Repaint();
+        });
+    }
+
+    void ShowPendingCopyPopup()
+    {
+        if (_pendingCopy == null || Event.current.type != EventType.Repaint) return;
+        List<NodeRef> nodes = _pendingCopy;
+        _pendingCopy = null;
+        PopupWindow.Show(new Rect(_pendingCopyAt, Vector2.one), new CopyToCharactersPopup(this, nodes));
+    }
+
+    // 복사 대상 후보 — 기본 + 세 캐릭터 중 지금 프로필이 아닌 것. 표에 프로필이 없는 캐릭터는 고를 수 없다(null).
+    List<(string label, BossVictoryProfile profile)> CopyTargets()
+    {
+        var list = new List<(string, BossVictoryProfile)>();
+        foreach (TutorialCharacter c in Characters)
+        {
+            BossVictoryProfile p = c == TutorialCharacter.None ? _settings.defaultProfile : _settings.HasOwnProfile(c) ? _settings.ProfileFor(c) : null;
+            if (p != null && p == _profile) continue;
+            list.Add((CharacterLabel(c), p));
+        }
+        return list;
+    }
+
+    void CopyNodesTo(List<NodeRef> nodes, List<BossVictoryProfile> targets)
+    {
+        if (nodes.Count == 0 || targets.Count == 0) return;
+        const string label = "처치 연출 노드 다른 캐릭터에 복사";
+        Undo.IncrementCurrentGroup();
+        Undo.SetCurrentGroupName(label);
+        int group = Undo.GetCurrentGroup();
+        Undo.RecordObjects(targets.ToArray(), label);
+        BossVictoryTimeline src = Timeline;
+        foreach (BossVictoryProfile target in targets)
+        {
+            target.timeline ??= BossVictoryTimeline.CreateDefault();
+            foreach (NodeRef n in nodes)
+            {
+                if (n.IsMarker) target.timeline.CopyMarkerFrom(src, (BossVictoryMarker)n.MarkerId);
+                else if (n.Index < src.Clips((BossVictoryTrack)n.Track).Count) target.timeline.CopyClipFrom(src, (BossVictoryTrack)n.Track, n.Index);
+            }
+            target.timeline.SyncCameraCutShots();
+            target.timeline.FitCameraCutLengths();
+            EditorUtility.SetDirty(target);
+            AssetDatabase.SaveAssetIfDirty(target);
+        }
+        Undo.CollapseUndoOperations(group);
+        var names = new List<string>();
+        foreach (BossVictoryProfile t in targets) names.Add(t.name);
+        var what = new List<string>();
+        foreach (NodeRef n in nodes) what.Add(NodeLabel(n));
+        Debug.Log($"[BossVictory] {_profile.name} → {string.Join(", ", names)} 노드 복사: {string.Join(" · ", what)} (마커 = 덮어쓰기 · 클립 = 추가, Ctrl+Z 로 되돌림)");
+    }
+
+    sealed class CopyToCharactersPopup : PopupWindowContent
+    {
+        readonly BossVictoryTimelineWindow _w;
+        readonly List<NodeRef> _nodes;
+        readonly List<(string label, BossVictoryProfile profile)> _targets;
+        readonly bool[] _on;
+
+        public CopyToCharactersPopup(BossVictoryTimelineWindow w, List<NodeRef> nodes)
+        {
+            _w = w;
+            _nodes = nodes;
+            _targets = w.CopyTargets();
+            _on = new bool[_targets.Count];
+        }
+
+        public override Vector2 GetWindowSize() => new Vector2(300f, 96f + 20f * (_targets.Count + Mathf.Min(_nodes.Count, 6)));
+
+        public override void OnGUI(Rect rect)
+        {
+            EditorGUILayout.LabelField($"다른 캐릭터에 복사 — 노드 {_nodes.Count}개(같은 시각)", EditorStyles.boldLabel);
+            for (int i = 0; i < _nodes.Count && i < 6; i++) EditorGUILayout.LabelField("· " + _w.NodeLabel(_nodes[i]), EditorStyles.miniLabel);
+            if (_nodes.Count > 6) EditorGUILayout.LabelField($"… 외 {_nodes.Count - 6}개", EditorStyles.miniLabel);
+            EditorGUILayout.Space(2f);
+            for (int i = 0; i < _targets.Count; i++)
+            {
+                bool has = _targets[i].profile != null;
+                using (new EditorGUI.DisabledScope(!has))
+                    _on[i] = EditorGUILayout.ToggleLeft(has ? $"{_targets[i].label} ({_targets[i].profile.name})" : $"{_targets[i].label} (프로필 없음 — 먼저 만들기)", _on[i] && has);
+            }
+            EditorGUILayout.LabelField("마커 = 덮어쓰기 · 클립 = 새로 추가(1개뿐인 트랙은 덮어쓰기)", EditorStyles.miniLabel);
+            var picked = new List<BossVictoryProfile>();
+            for (int i = 0; i < _targets.Count; i++) if (_on[i] && _targets[i].profile != null) picked.Add(_targets[i].profile);
+            using (new EditorGUI.DisabledScope(picked.Count == 0))
+                if (GUILayout.Button($"복사 ({picked.Count}개 캐릭터)"))
+                {
+                    _w.CopyNodesTo(_nodes, picked);
+                    editorWindow.Close();
+                    _w.Repaint();
+                }
         }
     }
 }

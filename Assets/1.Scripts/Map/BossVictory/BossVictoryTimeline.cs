@@ -442,6 +442,46 @@ public sealed class BossVictoryTimeline
         return true;
     }
 
+    // ── 다른 캐릭터 프로필에 노드 복사(267 — 타임라인 창 '다른 캐릭터에 복사') ──
+
+    /// <summary>
+    /// 마커(하나뿐인 노드)를 <paramref name="src"/> 와 같은 시각으로 덮어쓴다. 애니 클립 노드(스킬 연출 시작·보스 피격 애니 시작)는 끝 자르기도 같이.
+    /// </summary>
+    public void CopyMarkerFrom(BossVictoryTimeline src, BossVictoryMarker marker)
+    {
+        SetMarkerTime(marker, src.MarkerTime(marker));
+        if (marker == BossVictoryMarker.FinisherStart) finisherTrimSeconds = src.finisherTrimSeconds;
+        else if (marker == BossVictoryMarker.BossHitAnim) bossHitTrimSeconds = src.bossHitTrimSeconds;
+    }
+
+    /// <summary>
+    /// <paramref name="src"/> 의 클립 하나를 같은 시각으로 복사 — 하나뿐인 트랙(TV 꺼짐·처치자 평타)은 덮어쓰기, 나머지는 새로 추가.
+    /// 키 목록·카메라 컷 값은 새 목록(공유 안 함). 결과 클립 번호(덮어쓰기면 0).
+    /// </summary>
+    public int CopyClipFrom(BossVictoryTimeline src, BossVictoryTrack track, int index)
+    {
+        BossVictoryClip c = src.Clips(track)[index].WithCopiedKeys();
+        List<BossVictoryClip> clips = Clips(track);
+        int at;
+        if (KindOf(track) == TrackKind.Single && clips.Count > 0)
+        {
+            clips[0] = c;
+            at = 0;
+        }
+        else
+        {
+            clips.Add(c);
+            at = clips.Count - 1;
+        }
+        if (track == BossVictoryTrack.CameraCut)
+        {
+            SyncCameraCutShots();   // 앞 번호 보정 뒤 이 클립 값
+            cameraCutShots[at] = src.CameraCutShot(index).WithCopiedKeys();
+            FitCameraCutLengths();
+        }
+        return at;
+    }
+
     /// <summary>모든 클립 끝·마커 중 가장 늦은 시각(창 시간축 길이).</summary>
     public float Duration
     {

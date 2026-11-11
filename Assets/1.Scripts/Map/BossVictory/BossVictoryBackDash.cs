@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 보스 처치 연출 — 처치자 백대쉬 순수 계산(255 후속 3, 테스트 <c>BossVictoryBackDashTests</c>).
-/// 값 = 설정 SO(<see cref="BossVictoryGlitchSettings.backDashDistance"/> 등, 기본 = 보스 등장 밀림 값 복사). 이동·리액션 애니는 <see cref="BossEncounterDirector.StepSkid"/> 그대로.
+/// 값 = 설정 SO(<see cref="BossVictoryProfile.backDashDistance"/> 등, 기본 = 보스 등장 밀림 값 복사). 이동·리액션 애니는 <see cref="BossEncounterDirector.StepSkid"/> 그대로.
 /// </summary>
 public static class BossVictoryBackDash
 {

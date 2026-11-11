@@ -76,7 +76,7 @@ public sealed class BossVictoryKillerSequenceTests
         Assert.AreEqual(0.13f, tl.backDashStartTime, Tolerance, "백대쉬 시작 = 평타 끝 직후");
         Assert.AreEqual(0f, tl.slowStartTime, "느려짐 = 꺼짐(스킬 End)");
 
-        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        var s = ScriptableObject.CreateInstance<BossVictoryProfile>();
         try
         {
             Assert.AreEqual(BossEncounterDirector.SkidIdleDelay, s.backDashIdleDelay, Tolerance, "백대쉬 후 대기 = 등장 밀림 Idle 복귀 지연");
@@ -127,7 +127,7 @@ public sealed class BossVictoryKillerSequenceTests
     [Test]
     public void 옛_처치자_동작_끝_마커는_평타_클립_끝으로_옮긴다()
     {
-        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        var s = ScriptableObject.CreateInstance<BossVictoryProfile>();
         try
         {
             string json = "{\"backDashDuration\":0.5,\"backDashIdleDelay\":0.35,\"timeline\":{\"lobbyTransitionTime\":5.6,\"killerActionEndTime\":0.2}}";

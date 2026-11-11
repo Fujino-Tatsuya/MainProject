@@ -10,7 +10,7 @@ using VeyTrace.Rendering.Occlusion;
 /// 복제 상태 <see cref="BossEncounterDirector.VictoryState"/>(막타·보스·처치 시각)만 읽는다 — 새 RPC·복제 값 없음.
 ///
 /// <para><b>2단계(지금)</b> — 처치 판정 즉시: 이 피어의 스킬 이펙트·장판 표시·투사체 소거(Q11) · 대상별 시간 배율(전역 timeScale 아님):
-/// 처치자 1 · 그 외 플레이어 0.05 · 보스 0. 처치자 캐릭터에 처치 연출 스킬(Q9, 칸 = <see cref="PlayerVictoryFinisher"/>)을 표시로만 재생하고,
+/// 처치자 1 · 그 외 플레이어 0.05 · 보스 0. 처치자 캐릭터에 처치 연출 스킬(Q9, 칸 = 처치자 캐릭터 프로필 <see cref="BossVictoryProfile.finisherSlot"/>)을 표시로만 재생하고,
 /// 타임라인 '느려짐 시작' 마커(꺼짐이면 그 클립 End 이벤트 — 이 피어 화면 기준, Q12)에서 처치자 0.1 → <see cref="FinisherEnded"/>.
 /// 보스(255 후속 5) = 처치 순간 0 → '보스 피격 애니 시작'(23호 getowned = ParryHit_InPlace, ×1) · '보스 정지'(0) · '보스 슬로우'(꺼짐이면 처치자 느려짐 순간) 중
 /// 시각이 가장 늦은 노드(<see cref="BossVictoryBossTimeScale"/>).</para>
@@ -47,6 +47,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     BossEncounterDirector _director;
     BossVictoryGlitchSettings _settings;
+    BossVictoryProfile _profile;   // 처치자 캐릭터 프로필(267 — 타임라인·백대쉬·시간 배율·처치 연출 스킬 칸). 회차 시작 때 고정
+    TutorialCharacter _killerCharacter;
     int _sequence = -1;
     bool _running;
     Phase _phase = Phase.None;
@@ -77,6 +79,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 지금 처치자(연출 중이 아니면 null) — 타임라인 창이 실제 처치자의 처치 연출 스킬 클립 길이를 보여 준다.</summary>
     public GameObject KillerObject => _running && _killer != null ? _killer.gameObject : null;
 
+    /// <summary>[이 피어] 이번 회차 처치자 캐릭터(모르면·나갔으면 None = 기본 프로필) — 타임라인 창이 Play 중 이 캐릭터 프로필을 따라간다(267).</summary>
+    public TutorialCharacter KillerCharacter => _running ? _killerCharacter : TutorialCharacter.None;
+
+    /// <summary>[이 피어] 이번 회차가 쓰는 프로필(연출 중이 아니면 null).</summary>
+    public BossVictoryProfile Profile => _running ? _profile : null;
+
     // ── 시계 진단(디버그 씬 — 랩 timelineClockLog) · 클립 노드 실측 표본(에디터 — 창이 클립 시간을 타임라인 초로 그린다) ──
     /// <summary>[디버그] 켜면 노드·키가 발화할 때마다 "타임라인 t / 실제 경과" 한 줄(디버그 랩이 켠다 — 랩 인스펙터 timelineClockLog).</summary>
     public static bool TimelineClockLog;
@@ -96,7 +104,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void ClockLogKeys(float from, float to)
     {
         if (!TimelineClockLog || to <= from) return;
-        BossVictoryTimeline tl = _settings.timeline;
+        BossVictoryTimeline tl = _profile.timeline;
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             if (!BossVictoryTimeline.HasFades(track)) continue;
@@ -129,7 +137,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void SampleClipTiming()
     {
 #if UNITY_EDITOR
-        BossVictoryTimeline tl = _settings.timeline;
+        BossVictoryTimeline tl = _profile.timeline;
         if (_finisherState != 0 && SampleState(_killerAnimator, _finisherState, out AnimationClip fc, out float ft))
         {
             if (_finisherTimingKey == null) { _finisherTimingKey = BossVictoryClipTiming.Key(false, fc.name); BossVictoryClipTiming.BeginRun(_finisherTimingKey); }
@@ -272,8 +280,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 #endif
 
     /// <summary>[이 피어] 보스 시간 배율 — 서버(호스트)의 사망 표현 대기도 이 값으로 흐른다(<see cref="BossEncounterDirector.VictoryDeathTimeScaleFor"/>).</summary>
-    public float BossTimeScale => _running && _settings != null
-        ? BossVictoryBossTimeScale.Scale(_settings.timeline.BossNodes(HasBossHitAnim, _bossTrimAt), _killerSlowAt, _settings.bossAfterFinisherScale, _glitchTime)
+    public float BossTimeScale => _running && _profile != null
+        ? BossVictoryBossTimeScale.Scale(_profile.timeline.BossNodes(HasBossHitAnim, _bossTrimAt), _killerSlowAt, _profile.bossAfterFinisherScale, _glitchTime)
         : 1f;
 
     bool HasBossHitAnim => !string.IsNullOrEmpty(_settings.bossHitStateName);
@@ -352,6 +360,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (p.OwnerClientId == v.KillerClientId) _killer = p;
             else _others.Add(p.gameObject);
         }
+        // 프로필 = 처치자 캐릭터(복제된 KillerClientId → 그 Player 의 프리팹 해시 → 로스터 캐릭터, 새 복제 값 없음 — 늦은 참가자·호스트 로비 전환도 같은 프로필).
+        // 처치자를 못 찾으면(나감 등) 기본 프로필(267).
+        _killerCharacter = _killer != null ? TutorialLocalPlayerInfo.ResolveCharacter(_killer) : TutorialCharacter.None;
+        _profile = _settings.ProfileFor(_killerCharacter);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         // 디버그 랩(244) 표시용 팀원 복제본 — Player 가 아니라 위에서 안 잡힌다. 비어 있으면 실게임과 같다.
         foreach (GameObject mate in BossEncounterDirector.DevVictoryExtraTeammates)
@@ -376,7 +388,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_killer == null)
             Edit.LogWarning($"[BossVictory] 막타 client {v.KillerClientId} 의 플레이어가 이 피어에 없다 — 처치 연출 스킬을 못 튼다.", this);
         Edit.Log($"[BossVictory] 글리치 연출 시작 — 회차 {v.Sequence} · 막타 client {v.KillerClientId} · 팀원 {_others.Count} · " +
-                 $"Animator {_animators.Count} · 이펙트 소거 {cleared}", this);
+                 $"Animator {_animators.Count} · 이펙트 소거 {cleared} · 프로필 {_profile.name}({_killerCharacter})", this);
     }
 
     // 처치 판정 즉시 이 피어 표시 소거(Q11). 서버 판정 장판·투사체는 디렉터가 서버에서 디스폰한다(TryStartVictoryServer).
@@ -413,7 +425,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // 매 프레임 — 지금 단계보다 타임라인이 정하는 단계가 뒤면 넘어간다. 하던 동작이 자기 클립 끝에 닿으면 대기(애니는 클립의 Exit 전이 그대로).
     void TickKillerSequence()
     {
-        BossVictoryTimeline tl = _settings.timeline;
+        BossVictoryTimeline tl = _profile.timeline;
         if (_killerStep != BossVictoryKillerSequence.Step.None)
         {
             if (_killerStep == BossVictoryKillerSequence.Step.CurrentAction && ReachedClipEnd(_killerAnimator, _killerActionState))
@@ -434,11 +446,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         {
             case BossVictoryKillerSequence.Step.Wait:   // 처치자 평타 클립 끝 — 하던 동작을 끊고 대기 자세
                 BossEncounterDirector.CrossFadeIdle(_killerAnimator);
-                ClockLog($"처치자 평타 클립 끝 {_settings.timeline.KillerTimes().ActionEnd:0.000}s");
+                ClockLog($"처치자 평타 클립 끝 {_profile.timeline.KillerTimes().ActionEnd:0.000}s");
                 Edit.Log($"[BossVictory] 처치자 평타 끝 — 하던 동작 끊고 대기 (글리치 t {_glitchTime:0.00})", this);
                 break;
             case BossVictoryKillerSequence.Step.BackDash:
-                ClockLog($"백대쉬 시작 {_settings.timeline.backDashStartTime:0.000}s");
+                ClockLog($"백대쉬 시작 {_profile.timeline.backDashStartTime:0.000}s");
                 BeginBackDash();
                 break;
             case BossVictoryKillerSequence.Step.Finisher:
@@ -483,8 +495,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void BeginBackDash()
     {
         Vector3 killerPos = _killer.transform.position;
-        _dashDir = BossVictoryBackDash.Direction(killerPos, _boss != null ? _boss.transform.position : killerPos, _killer.transform.forward, _settings.backDashAngle);
-        _dashEase ??= u => BossVictoryCameraCuts.Evaluate(_settings.backDashEase, u);
+        _dashDir = BossVictoryBackDash.Direction(killerPos, _boss != null ? _boss.transform.position : killerPos, _killer.transform.forward, _profile.backDashAngle);
+        _dashEase ??= u => BossVictoryCameraCuts.Evaluate(_profile.backDashEase, u);
         _dashStartAt = Time.timeAsDouble;
         _dashDone = 0f;
         _dashReaction = false;
@@ -498,14 +510,14 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             motor.PassThroughUnitsOverride = true;
             _dashMotor = motor;
         }
-        Edit.Log($"[BossVictory] 처치자 백대쉬 — {_settings.backDashDistance:0.##}m / {_settings.backDashDuration:0.##}초 · {_settings.backDashEase} · 보정 {_settings.backDashAngle:0}° · 후 대기 {_settings.backDashIdleDelay:0.##}초{(_dashMotor != null ? "(오너 이동)" : "(애니만 — 위치는 복제)")} (글리치 t {_glitchTime:0.00})", this);
+        Edit.Log($"[BossVictory] 처치자 백대쉬 — {_profile.backDashDistance:0.##}m / {_profile.backDashDuration:0.##}초 · {_profile.backDashEase} · 보정 {_profile.backDashAngle:0}° · 후 대기 {_profile.backDashIdleDelay:0.##}초{(_dashMotor != null ? "(오너 이동)" : "(애니만 — 위치는 복제)")} (글리치 t {_glitchTime:0.00})", this);
     }
 
     void FixedUpdate()
     {
         if (!_running || !_dashRunning || _killer == null) return;
-        if (!BossEncounterDirector.StepSkid(_killer, _dashMotor, _dashDir, _settings.backDashDistance, _dashStartAt, _settings.backDashDuration,
-                                            Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle, _dashEase, _settings.backDashIdleDelay))
+        if (!BossEncounterDirector.StepSkid(_killer, _dashMotor, _dashDir, _profile.backDashDistance, _dashStartAt, _profile.backDashDuration,
+                                            Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle, _dashEase, _profile.backDashIdleDelay))
             return;
         EndDash();   // Idle 복귀까지 끝 — 스킬 연출 시작 마커까지 대기 자세
     }
@@ -524,7 +536,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void StartFinisher()
     {
         if (_killerSkills == null) return;
-        PlayerSkillSlot slot = PlayerVictoryFinisher.ResolveSlot(_killer.gameObject, _settings);
+        PlayerSkillSlot slot = _profile.finisherSlot;
         PlayerSkillBase skill = _killerSkills.GetSkill(slot);
         if (skill == null || skill.Data == null)
         {
@@ -544,12 +556,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             return;
         }
         _finisherState = Animator.StringToHash(skill.Data.AnimatorStateName);
-        ClockLog($"처치 연출 스킬 시작 {_settings.timeline.finisherStartTime:0.000}s");
+        ClockLog($"처치 연출 스킬 시작 {_profile.timeline.finisherStartTime:0.000}s");
         Edit.Log($"[BossVictory] 처치 연출 스킬 — {_killer.name} {slot} {skill.Data.AnimatorStateName}" +
                  (FinisherTrim > 0f ? $" · 끝 자르기 {FinisherTrim:0.###}초(클립 시간)" : ""), this);
     }
 
-    float FinisherTrim => _settings.timeline.finisherTrimSeconds;
+    float FinisherTrim => _profile.timeline.finisherTrimSeconds;
 
     // 자른 프레임(클립 시간 — 공속과 무관)에 닿으면 그 자세로 멈춤(처치자 배율 0). 그 뒤 애니 이벤트는 안 난다(멈춰서 — 의도).
     // 이미 생긴 이펙트는 지금 규칙(스킬 동안 ×1 · 느려짐 뒤 End 후 배율) 그대로. '느려짐 시작' 이 꺼져 있고 자른 끝이 End 이벤트보다 앞이면 여기서 느려짐.
@@ -562,7 +574,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         ClockLog($"처치 연출 스킬 끝 자르기 도달(클립 {trim:0.000}s)");
         int fps = Mathf.RoundToInt(BossVictoryAnimTrim.FrameRate(clip.frameRate));
         Edit.Log($"[BossVictory] 처치 연출 스킬 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, fps)}({clip.name}) 에서 멈춤 (글리치 t {_glitchTime:0.00})", this);
-        if (_phase == Phase.Finisher && BossVictoryAnimTrim.SlowAtTrimEnd(_settings.timeline.slowStartTime, trim, _finisherEndEvent))
+        if (_phase == Phase.Finisher && BossVictoryAnimTrim.SlowAtTrimEnd(_profile.timeline.slowStartTime, trim, _finisherEndEvent))
             EnterSlow("처치 연출 스킬 클립 끝(잘림 — End 이벤트 전)");
     }
 
@@ -593,9 +605,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (!_running) return;
         _finisherEndedAt = _glitchTime;
         ClockLog("처치 연출 스킬 End 이벤트");
-        if (_settings.timeline.slowStartTime > 0f)
+        if (_profile.timeline.slowStartTime > 0f)
         {
-            Edit.Log($"[BossVictory] 처치 연출 스킬 End (글리치 t {_glitchTime:0.00}) — 느려짐은 '느려짐 시작' 마커 {_settings.timeline.slowStartTime:0.00}s", this);
+            Edit.Log($"[BossVictory] 처치 연출 스킬 End (글리치 t {_glitchTime:0.00}) — 느려짐은 '느려짐 시작' 마커 {_profile.timeline.slowStartTime:0.00}s", this);
             return;
         }
         EnterSlow("처치 연출 스킬 End");
@@ -609,7 +621,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerSlowAt = _glitchTime;
         ClockLog($"처치자 느려짐 — {reason}");
         ApplyEffectRates();
-        Edit.Log($"[BossVictory] {reason} — 처치자 ×{_settings.killerAfterFinisherScale}{(_settings.timeline.bossSlowTime > 0f ? "" : $" · 보스 ×{_settings.bossAfterFinisherScale}(보스 슬로우 끔)")} (글리치 t {_glitchTime:0.00})", this);
+        Edit.Log($"[BossVictory] {reason} — 처치자 ×{_profile.killerAfterFinisherScale}{(_profile.timeline.bossSlowTime > 0f ? "" : $" · 보스 ×{_profile.bossAfterFinisherScale}(보스 슬로우 끔)")} (글리치 t {_glitchTime:0.00})", this);
         FinisherEnded?.Invoke(_state);
     }
 
@@ -619,7 +631,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void TickBoss()
     {
         if (_boss == null) return;
-        if (!_bossHitPlayed && BossVictoryBossTimeScale.ShouldPlayHitAnim(_settings.timeline.BossNodes(HasBossHitAnim), _glitchTime))
+        if (!_bossHitPlayed && BossVictoryBossTimeScale.ShouldPlayHitAnim(_profile.timeline.BossNodes(HasBossHitAnim), _glitchTime))
             PlayBossHitAnim();
         if (_bossHitPlayed && _bossTrimAt < 0f) TickBossHitTrim();
         // 처치 순간 서버 사망 상태가 건 사망 트리거(AnyState→Death)가 피격 애니를 빼앗지 않게 — 사망 상태 복제가 늦게 와도 매 프레임 비운다.
@@ -637,7 +649,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         _bossHitPlayed = true;
         string state = _settings.bossHitStateName;
-        ClockLog($"보스 피격 애니 시작 {_settings.timeline.bossHitAnimTime:0.000}s '{state}'");
+        ClockLog($"보스 피격 애니 시작 {_profile.timeline.bossHitAnimTime:0.000}s '{state}'");
         int hash = Animator.StringToHash(state);
         _bossDeathTrigger = _boss.TryGetComponent(out MonsterBase monster) && monster.MonsterData != null ? monster.MonsterData.deathTrigger : null;
         int played = 0;
@@ -660,7 +672,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // 피격 애니 끝 자르기(255 후속 10) — 자른 프레임(클립 시간)에 닿은 순간을 보스 배율 노드로 남긴다(배율 0, 뒤 슬로우 노드가 오면 다시 움직임). 한 번만.
     void TickBossHitTrim()
     {
-        float trim = _settings.timeline.bossHitTrimSeconds;
+        float trim = _profile.timeline.bossHitTrimSeconds;
         if (trim <= 0f) return;
         int hash = Animator.StringToHash(_settings.bossHitStateName);
         for (int i = 0; i < _bossPlayedAnimators.Count; i++)
@@ -710,7 +722,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         float t = _glitchTime;
         ClockLogKeys(before, t);
         BossVictoryGlitchSettings s = _settings;
-        BossVictoryTimeline tl = s.timeline;
+        BossVictoryTimeline tl = _profile.timeline;
         TickCuts();
         TickCrtAndLobby(tl, t);
 
@@ -949,7 +961,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // → 들어오는 컷 첫 화면으로 월드 기준 섞음. 시각 t 의 순수 결과(되감기 정확). 블렌드 중 벽 숨김 = 들어오는 컷 설정, 컷 진입 처리 = 블렌드 시작 순간.
     void TickCuts()
     {
-        BossVictoryTimeline tl = _settings.timeline;
+        BossVictoryTimeline tl = _profile.timeline;
         int index = tl.ActiveCameraCut(_glitchTime);
         int incoming = tl.BlendingCameraCut(_glitchTime, out float blend);
         if (index < 0 && incoming < 0)
@@ -1215,10 +1227,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     float Scale(Role role) => role switch
     {
         Role.Killer => _killerFrozen ? 0f   // 처치 연출 스킬 끝 자르기(255 후속 7) — 그 프레임에 멈춤
-                     : _phase == Phase.Slow ? _settings.killerAfterFinisherScale
-                     : _killerStep == BossVictoryKillerSequence.Step.CurrentAction ? _settings.killerCurrentActionScale
+                     : _phase == Phase.Slow ? _profile.killerAfterFinisherScale
+                     : _killerStep == BossVictoryKillerSequence.Step.CurrentAction ? _profile.killerCurrentActionScale
                      : -1f,   // 백대쉬·처치 연출 스킬 동안은 덮지 않는다(1)
-        Role.Other => _settings.otherPlayersScale,
+        Role.Other => _profile.otherPlayersScale,
         Role.Boss => BossTimeScale,
         _ => -1f,
     };
@@ -1249,11 +1261,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // 이펙트 — EffectManager 추종 이펙트 + 대상 몸 아래 파티클. 단계가 바뀔 때만(처치 연출 이펙트는 End 뒤 처치자 배율로).
     void ApplyEffectRates()
     {
-        float killer = _phase == Phase.Slow ? _settings.killerAfterFinisherScale
-                     : _killerStep == BossVictoryKillerSequence.Step.CurrentAction ? _settings.killerCurrentActionScale : 1f;
+        float killer = _phase == Phase.Slow ? _profile.killerAfterFinisherScale
+                     : _killerStep == BossVictoryKillerSequence.Step.CurrentAction ? _profile.killerCurrentActionScale : 1f;
         if (_killer != null) SetEffectRate(_killer.transform, killer);
         for (int i = 0; i < _others.Count; i++)
-            if (_others[i] != null) SetEffectRate(_others[i].transform, _settings.otherPlayersScale);
+            if (_others[i] != null) SetEffectRate(_others[i].transform, _profile.otherPlayersScale);
         // 보스 이펙트 배율은 TickBoss(보스 노드가 시각으로 바꾼다).
     }
 

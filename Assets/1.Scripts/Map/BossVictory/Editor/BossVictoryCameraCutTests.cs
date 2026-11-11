@@ -164,7 +164,7 @@ public sealed class BossVictoryCameraCutTests
     [Test]
     public void 기본_목록은_비어_있어_게임_카메라만_쓴다()
     {
-        var settings = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        var settings = ScriptableObject.CreateInstance<BossVictoryProfile>();
         try
         {
             BossVictoryTimeline tl = settings.timeline;
@@ -258,7 +258,8 @@ public sealed class BossVictoryCameraCutTests
             Assert.AreEqual("[]", m.Groups[1].Value.Trim(), "에셋에 옛 컷 값이 있다 — 카메라 컷 트랙으로 옮긴 뒤 지울 것");
         var settings = UnityEditor.AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(AssetPath);
         Assert.IsNotNull(settings);
-        Assert.AreEqual(settings.timeline.cameraCut.Count, settings.timeline.cameraCutShots.Count, "컷 값 개수 = 컷 클립 개수");
+        BossVictoryProfile p = settings.ProfileFor(TutorialCharacter.None);   // 타임라인 = 프로필(267)
+        Assert.AreEqual(p.timeline.cameraCut.Count, p.timeline.cameraCutShots.Count, "컷 값 개수 = 컷 클립 개수");
     }
 
     // ── 컷 블렌드(255 후속 8) ──

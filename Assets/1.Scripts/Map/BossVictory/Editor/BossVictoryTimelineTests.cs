@@ -73,8 +73,17 @@ public sealed class BossVictoryTimelineTests
     {
         var settings = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(AssetPath);
         Assert.IsNotNull(settings, AssetPath);
-        BossVictoryTimeline tl = settings.timeline;
-        Assert.IsNotNull(tl, "timeline");
+        // 타임라인은 캐릭터별 프로필(267) — 기본 + 표의 모든 프로필.
+        Assert.IsNotNull(settings.defaultProfile, "기본 프로필");
+        AssertProfileTimeline(settings.defaultProfile);
+        foreach (BossVictoryGlitchSettings.CharacterProfile row in settings.characterProfiles)
+            if (row.profile != null) AssertProfileTimeline(row.profile);
+    }
+
+    static void AssertProfileTimeline(BossVictoryProfile profile)
+    {
+        BossVictoryTimeline tl = profile.timeline;
+        Assert.IsNotNull(tl, $"{profile.name} timeline");
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             var clips = tl.Clips(track);
