@@ -19,7 +19,6 @@ public sealed class MapSceneBossApproachView : MonoBehaviour
     private bool _dirty = true;
     private float _retryAt;
     private bool _finishedCleared;
-    private bool _minimapShown;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void InstallBootstrap()
@@ -69,7 +68,6 @@ public sealed class MapSceneBossApproachView : MonoBehaviour
             if (_finishedCleared) return;
             _finishedCleared = true;
             ui.Clear();
-            _minimapShown = false;
             _shownObjectiveId = null;
             Edit.Log("[Tutorial] 보스방 도착 — 안내 정리.", this);
             return;
@@ -80,8 +78,8 @@ public sealed class MapSceneBossApproachView : MonoBehaviour
         MapSceneStep step = _director.Step;
         bool g9 = _director.IsGateOpen(MapSceneGate.G9_Corridor4Entry);
 
+        // 미니맵 보스 아이콘 강조(노란 테두리·▼ 화살표)는 할 일 266 으로 뺐다 — 목표 줄만 띄운다.
         ApplyObjective(ui, MapSceneBossApproachDisplay.ObjectiveFor(step, g9));
-        ApplyMinimap(ui, MapSceneBossApproachDisplay.ShowsMinimapBossIcon(step, g9));
     }
 
     private void ApplyObjective(TutorialGuideUI ui, string id)
@@ -109,13 +107,5 @@ public sealed class MapSceneBossApproachView : MonoBehaviour
         if (id == _shownObjectiveId && current == id) return;
         ui.SetObjective(id);
         _shownObjectiveId = id;
-    }
-
-    private void ApplyMinimap(TutorialGuideUI ui, bool on)
-    {
-        if (on == _minimapShown) return;
-        if (on) ui.Highlight(TutorialHudTarget.MinimapBossIcon);
-        else ui.ClearHighlight(TutorialHudTarget.MinimapBossIcon);
-        _minimapShown = on;
     }
 }
