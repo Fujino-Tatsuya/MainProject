@@ -111,7 +111,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
 
             float4 _GroundCircle;      // xyz 중심(월드), w 반경(m)
             float4 _GroundCircleLook;  // x 가장자리 부드러움(m), y 흑백 밝기
-            float4 _ScanFloor;         // x 벽 normal.y(이하 = 주사선 그대로), y 바닥 normal.y(이상 = 바닥), z 바닥에 남길 비율
+            float4 _ScanFloor;         // x 벽 normal.y(이하 = 주사선 그대로), y 바닥 normal.y(이상 = 바닥), z 바닥에 남길 비율, w 하늘 호박 명도 하한
 
             float3 WorldAt(float2 uv, out float rawDepth)
             {
@@ -121,6 +121,17 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 d = lerp(UNITY_NEAR_CLIP_VALUE, 1.0, d);
             #endif
                 return ComputeWorldSpacePosition(saturate(uv), d, UNITY_MATRIX_I_VP);
+            }
+
+            // 하늘 = 먼 평면 깊이(지운 채 남은 곳). 1 = 하늘.
+            half SkyMask(float2 uv)
+            {
+                float d = SampleSceneDepth(saturate(uv));
+            #if UNITY_REVERSED_Z
+                return d <= 1e-6 ? 1.0h : 0.0h;
+            #else
+                return d >= 1.0 - 1e-6 ? 1.0h : 0.0h;
+            #endif
             }
 
             // CRT 주사선 가중치(267 후속) — 1 = 벽·하늘(주사선), 0 = 바닥. 법선 = 이웃 깊이 4개 중 깊이 차가 작은 쪽으로
@@ -226,7 +237,9 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 // 흑백 → 배경만 호박색. 플레이어(캐릭터)는 흑백 유지.
                 half lum = Luma(col);
                 half3 gray = lerp(col, lum.xxx, (half)_GlitchA.z);
-                half3 amber = lum * _AmberColor.rgb * 1.6h;
+                // 하늘(먼 평면)은 명도 하한 — 곱하기 틴트라 검은 하늘이 칙칙한 겨자색이 되던 것(267 후속). 벽·바닥 톤의 밝은 노랑으로.
+                half lumAmber = lerp(lum, max(lum, (half)_ScanFloor.w), SkyMask(uv));
+                half3 amber = lumAmber * _AmberColor.rgb * 1.6h;
                 half3 graded = lerp(gray, amber, (half)_GlitchA.w);
                 graded = lerp(graded, lerp(col, lum.xxx, (half)max(_GlitchA.z, _GlitchA.w)), player);
                 // 발밑 회색 원 — 원 안 배경은 호박색 대신 흑백(밝기 배율). 흑백·호박이 들어오는 만큼만(플레이어는 위에서 이미 흑백).

@@ -52,6 +52,8 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Range(0f, 1f)] public float scanlineFloorNormalMax = 0.8f;
     [Tooltip("바닥에 남기는 주사선 비율(0 = 바닥 없음, 1 = 예전처럼 전체).")]
     [Range(0f, 1f)] public float scanlineFloorKeep = 0f;
+    [Tooltip("하늘(먼 평면 깊이) 호박색 밝기 하한(267 후속) — 호박색 = 흑백 명도 × 색이라 검은 하늘은 칙칙한 겨자색이 된다. 하늘만 명도를 이 값 이상으로 올린다(0 = 예전대로).")]
+    [Range(0f, 1f)] public float skyAmberMinLuma = 0.6f;
 
     [Header("가로줄 찢김 모양")]
     [Tooltip("찢김 줄 기본 굵기(px, 화면 해상도 기준).")]
@@ -113,11 +115,13 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     };
     [Tooltip("링 공통 중심(단어 사각형 UV 0~1) — 기본 = 가운데에서 왼쪽으로 조금.")]
     public Vector2 rectifyFillCenter = new Vector2(0.46f, 0.5f);
-    [Tooltip("링 사이 생성 간격(초) — 기본 4프레임(4/60).")]
+    [Tooltip("링 시작 반지름(단어 높이 비율) — 이 크기로 생겨 페이드한 뒤 확장한다.")]
+    [Min(0f)] public float rectifyFillStartRadius = 0.15f;
+    [Tooltip("링 사이 생성 간격(초, 생성 시각 기준) — 기본 4프레임(4/60).")]
     [Min(0f)] public float rectifyFillDelay = 4f / 60f;
-    [Tooltip("링 페이드 인(초) — 알파 0→1(확장과 동시).")]
+    [Tooltip("링 페이드 인(초) — 시작 반지름 그대로 알파 0→1. 끝나면 확장 시작.")]
     [Min(0f)] public float rectifyFillFade = 0.15f;
-    [Tooltip("링 확장(초, easeOutCubic) — 반지름 0 → 단어 사각형 네 모서리까지.")]
+    [Tooltip("링 확장(초, easeOutCubic, 페이드 뒤) — 시작 반지름 → 단어 사각형 네 모서리까지.")]
     [Min(0.01f)] public float rectifyFillExpand = 0.6f;
     [Tooltip("링 가장자리 부드러움(단어 높이 비율). 화면 픽셀보다 작으면 픽셀 기준 AA.")]
     [Min(0f)] public float rectifyFillSoftness = 0.01f;

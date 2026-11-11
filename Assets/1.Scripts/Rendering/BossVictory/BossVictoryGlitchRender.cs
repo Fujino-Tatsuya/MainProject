@@ -71,7 +71,7 @@ public static class BossVictoryGlitchRender
     static readonly int IdFillParams = Shader.PropertyToID("_RectifyFillParams");     // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
     static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기, y 그라데이션 세기, zw 중심(단어 UV)
     static readonly int IdCircle = Shader.PropertyToID("_GroundCircle");          // xyz 중심(월드), w 반경(m)
-    static readonly int IdScanFloor = Shader.PropertyToID("_ScanFloor");          // x 벽 normal.y, y 바닥 normal.y, z 바닥 남김(267 후속)
+    static readonly int IdScanFloor = Shader.PropertyToID("_ScanFloor");          // x 벽 normal.y, y 바닥 normal.y, z 바닥 남김, w 하늘 호박 명도 하한(267 후속)
     static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
     static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 찢김 줄 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
 
@@ -148,7 +148,7 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdTear, new Vector4(Mathf.Max(0f, s.tearMaxShift), Mathf.Clamp01(s.tearDensity), Mathf.Max(0f, s.tearStreakLength), 0f));
         _noiseSpace = s.bossNoiseSpace == BossVictoryGlitchSettings.NoiseSpace.Boss ? 1f : 0f;
         float floorMin = Mathf.Clamp01(s.scanlineFloorNormalMin);
-        _composite.SetVector(IdScanFloor, new Vector4(floorMin, Mathf.Max(floorMin + 0.001f, Mathf.Clamp01(s.scanlineFloorNormalMax)), Mathf.Clamp01(s.scanlineFloorKeep), 0f));
+        _composite.SetVector(IdScanFloor, new Vector4(floorMin, Mathf.Max(floorMin + 0.001f, Mathf.Clamp01(s.scanlineFloorNormalMax)), Mathf.Clamp01(s.scanlineFloorKeep), Mathf.Clamp01(s.skyAmberMinLuma)));
         _composite.SetVector(IdCircleLook, new Vector4(Mathf.Max(0f, s.groundCircleSoftness), Mathf.Max(0f, s.groundCircleBrightness), 0f, 0f));
         ApplyRectify(s);
         ApplyFillLook(s);
@@ -196,7 +196,7 @@ public static class BossVictoryGlitchRender
     // 안쪽 색 Ring Wipe Fill(267 후속) — 설정 값 사본(ApplyLook)·링 3개 배열.
     static Color[] _fillColors = new Color[0];
     static Vector2 _fillCenter = new Vector2(0.46f, 0.5f);
-    static float _fillDelay, _fillFade, _fillExpand = 0.6f, _fillSoft, _fillGradient, _scanSpacing = 0.003f, _scanDark;
+    static float _fillStartRadius, _fillDelay, _fillFade, _fillExpand = 0.6f, _fillSoft, _fillGradient, _scanSpacing = 0.003f, _scanDark;
     static readonly Vector4[] _fillRings = new Vector4[BossVictoryRectifyFill.RingCount];
     static readonly Vector4[] _fillRingColors = new Vector4[BossVictoryRectifyFill.RingCount];
 
@@ -204,6 +204,7 @@ public static class BossVictoryGlitchRender
     {
         _fillColors = s.rectifyFillColors ?? new Color[0];
         _fillCenter = s.rectifyFillCenter;
+        _fillStartRadius = s.rectifyFillStartRadius;
         _fillDelay = s.rectifyFillDelay;
         _fillFade = s.rectifyFillFade;
         _fillExpand = s.rectifyFillExpand;
@@ -225,7 +226,7 @@ public static class BossVictoryGlitchRender
             BossVictoryRectifyFill.Ring r = opacity > 0f && i < _fillColors.Length
                 ? BossVictoryRectifyFill.Evaluate(i, f.RectifyFillElapsed, _fillDelay, _fillFade, _fillExpand)
                 : default;
-            _fillRings[i] = r.exists ? new Vector4(BossVictoryRectifyFill.Radius(r.grow, rMax, _fillSoft), r.alpha, 0f, 0f) : Vector4.zero;
+            _fillRings[i] = r.exists ? new Vector4(BossVictoryRectifyFill.Radius(r.grow, _fillStartRadius, rMax, _fillSoft), r.alpha, 0f, 0f) : Vector4.zero;
             _fillRingColors[i] = i < _fillColors.Length ? (Vector4)_fillColors[i].linear : Vector4.zero;
         }
         _composite.SetVectorArray(IdFillRings, _fillRings);

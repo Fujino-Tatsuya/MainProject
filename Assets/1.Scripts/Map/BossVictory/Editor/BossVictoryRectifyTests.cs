@@ -85,21 +85,25 @@ public class BossVictoryRectifyTests
     const float Delay = 4f / 60f, Fade = 0.15f, Expand = 0.6f;
 
     [Test]
-    public void 링_생성은_간격마다_페이드와_확장이_동시_easeOutCubic()
+    public void 링은_시작_반지름으로_생겨_페이드한_뒤_easeOutCubic_확장()
     {
         Assert.IsFalse(BossVictoryRectifyFill.Evaluate(0, -0.01f, Delay, Fade, Expand).exists, "클립 전 없음");
-        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(1, Delay - 0.001f, Delay, Fade, Expand).exists, "링 1 은 4프레임 뒤");
+        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(1, Delay - 0.001f, Delay, Fade, Expand).exists, "링 1 은 생성 시각 기준 4프레임 뒤");
         BossVictoryRectifyFill.Ring r = BossVictoryRectifyFill.Evaluate(1, Delay + 0.075f, Delay, Fade, Expand);
         Assert.IsTrue(r.exists);
         Assert.AreEqual(0.5f, r.alpha, 1e-4f, "페이드 반");
-        Assert.AreEqual(1f - Mathf.Pow(1f - 0.075f / Expand, 3f), r.grow, 1e-5f, "페이드 동안에도 확장");
-        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Expand * 0.5f, Delay, Fade, Expand);
+        Assert.AreEqual(0f, r.grow, 1e-6f, "페이드 동안 크기 그대로");
+        r = BossVictoryRectifyFill.Evaluate(1, Delay + Fade, Delay, Fade, Expand);
+        Assert.AreEqual(1f, r.alpha, 1e-5f);
+        Assert.AreEqual(0f, r.grow, 1e-5f, "불투명해진 순간 확장 시작");
+        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Fade + Expand * 0.5f, Delay, Fade, Expand);
         Assert.AreEqual(0.875f, r.grow, 1e-5f, "easeOutCubic(0.5) = 0.875");
-        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Expand + 0.01f, Delay, Fade, Expand);
+        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Fade + Expand + 0.01f, Delay, Fade, Expand);
         Assert.AreEqual(1f, r.grow, 1e-6f);
-        Assert.AreEqual(1f, r.alpha, 1e-6f);
         Assert.IsTrue(BossVictoryRectifyFill.Evaluate(2, 99f, Delay, Fade, Expand).exists, "마지막 링 = 끝까지 유지(반복 없음)");
         Assert.AreEqual(3, BossVictoryRectifyFill.RingCount);
+        Assert.AreEqual(0.15f, BossVictoryRectifyFill.Radius(0f, 0.15f, 3f, 0.01f), 1e-6f, "생성 = 시작 반지름");
+        Assert.AreEqual(3.01f, BossVictoryRectifyFill.Radius(1f, 0.15f, 3f, 0.01f), 1e-5f, "다 퍼지면 Rmax + 경계");
     }
 
     [Test]
@@ -112,24 +116,28 @@ public class BossVictoryRectifyTests
         Assert.AreEqual(0.8f * 16f / 9f / 0.2f, aspect, 1e-4f);
         float rMax = BossVictoryRectifyFill.MaxRadius(new Vector2(0.46f, 0.5f), aspect);
         Assert.AreEqual(Mathf.Sqrt(0.54f * aspect * 0.54f * aspect + 0.25f), rMax, 1e-4f, "먼 쪽(오른쪽) 모서리");
-        Assert.AreEqual(rMax + 0.01f, BossVictoryRectifyFill.Radius(1f, rMax, 0.01f), 1e-6f, "다 퍼지면 경계까지 덮음");
-        Assert.AreEqual(0f, BossVictoryRectifyFill.Radius(0f, rMax, 0.01f), 1e-6f);
         Assert.AreEqual(Vector4.zero, BossVictoryRectifyFill.WordRect(rects, 0));
     }
 
     [Test]
-    public void 링_기본_설정은_사양값()
+    public void 링_코드_기본값은_사양값()
     {
-        BossVictoryGlitchSettings s = BossVictoryGlitchSettings.Load();
-        Assert.IsNotNull(s);
-        Assert.AreEqual(3, s.rectifyFillColors.Length);
-        Assert.Less(Vector4.Distance((Color)new Color32(0xFF, 0x2D, 0xB4, 0xFF), s.rectifyFillColors[0]), 1e-4f, "마젠타");
-        Assert.Less(Vector4.Distance((Color)new Color32(0x8A, 0x8A, 0x8A, 0xFF), s.rectifyFillColors[2]), 1e-4f, "그레이");
-        Assert.AreEqual(0.46f, s.rectifyFillCenter.x, 1e-5f);
-        Assert.AreEqual(4f / 60f, s.rectifyFillDelay, 1e-5f);
-        Assert.AreEqual(0.15f, s.rectifyFillFade, 1e-5f);
-        Assert.AreEqual(0.6f, s.rectifyFillExpand, 1e-5f);
-        Assert.AreEqual(0.35f, s.rectifyFillGradient, 1e-5f);
+        // 에셋 값은 사용자가 튜닝하므로 코드 기본값만 고정한다.
+        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        try
+        {
+            Assert.AreEqual(3, s.rectifyFillColors.Length);
+            Assert.Less(Vector4.Distance((Color)new Color32(0xFF, 0x2D, 0xB4, 0xFF), s.rectifyFillColors[0]), 1e-4f, "마젠타");
+            Assert.Less(Vector4.Distance((Color)new Color32(0x8A, 0x8A, 0x8A, 0xFF), s.rectifyFillColors[2]), 1e-4f, "그레이");
+            Assert.AreEqual(0.46f, s.rectifyFillCenter.x, 1e-5f);
+            Assert.AreEqual(0.15f, s.rectifyFillStartRadius, 1e-5f);
+            Assert.AreEqual(4f / 60f, s.rectifyFillDelay, 1e-5f);
+            Assert.AreEqual(0.15f, s.rectifyFillFade, 1e-5f);
+            Assert.AreEqual(0.6f, s.rectifyFillExpand, 1e-5f);
+            Assert.AreEqual(0.35f, s.rectifyFillGradient, 1e-5f);
+            Assert.AreEqual(0.6f, s.skyAmberMinLuma, 1e-5f);
+        }
+        finally { Object.DestroyImmediate(s); }
     }
 
     [Test]
