@@ -143,6 +143,186 @@ public sealed class LobbyFloorDashBeltLayoutTests
         Assert.That(LobbyFloorDashBeltLayout.PathLength(center), Is.EqualTo(5f).Within(Eps));
     }
 
+    // ───────────── 아이콘 쿼드(257 보완) ─────────────
+
+    private sealed class PathData
+    {
+        public readonly List<Vector3> Center = new List<Vector3>();
+        public readonly List<Vector3> In = new List<Vector3>();
+        public readonly List<Vector3> Out = new List<Vector3>();
+        public readonly List<Vector4> Positions = new List<Vector4>();
+        public readonly List<Vector4> Tangents = new List<Vector4>();
+        public float Length;
+
+        public void Sample(float s, out Vector3 position, out Vector3 tangent)
+        {
+            LobbyFloorDashBeltLayout.SamplePath(Positions, Tangents, Positions.Count, s, out position, out tangent);
+        }
+    }
+
+    private static PathData Path(float radius, int maxSamples, params Vector3[] points)
+    {
+        var d = new PathData();
+        LobbyFloorDashBeltLayout.BuildCenterline(points, radius, 10f, d.Center, d.In, d.Out);
+        d.Length = LobbyFloorDashBeltLayout.BuildPathSamples(d.Center, d.In, d.Out, maxSamples, d.Positions, d.Tangents);
+        return d;
+    }
+
+    [Test]
+    public void 원호_접선은_정확하고_양_끝은_구간_방향()
+    {
+        var d = Path(1f, 128, Vector3.zero, new Vector3(0, 0, 4), new Vector3(4, 0, 4));
+        Assert.That(d.In.Count, Is.EqualTo(d.Center.Count));
+        Assert.That(d.Out.Count, Is.EqualTo(d.Center.Count));
+        AssertNear(d.In[0], Vector3.forward);
+        AssertNear(d.In[1], Vector3.forward); // 원호 시작 = 들어오는 구간 방향 그대로
+        AssertNear(d.In[10], Vector3.right); // 원호 끝 = 나가는 구간 방향
+        AssertNear(d.Out[d.Out.Count - 1], Vector3.right);
+        for (var i = 1; i <= 10; i++)
+        {
+            // 원 접선 ⟂ 반지름, 들어오고 나가는 방향이 같다(매끄럽게 돈다).
+            Assert.That(Vector3.Dot(d.In[i], d.Center[i] - new Vector3(1, 0, 3)), Is.EqualTo(0f).Within(Eps));
+            AssertNear(d.In[i], d.Out[i]);
+        }
+
+        // 원호 아닌 경로 표본은 꼭짓점마다 하나 — 길이는 띠와 같다.
+        Assert.That(d.Positions.Count, Is.EqualTo(d.Center.Count));
+        Assert.That(d.Length, Is.EqualTo(Ribbon(d.Center).length).Within(Eps));
+        Assert.That(d.Positions[d.Positions.Count - 1].w, Is.EqualTo(d.Length).Within(Eps));
+    }
+
+    [Test]
+    public void 직선_구간에선_아이콘_방향이_기울지_않는다()
+    {
+        // 둥근 모서리 직전 직선 구간(z 0~3)과 직후 구간(x 1~4) — 진행 방향이 정확히 구간 방향이어야 예전 직선 모양 그대로.
+        var d = Path(1f, 128, Vector3.zero, new Vector3(0, 0, 4), new Vector3(4, 0, 4));
+        for (var s = 0f; s <= 3f; s += 0.25f)
+        {
+            d.Sample(s, out var p, out var t);
+            AssertNear(p, new Vector3(0, 0, s));
+            AssertNear(t, Vector3.forward);
+        }
+
+        var afterArc = 3f + Mathf.PI * 0.5f;
+        for (var s = afterArc + 0.1f; s <= d.Length; s += 0.25f)
+        {
+            d.Sample(s, out _, out var t);
+            AssertNear(t, Vector3.right);
+        }
+    }
+
+    [Test]
+    public void 원호_위에선_아이콘이_돌기만_한다()
+    {
+        var d = Path(1f, 128, Vector3.zero, new Vector3(0, 0, 4), new Vector3(4, 0, 4));
+        var previousAngle = 0f;
+        for (var s = 3f; s <= 3f + Mathf.PI * 0.5f; s += 0.05f)
+        {
+            d.Sample(s, out var p, out var t);
+            // 각도는 0°→90° 로 단조 증가(코너를 따라 돈다), 위치는 원 위(현 근사 오차만).
+            var angle = Vector3.SignedAngle(Vector3.forward, t, Vector3.up);
+            Assert.That(angle, Is.GreaterThanOrEqualTo(previousAngle - 0.01f));
+            previousAngle = angle;
+            Assert.That(Vector3.Distance(p, new Vector3(1, 0, 3)), Is.EqualTo(1f).Within(0.01f));
+
+            // 쿼드 = 같은 정사각형을 돌린 것 — 변·대각선 길이가 어디서나 같다(찌그러짐·전단 없음).
+            var c00 = LobbyFloorDashBeltLayout.IconCorner(p, t, -0.4f, -0.4f);
+            var c01 = LobbyFloorDashBeltLayout.IconCorner(p, t, -0.4f, 0.4f);
+            var c10 = LobbyFloorDashBeltLayout.IconCorner(p, t, 0.4f, -0.4f);
+            var c11 = LobbyFloorDashBeltLayout.IconCorner(p, t, 0.4f, 0.4f);
+            Assert.That(Vector3.Distance(c00, c01), Is.EqualTo(0.8f).Within(Eps));
+            Assert.That(Vector3.Distance(c00, c10), Is.EqualTo(0.8f).Within(Eps));
+            Assert.That(Vector3.Distance(c10, c11), Is.EqualTo(0.8f).Within(Eps));
+            Assert.That(Vector3.Distance(c00, c11), Is.EqualTo(0.8f * Mathf.Sqrt(2f)).Within(Eps));
+            Assert.That(Vector3.Distance(c01, c10), Is.EqualTo(0.8f * Mathf.Sqrt(2f)).Within(Eps));
+        }
+
+        Assert.That(previousAngle, Is.GreaterThan(80f));
+    }
+
+    [Test]
+    public void 직선_쿼드는_예전_띠와_같은_축()
+    {
+        // +Z 진행: 진행 방향 = +Z(U), 왼쪽 = -X(V1). 예전 띠 UV 의 아이콘 칸과 같은 자리.
+        var c = LobbyFloorDashBeltLayout.IconCorner(new Vector3(0, 0, 2), Vector3.forward, 0.5f, 0.5f);
+        AssertNear(c, new Vector3(-0.5f, 0, 2.5f));
+    }
+
+    [Test]
+    public void 마이터_꺾임은_같은_자리에_표본_둘()
+    {
+        var d = Path(0f, 128, Vector3.zero, new Vector3(0, 0, 4), new Vector3(3, 0, 4));
+        Assert.That(d.Positions.Count, Is.EqualTo(4));
+        Assert.That(d.Positions[1].w, Is.EqualTo(4f).Within(Eps));
+        Assert.That(d.Positions[2].w, Is.EqualTo(4f).Within(Eps));
+        AssertNear(d.Tangents[1], Vector3.forward);
+        AssertNear(d.Tangents[2], Vector3.right);
+
+        // 꺾임 앞뒤 직선 구간에서 방향이 섞이지 않는다.
+        d.Sample(3.9f, out _, out var before);
+        d.Sample(4.1f, out _, out var after);
+        AssertNear(before, Vector3.forward);
+        AssertNear(after, Vector3.right);
+    }
+
+    [Test]
+    public void 경로_밖은_끝_방향으로_곧게_늘인다()
+    {
+        var d = Path(0.5f, 128, Vector3.zero, new Vector3(0, 0, 4), new Vector3(3, 0, 4));
+        d.Sample(-0.5f, out var p0, out var t0);
+        AssertNear(p0, new Vector3(0, 0, -0.5f));
+        AssertNear(t0, Vector3.forward);
+        d.Sample(d.Length + 0.5f, out var p1, out var t1);
+        AssertNear(p1, new Vector3(3.5f, 0, 4));
+        AssertNear(t1, Vector3.right);
+    }
+
+    [Test]
+    public void 표본이_넘치면_같은_간격으로_다시_뽑는다()
+    {
+        var d = Path(1f, 8, Vector3.zero, new Vector3(0, 0, 4), new Vector3(4, 0, 4), new Vector3(4, 0, 0));
+        Assert.That(d.Positions.Count, Is.EqualTo(8));
+        Assert.That(d.Positions[0].w, Is.EqualTo(0f).Within(Eps));
+        Assert.That(d.Positions[7].w, Is.EqualTo(d.Length).Within(Eps));
+        for (var i = 1; i < 8; i++)
+            Assert.That(d.Positions[i].w - d.Positions[i - 1].w, Is.EqualTo(d.Length / 7f).Within(Eps));
+    }
+
+    [Test]
+    public void 아이콘_중심과_번호는_예전_띠_UV_와_같다()
+    {
+        // 예전: 칸 n 의 아이콘 중심 = n + 흐름 + 0.5(칸 단위). 흘러도 같은 n 은 같은 맥동 위상.
+        foreach (var flow in new[] { 0f, 0.3f, 1.7f, -2.4f, 12.99f })
+        {
+            var count = LobbyFloorDashBeltLayout.IconQuadCount(5.5f, 1f);
+            var lastCenter = float.NegativeInfinity;
+            for (var q = 0; q < count; q++)
+            {
+                var x = LobbyFloorDashBeltLayout.IconCenterCells(q, flow, out var n);
+                Assert.That(x, Is.EqualTo(n + flow + 0.5f).Within(Eps), $"flow {flow} quad {q}");
+                Assert.That(n, Is.EqualTo(Mathf.Round(n)));
+                Assert.That(x, Is.GreaterThan(lastCenter)); // 쿼드 순서 = 경로 순서
+                lastCenter = x;
+                Assert.That(x, Is.GreaterThanOrEqualTo(-0.5f - Eps));
+                Assert.That(x, Is.LessThan(count - 0.5f));
+            }
+        }
+    }
+
+    [Test]
+    public void 쿼드_수는_양_끝에_걸친_아이콘까지_덮는다()
+    {
+        foreach (var length in new[] { 0.3f, 1f, 4f, 5.5f, 17.25f })
+        foreach (var spacing in new[] { 0.5f, 1f, 1.3f })
+        {
+            var count = LobbyFloorDashBeltLayout.IconQuadCount(length, spacing);
+            // 흐름 소수부 0 일 때 마지막 중심 = count - 1.5 — 끝(길이/간격)에서 반 칸 넘게 걸친 아이콘까지 있어야 한다.
+            var last = LobbyFloorDashBeltLayout.IconCenterCells(count - 1, 0f, out _);
+            Assert.That(last, Is.GreaterThanOrEqualTo(length / spacing + 0.5f - Eps), $"length {length} spacing {spacing}");
+            Assert.That(LobbyFloorDashBeltLayout.IconCenterCells(0, 0.999f, out _), Is.LessThanOrEqualTo(0.5f));
+        }
+    }
+
     private static void AssertNear(Vector3 actual, Vector3 expected)
     {
         Assert.That(Vector3.Distance(actual, expected), Is.LessThan(1e-3f), $"actual {actual} expected {expected}");

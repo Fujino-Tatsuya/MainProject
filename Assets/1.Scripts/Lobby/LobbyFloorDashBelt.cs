@@ -8,10 +8,12 @@ using UnityEditor;
 /// 경로형 로비 바닥 대시 벨트(할 일 257) — 시작점·경유지·도착점을 잇는 꺾은선을 따라 하나로 이어진 띠를 깔고,
 /// 그 위에 대시 아이콘(»)을 <see cref="iconSpacing"/> 간격으로 반복해 맥동하며 아주 느리게 경로를 따라 흘린다.
 /// <list type="bullet">
-/// <item>띠 메시 = <see cref="LobbyFloorDashBeltLayout"/>(꺾임은 둥근 모서리 <see cref="cornerRadius"/>, 0 = 마이터). U = 누적 경로 길이라 아이콘이 꺾임을 지나 계속 흐르고 그 자리 진행 방향을 가리킨다.</item>
+/// <item>한 메시 = 띠 바탕(<see cref="LobbyFloorDashBeltLayout"/>, 꺾임은 둥근 모서리 <see cref="cornerRadius"/>, 0 = 마이터) + 아이콘 쿼드 고정 개수
+/// (<see cref="LobbyFloorDashBeltLayout.IconQuadCount"/>). 아이콘은 띠 UV 로 찍지 않고 쿼드마다 경로 위 호 길이 자리에서 그 자리 접선으로 돌려 세운다
+/// — 코너에서 찌그러지지 않고 회전만 한다(257 보완).</item>
 /// <item>🔴 메시는 켜질 때 한 번, 에디터에서 점·값이 바뀔 때만 다시 만든다(매 프레임 생성 없음). 메시와 그것을 그리는 자식은 저장하지 않는다(HideAndDontSave)
 /// — 씬·프리팹에 구운 메시가 남지 않아 diff 가 없다.</item>
-/// <item>흐름·맥동 = 셰이더 Lobby/FloorDashBelt 가 _Time 으로. 수치 = <see cref="MaterialPropertyBlock"/>(머티리얼 복제 없음).</item>
+/// <item>흐름·맥동·아이콘 위치/회전 = 셰이더 Lobby/FloorDashBelt 가 _Time 과 경로 표본 배열로. 수치·경로 표본 = <see cref="MaterialPropertyBlock"/>(머티리얼 복제 없음).</item>
 /// <item>늘 켜져 있다 — 배치·튜토리얼 연결은 아직 없음.</item>
 /// </list>
 /// 상세: Docs/tech/lobby-training.md "대시 벨트".
@@ -26,8 +28,13 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int BeltColorId = Shader.PropertyToID("_BeltColor");
-    private static readonly int TilingId = Shader.PropertyToID("_Tiling");
-    private static readonly int IconScaleUvId = Shader.PropertyToID("_IconScaleUV");
+    private static readonly int PathLengthId = Shader.PropertyToID("_PathLength");
+    private static readonly int SpacingId = Shader.PropertyToID("_Spacing");
+    private static readonly int IconSizeId = Shader.PropertyToID("_IconSize");
+    private static readonly int WidthId = Shader.PropertyToID("_Width");
+    private static readonly int PathPointsId = Shader.PropertyToID("_PathPoints");
+    private static readonly int PathTangentsId = Shader.PropertyToID("_PathTangents");
+    private static readonly int PathCountId = Shader.PropertyToID("_PathCount");
     private static readonly int IconRotationId = Shader.PropertyToID("_IconRotation");
     private static readonly int ScrollSpeedId = Shader.PropertyToID("_ScrollSpeed");
     private static readonly int PulseSpeedId = Shader.PropertyToID("_PulseSpeed");
@@ -97,8 +104,13 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
 
     private static readonly List<Vector3> PointBuffer = new List<Vector3>();
     private static readonly List<Vector3> CenterBuffer = new List<Vector3>();
+    private static readonly List<Vector3> TangentInBuffer = new List<Vector3>();
+    private static readonly List<Vector3> TangentOutBuffer = new List<Vector3>();
+    private static readonly List<Vector4> SamplePositionBuffer = new List<Vector4>();
+    private static readonly List<Vector4> SampleTangentBuffer = new List<Vector4>();
     private static readonly List<Vector3> VertexBuffer = new List<Vector3>();
     private static readonly List<Vector2> UvBuffer = new List<Vector2>();
+    private static readonly List<Vector2> KindBuffer = new List<Vector2>();
     private static readonly List<int> TriangleBuffer = new List<int>();
 
     private MaterialPropertyBlock _block;
@@ -106,33 +118,29 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
     private MeshFilter _filter;
     private MeshRenderer _renderer;
     private float _pathLength;
+    private int _iconQuadCount;
     private int _builtHash;
+    // 셰이더 배열은 늘 같은 길이로 넘긴다(처음 넘긴 길이로 굳는다). 인스턴스마다 한 번만 만든다.
+    private Vector4[] _pathPoints;
+    private Vector4[] _pathTangents;
+    private int _pathCount;
 #if UNITY_EDITOR
     private bool _built;
 #endif
 
-    /// <summary>띠를 그리는 렌더러(저장 안 되는 숨은 자식). 아직 안 만들었으면 null.</summary>
+    /// <summary>띠·아이콘을 그리는 렌더러(저장 안 되는 숨은 자식). 아직 안 만들었으면 null.</summary>
     public MeshRenderer BeltRenderer => _renderer;
 
     /// <summary>둥근 모서리까지 반영한 중심선 길이(m).</summary>
     public float PathLength => _pathLength;
 
-    /// <summary>길이 방향 칸 수(셰이더 _Tiling) — 경로 길이에 비례해 아이콘 개수가 는다.</summary>
-    public static float TilingFor(float length, float iconSpacing)
-    {
-        return Mathf.Max(0.01f, length / Mathf.Max(0.05f, iconSpacing));
-    }
+    /// <summary>아이콘 쿼드 수(고정) — 경로 길이에 비례해 아이콘 개수가 는다.</summary>
+    public int IconQuadCount => _iconQuadCount;
 
     /// <summary>m/초 흐름을 셰이더 단위(칸/초)로 — 간격이 바뀌어도 같은 실제 속도.</summary>
     public static float ScrollCellsPerSecond(float flowSpeed, float iconSpacing)
     {
         return flowSpeed / Mathf.Max(0.05f, iconSpacing);
-    }
-
-    /// <summary>아이콘 크기를 칸 UV 비율로(x = 길이 방향 / 간격, y = 폭 방향 / 폭) — 정사각 아이콘이 찌그러지지 않게.</summary>
-    public static Vector2 IconScaleUv(float iconSize, float iconSpacing, float width)
-    {
-        return new Vector2(iconSize / Mathf.Max(0.05f, iconSpacing), iconSize / Mathf.Max(0.05f, width));
     }
 
     private void OnEnable()
@@ -147,7 +155,7 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
             DestroyImmediateOrDeferred(_mesh);
     }
 
-    /// <summary>지금 점·값으로 띠 메시를 다시 만든다(켜질 때, 에디터에서 바뀔 때만).</summary>
+    /// <summary>지금 점·값으로 띠·아이콘 메시와 경로 표본을 다시 만든다(켜질 때, 에디터에서 바뀔 때만).</summary>
     [ContextMenu("다시 만들기")]
     public void Rebuild()
     {
@@ -158,17 +166,60 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
         EnsureMeshObject();
 
         CollectPoints(PointBuffer);
-        LobbyFloorDashBeltLayout.BuildCenterline(PointBuffer, cornerRadius, ArcStepDegrees, CenterBuffer);
+        LobbyFloorDashBeltLayout.BuildCenterline(PointBuffer, cornerRadius, ArcStepDegrees, CenterBuffer, TangentInBuffer, TangentOutBuffer);
         var up = Vector3.up * heightOffset;
         for (var i = 0; i < CenterBuffer.Count; i++)
             CenterBuffer[i] += up;
         _pathLength = LobbyFloorDashBeltLayout.BuildRibbon(CenterBuffer, width, MaxMiter, VertexBuffer, UvBuffer, TriangleBuffer);
+        KindBuffer.Clear();
+        for (var i = 0; i < VertexBuffer.Count; i++)
+            KindBuffer.Add(Vector2.zero);
+
+        // 경로 표본(셰이더 배열) — 아이콘 위치·접선을 정점 셰이더가 여기서 찾는다.
+        LobbyFloorDashBeltLayout.BuildPathSamples(CenterBuffer, TangentInBuffer, TangentOutBuffer,
+            LobbyFloorDashBeltLayout.MaxPathSamples, SamplePositionBuffer, SampleTangentBuffer);
+        _pathPoints ??= new Vector4[LobbyFloorDashBeltLayout.MaxPathSamples];
+        _pathTangents ??= new Vector4[LobbyFloorDashBeltLayout.MaxPathSamples];
+        _pathCount = SamplePositionBuffer.Count;
+        for (var i = 0; i < _pathPoints.Length; i++)
+        {
+            _pathPoints[i] = i < _pathCount ? SamplePositionBuffer[i] : Vector4.zero;
+            _pathTangents[i] = i < _pathCount ? SampleTangentBuffer[i] : Vector4.zero;
+        }
+
+        // 아이콘 쿼드 — 띠 뒤에 붙여 한 번의 그리기에서 바탕 위에 덮인다. 자리는 셰이더가 정하므로 여기선 꼭짓점 부호·쿼드 번호만.
+        _iconQuadCount = TriangleBuffer.Count > 0 ? LobbyFloorDashBeltLayout.IconQuadCount(_pathLength, iconSpacing) : 0;
+        var placeholder = CenterBuffer.Count > 0 ? CenterBuffer[0] : Vector3.zero;
+        for (var q = 0; q < _iconQuadCount; q++)
+        {
+            var b = VertexBuffer.Count;
+            for (var corner = 0; corner < 4; corner++)
+            {
+                VertexBuffer.Add(placeholder);
+                UvBuffer.Add(new Vector2(corner < 2 ? -1f : 1f, (corner & 1) == 0 ? -1f : 1f)); // (진행 방향, 왼쪽) 부호
+                KindBuffer.Add(new Vector2(1f, q));
+            }
+
+            TriangleBuffer.Add(b);
+            TriangleBuffer.Add(b + 1);
+            TriangleBuffer.Add(b + 3);
+            TriangleBuffer.Add(b);
+            TriangleBuffer.Add(b + 3);
+            TriangleBuffer.Add(b + 2);
+        }
 
         _mesh.Clear();
         _mesh.SetVertices(VertexBuffer);
         _mesh.SetUVs(0, UvBuffer);
+        _mesh.SetUVs(1, KindBuffer);
         _mesh.SetTriangles(TriangleBuffer, 0);
-        _mesh.RecalculateBounds();
+        // 아이콘 꼭짓점은 셰이더가 옮긴다 — 띠 범위에 아이콘이 넘칠 만큼 여유를 둔다(컬링에 안 걸리게).
+        var ribbonVertexCount = VertexBuffer.Count - _iconQuadCount * 4;
+        var bounds = new Bounds(placeholder, Vector3.zero);
+        for (var i = 0; i < ribbonVertexCount; i++)
+            bounds.Encapsulate(VertexBuffer[i]);
+        bounds.Expand(2f * (iconSize + iconSpacing));
+        _mesh.bounds = bounds;
         _renderer.enabled = TriangleBuffer.Count > 0;
         _renderer.sharedMaterial = material;
 
@@ -228,13 +279,20 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
         if (_renderer == null)
             return;
 
-        var iconUv = IconScaleUv(iconSize, iconSpacing, width);
         _block ??= new MaterialPropertyBlock();
         _renderer.GetPropertyBlock(_block);
         _block.SetColor(BaseColorId, iconColor);
         _block.SetColor(BeltColorId, beltColor);
-        _block.SetFloat(TilingId, TilingFor(_pathLength, iconSpacing));
-        _block.SetVector(IconScaleUvId, new Vector4(iconUv.x, iconUv.y, 0f, 0f));
+        _block.SetFloat(PathLengthId, _pathLength);
+        _block.SetFloat(SpacingId, Mathf.Max(0.05f, iconSpacing));
+        _block.SetFloat(IconSizeId, iconSize);
+        _block.SetFloat(WidthId, width);
+        if (_pathPoints != null)
+        {
+            _block.SetVectorArray(PathPointsId, _pathPoints);
+            _block.SetVectorArray(PathTangentsId, _pathTangents);
+            _block.SetFloat(PathCountId, _pathCount);
+        }
         _block.SetFloat(IconRotationId, iconRotation);
         _block.SetFloat(ScrollSpeedId, ScrollCellsPerSecond(flowSpeed, iconSpacing));
         _block.SetFloat(PulseSpeedId, pulseSpeed);
@@ -279,6 +337,8 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
             Add(width);
             Add(cornerRadius);
             Add(heightOffset);
+            Add(iconSpacing); // 아이콘 쿼드 수
+            Add(iconSize); // 메시 범위 여유
             h = h * 31 + (material != null ? material.GetInstanceID() : 0);
             return h;
         }
@@ -330,7 +390,8 @@ public sealed class LobbyFloorDashBelt : MonoBehaviour
         Gizmos.color = new Color(0.3f, 0.85f, 1f, 1f);
         Gizmos.matrix = transform.localToWorldMatrix;
         var vertices = _mesh.vertices;
-        for (var i = 2; i < vertices.Length; i++)
+        var ribbonCount = vertices.Length - _iconQuadCount * 4; // 뒤쪽 아이콘 쿼드 꼭짓점은 셰이더가 옮기므로 뺀다
+        for (var i = 2; i < ribbonCount; i++)
             Gizmos.DrawLine(vertices[i - 2], vertices[i]);
         Gizmos.matrix = Matrix4x4.identity;
     }
