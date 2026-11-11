@@ -33,12 +33,15 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         [System.NonSerialized] public bool grayedByTrait;  // 특성이 슬롯을 못 쓰게 했다(절제된 분노 = R) — 칸은 두고 아이콘만 회색조(할 일 133 숨김 → 237)
         [System.NonSerialized] public Material iconMaterial;          // 회색조 전 원래 재질(프리팹 값, 보통 null = UI 기본)
         [System.NonSerialized] public Material cooldownIconMaterial;
+        [System.NonSerialized] public CooldownIconFeedback feedback;   // 쿨다운 아이콘 연출(할 일 259)
     }
 
     [SerializeField] private SlotWidget[] slots;
     [SerializeField] private Color blockedColor = new Color(0.35f, 0.35f, 0.35f, 0.75f);
     [Tooltip("특성으로 못 쓰게 된 칸(절제된 분노 = R) 아이콘에 끼울 회색조 재질 — MA_UIGrayscale(셰이더 UI/Grayscale). 비면 색을 빼지 않는다.")]
     [SerializeField] private Material grayscaleIconMaterial;
+    [Tooltip("쿨다운 아이콘 연출(할 일 259) — 쿨다운 중 어둡게·끝나는 순간 펄스·번쩍. 슬롯 4개 공용.")]
+    [SerializeField] private CooldownIconFeedbackSettings cooldownFeedback = new CooldownIconFeedbackSettings();
 
     private PlayerSkillController skillController;
     private AssassinState assassinState;
@@ -63,6 +66,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             skillController.SlotBindingChanged += HandleSlotBindingChanged;
 
         BindTooltipSlots(player);
+        ResetCooldownFeedback();
         Refresh();
     }
 
@@ -76,6 +80,22 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
     private void OnDisable()
     {
         KeyBindingConfig.Changed -= HandleKeyBindingsChanged;
+
+        if (slots == null)
+            return;
+
+        foreach (SlotWidget widget in slots)
+            widget?.feedback?.Stop();
+    }
+
+    // 바인딩이 바뀐 프레임의 남은 쿨 변화를 '끝남' 으로 읽지 않게 기준을 새로 잡는다.
+    private void ResetCooldownFeedback()
+    {
+        if (slots == null)
+            return;
+
+        foreach (SlotWidget widget in slots)
+            widget?.feedback?.ResetBaseline();
     }
 
     private void HandleKeyBindingsChanged() => BindTooltipSlots(boundPlayer);
@@ -248,6 +268,9 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             }
 
             widget.cooldownBody.Apply(widget.cooldownFill, total > 0f ? remaining / total : 0f);
+
+            widget.feedback ??= new CooldownIconFeedback(widget.icon);
+            widget.feedback.Tick(remaining > 0f, cooldownFeedback, Time.unscaledDeltaTime);
 
             if (widget.remainingText != null)
             {

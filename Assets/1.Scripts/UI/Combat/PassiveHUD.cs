@@ -35,8 +35,12 @@ public class PassiveHUD : MonoBehaviour
     [SerializeField] private Color readyColor = Color.white;
     [SerializeField] private Color cooldownColor = new Color(1f, 1f, 1f, 0.4f);
 
+    [Tooltip("쿨다운 아이콘 연출(할 일 259) — 쿨다운 중 어둡게·끝나는 순간 펄스·번쩍. 위 readyColor/cooldownColor 와 따로 곱해진다(덮개).")]
+    [SerializeField] private CooldownIconFeedbackSettings cooldownFeedback = new CooldownIconFeedbackSettings();
+
     private IPlayerPassive passive;
     private ISkillTooltipSource tooltipSource;
+    private CooldownIconFeedback feedback;
 
     public void Bind(Player player)
     {
@@ -57,7 +61,13 @@ public class PassiveHUD : MonoBehaviour
             displayKey: DisplayKey,
             cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null,
             fallbackIcon: icon != null ? icon.sprite : null);
+        feedback?.ResetBaseline();   // 바인딩이 바뀐 프레임의 남은 쿨 변화를 '끝남' 으로 읽지 않는다
         Refresh();
+    }
+
+    private void OnDisable()
+    {
+        feedback?.Stop();
     }
 
     private void Update()
@@ -79,6 +89,12 @@ public class PassiveHUD : MonoBehaviour
         }
 
         cooldownBody.Apply(cooldownFill, total > 0f ? remaining / total : 0f);
+
+        if (icon != null)
+        {
+            feedback ??= new CooldownIconFeedback(icon);
+            feedback.Tick(remaining > 0f, cooldownFeedback, Time.unscaledDeltaTime);
+        }
 
         if (icon != null)
             icon.color = passive == null && tooltipSource != null
