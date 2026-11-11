@@ -1,0 +1,226 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aca0e2726a4a76d24415043ca9f5a9d1, type: 3}
+  m_Name: BossVictoryProfile_Gunner
+  m_EditorClassIdentifier: Assembly-CSharp::BossVictoryProfile
+  killerCurrentActionScale: 0.5
+  killerAfterFinisherScale: 0.1
+  otherPlayersScale: 0.05
+  bossAfterFinisherScale: 0.1
+  finisherSlot: 3
+  backDashDistance: 4
+  backDashDuration: 0.5
+  backDashEase: 3
+  backDashAngle: -30
+  backDashIdleDelay: 0.35
+  timeline:
+    desaturate:
+    - start: 0.105
+      length: 5.495
+      fadeIn: 0.09
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.016378526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+    amber:
+    - start: 0.3
+      length: 5.3
+      fadeIn: 0.15
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.028301883
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+    scanline:
+    - start: 0.105
+      length: 5.495
+      fadeIn: 0.09
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.016378526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+    bossNoise:
+    - start: 0.12
+      length: 5.48
+      fadeIn: 0.05
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.009124088
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+    tear:
+    - start: 0.09
+      length: 0.16
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.65625
+        value: 1
+        curve: 0
+      - u: 0.6875
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+    - start: 0.32
+      length: 0.09
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.111111104
+        value: 1
+        curve: 0
+      - u: 0.111111164
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+    smear:
+    - start: 0.09
+      length: 0.16
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.65625
+        value: 1
+        curve: 0
+      - u: 0.6875
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+    - start: 0.32
+      length: 0.09
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.111111104
+        value: 1
+        curve: 0
+      - u: 0.111111164
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+    hudHide:
+    - start: 0.08
+      length: 5.52
+      fadeIn: 0.04
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.0072463765
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+    crtOff: []
+    cameraCut:
+    - start: 0.96
+      length: 4.64
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+    cameraCutShots:
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 1.6458317, y: 0.7546348, z: -5.37314}
+        rotation: {x: -0.027950438, y: -0.12646225, z: -0.0036580502, w: 0.9915709}
+        fov: 60.000004
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 0
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
+    killerAction:
+    - start: 0
+      length: 0.2
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+    focusKillerTime: 0.2
+    hideOthersTime: 0.2
+    lobbyTransitionTime: 5.6
+    backDashStartTime: 0.2
+    finisherStartTime: 0.65
+    finisherTrimSeconds: 4.9333334
+    slowStartTime: 1.83
+    bossHitAnimTime: 0.2
+    bossHitTrimSeconds: 0
+    bossFreezeTime: 0
+    bossSlowTime: 0.2
+    killerActionEndTime: 0
