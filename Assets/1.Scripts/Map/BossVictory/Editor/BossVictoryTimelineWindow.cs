@@ -354,6 +354,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         EditorGUI.DrawRect(r, baseColor * (selected ? 1f : 0.75f));
         if (BossVictoryTimeline.HasFades(track)) DrawEnvelope(r, clip);
         if (BossVictoryTimeline.IsUvScroll(track)) DrawUvScroll(r, clip);
+        if (BossVictoryTimeline.IsBob(track))
+            GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
+                $"±{clip.bobAmplitude:0.##}% · {clip.bobPeriod:0.##}s", EditorStyles.miniLabel);
         if (track == BossVictoryTrack.CameraCut)
         {
             EditorGUI.DrawRect(new Rect(r.x, r.y, 2f, r.height), Color.white);   // 컷 = 시작 순간
@@ -1220,7 +1223,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     bool CanAdd(BossVictoryTrack track) =>
         BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Single || Timeline.Clips(track).Count == 0;
 
-    static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.IsUvScroll(track)
+    static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.IsBob(track)
+        ? new BossVictoryClip { start = start, length = 2f, fadeIn = 0.2f, fadeOut = 0.3f, weight = 1f,
+            bobAmplitude = BossVictoryTimeline.DefaultBobAmplitude, bobPeriod = BossVictoryTimeline.DefaultBobPeriod, bobPhase = 0.25f }   // 레퍼런스 값(꼭대기에서 출발)
+        : BossVictoryTimeline.IsUvScroll(track)
         ? new BossVictoryClip { start = start, length = 1f, weight = 1f, uvFrom = 0f, uvTo = 1f, uvEase = BossVictoryKeyCurve.EaseInOut }   // 노이즈 한 장 위로, ease in/out
         : BossVictoryTimeline.StartFixed(track)
         ? BossVictoryClip.Make(0f, Mathf.Max(MinLength, start))   // 처치자 평타 — 누른 시각 = 끝
@@ -1453,6 +1459,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             c.uvFrom = EditorGUILayout.FloatField(new GUIContent("시작 오프셋(UV)", "노이즈 텍스처 V 오프셋 — 1 = 한 장. 텍스처가 Repeat 라 넘어가면 감긴다."), c.uvFrom);
             c.uvTo = EditorGUILayout.FloatField(new GUIContent("끝 오프셋(UV)", "클립 끝 이후에도 이 값 유지 — 다음 클립은 여기에 더해진다."), c.uvTo);
             c.uvEase = (BossVictoryKeyCurve)EditorGUILayout.Popup("이징", (int)c.uvEase, KeyCurveLabels);
+        }
+        if (BossVictoryTimeline.IsBob(track))
+        {
+            c.bobAmplitude = EditorGUILayout.FloatField(new GUIContent("진폭(화면 높이 %)", "+ = 화면 내용이 위로. 레퍼런스 0.22."), c.bobAmplitude);
+            c.bobPeriod = Mathf.Max(0f, EditorGUILayout.FloatField(new GUIContent("주기(초)", "레퍼런스 1.6."), c.bobPeriod));
+            c.bobPhase = EditorGUILayout.Slider(new GUIContent("시작 위상(주기)", "0 = 가운데에서 위로 출발 · 0.25 = 꼭대기에서 출발."), c.bobPhase, 0f, 1f);
+            c.bobDamping = Mathf.Max(0f, EditorGUILayout.FloatField(new GUIContent("감쇠(1/초)", "e^(−감쇠·경과). 0 = 그대로 · 2 = 0.35초마다 절반."), c.bobDamping));
         }
         if (EditorGUI.EndChangeCheck())
         {
@@ -1735,6 +1748,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             case BossVictoryTrack.NoiseScrollV:
                 EditorGUILayout.LabelField("보스 노이즈 텍스처 UV 를 수직으로 옮긴다(_NoiseST.w = 카메라 이동 누적 + 이 값). 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함. + = 위(카메라 위 이동과 같은 방향). 노이즈가 보이려면 '보스 노이즈' 세기 클립이 켜져 있어야 한다.", EditorStyles.wordWrappedMiniLabel);
                 DrawSettingsFields("보스 노이즈 모양", nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseTiling));
+                break;
+            case BossVictoryTrack.CameraBob:
+                EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);
                 break;
             case BossVictoryTrack.GroundCircle:
                 EditorGUILayout.LabelField("카메라 바로 아래 바닥(매 프레임 따라감, 높이 = 처치자 발 — '카메라 처치자로' 마커 전엔 처치자 발밑) 둘레 배경을 호박색 대신 흑백으로(246 복원). 반경 = 아래 반경 × 클립 세기 — 세기 키가 0 → 1 로 올라가는 동안 원이 커진다. 흑백·노란 틴트가 들어온 만큼만 보인다. 모양 값은 모든 캐릭터 공용.", EditorStyles.wordWrappedMiniLabel);

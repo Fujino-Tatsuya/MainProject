@@ -241,4 +241,41 @@ public sealed class BossVictoryTimelineTests
         Assert.AreEqual(new Vector3(10f, 2f, -4f), BossVictoryTimeline.GroundCircleCenter(3f, 0.2f, killer, true, cam));
         Assert.AreEqual(killer, BossVictoryTimeline.GroundCircleCenter(3f, 0.2f, killer, false, cam), "카메라 없음 = 처치자");
     }
+
+    // ── 카메라 두둥실(267 후속) ──
+
+    [Test]
+    public void 카메라_두둥실은_사인_진폭_주기_감쇠_세기_곱()
+    {
+        var c = new BossVictoryClip { start = 1f, length = 4f, weight = 1f, bobAmplitude = 0.5f, bobPeriod = 2f };
+        Assert.AreEqual(0f, c.BobOffset(0.5f), 1e-6f, "클립 밖");
+        Assert.AreEqual(0f, c.BobOffset(1f), 1e-5f, "위상 0 = 가운데 출발");
+        Assert.AreEqual(0.5f, c.BobOffset(1.5f), 1e-5f, "1/4 주기 = 꼭대기");
+        Assert.AreEqual(-0.5f, c.BobOffset(2.5f), 1e-5f, "3/4 주기 = 바닥");
+        c.bobPhase = 0.25f;
+        Assert.AreEqual(0.5f, c.BobOffset(1f), 1e-5f, "위상 0.25 = 꼭대기 출발");
+        c.bobDamping = 1f;
+        Assert.AreEqual(0.5f * Mathf.Exp(-2f), c.BobOffset(3f), 1e-5f, "감쇠 e^(−1·2)");
+        c.bobDamping = 0f; c.weight = 0.5f;
+        Assert.AreEqual(0.25f, c.BobOffset(1f), 1e-5f, "세기 곱");
+        c.bobPeriod = 0f;
+        Assert.AreEqual(0f, c.BobOffset(2f), 1e-6f, "주기 0 = 없음");
+    }
+
+    [Test]
+    public void 카메라_두둥실_클립끼리_더하고_복사는_추가()
+    {
+        var tl = new BossVictoryTimeline();
+        Assert.AreEqual(0f, tl.CameraBobOffset(1f));
+        tl.cameraBob.Add(new BossVictoryClip { start = 0f, length = 4f, weight = 1f, bobAmplitude = 0.2f, bobPeriod = 2f, bobPhase = 0.25f });
+        tl.cameraBob.Add(new BossVictoryClip { start = 0f, length = 4f, weight = 1f, bobAmplitude = 0.1f, bobPeriod = 2f, bobPhase = 0.25f });
+        Assert.AreEqual(0.3f, tl.CameraBobOffset(0f), 1e-5f);
+        Assert.IsTrue(BossVictoryTimeline.IsBob(BossVictoryTrack.CameraBob));
+        Assert.IsTrue(BossVictoryTimeline.HasFades(BossVictoryTrack.CameraBob), "들어오고 나감 = 세기 키");
+        var dst = new BossVictoryTimeline();
+        dst.CopyClipFrom(tl, BossVictoryTrack.CameraBob, 1);
+        dst.CopyClipFrom(tl, BossVictoryTrack.CameraBob, 0);
+        Assert.AreEqual(2, dst.cameraBob.Count);
+        Assert.AreEqual(0.2f, dst.cameraBob[1].bobAmplitude, 1e-6f);
+    }
 }

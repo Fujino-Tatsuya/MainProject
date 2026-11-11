@@ -17,6 +17,7 @@ public enum BossVictoryTrack
     KillerAction, // 처치자 평타 — 첫 클립만, 시작 0 고정, 끝 = 처치 순간 하던 동작을 끊는 시각(없으면 자기 클립 끝까지 — 255 후속 4)
     NoiseScrollV, // 보스 노이즈 UV 수직 이동 — 클립 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함(267 후속). 노이즈 텍스처 V 오프셋(_NoiseST.w)
     GroundCircle, // 발밑 회색 원(246 복원 — 267 후속) — 세기 = 반경 비율(설정 SO groundCircleRadius × 세기). 원 안 배경은 호박색 대신 흑백
+    CameraBob,    // 카메라 두둥실(267 후속) — 화면 세로 흔들림 = 세기 × 진폭(화면 높이 %) × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영 행렬 세로 이동(카메라 위치는 안 건드림)
 }
 
 /// <summary>보스 처치 연출 타임라인 순간 마커.</summary>
@@ -52,6 +53,11 @@ public struct BossVictoryClip
     public float uvFrom;
     public float uvTo;
     public BossVictoryKeyCurve uvEase;
+    /// <summary>[카메라 두둥실 트랙만] 진폭(화면 높이 %, + = 화면 내용이 위로)·주기(초)·시작 위상(0~1 주기)·감쇠(1/초) — 267 후속.</summary>
+    public float bobAmplitude;
+    public float bobPeriod;
+    public float bobPhase;
+    public float bobDamping;
 
     public float End => start + length;
 
@@ -96,6 +102,16 @@ public struct BossVictoryClip
         return Mathf.LerpUnclamped(uvFrom, uvTo, BossVictoryKeys.Ease(uvEase, (t - start) / length));
     }
 
+    /// <summary>[카메라 두둥실] 시각 t 의 화면 세로 오프셋(화면 높이 %) — 세기(키·페이드) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 클립 밖 0.</summary>
+    public float BobOffset(float t)
+    {
+        float w = Evaluate(t);
+        if (w <= 0f || bobAmplitude == 0f) return 0f;
+        float e = t - start;
+        float wave = bobPeriod > 0.0001f ? Mathf.Sin(2f * Mathf.PI * (e / bobPeriod + bobPhase)) : 0f;
+        return w * bobAmplitude * Mathf.Exp(-Mathf.Max(0f, bobDamping) * e) * wave;
+    }
+
     static float Smooth(float x)
     {
         x = Mathf.Clamp01(x);
@@ -129,6 +145,8 @@ public sealed class BossVictoryTimeline
     public List<BossVictoryClip> killerAction = new List<BossVictoryClip>();
     /// <summary>보스 노이즈 UV 수직 이동 클립(267 후속) — <see cref="NoiseScrollV"/>.</summary>
     public List<BossVictoryClip> noiseScrollV = new List<BossVictoryClip>();
+    /// <summary>카메라 두둥실 클립(267 후속) — <see cref="BossVictoryTrack.CameraBob"/>.</summary>
+    public List<BossVictoryClip> cameraBob = new List<BossVictoryClip>();
     /// <summary>발밑 회색 원 클립(246 복원 — 267 후속) — 세기 = 반경 비율. 페이드 인 = 0 → 목표 반경으로 커짐.</summary>
     public List<BossVictoryClip> groundCircle = new List<BossVictoryClip>();
     // 옛 에셋(이 트랙 전)에 기본 원 클립을 한 번 넣었는가 — 넣은 뒤 사용자가 지우면 그대로 둔다(<see cref="SeedGroundCircle"/>).
@@ -176,6 +194,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.CameraCut => cameraCut,
         BossVictoryTrack.KillerAction => killerAction,
         BossVictoryTrack.NoiseScrollV => noiseScrollV ??= new List<BossVictoryClip>(),
+        BossVictoryTrack.CameraBob => cameraBob ??= new List<BossVictoryClip>(),
         BossVictoryTrack.GroundCircle => groundCircle ??= new List<BossVictoryClip>(),
         _ => throw new ArgumentOutOfRangeException(nameof(track)),
     };
@@ -223,6 +242,12 @@ public sealed class BossVictoryTimeline
     public static bool HasFades(BossVictoryTrack track) =>
         track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut && track != BossVictoryTrack.KillerAction && track != BossVictoryTrack.NoiseScrollV;
 
+    /// <summary>카메라 두둥실 트랙인가(세기 키 + 진폭·주기·위상·감쇠 칸 — 267 후속).</summary>
+    public static bool IsBob(BossVictoryTrack track) => track == BossVictoryTrack.CameraBob;
+
+    /// <summary>레퍼런스(ZZZ WIPEOUT 1.3~2.4초 60fps 측정) 기본값 — 진폭 0.22%·주기 1.6초·위상 0·감쇠 0.</summary>
+    public const float DefaultBobAmplitude = 0.22f, DefaultBobPeriod = 1.6f;
+
     /// <summary>값 = UV 오프셋(시작·끝·이징)인 트랙인가(세기 키 없음 — 267 후속).</summary>
     public static bool IsUvScroll(BossVictoryTrack track) => track == BossVictoryTrack.NoiseScrollV;
 
@@ -242,6 +267,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.CameraCut => "카메라 컷",
         BossVictoryTrack.KillerAction => "처치자 평타",
         BossVictoryTrack.NoiseScrollV => "노이즈 UV 수직 이동",
+        BossVictoryTrack.CameraBob => "카메라 두둥실",
         BossVictoryTrack.GroundCircle => "발밑 회색 원",
         _ => track.ToString(),
     };
@@ -266,6 +292,15 @@ public sealed class BossVictoryTimeline
         List<BossVictoryClip> clips = Clips(track);
         float v = 0f;
         for (int i = 0; i < clips.Count; i++) v = Mathf.Max(v, clips[i].Evaluate(t));
+        return v;
+    }
+
+    /// <summary>카메라 두둥실 화면 세로 오프셋(화면 높이 %) = 클립마다 <see cref="BossVictoryClip.BobOffset"/> 의 합(267 후속).</summary>
+    public float CameraBobOffset(float t)
+    {
+        if (cameraBob == null) return 0f;
+        float v = 0f;
+        for (int i = 0; i < cameraBob.Count; i++) v += cameraBob[i].BobOffset(t);
         return v;
     }
 

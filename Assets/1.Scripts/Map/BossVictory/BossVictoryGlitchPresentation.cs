@@ -738,7 +738,23 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
 
         if (_renderOn) SetGlitchFrame(s, tl, t);
+        ApplyCameraBob(tl.CameraBobOffset(t));
         TickMarkers(tl, t);   // 노이즈 UV 누적 뒤 — 카메라 컷이 다음 프레임 누적에서 빠지게
+    }
+
+    // 카메라 두둥실(267 후속) — 투영 행렬 세로 이동(화면 높이 %). 카메라 위치·회전은 안 건드려 컷·추적과 겹치지 않고 누적도 없다.
+    // 시각 t 만으로 정해지는 값(스크럽 OK·모든 피어 같은 화면). 0 이면 원래 투영으로.
+    Camera _bobCam;
+    void ApplyCameraBob(float percent)
+    {
+        Camera cam = Camera.main;
+        if (_bobCam != null && (_bobCam != cam || Mathf.Abs(percent) < 1e-5f)) { _bobCam.ResetProjectionMatrix(); _bobCam = null; }
+        if (cam == null || Mathf.Abs(percent) < 1e-5f) return;
+        cam.ResetProjectionMatrix();
+        Matrix4x4 m = cam.projectionMatrix;
+        m.m12 -= percent * 0.02f;   // NDC 세로 2 = 화면 높이 100% · + = 화면 내용이 위로
+        cam.projectionMatrix = m;
+        _bobCam = cam;
     }
 
     void SetGlitchFrame(BossVictoryGlitchSettings s, BossVictoryTimeline tl, float t)
@@ -1340,6 +1356,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _hudHidden = false;
         DisposeCrt();
         _finished = false;
+        ApplyCameraBob(0f);
         RestoreCuts();
         RestoreMarkers();
         _overlay?.Dispose();   // HUD 복구 · 컷 카메라 나감(블렌드 없음) · 디밍 기준점 복구
