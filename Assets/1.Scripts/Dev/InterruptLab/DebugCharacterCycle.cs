@@ -79,6 +79,15 @@ public sealed class DebugCharacterCycle : MonoBehaviour
     public CharacterRoster Roster => characterRoster;
 
     /// <summary>
+    /// 런타임에 붙일 때 로스터를 넣는다(보스 처치 연출 랩 267 — 그 씬은 빌드 목록에 있어 씬에 디버그 컴포넌트를 두지 않고 랩이 실행 중에 붙인다).
+    /// 이미 로스터가 있으면 그대로.
+    /// </summary>
+    public void SetRosterIfEmpty(CharacterRoster roster)
+    {
+        if (characterRoster == null) characterRoster = roster;
+    }
+
+    /// <summary>
     /// [호스트] 로컬 플레이어를 로스터 캐릭터 <paramref name="characterId"/> 로 바꾼다 — F1 순환과 같은 길(특성 랩 버튼도 이것).
     /// 이미 그 캐릭터면 아무것도 안 하고 false. 클라·연타 간격 안·프리팹 없음도 false.
     /// </summary>

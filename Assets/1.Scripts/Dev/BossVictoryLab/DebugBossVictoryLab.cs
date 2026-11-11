@@ -14,7 +14,7 @@ using UnityEngine;
 /// 랩이 더하는 것: 등장 연출 없이 보스 세우기 · 표시용 팀원(몸뿐인 복제본) · 결과 화면 전환 차단 → 원상복구 → 처음부터 · 배속/일시정지.
 ///
 /// <list type="bullet">
-/// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · 패널 = 자동 반복·배속·막타 각도/거리/방향·팀원 수.</item>
+/// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · F1 = 처치자(내 플레이어) 캐릭터 순환(<see cref="DebugCharacterCycle"/> 재사용 — 랩이 실행 중에 붙인다, 바뀌면 처음부터, 267 캐릭터별 프로필 미리보기) · 패널 = 자동 반복·배속·막타 각도/거리/방향·팀원 수.</item>
 /// <item>처치 연출 = ZZZ 글리치(PLAN-boss-victory-glitch — 처치 판정 즉시 글리치·처치자 하던 동작 ×0.5 → 백대쉬 → 처치 연출 스킬 → 유지 → CRT 꺼짐). 옛 카메라 무빙·프리셋·슬라이더·주황·회색 원은 Legacy(연결 끊음).</item>
 /// <item>타임라인 창(<c>Tools/Boss Victory/처치 연출 타임라인</c>) — 재생 헤드를 끌면 일시정지 + 그 시각 화면 고정, ▶·⏮(= F7). 고친 클립·마커는 SO 에 바로 저장.</item>
 /// <item>끝 = 호스트 화면이 타임라인 로비 전환 마커(기본 = CRT 꺼짐 끝)를 지나 결과 전환 순간 → 랩이 차단하고 원상복구 → 처음부터. 패널은 재생 중 접힌다(CRT 꺼짐 캡처에 안 찍히게 — "패널 숨김" 끄면 계속 보임).</item>
@@ -89,6 +89,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     int _playedSequence = -1;
     float _speed = 1f;
     bool _paused;
+    int _localPlayerId;   // 내 플레이어 오브젝트(F1 캐릭터 교체로 바뀌면 처음부터 — 267)
 
     /// <summary>씬의 랩(타임라인 창 미리보기가 쓴다 — 처음부터·일시정지).</summary>
     public static DebugBossVictoryLab Instance { get; private set; }
@@ -168,6 +169,17 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
             return;
         }
         if (!EnsureDirector()) return;
+        EnsureCharacterCycle(nm);
+
+        // F1(DebugCharacterCycle) 로 내 플레이어가 새 캐릭터로 다시 스폰됐으면 그 캐릭터가 처치자로 처음부터(267 — 처치자 캐릭터 프로필 미리보기).
+        int localId = Player.LocalPlayer.GetInstanceID();
+        if (_localPlayerId != 0 && localId != _localPlayerId)
+        {
+            Debug.Log($"{Tag} 내 플레이어가 바뀜({Player.LocalPlayer.name}) — 처치자 캐릭터 프로필로 처음부터.", this);
+            _localPlayerId = localId;
+            Replay();
+        }
+        _localPlayerId = localId;
 
         if (Input.GetKeyDown(ReplayKey)) Replay();
         if (Input.GetKeyDown(PauseKey)) _paused = !_paused;
@@ -175,6 +187,22 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         TickClock();
         TickLoop();
     }
+
+    // F1 캐릭터 순환(267) — 간파·특성 랩의 DebugCharacterCycle 을 그대로 쓴다. 이 씬은 빌드 목록에 있어(디버그 컴포넌트 격리 테스트) 씬에 두지 않고
+    // 실행 중에 붙인다. 로스터 = 스폰 로스터(NetworkManager 의 NetworkLoadingFlowController — 캐릭터 판별과 같은 것).
+    void EnsureCharacterCycle(NetworkManager nm)
+    {
+        if (_cycleAdded) return;
+        NetworkLoadingFlowController flow = nm.GetComponent<NetworkLoadingFlowController>();
+        CharacterRoster roster = flow != null ? flow.CharacterRoster : null;
+        if (roster == null) return;
+        _cycleAdded = true;
+        DebugCharacterCycle cycle = GetComponent<DebugCharacterCycle>();
+        if (cycle == null) cycle = gameObject.AddComponent<DebugCharacterCycle>();
+        cycle.SetRosterIfEmpty(roster);
+    }
+
+    bool _cycleAdded;
 
     bool EnsureDirector()
     {
@@ -433,6 +461,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         bool reached = ready && _director.DevVictoryResultReached;
 
         GUILayout.Label($"상태: {_status}");
+        GUILayout.Label($"처치자 {Player.LocalPlayer?.name ?? "-"} · F1 = 캐릭터 바꾸기(바뀌면 처음부터 — 캐릭터별 처치 연출 프로필)");
         if (v.Active)
         {
             float elapsed = v.Elapsed(_director.NetworkManager.ServerTime.Time);
@@ -502,7 +531,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         const float w = 260f, h = 26f;
         GUILayout.BeginArea(new Rect(Screen.width - w - 10f, Screen.height - h - 10f, w, h));
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"랩 재생 중 {t} · F7 · F8");
+        GUILayout.Label($"랩 재생 중 {t} · F1 · F7 · F8");
         if (GUILayout.Button("패널", GUILayout.Width(50f))) hidePanelDuringPlay = false;
         GUILayout.EndHorizontal();
         GUILayout.EndArea();
