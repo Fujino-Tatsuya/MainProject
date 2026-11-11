@@ -259,6 +259,12 @@ public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequiremen
     // 🔴 판정·피해·상태 변경 금지. 끝은 OnEnd(표시 전용도 부른다).
     public virtual void OnPresentationOnlyStart(Transform target) { }
 
+    /// <summary>
+    /// 표시 전용 재생에서 Skill End 이벤트를 내는 애니 상태(처치 연출 — End 검사·끝 자르기 기준). 기본 = 시전 상태.
+    /// 시전 상태 뒤 다른 클립이 End 를 내는 스킬(거너 Q = 집중 → Gunner_Q_Fire)은 덮어쓴다(267 후속).
+    /// </summary>
+    public virtual string PresentationEndStateName => Data != null ? Data.AnimatorStateName : null;
+
     // 서버 전용: 이벤트 방식(EndsOnClipEvent) 스킬의 상태 클립 실제 길이를 컨트롤러가 읽었다(시전 뒤 애니메이터 첫 갱신 후,
     // 그리고 원격 오너 동기로 상태가 다시 시작돼 안전망을 늦출 때마다).
     // remainingSeconds = 지금부터 클립 끝까지 실제 초. 안전망은 이 시각 + padding 에 끊는다. 클립 길이로 맞출 보호 지속(R 슈퍼아머)용.

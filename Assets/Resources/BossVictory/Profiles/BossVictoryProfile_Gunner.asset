@@ -16,7 +16,7 @@ MonoBehaviour:
   killerAfterFinisherScale: 0.07
   otherPlayersScale: 0.05
   bossAfterFinisherScale: 0.1
-  finisherSlot: 3
+  finisherSlot: 0
   backDashDistance: 4
   backDashDuration: 0.5
   backDashEase: 3

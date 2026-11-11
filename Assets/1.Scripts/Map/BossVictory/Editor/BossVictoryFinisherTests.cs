@@ -35,8 +35,8 @@ public sealed class BossVictoryFinisherTests
 
         Animator animator = prefab.GetComponentInChildren<Animator>(true);
         Assert.IsNotNull(animator != null ? animator.runtimeAnimatorController : null, "Animator 컨트롤러");
-        AnimationClip clip = AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.Data.AnimatorStateName);
-        Assert.IsNotNull(clip, $"{skill.Data.AnimatorStateName} 상태 클립");
+        AnimationClip clip = AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.PresentationEndStateName);   // End 를 내는 클립(거너 Q = Gunner_Q_Fire)
+        Assert.IsNotNull(clip, $"{skill.PresentationEndStateName} 상태 클립");
         Assert.IsTrue(AnimationEventRequirements.HasEvent(clip, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)SkillAnimationEventType.End),
             $"{prefab.name} 처치 연출 스킬 {skill.name}({slot}) 클립 {clip.name} 에 Skill End 이벤트가 없다");
     }

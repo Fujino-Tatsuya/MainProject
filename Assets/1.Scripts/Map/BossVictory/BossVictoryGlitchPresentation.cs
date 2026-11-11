@@ -560,7 +560,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             Edit.LogError($"[BossVictory] 처치 연출 스킬 재생 실패 — {skill.name}", this);
             return;
         }
-        _finisherState = Animator.StringToHash(skill.Data.AnimatorStateName);
+        _finisherState = Animator.StringToHash(skill.PresentationEndStateName ?? skill.Data.AnimatorStateName);   // End 를 내는 클립(거너 Q = 발사)
         ClockLog($"처치 연출 스킬 시작 {_profile.timeline.finisherStartTime:0.000}s");
         Edit.Log($"[BossVictory] 처치 연출 스킬 — {_killer.name} {slot} {skill.Data.AnimatorStateName}" +
                  (FinisherTrim > 0f ? $" · 끝 자르기 {FinisherTrim:0.###}초(클립 시간)" : ""), this);
@@ -597,11 +597,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_finisherWarned) return;
         Animator animator = _killer.GetComponentInChildren<Animator>(true);
         RuntimeAnimatorController controller = animator != null ? animator.runtimeAnimatorController : null;
-        AnimationClip clip = controller != null ? AnimationEventRequirements.FindStateClip(controller, skill.Data.AnimatorStateName) : null;
+        AnimationClip clip = controller != null ? AnimationEventRequirements.FindStateClip(controller, skill.PresentationEndStateName) : null;
         if (clip != null && AnimationEventRequirements.HasEvent(clip, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)SkillAnimationEventType.End))
             return;
         _finisherWarned = true;
-        Edit.LogError($"[BossVictory] 처치 연출 스킬 {skill.name}(상태 {skill.Data.AnimatorStateName}) 클립에 Skill End 이벤트가 없다 — 처치자·보스가 0.1 로 느려지지 않는다.", this);
+        Edit.LogError($"[BossVictory] 처치 연출 스킬 {skill.name}(End 상태 {skill.PresentationEndStateName}) 클립에 Skill End 이벤트가 없다 — 처치자·보스가 0.1 로 느려지지 않는다.", this);
     }
 
     void OnFinisherEnded(PlayerSkillBase skill)
