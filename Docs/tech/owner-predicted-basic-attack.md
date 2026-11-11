@@ -85,6 +85,30 @@
 4. **Runtime Network Stats Monitor**(같은 패키지 — 클라 인스턴스 `NetworkManager` 에 Add Component)의 **RTT 가 약 150ms** 인지 본다 — 넘치면 Delay 를 줄이고(예: 150 → 75) 다시 확인.
 5. 끝나면 컴포넌트를 떼거나 Play 를 끈다(런타임 추가는 남지 않는다).
 
+> 할 일 258 이후 `NetworkManager.prefab` 에 `Network Simulator` 가 **꺼진 채** 이미 붙어 있다(아래 7.1.1). 에디터에서는 2번 대신
+> 클라 인스턴스의 그 컴포넌트를 Play 중 **체크(켜기)** 해도 된다 — 값은 프리셋 25ms 가 들어 있으니 Custom 칸에서 바꾼다.
+
+#### 7.1.1 빌드에서 지연 거는 법 (할 일 258 — Development Build 전용)
+- **구성**: `Assets/2.Prefabs/Network/NetworkManager.prefab` 에 `Network Simulator`(꺼진 채, 사용자 정의 프리셋 `빌드 지연 25ms` =
+  Packet Delay 25ms, Jitter·Loss Interval·Loss % 모두 0, 시나리오 없음) + 부트 `NetSimDevBuildBoot`(`Assets/1.Scripts/Network/`).
+  부트가 `Awake` 에서 **`DEVELOPMENT_BUILD && !UNITY_EDITOR` 일 때만** 시뮬레이터를 켜고 `Player.log` 에 `[NetSim] 지연 25ms 켬` 한 줄을 찍는다.
+  에디터(MPPM 포함)·릴리스 빌드에서는 꺼 둔다 → 에디터 기본 동작 불변.
+- **릴리스 영향 없음**: NGO `UnityTransport` 는 `UNITY_EDITOR || DEVELOPMENT_BUILD`(릴리스는 `UNITY_MP_TOOLS_NETSIM_ENABLED_IN_RELEASE` 심볼이 있을 때만)
+  에서만 시뮬레이터 파이프라인 단계(`SimulatorPipelineStage`)를 만든다. 릴리스에서는 컴포넌트가 켜져도 바꿀 단계가 없다.
+  (`UnityTransport` 의 `Debug Simulator` 칸은 Obsolete·무효 — 쓰지 않는다.)
+- **빌드 방법**: Build Profiles 에서 **Development Build 체크** 후 빌드. 호스트·클라 PC 각각 실행 → `Player.log`
+  (`%USERPROFILE%\AppData\LocalLow\<회사>\<제품>\Player.log`)에 `[NetSim] 지연 25ms 켬` 이 있는지 본다.
+- **값 바꾸는 곳**: `NetworkManager.prefab` → `Network Simulator` 인스펙터의 Connection Preset(Custom) **Packet Delay**.
+  컴포넌트의 **체크는 끈 채로** 둔다(켜는 것은 부트가 한다. 켜서 저장해도 부트가 에디터·릴리스에서 `Awake` 에 다시 끄지만, 프리팹 기본값은 꺼짐으로 유지).
+  `NetSimDevBuildBootTests`(EditMode)가 꺼짐·25ms·나머지 0 을 확인한다 — 값을 바꾸면 테스트 기대값도 같이 바꾼다.
+- **지연은 피어당·양방향이다**(패키지 코드 확인): NGO 가 `WithSimulatorStageParameters` 를 기본 `ApplyMode.AllPackets` 로 만들고,
+  Multiplayer Tools 의 `Utp2Adapter` 가 그 파라미터의 지연만 바꾼다(`ModifySimulatorStageParameters`). `SimulatorPipelineStage` 는
+  보내기(`Send`)·받기(`Receive`) 둘 다에서 `PacketDelayMs` 만큼 붙잡는다. 따라서 값 *d* 일 때
+  - 한 피어만 Development Build → 그 피어의 보내기 +*d*, 받기 +*d* → **RTT ≈ +2d (25ms → +50ms)**
+  - 호스트·클라 둘 다 Development Build → 한 방향마다 보낸 쪽 +*d*·받은 쪽 +*d* → **RTT ≈ +4d (25ms → +100ms)**
+  - 7.2 의 목표 RTT 150ms 를 둘 다 Development Build 로 맞추려면 *d* ≈ 37ms, 한쪽만이면 *d* ≈ 75ms (LAN 기본 RTT 는 별도로 더해진다).
+  - RTT 는 Runtime Network Stats Monitor 또는 NGO `GetCurrentRtt` 로 확인(신뢰 파이프라인 ack 가 시뮬레이터 단계를 지나므로 지연이 포함된다).
+
 ### 7.2 확인 항목 (세 캐릭터 각각)
 - [ ] 누르는 즉시 휘두름/발사(원격 클라 화면에서 RTT 만큼 늦지 않다)
 - [ ] 창 끝 탭으로도 콤보가 이어진다(팔라딘·어쌔신), 꾹 누르면 순환/연사
