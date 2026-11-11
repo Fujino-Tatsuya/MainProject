@@ -21,6 +21,7 @@ internal static class PlayerEditModeTestRunner
         "^PassiveCooldownSyncTests$", // 할 일 91 T4 — 가붕이 패시브 내부 쿨: 남은 초 도장·피어 환산·늦은 참가·배율 2·피격 감소
         "^DashCooldownClockSyncTests$", // 할 일 91 T3 — 대시 응답 = 남은 초, 오너 자기 쿨 시계 환산·서버/오너 남은 시간 일치·강제 초기화
         "^PlayerGroundPointProjectionTests$", // PLAN-assassin A4 — 고정 거리 조준·서버 재투영
+        "^CursorUnitPickLenientTests$", // 할 일 265 — 커서 대상 판정 널널하게: 직접 맞음 우선·반경 안 가장 가까운 것·반경 밖 없음·반경 0 = 예전
         "^AssassinComboModelTests$", // PLAN-assassin A6 — 평타 순서·0.8초 유예·스킬 리셋
         "^AssassinComboWindowRulesTests$", // 할 일 47 연장 — 평타 다음 타 예약 창(정규화 시간·경계·단별 기본값)
         "^AssassinLungeModelTests$", // 할 일 19 — 일반 E 강타 전진 거리 분배

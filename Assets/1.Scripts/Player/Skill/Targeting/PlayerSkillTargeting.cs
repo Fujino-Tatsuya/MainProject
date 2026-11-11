@@ -411,6 +411,9 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
     }
 
+    // 커서 대상 판정 반경 — 호버 외곽선과 같은 값(PlayerInputReader, 할 일 265).
+    private float CursorPickRadius => input != null ? input.CursorPickRadius : 0f;
+
     private void UpdateSingleTargetPreview()
     {
         hoveredTarget = null;
@@ -425,7 +428,8 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
 
         Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
-        CursorPickResult pick = CursorUnitPick.Pick(ray, currentData.TargetableLayers, owner, out Unit unit);
+        CursorPickResult pick = CursorUnitPick.Pick(
+            ray, currentData.TargetableLayers, owner, aimIndicator.GroundMask, CursorPickRadius, out Unit unit);
         // 호버 외곽선은 이 판정을 받아 쓴다 — 조준 중엔 레이를 한 번만 쏜다.
         SetHighlightedTarget(unit);
         if (pick != CursorPickResult.ValidTarget)

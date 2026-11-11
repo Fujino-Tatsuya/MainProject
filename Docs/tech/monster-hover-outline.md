@@ -10,7 +10,7 @@
 | 파일 | 역할 |
 |---|---|
 | `Assets/1.Scripts/Player/PlayerEnemyHoverOutline.cs` | `Player.prefab`(base) 루트 컴포넌트. 오너(오프라인 포함 `IsInputSource`)만 돈다. 대상 세트 3개를 고르고 렌더러 목록을 `EnemyOutlineDrawList` 에 넘긴다. **색·두께·상한 튜닝은 여기 한 곳.** |
-| `Assets/1.Scripts/Player/Skill/Targeting/CursorUnitPick.cs` | 커서 레이 판정 공용 — 레이 → 마스크 안 첫 콜라이더 → Hurtbox 우선 Unit 해석 → 자기 자신·HP 0 제외. 스킬 조준(SingleTarget)도 이걸 쓴다. |
+| `Assets/1.Scripts/Player/Skill/Targeting/CursorUnitPick.cs` | 커서 레이 판정 공용 — 레이 → 마스크 안 첫 콜라이더 → Hurtbox 우선 Unit 해석 → 자기 자신·HP 0 제외. 스킬 조준(SingleTarget)도 이걸 쓴다. **널널한 판정(할 일 265)**: 레이가 고를 수 있는 유닛에 안 맞으면 커서 바닥 지점 수평 반경(`PlayerInputReader.cursorPickRadius`, 기본 1m · `Player` 시트 · 0 = 예전) 안 고를 수 있는 유닛 중 콜라이더 표면이 가장 가까운 것 — 호버 외곽선·조준 대상·확정 대상이 같은 결과. 순수 규칙 `Resolve`(테스트 `CursorUnitPickLenientTests`). |
 | `Assets/1.Scripts/Rendering/HoverOutline/EnemyOutlineFeature.cs` | URP 렌더러 피처(RenderGraph). 마스크 패스 + 합성 패스. `PlayerSilhouetteFeature` 구조를 본떴다. |
 | `Assets/1.Scripts/Rendering/HoverOutline/Shaders/EnemyOutlineMask.shader` | `Hidden/Rendering/EnemyOutlineMask` — 마스크(R 커버리지·G 색 인덱스·B eye 깊이). |
 | `Assets/1.Scripts/Rendering/HoverOutline/Shaders/EnemyOutlineComposite.shader` | `Hidden/Rendering/EnemyOutlineComposite` — 원판 팽창 − 원래 마스크, 가림 판정, 알파 블렌딩. |

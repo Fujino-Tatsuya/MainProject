@@ -52,8 +52,14 @@ public sealed class DebugTraitLab : MonoBehaviour
 #if UNITY_EDITOR
     // 공격 범위 기즈모(할 일 152) — 기본 꺼짐. 에디터 전용(Gizmos·Handles).
     readonly TraitLabAttackGizmos attackGizmos = new TraitLabAttackGizmos();
+    // 빗나감 커서 범위 기즈모(할 일 265 후속) — 기본 켬. 조준·호버 외곽선이 실제로 부른 CursorUnitPick 결과를 그린다.
+    readonly TraitLabCursorPickGizmo cursorPickGizmo = new TraitLabCursorPickGizmo();
 
-    void OnDrawGizmos() => attackGizmos.Draw();
+    void OnDrawGizmos()
+    {
+        attackGizmos.Draw();
+        cursorPickGizmo.Draw();
+    }
 #endif
 
     void OnEnable()
@@ -220,6 +226,7 @@ public sealed class DebugTraitLab : MonoBehaviour
 
 #if UNITY_EDITOR
         DrawAttackGizmoOptions();
+        DrawCursorPickGizmoOptions();
 #endif
     }
 
@@ -240,6 +247,19 @@ public sealed class DebugTraitLab : MonoBehaviour
         GUILayout.Label("<size=10>Gizmos 라 Game 뷰에서는 상단 Gizmos 버튼이 켜져 있어야 보입니다. 특성 추가 공격·거너 R 은 호스트 창에서만 나옵니다. " +
                         "'(도형 아님)' = 판정 도형이 아닌 콜라이더 판정(거너 평타·R·간파 상자).</size>", RichLabel());
     }
+
+    // ── 빗나감 커서 범위 기즈모(할 일 265 후속) ──
+    void DrawCursorPickGizmoOptions()
+    {
+        cursorPickGizmo.Enabled = GUILayout.Toggle(cursorPickGizmo.Enabled, "빗나감 커서 범위 기즈모", RichToggle());
+        if (!cursorPickGizmo.Enabled)
+            return;
+
+        GUILayout.Label($"<size=10>{CursorPickLegend(TraitLabCursorPickGizmo.DirectColor, "직접 맞음")} · {CursorPickLegend(TraitLabCursorPickGizmo.LenientColor, "반경으로 잡음")} · " +
+                        $"{CursorPickLegend(TraitLabCursorPickGizmo.MissColor, "못 잡음")} — 반경 = PlayerInputReader 커서 대상 판정 반경. Game 뷰는 Gizmos 버튼을 켜야 보입니다.</size>", RichLabel());
+    }
+
+    static string CursorPickLegend(Color color, string text) => $"<color=#{ColorUtility.ToHtmlStringRGB(color)}>■</color> {text}";
 
     static string GizmoLabel(string text, TraitLabGizmoCategory category) =>
         $"<color=#{ColorUtility.ToHtmlStringRGB(TraitLabAttackGizmos.ColorOf(category))}>■</color> {text}";

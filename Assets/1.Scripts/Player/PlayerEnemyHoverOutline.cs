@@ -64,6 +64,7 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
 
     Player owner;
     PlayerAimIndicator aimIndicator;
+    PlayerInputReader input;
     int enemyMask;
     bool publishing;
     readonly HoverOutlineTracker tracker = new HoverOutlineTracker();
@@ -102,6 +103,7 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
     {
         owner = GetComponent<Player>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
+        input = GetComponent<PlayerInputReader>();
         // LayerMask.GetMask 는 호출마다 배열을 만든다 — 한 번만 읽는다.
         enemyMask = GameLayers.EnemyTargetMask;
     }
@@ -159,7 +161,8 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
             return null;
 
         Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
-        return CursorUnitPick.Pick(ray, enemyMask, owner, out Unit unit) == CursorPickResult.ValidTarget
+        float radius = input != null ? input.CursorPickRadius : 0f;
+        return CursorUnitPick.Pick(ray, enemyMask, owner, aimIndicator.GroundMask, radius, out Unit unit) == CursorPickResult.ValidTarget
             ? unit
             : null;
     }

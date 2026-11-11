@@ -27,6 +27,10 @@ public class PlayerInputReader : BaseNetworkBehaviour
     [Tooltip("선입력 버퍼 우선순위 — 좌클릭(기본 공격). 클수록 높다")]
     [SerializeField] private int bufferPriorityAttack = 1;
 
+    // 할 일 265 — 타겟팅 스킬·몬스터 호버 외곽선이 같은 값을 쓴다(CursorUnitPick).
+    [Tooltip("커서 대상 판정 널널함(m). 커서 광선이 유닛에 직접 안 맞으면 커서가 가리키는 바닥 지점에서 이 수평 반경 안의 고를 수 있는 유닛 중 가장 가까운 것을 잡는다(타겟팅 스킬 대상·호버 외곽선 공용). 0 = 직접 맞아야만(예전)")]
+    [SerializeField, Min(0f)] private float cursorPickRadius = 1f;
+
     private PlayerInput playerInput;
     private PlayerMovement movement;
     private InputAction moveAction;
@@ -94,6 +98,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
     internal bool DiagnosticEffectiveInputEnabled => EffectiveInputEnabled;
 
     public float InputBufferSeconds => inputBufferSeconds;
+    /// <summary>커서 대상 판정 반경(m, 0 = 직접 맞아야만) — <see cref="CursorUnitPick"/> 널널한 판정(할 일 265).</summary>
+    public float CursorPickRadius => cursorPickRadius;
 
     private void Awake()
     {
