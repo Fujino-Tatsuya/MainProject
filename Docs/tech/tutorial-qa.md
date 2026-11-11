@@ -1,5 +1,7 @@
 # 튜토리얼 QA 체크리스트 — Play·MPPM 검증 순서표 (할 일 15 · S12-3)
 
+> **🟪 할 일 260 (2026-11-11)** — 아래 항목의 `TUT_Z4_LORE`·`TUT_Z4_TIMER_HINT`·`TUT_TIMER_EXPIRED`·`TUT_B_PAD_COUNT`·`TUT_B_BOSS_FRONT_TIP` 자막은 **안 나오는 것이 정상**이고, 존4 설정 대기는 0초(첫 진입 직후 G8). [tutorial-zone4.md](tutorial-zone4.md) 맨 위.
+
 > **🟪 할 일 107 (2026-10-27) — 맵씬 정리 뒤 먼저 이 절부터.** 존1 체크리스트·존2 안내·존3 스피너 연습·복도1 쿨 초기화·존4 교육 문구는 Legacy 로 빠졌다(→ [tutorial-director.md](tutorial-director.md) 맨 위).
 > 아래 1부의 존1·존2 안내·존3 연습·존4 패널 안내 항목은 **더 이상 나오지 않는 것이 정상**이다. 로그 태그 `[Tutorial]` 은 그대로다. 메뉴는 `Tools/MapScene/Debug/*`·`Tools/Tests/맵씬 EditMode 테스트 실행`.
 >
