@@ -1,5 +1,7 @@
 # 맵씬 진행 상태 — MapSceneDirector (옛 TutorialDirector)
 
+> **🟪 할 일 260 (2026-11-11)** — 존4 `MapSceneBossApproachGuide` 는 자막 `TUT_Z4_LORE`·`TUT_Z4_TIMER_HINT`·`TUT_TIMER_EXPIRED`·`TUT_B_PAD_COUNT`·`TUT_B_BOSS_FRONT_TIP` 을 띄우지 않고 설정 대기 0초로 바로 G8. 상세 [tutorial-zone4.md](tutorial-zone4.md) 맨 위.
+
 > **🟪 할 일 107 (2026-10-27) — 맵씬 튜토리얼 정리.** 교육은 로비 훈련([lobby-training.md](lobby-training.md))이 맡고, 맵씬(`4.MapScene`)은 **메인 스테이지**다.
 > - **빠진 것 → Legacy(코드 보관, 런타임 연결 끊음)**: 존1 체크리스트(`TutorialZone1Flow/Model`·허수아비 `TutorialZone1Dummies`)·존2 안내(`TutorialZone2Flow/Model`)·존3 스피너 연습(`TutorialZone3Flow/Guide/Rules`·`SpinnerPractice` 전부·`SpinnerBot_Tutorial.prefab` 네트워크 등록 해제)·복도1 쿨 초기화(`TutorialCorridor1CooldownFlow`)·존4 교육(`TutorialZone4EducationFlow/Guide/Display` — 장치 설명·첫 패널·패널 n/4·중간보스 간파 리마인드·강조).
 >   위치: `Assets/1.Scripts/Map/Tutorial/Legacy/`(+`Editor/`) · `Assets/1.Scripts/Tutorial/Legacy/SpinnerPractice/`. `RuntimeInitializeOnLoadMethod` 부착을 지웠으니 맵씬에서 돌지 않는다. 디렉터의 존1 오너 보고 API(`ReportLocalCheck`·`ReportLocalMoveDistance`)도 지웠다.

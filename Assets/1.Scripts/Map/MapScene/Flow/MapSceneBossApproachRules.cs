@@ -24,10 +24,10 @@ public enum MapSceneBossApproachPhase : byte
 public sealed class MapSceneBossApproachModel
 {
     /// <summary>
-    /// 설정 자막(Z4-0) 길이 = G8 까지 기다릴 시간. <c>TUT_Z4_LORE</c>(5초) + <c>TUT_Z4_TIMER_HINT</c>(5초) 문구 표시 시간 합 —
-    /// 시나리오 §3.7 "설정 자막이 끝나면(약 8~10초)". 문구 행 표시 시간을 바꾸면 이 값(인스펙터)도 맞출 것.
+    /// 설정 단계(Z4-0) → G8 까지 기다릴 시간. 0 = 바로 G8(타이머 시작) — 할 일 260(11-11)으로 설정 자막
+    /// <c>TUT_Z4_LORE</c>·<c>TUT_Z4_TIMER_HINT</c> 를 띄우지 않아 기다릴 이유가 없다(전엔 두 문구 표시 시간 합 5+5 = 10초).
     /// </summary>
-    public const float DefaultLoreSeconds = 10f;
+    public const float DefaultLoreSeconds = 0f;
     /// <summary>G8 → 존4 일반 몬스터 기상(Z4-2 "3초 뒤").</summary>
     public const float DefaultWakeDelaySeconds = 3f;
     /// <summary>패드 카운트다운 자막을 다시 띄우기까지 최소 간격 — 발판을 들락거릴 때 도배 방지.</summary>

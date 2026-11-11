@@ -64,10 +64,19 @@ public class MapSceneBossApproachRulesTests
     }
 
     [Test]
-    public void DefaultLore_IsWithinScenarioRange()
+    public void DefaultLore_IsZero_NoLoreSubtitles()
     {
-        // §3.7 Z4-1 "설정 자막이 끝나면(약 8~10초)".
-        Assert.That(MapSceneBossApproachModel.DefaultLoreSeconds, Is.InRange(8f, 10f));
+        // 할 일 260: 설정 자막(TUT_Z4_LORE·TUT_Z4_TIMER_HINT)을 띄우지 않는다 → G8 을 기다리지 않는다.
+        Assert.That(MapSceneBossApproachModel.DefaultLoreSeconds, Is.EqualTo(0f));
+    }
+
+    [Test]
+    public void DefaultLore_StartsTimerRightAfterLore()
+    {
+        var m = new MapSceneBossApproachModel();
+        m.NotifyEntryGateOpen(100d);
+        Assert.IsTrue(m.NotifyPartyEntered(100d));
+        Assert.IsTrue(m.ShouldStartTimer(100d));
     }
 
     [Test]

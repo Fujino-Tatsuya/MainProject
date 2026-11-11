@@ -1,5 +1,7 @@
 # 튜토리얼 존4 흐름 + 보스 진입 안내 — 설정 → 타이머 → 패널·다리·중간보스 (할 일 15 · S10)
 
+> **🟪 할 일 260 (2026-11-11) — 자막 5개 안 띄움 · 설정 대기 0초.** `MapSceneBossApproachGuide` 가 `TUT_Z4_LORE`·`TUT_Z4_TIMER_HINT`·`TUT_TIMER_EXPIRED`·`TUT_B_PAD_COUNT`·`TUT_B_BOSS_FRONT_TIP` 을 더 띄우지 않는다(호출 삭제 — Strings·SO 행은 남김, 빈 ko 는 `StringTableValidator` 오류라 데이터로 숨기지 않는다). `DefaultLoreSeconds` 10 → **0** — G7 ∧ 존4 첫 진입 다음 폴링에 바로 G8. 흐름(타이머·발판·G8·기상)은 그대로. 아래 표·§의 해당 자막·10초 언급은 옛 기록.
+
 > **🟪 할 일 107 (2026-10-27) — 교육 부분만 Legacy, 나머지는 이름만 바뀜.**
 > - 유지: `MapSceneBossApproachGuide`(옛 `TutorialZone4Flow`, 서버) — 설정 자막(TUT_Z4_LORE·TIMER_HINT) → G8 · 일반 몬스터 기상 · 다리 개통 → TUT_Z4_BRIDGE·중간보스 기상 · 클리어 → TUT_Z4_CLEAR·GO_BOSS · 만료·패드 카운트다운·23호 정면 팁 · 재도전 래치.
 >   `MapSceneBossApproachView`(옛 `TutorialZone4Guide`, 모든 피어) — G9 뒤 "보스방으로" 목표·미니맵 보스 아이콘 펄스 · 존4 안(Lore·Combat)에 남은 복도 "다음 구역으로" 지움 · 보스방 도착 정리. 규칙 `MapSceneBossApproachModel`/`Display`(`MapSceneBossApproachRules.cs`).

@@ -12,6 +12,7 @@ public static class TutorialGuideIds
     public const string S0Welcome = "TUT_S0_WELCOME";
     public const string ZoneClear = "TUT_ZONE_CLEAR";
     public const string TipRCancel = "TUT_TIP_R_CANCEL";
+    /// <summary>할 일 260(11-11)부터 런타임에서 띄우지 않는다(행만 남김).</summary>
     public const string TimerExpired = "TUT_TIMER_EXPIRED";
 
     public const string Z1Move = "TUT_Z1_MOVE";
@@ -53,7 +54,9 @@ public static class TutorialGuideIds
     public const string Z3Real = "TUT_Z3_REAL";
     public const string Z3Boss = "TUT_Z3_BOSS";
 
+    /// <summary>할 일 260(11-11)부터 런타임에서 띄우지 않는다(행만 남김, 설정 대기도 0초).</summary>
     public const string Z4Lore = "TUT_Z4_LORE";
+    /// <summary>할 일 260(11-11)부터 런타임에서 띄우지 않는다(행만 남김).</summary>
     public const string Z4TimerHint = "TUT_Z4_TIMER_HINT";
     public const string Z4Start = "TUT_Z4_START";
     public const string Z4PanelIntro = "TUT_Z4_PANEL_INTRO";
@@ -82,8 +85,9 @@ public static class TutorialGuideIds
     public const string Z4ExitOpen = "TUT_Z4_EXIT_OPEN";
 
     public const string BPadWarn = "TUT_B_PAD_WARN";
+    /// <summary>할 일 260(11-11)부터 런타임에서 띄우지 않는다(행만 남김).</summary>
     public const string BPadCount = "TUT_B_PAD_COUNT";
-    /// <summary>23호 정면 ±60° 에서만 간파 1줄(D19).</summary>
+    /// <summary>23호 정면 ±60° 에서만 간파 1줄(D19). 할 일 260(11-11)부터 런타임에서 띄우지 않는다(행만 남김).</summary>
     public const string BBossFrontTip = "TUT_B_BOSS_FRONT_TIP";
 
     /// <summary>
