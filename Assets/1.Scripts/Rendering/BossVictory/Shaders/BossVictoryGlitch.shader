@@ -7,6 +7,8 @@
 //    색(글리치 아님): 흑백(Desat) → 배경만 호박색(플레이어 제외) → 보스 = 흑백 노이즈 텍스처(UV 는 카메라 이동으로만)
 //      → CRT 주사선.
 //    발밑 회색 원(246 복원 — 267 후속): 배경 중 처치자 발밑(_GroundCircle.xyz)에서 **수평** 거리 _GroundCircle.w 안(원기둥)은 호박색 대신 흑백
+//    배경 글자 RECTIFY(267 후속): 글자마다 화면 사각형(_RectifyScreen)·아틀라스 UV(_RectifyUV) → SDF 외곽선만(|거리| < 반두께, 안 비움).
+//      플레이어·보스 마스크가 0 인 곳에만(인물·보스 뒤, 배경 앞) · 찢긴 UV(같이 찢김) · 들어오는 동안(알파 < 1) 가로줄이 무작위로 켜진다.
 //      (원래 명도 × _GroundCircleLook.y), 가장자리 _GroundCircleLook.x(m). 픽셀 월드 위치 = _CameraDepthTexture(찢긴 UV 그대로 — 원도 같이 찢긴다). 반경 0 = 끔.
 // ----------------------------------------------------------------------------
 Shader "Hidden/Rendering/BossVictoryGlitch"
@@ -46,6 +48,32 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             float4 _NoiseST;      // xy 타일링, zw UV 오프셋(카메라 이동 누적 — 시간 흐름 없음)
             float4 _NoiseBright;
             float4 _NoiseDark;
+            TEXTURE2D(_RectifyTex);
+            SAMPLER(sampler_RectifyTex);
+            float4 _RectifyScreen[8];  // 글자마다 xy 최소 · zw 최대(뷰포트)
+            float4 _RectifyUV[8];      // 글자마다 아틀라스 xy 시작 · zw 크기
+            float4 _RectifyParams;     // x 알파, y 외곽선 반두께(SDF 값), z 글자 수, w 아틀라스 높이 ÷ (패딩 + 1)
+            float4 _RectifyColor;
+
+            // 배경 글자 외곽선 가중치(0~1).
+            half RectifyAt(float2 uv)
+            {
+                half a = 0.0h;
+                int n = (int)_RectifyParams.z;
+                [unroll] for (int i = 0; i < 8; i++)
+                {
+                    float4 r = _RectifyScreen[i];
+                    float2 l = (uv - r.xy) / max(r.zw - r.xy, 1e-5);
+                    if (i >= n || any(l < 0.0) || any(l > 1.0)) continue;
+                    float2 auv = _RectifyUV[i].xy + l * _RectifyUV[i].zw;
+                    float sd = SAMPLE_TEXTURE2D_LOD(_RectifyTex, sampler_RectifyTex, auv, 0).a - 0.5;
+                    // 안티앨리어싱 폭 = 화면 1px 의 SDF 값(도함수 없이 — 루프 안 분기)
+                    float w = max(0.75 * _RectifyUV[i].w * _RectifyParams.w / max((r.w - r.y) * _ScreenParams.y, 1.0), 1e-4);
+                    a = max(a, (half)(1.0 - smoothstep(_RectifyParams.y - w, _RectifyParams.y + w, abs(sd))));
+                }
+                return a;
+            }
+
             float4 _GroundCircle;      // xyz 중심(월드), w 반경(m)
             float4 _GroundCircleLook;  // x 가장자리 부드러움(m), y 흑백 밝기
 
@@ -134,6 +162,15 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 // 발밑 회색 원 — 원 안 배경은 호박색 대신 흑백(밝기 배율). 흑백·호박이 들어오는 만큼만(플레이어는 위에서 이미 흑백).
                 half circle = GroundCircleMask(uv) * (1.0h - player);
                 graded = lerp(graded, lerp(col, (lum * (half)_GroundCircleLook.y).xxx, (half)max(_GlitchA.z, _GlitchA.w)), circle);
+
+                // 배경 글자 RECTIFY — 인물·보스 뒤, 배경 앞. 들어오는 동안 가로줄(찢김 줄 굵기 × 2)이 알파 비율만큼 무작위로 켜진다.
+                if (_RectifyParams.x > 0.0001)
+                {
+                    float revealRow = floor(ypx / (baseH * 2.0));
+                    half reveal = _RectifyParams.x >= 0.999 ? 1.0h : (half)step(Hash(float2(revealRow, tick + 51.0)), _RectifyParams.x);
+                    half text = RectifyAt(uv) * reveal * (1.0h - player) * (1.0h - boss);
+                    graded = lerp(graded, _RectifyColor.rgb, text * (half)_RectifyColor.a);
+                }
 
                 // 보스 — 흑백 노이즈(흰 = 밝은 색, 검 = 어두운 적갈색)
                 float2 nUV = _BossScreen.w > 0.5

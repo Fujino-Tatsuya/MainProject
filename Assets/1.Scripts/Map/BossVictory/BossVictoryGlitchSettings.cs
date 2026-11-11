@@ -86,6 +86,19 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("원 안 흑백 밝기 배율(원래 명도 × 이 값).")]
     [Min(0f)] public float groundCircleBrightness = 1f;
 
+    [Header("배경 글자 RECTIFY(267 후속 — 켜는 시각·알파 = 타임라인 '배경 글자 RECTIFY' 클립)")]
+    [Tooltip("폰트(SVN Assets/50.Art/UI/Fonts/JalnanGothicTTF). 비면 글자 없음.")]
+    public Font rectifyFont;
+    [Tooltip("글자(최대 8자).")]
+    public string rectifyText = "RECTIFY";
+    [Tooltip("글자 전체 폭(화면 너비 비율) — 1 넘으면 양끝 글자가 조금 잘린다.")]
+    [Min(0.05f)] public float rectifyWidth = 1.06f;
+    [Tooltip("대문자 높이 가운데(뷰포트 세로, 0 아래 · 1 위) — 레퍼런스 = 화면 위에서 45%.")]
+    [Range(0f, 1f)] public float rectifyCenterY = 0.55f;
+    [Tooltip("외곽선 두께(대문자 높이 비율). 안쪽은 비운다.")]
+    [Range(0.005f, 0.1f)] public float rectifyOutline = 0.04f;
+    public Color rectifyColor = Color.white;
+
     // 카메라 컷 목록은 타임라인 '카메라 컷' 트랙(timeline.cameraCut·cameraCutShots — 255, 옛 cuts 배열 삭제). 예: 와이드(0.33·거리 16·각 22·방위 50) → 보스 클로즈업(1.67·7·6·−160) → 와이드(2.6).
     [Header("카메라 컷 벽 숨김(컷·컷별 켜기/끄기 = 타임라인 '카메라 컷' 트랙)")]
     [Tooltip("연출 카메라에서 앞면이 확실히 카메라를 향하지 않는 벽을 끈다 — 법선·시선 내적 문턱(옛 연출과 같은 기준).")]

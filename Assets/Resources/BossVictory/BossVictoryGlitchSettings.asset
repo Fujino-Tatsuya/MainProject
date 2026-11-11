@@ -42,6 +42,12 @@ MonoBehaviour:
   groundCircleRadius: 5.73
   groundCircleSoftness: 19.05
   groundCircleBrightness: 1
+  rectifyFont: {fileID: 12800000, guid: ec558e14f18f3e04183bac06c64ac696, type: 3}
+  rectifyText: RECTIFY
+  rectifyWidth: 1.06
+  rectifyCenterY: 0.55
+  rectifyOutline: 0.04
+  rectifyColor: {r: 1, g: 1, b: 1, a: 1}
   wallFacingThreshold: 0.3
   wallSearchRadius: 40
   crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}

@@ -1749,6 +1749,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 EditorGUILayout.LabelField("보스 노이즈 텍스처 UV 를 수직으로 옮긴다(_NoiseST.w = 카메라 이동 누적 + 이 값). 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함. + = 위(카메라 위 이동과 같은 방향). 노이즈가 보이려면 '보스 노이즈' 세기 클립이 켜져 있어야 한다.", EditorStyles.wordWrappedMiniLabel);
                 DrawSettingsFields("보스 노이즈 모양", nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseTiling));
                 break;
+            case BossVictoryTrack.Rectify:
+                EditorGUILayout.LabelField("배경 글자 — 외곽선만, 플레이어·보스 뒤·벽/바닥 앞, 찢긴 화면과 같이 찢긴다. 세기 = 알파: 들어오는 동안 가로줄이 그 비율만큼 무작위로 켜져 찢기듯 등장. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
+                DrawSettingsFields("배경 글자 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFont), nameof(BossVictoryGlitchSettings.rectifyText),
+                    nameof(BossVictoryGlitchSettings.rectifyWidth), nameof(BossVictoryGlitchSettings.rectifyCenterY),
+                    nameof(BossVictoryGlitchSettings.rectifyOutline), nameof(BossVictoryGlitchSettings.rectifyColor));
+                break;
             case BossVictoryTrack.CameraBob:
                 EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);
                 break;

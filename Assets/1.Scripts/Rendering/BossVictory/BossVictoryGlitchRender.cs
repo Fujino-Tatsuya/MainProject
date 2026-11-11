@@ -43,6 +43,7 @@ public static class BossVictoryGlitchRender
         public Vector2 NoiseOffset;        // 노이즈 UV 오프셋 — 카메라 이동으로만 누적(시간 흐름 없음)
         public Vector3 GroundCircleCenter; // 발밑 회색 원 중심(월드, 246 복원)
         public float GroundCircleRadius;   // 발밑 회색 원 반경(m) — 0 = 끔
+        public float Rectify;              // 배경 글자 알파(267 후속)
     }
 
     static readonly int IdId = Shader.PropertyToID("_GlitchId");
@@ -57,6 +58,11 @@ public static class BossVictoryGlitchRender
     static readonly int IdNoiseST = Shader.PropertyToID("_NoiseST");          // xy 타일링, zw UV 오프셋(카메라 이동 누적)
     static readonly int IdNoiseBright = Shader.PropertyToID("_NoiseBright");
     static readonly int IdNoiseDark = Shader.PropertyToID("_NoiseDark");
+    static readonly int IdRectifyTex = Shader.PropertyToID("_RectifyTex");
+    static readonly int IdRectifyScreen = Shader.PropertyToID("_RectifyScreen");   // 글자마다 xy 최소 · zw 최대(뷰포트)
+    static readonly int IdRectifyUV = Shader.PropertyToID("_RectifyUV");           // 글자마다 아틀라스 xy 시작 · zw 크기
+    static readonly int IdRectifyParams = Shader.PropertyToID("_RectifyParams");   // x 알파, y 외곽선 반두께(SDF), z 글자 수
+    static readonly int IdRectifyColor = Shader.PropertyToID("_RectifyColor");
     static readonly int IdCircle = Shader.PropertyToID("_GroundCircle");          // xyz 중심(월드), w 반경(m)
     static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
     static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 찢김 줄 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
@@ -111,6 +117,12 @@ public static class BossVictoryGlitchRender
         CoreUtils.Destroy(_maskBoss);
         CoreUtils.Destroy(_composite);
         _maskPlayer = _maskBoss = _composite = null;
+        BossVictoryRectifyText.Destroy(_rectifyAsset);
+        _rectifyAsset = null;
+        _rectifyFont = null;
+        _rectifyText = null;
+        _rectifyGlyphs.Clear();
+        _rectifyCount = 0;
         _anyEffect = false;
     }
 
@@ -128,6 +140,46 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdTear, new Vector4(Mathf.Max(0f, s.tearMaxShift), Mathf.Clamp01(s.tearDensity), Mathf.Max(0f, s.tearStreakLength), 0f));
         _noiseSpace = s.bossNoiseSpace == BossVictoryGlitchSettings.NoiseSpace.Boss ? 1f : 0f;
         _composite.SetVector(IdCircleLook, new Vector4(Mathf.Max(0f, s.groundCircleSoftness), Mathf.Max(0f, s.groundCircleBrightness), 0f, 0f));
+        ApplyRectify(s);
+    }
+
+    // 배경 글자(267 후속) — 켤 때 아틀라스 1회, 배치는 화면 비율이 바뀔 때만.
+    static TMPro.TMP_FontAsset _rectifyAsset;
+    static readonly List<BossVictoryRectifyText.Glyph> _rectifyGlyphs = new List<BossVictoryRectifyText.Glyph>();
+    static readonly Vector4[] _rectifyScreen = new Vector4[BossVictoryRectifyText.MaxGlyphs];
+    static readonly Vector4[] _rectifyUV = new Vector4[BossVictoryRectifyText.MaxGlyphs];
+    static float _rectifyCap, _rectifyAspect = -1f, _rectifyWidth, _rectifyCenterY, _rectifyHalf;
+    static int _rectifyCount;
+    static Font _rectifyFont;
+    static string _rectifyText;
+
+    static void ApplyRectify(BossVictoryGlitchSettings s)
+    {
+        if (_rectifyFont != s.rectifyFont || _rectifyText != s.rectifyText)
+        {
+            BossVictoryRectifyText.Destroy(_rectifyAsset);
+            _rectifyAsset = BossVictoryRectifyText.CreateAtlas(s.rectifyFont, s.rectifyText, _rectifyGlyphs, out _rectifyCap);
+            _rectifyFont = s.rectifyFont;
+            _rectifyText = s.rectifyText;
+            if (s.rectifyFont != null && _rectifyAsset == null) Debug.LogWarning($"[BossVictory] 배경 글자 아틀라스를 못 만들었다 — 폰트 {s.rectifyFont.name} · '{s.rectifyText}'");
+        }
+        _rectifyWidth = s.rectifyWidth;
+        _rectifyCenterY = s.rectifyCenterY;
+        _rectifyHalf = BossVictoryRectifyText.OutlineHalfWidthSdf(_rectifyCap, s.rectifyOutline, BossVictoryRectifyText.AtlasPadding);
+        _rectifyAspect = -1f;   // 다음 프레임에 다시 배치
+        _composite.SetColor(IdRectifyColor, s.rectifyColor.linear);
+        _composite.SetTexture(IdRectifyTex, _rectifyAsset != null ? _rectifyAsset.atlasTexture : Texture2D.blackTexture);
+    }
+
+    static void LayoutRectify()
+    {
+        float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 16f / 9f;
+        if (Mathf.Approximately(aspect, _rectifyAspect)) return;
+        _rectifyAspect = aspect;
+        _rectifyCount = _rectifyAsset == null ? 0 : BossVictoryRectifyText.Layout(_rectifyGlyphs, _rectifyCap, BossVictoryRectifyText.AtlasPadding,
+            new Vector2(_rectifyAsset.atlasWidth, _rectifyAsset.atlasHeight), _rectifyWidth, _rectifyCenterY, aspect, _rectifyScreen, _rectifyUV);
+        _composite.SetVectorArray(IdRectifyScreen, _rectifyScreen);
+        _composite.SetVectorArray(IdRectifyUV, _rectifyUV);
     }
 
     static float _noiseSpace;
@@ -143,6 +195,9 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdC, new Vector4(f.BossNoise, 0f, 0f, 0f));
         _composite.SetVector(IdBossScreen, new Vector4(f.BossScreenCenter.x, f.BossScreenCenter.y, Mathf.Max(0.01f, f.BossScreenSize), _noiseSpace));
         _composite.SetVector(IdNoiseST, new Vector4(_noiseTiling.x, _noiseTiling.y, f.NoiseOffset.x, f.NoiseOffset.y));
+        LayoutRectify();
+        _composite.SetVector(IdRectifyParams, new Vector4(_rectifyCount > 0 ? Mathf.Clamp01(f.Rectify) : 0f, _rectifyHalf, _rectifyCount,
+            _rectifyAsset != null ? _rectifyAsset.atlasHeight / (BossVictoryRectifyText.AtlasPadding + 1f) : 1f));
         _composite.SetVector(IdCircle, new Vector4(f.GroundCircleCenter.x, f.GroundCircleCenter.y, f.GroundCircleCenter.z, Mathf.Max(0f, f.GroundCircleRadius)));
     }
 

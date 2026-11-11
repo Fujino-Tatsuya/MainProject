@@ -17,6 +17,7 @@ public enum BossVictoryTrack
     KillerAction, // 처치자 평타 — 첫 클립만, 시작 0 고정, 끝 = 처치 순간 하던 동작을 끊는 시각(없으면 자기 클립 끝까지 — 255 후속 4)
     NoiseScrollV, // 보스 노이즈 UV 수직 이동 — 클립 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함(267 후속). 노이즈 텍스처 V 오프셋(_NoiseST.w)
     GroundCircle, // 발밑 회색 원(246 복원 — 267 후속) — 세기 = 반경 비율(설정 SO groundCircleRadius × 세기). 원 안 배경은 호박색 대신 흑백
+    Rectify,      // 배경 글자 'RECTIFY'(267 후속) — 세기 = 알파(들어오는 동안 가로줄이 무작위로 켜지며 찢기듯 등장). 외곽선만, 인물·보스 뒤·배경 앞
     CameraBob,    // 카메라 두둥실(267 후속) — 화면 세로 흔들림 = 세기 × 진폭(화면 높이 %) × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영 행렬 세로 이동(카메라 위치는 안 건드림)
 }
 
@@ -147,6 +148,9 @@ public sealed class BossVictoryTimeline
     public List<BossVictoryClip> noiseScrollV = new List<BossVictoryClip>();
     /// <summary>카메라 두둥실 클립(267 후속) — <see cref="BossVictoryTrack.CameraBob"/>.</summary>
     public List<BossVictoryClip> cameraBob = new List<BossVictoryClip>();
+    /// <summary>배경 글자 'RECTIFY' 클립(267 후속) — 세기 = 알파.</summary>
+    public List<BossVictoryClip> rectify = new List<BossVictoryClip>();
+    [SerializeField, HideInInspector] bool rectifySeeded;
     // 옛 에셋(이 트랙 전)에 기본 두둥실 클립을 한 번 넣었는가 — 지운 뒤엔 다시 안 넣음(<see cref="SeedCameraBob"/>).
     [SerializeField, HideInInspector] bool cameraBobSeeded;
     /// <summary>발밑 회색 원 클립(246 복원 — 267 후속) — 세기 = 반경 비율. 페이드 인 = 0 → 목표 반경으로 커짐.</summary>
@@ -197,6 +201,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.KillerAction => killerAction,
         BossVictoryTrack.NoiseScrollV => noiseScrollV ??= new List<BossVictoryClip>(),
         BossVictoryTrack.CameraBob => cameraBob ??= new List<BossVictoryClip>(),
+        BossVictoryTrack.Rectify => rectify ??= new List<BossVictoryClip>(),
         BossVictoryTrack.GroundCircle => groundCircle ??= new List<BossVictoryClip>(),
         _ => throw new ArgumentOutOfRangeException(nameof(track)),
     };
@@ -270,6 +275,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.KillerAction => "처치자 평타",
         BossVictoryTrack.NoiseScrollV => "노이즈 UV 수직 이동",
         BossVictoryTrack.CameraBob => "카메라 두둥실",
+        BossVictoryTrack.Rectify => "배경 글자 RECTIFY",
         BossVictoryTrack.GroundCircle => "발밑 회색 원",
         _ => track.ToString(),
     };
@@ -613,6 +619,20 @@ public sealed class BossVictoryTimeline
         return true;
     }
 
+    /// <summary>배경 글자 기본 클립 — 0.3초(노란 틴트 시작)부터 0.1초 동안 찢기며 들어와 TV 꺼짐 시작(4.5초)까지(TV 꺼짐 캡처에 남는다).</summary>
+    public const float DefaultRectifyStart = 0.3f, DefaultRectifyFadeIn = 0.1f, DefaultRectifyEnd = 4.5f;
+
+    /// <summary>이 트랙 전 에셋이면 기본 글자 클립을 한 번 넣는다(멱등 — 지운 뒤엔 다시 안 넣음). 세기 키 이관 전에. 넣었으면 true.</summary>
+    public bool SeedRectify()
+    {
+        if (rectifySeeded) return false;
+        rectifySeeded = true;
+        rectify ??= new List<BossVictoryClip>();
+        if (rectify.Count > 0) return false;
+        rectify.Add(BossVictoryClip.Make(DefaultRectifyStart, DefaultRectifyEnd - DefaultRectifyStart, DefaultRectifyFadeIn));
+        return true;
+    }
+
     public bool SeedGroundCircle()
     {
         if (groundCircleSeeded) return false;
@@ -658,6 +678,7 @@ public sealed class BossVictoryTimeline
         tl.slowStartTime = 0f;
         tl.SeedGroundCircle();
         tl.SeedCameraBob();
+        tl.SeedRectify();
         tl.MigrateKeys();   // 효과 세기 클립 = 세기 키(같은 화면 — 255 후속 6)
         return tl;
     }
