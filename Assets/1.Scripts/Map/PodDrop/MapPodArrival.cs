@@ -543,7 +543,7 @@ public sealed class MapPodArrival : NetworkBehaviour
     }
 
     // 착지 애니는 상태마다 자기 마스크 레이어(Gear·Wings·Hatches)에서 1배속으로 돈다 — 겹쳐 돌아도 서로 덮지 않는다.
-    // 급감속 전(빠른 낙하 중)엔 날개 접기·다리 펴기 클립 처음 자세로 멈춰 떨어진다 — 날개 접기 0프레임 = 펴진 날개(DP_WingDeploy 끝과 같은 자세, 할 일 150).
+    // 급감속 전(빠른 낙하 중)엔 다리 펴기 클립 처음 자세로 멈춰 떨어진다. 날개는 접기 클립 처음 자세(펴짐)에 끝까지 고정(할 일 263) — 날개 접기 0프레임 = 펴진 날개(DP_WingDeploy 끝과 같은 자세, 할 일 150).
     // 접기·펴기는 급감속 시작 순간, 해치 열기는 지면에 닿는 순간 시작(늦게 본 피어는 지난 만큼 건너뛴다).
     // 해치는 지면에 닿기 전까지 열기 클립 0프레임에 고정(닫힌 자세) — Hatches 레이어가 비면 베이스 DP_Idle 의 열린 해치가 보인다. 고정 중 이벤트는 버린다.
     private void UpdatePodAnimation(PodDropMapTimeline timeline, bool started, double elapsed, double deployed)
@@ -559,22 +559,22 @@ public sealed class MapPodArrival : NetworkBehaviour
         if (PodArrivalRules.ShouldHoldHatchClosed(started, elapsed, touchdown))
             _podAnimator.HoldAtStart(map.hatchOpenState, -1);
 
+        // 날개는 착륙 내내 편 채로(할 일 263) — 날개 접기 클립 0프레임(= 펴진 자세)에 매 프레임 고정하고(해치와 같은 HoldAtStart, 이벤트 버림) 접기는 재생하지 않는다.
+        _podAnimator.HoldAtStart(map.wingFoldState, -1);
+
         if (timeline.SkipApproach)
         {
-            // 앞 구간 건너뛰기(할 일 198) — 로딩 아래에서부터 날개 접힘·다리 펴짐 끝 자세(클립 끝을 넘긴 시각 = 끝 자세로 남는다).
-            _podAnimator.Play(map.wingFoldState, -1, float.PositiveInfinity);
+            // 앞 구간 건너뛰기(할 일 198) — 로딩 아래에서부터 다리 펴짐 끝 자세(클립 끝을 넘긴 시각 = 끝 자세로 남는다).
             _podAnimator.Play(map.gearDeployState, -1, float.PositiveInfinity);
         }
         else if (!started || elapsed < timeline.BrakeAt)
         {
-            _podAnimator.PoseStart(map.wingFoldState, -1);
             _podAnimator.PoseStart(map.gearDeployState, -1);
             return;
         }
         else
         {
             float sinceBrake = (float)(elapsed - timeline.BrakeAt);
-            _podAnimator.Play(map.wingFoldState, -1, sinceBrake);
             _podAnimator.Play(map.gearDeployState, -1, sinceBrake);
         }
 
