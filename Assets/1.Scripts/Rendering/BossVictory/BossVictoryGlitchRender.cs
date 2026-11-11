@@ -41,6 +41,8 @@ public static class BossVictoryGlitchRender
         public Vector2 BossScreenCenter;   // 보스 중심(뷰포트 0~1) — 노이즈 보스 기준 공간
         public float BossScreenSize;       // 보스 화면 높이(뷰포트) — 노이즈 보스 기준 공간 배율
         public Vector2 NoiseOffset;        // 노이즈 UV 오프셋 — 카메라 이동으로만 누적(시간 흐름 없음)
+        public Vector3 GroundCircleCenter; // 발밑 회색 원 중심(월드, 246 복원)
+        public float GroundCircleRadius;   // 발밑 회색 원 반경(m) — 0 = 끔
     }
 
     static readonly int IdId = Shader.PropertyToID("_GlitchId");
@@ -55,6 +57,8 @@ public static class BossVictoryGlitchRender
     static readonly int IdNoiseST = Shader.PropertyToID("_NoiseST");          // xy 타일링, zw UV 오프셋(카메라 이동 누적)
     static readonly int IdNoiseBright = Shader.PropertyToID("_NoiseBright");
     static readonly int IdNoiseDark = Shader.PropertyToID("_NoiseDark");
+    static readonly int IdCircle = Shader.PropertyToID("_GroundCircle");          // xyz 중심(월드), w 반경(m)
+    static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
     static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 찢김 줄 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
 
     static Material _maskPlayer, _maskBoss, _composite;
@@ -88,6 +92,7 @@ public static class BossVictoryGlitchRender
         {
             renderPassEvent = RenderPassEvent.AfterRenderingTransparents,       // 이펙트까지 그린 뒤, 후처리 전
         };
+        _compositePass.ConfigureInput(ScriptableRenderPassInput.Depth);   // 발밑 회색 원 — 픽셀 월드 위치
 
         RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         _hooked = true;
@@ -122,6 +127,7 @@ public static class BossVictoryGlitchRender
             Mathf.Max(1f, s.tearLineMaxMultiplier), Mathf.Max(1f, s.tearRefreshRate)));
         _composite.SetVector(IdTear, new Vector4(Mathf.Max(0f, s.tearMaxShift), Mathf.Clamp01(s.tearDensity), Mathf.Max(0f, s.tearStreakLength), 0f));
         _noiseSpace = s.bossNoiseSpace == BossVictoryGlitchSettings.NoiseSpace.Boss ? 1f : 0f;
+        _composite.SetVector(IdCircleLook, new Vector4(Mathf.Max(0f, s.groundCircleSoftness), Mathf.Max(0f, s.groundCircleBrightness), 0f, 0f));
     }
 
     static float _noiseSpace;
@@ -137,6 +143,7 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdC, new Vector4(f.BossNoise, 0f, 0f, 0f));
         _composite.SetVector(IdBossScreen, new Vector4(f.BossScreenCenter.x, f.BossScreenCenter.y, Mathf.Max(0.01f, f.BossScreenSize), _noiseSpace));
         _composite.SetVector(IdNoiseST, new Vector4(_noiseTiling.x, _noiseTiling.y, f.NoiseOffset.x, f.NoiseOffset.y));
+        _composite.SetVector(IdCircle, new Vector4(f.GroundCircleCenter.x, f.GroundCircleCenter.y, f.GroundCircleCenter.z, Mathf.Max(0f, f.GroundCircleRadius)));
     }
 
     /// <summary>렌더러에 비트를 더한다(OR). 돌려받은 목록으로 <see cref="Untag"/>.</summary>
@@ -308,6 +315,9 @@ public static class BossVictoryGlitchRender
                 data.idTex = shared.idTex;
                 builder.UseTexture(color, AccessFlags.Read);
                 builder.UseTexture(shared.idTex, AccessFlags.Read);
+                // 발밑 회색 원(246 복원) — 셰이더가 _CameraDepthTexture 로 픽셀 월드 위치를 되살린다(읽기 선언 = 깊이 복사 뒤에 놓임).
+                if (resourceData.cameraDepthTexture.IsValid())
+                    builder.UseTexture(resourceData.cameraDepthTexture, AccessFlags.Read);
                 builder.SetRenderAttachment(dest, 0, AccessFlags.Write);
                 builder.SetRenderFunc(static (BlitData d, RasterGraphContext ctx) =>
                 {

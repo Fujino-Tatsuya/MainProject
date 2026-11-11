@@ -15,6 +15,8 @@ public enum BossVictoryTrack
     CrtOff,      // TV 꺼짐 — 첫 클립만, 시작에 화면 캡처·길이 = 꺼짐 길이
     CameraCut,   // 카메라 컷 — 클립 시작 = 컷 시작, 다음 컷 시작까지 유지(길이는 자동). 컷 값 = cameraCutShots 같은 번호(255)
     KillerAction, // 처치자 평타 — 첫 클립만, 시작 0 고정, 끝 = 처치 순간 하던 동작을 끊는 시각(없으면 자기 클립 끝까지 — 255 후속 4)
+    NoiseScrollV, // 보스 노이즈 UV 수직 이동 — 클립 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함(267 후속). 노이즈 텍스처 V 오프셋(_NoiseST.w)
+    GroundCircle, // 발밑 회색 원(246 복원 — 267 후속) — 세기 = 반경 비율(설정 SO groundCircleRadius × 세기). 원 안 배경은 호박색 대신 흑백
 }
 
 /// <summary>보스 처치 연출 타임라인 순간 마커.</summary>
@@ -46,6 +48,10 @@ public struct BossVictoryClip
     [Range(0f, 1f)] public float weight;
     /// <summary>세기 키(비율 위치 — 클립을 옮기거나 늘이면 비율대로 따라간다). 비면 옛 페이드 식.</summary>
     public List<BossVictoryKey> keys;
+    /// <summary>[노이즈 UV 수직 이동 트랙만] 시작·끝 오프셋(노이즈 UV, 1 = 텍스처 한 장 — 텍스처 Repeat 라 감김)·이징(267 후속).</summary>
+    public float uvFrom;
+    public float uvTo;
+    public BossVictoryKeyCurve uvEase;
 
     public float End => start + length;
 
@@ -82,6 +88,14 @@ public struct BossVictoryClip
         return weight * Mathf.Min(a, b);
     }
 
+    /// <summary>[노이즈 UV 수직 이동] 시각 t 의 오프셋 — 시작 전 0 · 구간 안 = 시작 → 끝(이징) · 끝 뒤 = 끝 값 유지. 길이 0 이면 시작부터 끝 값.</summary>
+    public float UvOffset(float t)
+    {
+        if (t < start) return 0f;
+        if (length <= 0f || t >= End) return uvTo;
+        return Mathf.LerpUnclamped(uvFrom, uvTo, BossVictoryKeys.Ease(uvEase, (t - start) / length));
+    }
+
     static float Smooth(float x)
     {
         x = Mathf.Clamp01(x);
@@ -113,6 +127,12 @@ public sealed class BossVictoryTimeline
     public List<BossVictoryCameraCuts.Cut> cameraCutShots = new List<BossVictoryCameraCuts.Cut>();
     /// <summary>처치자 평타 — 첫 클립만, 시작 0 · 끝 = 하던 동작을 끊는 시각(255 후속 4).</summary>
     public List<BossVictoryClip> killerAction = new List<BossVictoryClip>();
+    /// <summary>보스 노이즈 UV 수직 이동 클립(267 후속) — <see cref="NoiseScrollV"/>.</summary>
+    public List<BossVictoryClip> noiseScrollV = new List<BossVictoryClip>();
+    /// <summary>발밑 회색 원 클립(246 복원 — 267 후속) — 세기 = 반경 비율. 페이드 인 = 0 → 목표 반경으로 커짐.</summary>
+    public List<BossVictoryClip> groundCircle = new List<BossVictoryClip>();
+    // 옛 에셋(이 트랙 전)에 기본 원 클립을 한 번 넣었는가 — 넣은 뒤 사용자가 지우면 그대로 둔다(<see cref="SeedGroundCircle"/>).
+    [SerializeField, HideInInspector] bool groundCircleSeeded;
 
     [Min(0f)] public float focusKillerTime = 0.2f;
     [Min(0f)] public float hideOthersTime = 0.2f;
@@ -155,6 +175,8 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.CrtOff => crtOff,
         BossVictoryTrack.CameraCut => cameraCut,
         BossVictoryTrack.KillerAction => killerAction,
+        BossVictoryTrack.NoiseScrollV => noiseScrollV ??= new List<BossVictoryClip>(),
+        BossVictoryTrack.GroundCircle => groundCircle ??= new List<BossVictoryClip>(),
         _ => throw new ArgumentOutOfRangeException(nameof(track)),
     };
 
@@ -199,7 +221,10 @@ public sealed class BossVictoryTimeline
 
     /// <summary>페이드·세기가 의미 있는 트랙인가(TV 꺼짐·처치자 평타는 구간만 · 카메라 컷은 시작만).</summary>
     public static bool HasFades(BossVictoryTrack track) =>
-        track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut && track != BossVictoryTrack.KillerAction;
+        track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut && track != BossVictoryTrack.KillerAction && track != BossVictoryTrack.NoiseScrollV;
+
+    /// <summary>값 = UV 오프셋(시작·끝·이징)인 트랙인가(세기 키 없음 — 267 후속).</summary>
+    public static bool IsUvScroll(BossVictoryTrack track) => track == BossVictoryTrack.NoiseScrollV;
 
     /// <summary>시작이 0 고정인 트랙인가(처치자 평타 — 처치 순간부터, 끝만 고친다).</summary>
     public static bool StartFixed(BossVictoryTrack track) => track == BossVictoryTrack.KillerAction;
@@ -216,6 +241,8 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.CrtOff => "TV 꺼짐",
         BossVictoryTrack.CameraCut => "카메라 컷",
         BossVictoryTrack.KillerAction => "처치자 평타",
+        BossVictoryTrack.NoiseScrollV => "노이즈 UV 수직 이동",
+        BossVictoryTrack.GroundCircle => "발밑 회색 원",
         _ => track.ToString(),
     };
 
@@ -239,6 +266,15 @@ public sealed class BossVictoryTimeline
         List<BossVictoryClip> clips = Clips(track);
         float v = 0f;
         for (int i = 0; i < clips.Count; i++) v = Mathf.Max(v, clips[i].Evaluate(t));
+        return v;
+    }
+
+    /// <summary>노이즈 UV 수직 오프셋 = 클립마다 <see cref="BossVictoryClip.UvOffset"/> 의 합(이어 붙이면 이어서 흐른다 — 267 후속).</summary>
+    public float NoiseScrollOffset(float t)
+    {
+        if (noiseScrollV == null) return 0f;
+        float v = 0f;
+        for (int i = 0; i < noiseScrollV.Count; i++) v += noiseScrollV[i].UvOffset(t);
         return v;
     }
 
@@ -500,6 +536,35 @@ public sealed class BossVictoryTimeline
 
     public const float DefaultEnd = 5.6f;   // TV 꺼짐 끝 = 로비 전환
 
+    /// <summary>발밑 회색 원 기본 클립 — 노란 틴트 시작(0.3)부터 0.6초에 걸쳐 커져 끝까지(옛 246: 주황 들어오는 순간부터 0.6초 smoothstep, 씬 끝까지 유지).</summary>
+    public const float DefaultGroundCircleStart = 0.3f;
+    public const float DefaultGroundCircleGrow = 0.6f;
+
+    /// <summary>
+    /// 이 트랙이 생기기 전 에셋이면 기본 원 클립을 한 번 넣는다(멱등 — 넣은 표시를 남겨 사용자가 지운 뒤엔 다시 안 넣음). 넣었으면 true.
+    /// 세기 키 이관(<see cref="MigrateKeys"/>) 전에 부른다.
+    /// </summary>
+    /// <summary>
+    /// 발밑 회색 원 중심(267 후속 — 사용자: 카메라 기준) — 카메라 바로 아래 바닥 점(카메라 x·z, 높이 = 처치자 발 높이), 매 프레임 따라감.
+    /// 단 '카메라 처치자로' 마커 전(<paramref name="focusKillerTime"/>)은 피어마다 게임 카메라가 달라 처치자 발밑(연출 시작 위치)을 쓴다 — 모든 피어 같은 화면.
+    /// 카메라가 없으면 처치자 발밑.
+    /// </summary>
+    public static Vector3 GroundCircleCenter(float t, float focusKillerTime, Vector3 killerFloor, bool hasCamera, Vector3 cameraPos)
+    {
+        if (!hasCamera || t < focusKillerTime) return killerFloor;
+        return new Vector3(cameraPos.x, killerFloor.y, cameraPos.z);
+    }
+
+    public bool SeedGroundCircle()
+    {
+        if (groundCircleSeeded) return false;
+        groundCircleSeeded = true;
+        groundCircle ??= new List<BossVictoryClip>();
+        if (groundCircle.Count > 0) return false;
+        groundCircle.Add(BossVictoryClip.Make(DefaultGroundCircleStart, DefaultEnd - DefaultGroundCircleStart, DefaultGroundCircleGrow));
+        return true;
+    }
+
     /// <summary>
     /// 기본 타임라인 — 옛 기본 곡선(에셋 값)과 같은 화면(EditMode <c>BossVictoryTimelineTests</c>).
     /// 램프 곡선 → 끝(5.6)까지 가는 페이드 인 클립 · 펄스 곡선 → 키 사이 그대로의 페이드 인/아웃 클립 ·
@@ -533,6 +598,7 @@ public sealed class BossVictoryTimeline
         tl.backDashStartTime = DefaultActionEnd;
         tl.finisherStartTime = DefaultFinisherStart;
         tl.slowStartTime = 0f;
+        tl.SeedGroundCircle();
         tl.MigrateKeys();   // 효과 세기 클립 = 세기 키(같은 화면 — 255 후속 6)
         return tl;
     }

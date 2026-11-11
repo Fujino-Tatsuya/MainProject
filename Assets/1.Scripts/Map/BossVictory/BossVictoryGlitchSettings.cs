@@ -49,17 +49,17 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
 
     [Header("가로줄 찢김 모양")]
     [Tooltip("찢김 줄 기본 굵기(px, 화면 해상도 기준).")]
-    [Min(1f)] public float tearLinePixels = 3f;
+    [Min(1f)] public float tearLinePixels = 1.75f;
     [Tooltip("줄 굵기 최대 배수 — 줄마다 기본 굵기 × 1~이 값(가는 줄·조금 굵은 줄이 섞인다).")]
-    [Min(1f)] public float tearLineMaxMultiplier = 3f;
+    [Min(1f)] public float tearLineMaxMultiplier = 1.75f;
     [Tooltip("최대 밀림 거리(화면 너비 비율) — 줄마다 0~이 값(짧은 밀림이 많고 긴 밀림은 드물다), 좌우 무작위.")]
-    [Range(0f, 1f)] public float tearMaxShift = 0.12f;
+    [Range(0f, 1f)] public float tearMaxShift = 0.04f;
     [Tooltip("찢김 세기 1 일 때 켜지는 줄 비율(빈도).")]
-    [Range(0f, 1f)] public float tearDensity = 0.35f;
+    [Range(0f, 1f)] public float tearDensity = 0.9f;
     [Tooltip("찢김 무늬가 바뀌는 횟수(초당).")]
-    [Min(1f)] public float tearRefreshRate = 24f;
+    [Min(1f)] public float tearRefreshRate = 30f;
     [Tooltip("밝은 부분 끌림 길이(화면 너비 비율).")]
-    [Range(0f, 0.5f)] public float tearStreakLength = 0.08f;
+    [Range(0f, 0.5f)] public float tearStreakLength = 0.025f;
 
     public enum NoiseSpace { Screen, Boss }
 
@@ -76,6 +76,15 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("밝은 색 배율(과노출 느낌 — 블룸이 받는다).")]
     [Min(0f)] public float bossNoiseBrightIntensity = 1.6f;
     public Color bossNoiseDarkColor = new Color32(0x3A, 0x17, 0x12, 0xFF);
+
+    [Header("발밑 회색 원(246 복원 — 켜는 시각·커지는 시간 = 타임라인 '발밑 회색 원' 클립)")]
+    [Tooltip("원 목표 반경(m, 수평 거리) — 클립 세기 1 일 때. 중심 = 카메라 바로 아래 바닥(매 프레임 따라감, 높이 = 처치자 발 — '카메라 처치자로' 마커 전엔 처치자 발밑). 위에서 봤을 때 원 안(높이 한도 없음 — 원기둥)의 배경은 " +
+             "호박색 대신 원래 무늬를 살린 흑백. 플레이어·보스 노이즈는 그대로. 0 = 끔.")]
+    [Min(0f)] public float groundCircleRadius = 6f;
+    [Tooltip("원 가장자리 부드러움(m) — 반경 안쪽으로 이만큼에 걸쳐 흑백 → 호박색.")]
+    [Min(0f)] public float groundCircleSoftness = 1f;
+    [Tooltip("원 안 흑백 밝기 배율(원래 명도 × 이 값).")]
+    [Min(0f)] public float groundCircleBrightness = 1f;
 
     // 카메라 컷 목록은 타임라인 '카메라 컷' 트랙(timeline.cameraCut·cameraCutShots — 255, 옛 cuts 배열 삭제). 예: 와이드(0.33·거리 16·각 22·방위 50) → 보스 클로즈업(1.67·7·6·−160) → 와이드(2.6).
     [Header("카메라 컷 벽 숨김(컷·컷별 켜기/끄기 = 타임라인 '카메라 컷' 트랙)")]

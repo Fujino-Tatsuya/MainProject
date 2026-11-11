@@ -26,19 +26,22 @@ MonoBehaviour:
   hideOthersTarget: 0
   amberColor: {r: 0.8235294, g: 0.6509804, b: 0.30588236, a: 1}
   scanlineCount: 360
-  tearLinePixels: 3
-  tearLineMaxMultiplier: 3
-  tearMaxShift: 0.12
-  tearDensity: 0.35
-  tearRefreshRate: 24
-  tearStreakLength: 0.08
+  tearLinePixels: 1.75
+  tearLineMaxMultiplier: 1.75
+  tearMaxShift: 0.04
+  tearDensity: 0.9
+  tearRefreshRate: 30
+  tearStreakLength: 0.025
   bossNoiseTexture: {fileID: 2800000, guid: 465bf8b24a9102e0f904bee0aebfbe89, type: 3}
   bossNoiseSpace: 0
-  bossNoiseTiling: {x: 1, y: 1}
+  bossNoiseTiling: {x: 0.2, y: 1}
   bossNoiseCameraScale: {x: 0.1, y: 0.1}
   bossNoiseBrightColor: {r: 1, g: 0.9647059, b: 0.91764706, a: 1}
   bossNoiseBrightIntensity: 1.6
   bossNoiseDarkColor: {r: 0.22745098, g: 0.09019608, b: 0.07058824, a: 1}
+  groundCircleRadius: 5.73
+  groundCircleSoftness: 19.05
+  groundCircleBrightness: 1
   wallFacingThreshold: 0.3
   wallSearchRadius: 40
   crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}

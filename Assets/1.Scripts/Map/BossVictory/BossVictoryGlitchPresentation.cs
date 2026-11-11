@@ -65,6 +65,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     int _killerActionState;
     PlayerMotor _dashMotor;          // 오너 피어만(이동은 오너 권위) — 다른 피어는 애니만, 위치는 복제로 본다
     Vector3 _dashDir;
+    Vector3 _circleCenter;   // 발밑 회색 원 — 연출 시작 순간 처치자 발밑(높이 기준·마커 전 중심, 267 후속)
     System.Func<float, float> _dashEase;   // 설정 SO 백대쉬 곡선(한 번 만들어 재사용)
     double _dashStartAt;
     float _dashDone;
@@ -370,6 +371,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (mate != null && mate.activeInHierarchy) _others.Add(mate);
 #endif
         _killerSkills = _killer != null ? _killer.GetComponent<PlayerSkillController>() : null;
+        _circleCenter = _killer != null ? _killer.transform.position : v.HitPoint;   // 발밑 회색 원 — 처치자 발밑(높이 기준 + 마커 전 중심), 시작 순간 고정
 
         int cleared = ClearEffectsLocal();
 
@@ -752,7 +754,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             BossNoise = tl.Evaluate(BossVictoryTrack.BossNoise, t),
         };
         BossScreenRect(out frame.BossScreenCenter, out frame.BossScreenSize);
-        frame.NoiseOffset = TickNoiseOffset(s);
+        // 발밑 회색 원(246 복원) — 반경 = 설정 반경 × 클립 세기, 중심 = 카메라 바로 아래 바닥(매 프레임, 높이 = 처치자 발). '카메라 처치자로' 마커 전엔 처치자 발밑(피어마다 카메라가 다른 구간).
+        Camera circleCam = Camera.main;
+        frame.GroundCircleCenter = BossVictoryTimeline.GroundCircleCenter(t, tl.focusKillerTime, _circleCenter,
+            circleCam != null, circleCam != null ? circleCam.transform.position : Vector3.zero);
+        frame.GroundCircleRadius = s.groundCircleRadius * tl.Evaluate(BossVictoryTrack.GroundCircle, t);
+        frame.NoiseOffset = TickNoiseOffset(s) + new Vector2(0f, tl.NoiseScrollOffset(t));   // 카메라 이동 누적 + 타임라인 '노이즈 UV 수직 이동'(267 후속 — 시각 t 상태, 스크럽 OK)
         BossVictoryGlitchRender.SetFrame(frame);
     }
 

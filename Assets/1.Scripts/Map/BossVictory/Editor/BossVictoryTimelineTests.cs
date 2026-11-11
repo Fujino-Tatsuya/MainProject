@@ -153,4 +153,92 @@ public sealed class BossVictoryTimelineTests
         tl.SetMarkerTime(BossVictoryMarker.FocusKiller, 1.23f);
         Assert.AreEqual(1.23f, tl.focusKillerTime, 1e-6f);
     }
+
+    // ── 노이즈 UV 수직 이동(267 후속) ──
+
+    static BossVictoryClip Uv(float start, float length, float from, float to, BossVictoryKeyCurve ease) =>
+        new BossVictoryClip { start = start, length = length, weight = 1f, uvFrom = from, uvTo = to, uvEase = ease };
+
+    [Test]
+    public void UV_수직_이동_시작_전_0_구간_안_이징_끝_뒤_끝_값()
+    {
+        BossVictoryClip c = Uv(1f, 2f, 0.2f, 1.2f, BossVictoryKeyCurve.EaseInOut);
+        Assert.AreEqual(0f, c.UvOffset(0.5f), 1e-6f, "시작 전 = 0");
+        Assert.AreEqual(0.2f, c.UvOffset(1f), 1e-5f, "시작 = 시작 오프셋");
+        Assert.AreEqual(0.7f, c.UvOffset(2f), 1e-5f, "가운데 = smoothstep 0.5");
+        Assert.AreEqual(0.2f + 0.15625f, c.UvOffset(1.5f), 1e-5f, "1/4 = smoothstep 0.15625(ease in — 천천히 출발)");
+        Assert.AreEqual(1.2f, c.UvOffset(3f), 1e-5f, "끝");
+        Assert.AreEqual(1.2f, c.UvOffset(9f), 1e-5f, "끝 뒤 유지");
+        Assert.AreEqual(0.45f, Uv(1f, 2f, 0.2f, 1.2f, BossVictoryKeyCurve.Linear).UvOffset(1.5f), 1e-5f, "선형");
+        Assert.AreEqual(-1f, Uv(0f, 0f, 0f, -1f, BossVictoryKeyCurve.Linear).UvOffset(0f), 1e-6f, "길이 0 = 시작부터 끝 값");
+    }
+
+    [Test]
+    public void UV_수직_이동_클립끼리_더하고_세기_트랙이_아니다()
+    {
+        var tl = new BossVictoryTimeline();
+        Assert.AreEqual(0f, tl.NoiseScrollOffset(1f));
+        tl.noiseScrollV.Add(Uv(0f, 1f, 0f, 1f, BossVictoryKeyCurve.Linear));
+        tl.noiseScrollV.Add(Uv(2f, 1f, 0f, 0.5f, BossVictoryKeyCurve.Linear));
+        Assert.AreEqual(0.5f, tl.NoiseScrollOffset(0.5f), 1e-5f);
+        Assert.AreEqual(1f, tl.NoiseScrollOffset(1.5f), 1e-5f, "첫 클립 끝 값 유지");
+        Assert.AreEqual(1.25f, tl.NoiseScrollOffset(2.5f), 1e-5f, "이어서 더함");
+        Assert.IsFalse(BossVictoryTimeline.HasFades(BossVictoryTrack.NoiseScrollV), "세기 키 없음");
+        Assert.IsTrue(BossVictoryTimeline.IsUvScroll(BossVictoryTrack.NoiseScrollV));
+        Assert.AreSame(tl.noiseScrollV, tl.Clips(BossVictoryTrack.NoiseScrollV));
+        Assert.AreEqual(0, tl.MigrateKeys(), "키 이관 대상 아님");
+        Assert.AreEqual(1f, tl.noiseScrollV[0].uvTo);
+
+        // 다른 캐릭터에 복사 = 클립 추가(값·이징 그대로)
+        var dst = new BossVictoryTimeline();
+        dst.noiseScrollV.Add(Uv(0f, 1f, 0f, 3f, BossVictoryKeyCurve.Step));
+        dst.CopyClipFrom(tl, BossVictoryTrack.NoiseScrollV, 1);
+        Assert.AreEqual(2, dst.noiseScrollV.Count);
+        Assert.AreEqual(0.5f, dst.noiseScrollV[1].uvTo, 1e-6f);
+        Assert.AreEqual(2f, dst.noiseScrollV[1].start, 1e-6f);
+    }
+
+    // ── 발밑 회색 원(246 복원 — 267 후속) ──
+
+    [Test]
+    public void 발밑_회색_원_기본_클립은_노란_틴트_시작부터_커져_끝까지_유지()
+    {
+        BossVictoryTimeline tl = BossVictoryTimeline.CreateDefault();
+        Assert.AreEqual(1, tl.groundCircle.Count);
+        float s = BossVictoryTimeline.DefaultGroundCircleStart, g = BossVictoryTimeline.DefaultGroundCircleGrow;
+        Assert.AreEqual(0f, tl.Evaluate(BossVictoryTrack.GroundCircle, s - 0.01f), 1e-5f, "시작 전 0");
+        Assert.AreEqual(0.5f, tl.Evaluate(BossVictoryTrack.GroundCircle, s + g * 0.5f), 0.02f, "커지는 중(smoothstep 0.5 근처)");
+        Assert.AreEqual(1f, tl.Evaluate(BossVictoryTrack.GroundCircle, s + g), 0.01f, "목표 반경");
+        Assert.AreEqual(1f, tl.Evaluate(BossVictoryTrack.GroundCircle, BossVictoryTimeline.DefaultEnd - 0.01f), 1e-4f, "끝까지 유지");
+        Assert.IsTrue(BossVictoryTimeline.HasFades(BossVictoryTrack.GroundCircle), "세기 키 트랙");
+    }
+
+    [Test]
+    public void 발밑_회색_원_옛_에셋에_한_번만_넣고_지우면_다시_안_넣는다()
+    {
+        var tl = new BossVictoryTimeline();   // 이 트랙 전 에셋과 같음(표시 없음·클립 없음)
+        Assert.IsTrue(tl.SeedGroundCircle());
+        Assert.AreEqual(1, tl.groundCircle.Count);
+        Assert.IsFalse(tl.SeedGroundCircle(), "멱등");
+        tl.groundCircle.Clear();
+        Assert.IsFalse(tl.SeedGroundCircle(), "사용자가 지운 뒤 다시 안 넣음");
+        Assert.AreEqual(0, tl.groundCircle.Count);
+
+        // 다른 캐릭터에 복사 = 클립 추가
+        var src = BossVictoryTimeline.CreateDefault();
+        var dst = BossVictoryTimeline.CreateDefault();
+        dst.CopyClipFrom(src, BossVictoryTrack.GroundCircle, 0);
+        Assert.AreEqual(2, dst.groundCircle.Count);
+    }
+
+    [Test]
+    public void 발밑_회색_원_중심은_카메라_아래_바닥_마커_전엔_처치자()
+    {
+        var killer = new Vector3(1f, 2f, 3f);
+        var cam = new Vector3(10f, 15f, -4f);
+        Assert.AreEqual(killer, BossVictoryTimeline.GroundCircleCenter(0.1f, 0.2f, killer, true, cam), "마커 전 = 처치자(피어마다 카메라 다름)");
+        Assert.AreEqual(new Vector3(10f, 2f, -4f), BossVictoryTimeline.GroundCircleCenter(0.2f, 0.2f, killer, true, cam), "마커부터 카메라 x·z, 높이 = 처치자 발");
+        Assert.AreEqual(new Vector3(10f, 2f, -4f), BossVictoryTimeline.GroundCircleCenter(3f, 0.2f, killer, true, cam));
+        Assert.AreEqual(killer, BossVictoryTimeline.GroundCircleCenter(3f, 0.2f, killer, false, cam), "카메라 없음 = 처치자");
+    }
 }

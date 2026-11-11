@@ -55,7 +55,7 @@ public sealed class BossVictoryCameraCutTests
         // 처치자 (0,0,0) → 보스 (10,0,0) — 축 = 월드 +X. 기준 +Z 로 1m = 월드 +X 로 1m.
         var s = new BossVictoryCameraCuts.Subjects { Killer = Vector3.zero, BossBase = new Vector3(10f, 0f, 0f) };
         BossVictoryCameraCuts.ToWorld(BossVictoryCameraCuts.Anchor.Killer, s, Vector3.forward, Quaternion.identity, out Vector3 p, out Quaternion r);
-        Assert.AreEqual(new Vector3(1f, 0f, 0f), p);
+        Assert.Less(Vector3.Distance(new Vector3(1f, 0f, 0f), p), 1e-4f, $"{p:F6}");   // 부동소수 오차(정확 비교 X)
         Assert.Greater(Vector3.Dot(r * Vector3.forward, Vector3.right), 0.999f, "기준 정면 = 처치자에서 보스를 봄(옛 yaw 0 과 같은 정의)");
         BossVictoryCameraCuts.ToWorld(BossVictoryCameraCuts.Anchor.Middle, s, Vector3.zero, Quaternion.identity, out p, out _);
         Assert.AreEqual(new Vector3(5f, 0f, 0f), p, "가운데");

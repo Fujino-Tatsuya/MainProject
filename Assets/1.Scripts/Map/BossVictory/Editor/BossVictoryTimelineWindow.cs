@@ -353,6 +353,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         bool selected = IsSelected(track, index);
         EditorGUI.DrawRect(r, baseColor * (selected ? 1f : 0.75f));
         if (BossVictoryTimeline.HasFades(track)) DrawEnvelope(r, clip);
+        if (BossVictoryTimeline.IsUvScroll(track)) DrawUvScroll(r, clip);
         if (track == BossVictoryTrack.CameraCut)
         {
             EditorGUI.DrawRect(new Rect(r.x, r.y, 2f, r.height), Color.white);   // 컷 = 시작 순간
@@ -362,6 +363,25 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
         if (selected) DrawOutline(r, Color.white);
         if (IsKeyed(track)) DrawKeys(r, track, index, selected);
+    }
+
+    // 노이즈 UV 수직 이동(267 후속) — 시작 → 끝 오프셋 곡선(작은 쪽 = 아래, 큰 쪽 = 위)·'0.00 → 1.00 이징' 글자.
+    static void DrawUvScroll(Rect r, BossVictoryClip clip)
+    {
+        const int n = 24;
+        float lo = Mathf.Min(clip.uvFrom, clip.uvTo), hi = Mathf.Max(clip.uvFrom, clip.uvTo);
+        float span = Mathf.Max(0.0001f, hi - lo);
+        var pts = new Vector3[n + 1];
+        for (int i = 0; i <= n; i++)
+        {
+            float u = i / (float)n;
+            float v = Mathf.LerpUnclamped(clip.uvFrom, clip.uvTo, BossVictoryKeys.Ease(clip.uvEase, u));
+            pts[i] = new Vector3(r.x + u * r.width, r.yMax - 2f - (hi > lo ? (v - lo) / span : 0.5f) * (r.height - 4f));
+        }
+        Handles.color = EnvelopeColor;
+        Handles.DrawAAPolyLine(2f, pts);
+        GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
+            $"{clip.uvFrom:0.##} → {clip.uvTo:0.##} {KeyCurveLabels[Mathf.Clamp((int)clip.uvEase, 0, KeyCurveLabels.Length - 1)]}", EditorStyles.miniLabel);
     }
 
     // 클립 값 모양(페이드·세기) — 아래 = 0, 위 = 1
@@ -1200,7 +1220,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     bool CanAdd(BossVictoryTrack track) =>
         BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Single || Timeline.Clips(track).Count == 0;
 
-    static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.StartFixed(track)
+    static BossVictoryClip NewClip(BossVictoryTrack track, float start) => BossVictoryTimeline.IsUvScroll(track)
+        ? new BossVictoryClip { start = start, length = 1f, weight = 1f, uvFrom = 0f, uvTo = 1f, uvEase = BossVictoryKeyCurve.EaseInOut }   // 노이즈 한 장 위로, ease in/out
+        : BossVictoryTimeline.StartFixed(track)
         ? BossVictoryClip.Make(0f, Mathf.Max(MinLength, start))   // 처치자 평타 — 누른 시각 = 끝
         : BossVictoryTimeline.KindOf(track) switch
     {
@@ -1425,6 +1447,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             c.start = EditorGUILayout.FloatField("시작(초)", c.start);
             c.length = EditorGUILayout.FloatField("길이(초)", c.length);
             EditorGUILayout.LabelField("끝(초)", c.End.ToString("0.00"));
+        }
+        if (BossVictoryTimeline.IsUvScroll(track))
+        {
+            c.uvFrom = EditorGUILayout.FloatField(new GUIContent("시작 오프셋(UV)", "노이즈 텍스처 V 오프셋 — 1 = 한 장. 텍스처가 Repeat 라 넘어가면 감긴다."), c.uvFrom);
+            c.uvTo = EditorGUILayout.FloatField(new GUIContent("끝 오프셋(UV)", "클립 끝 이후에도 이 값 유지 — 다음 클립은 여기에 더해진다."), c.uvTo);
+            c.uvEase = (BossVictoryKeyCurve)EditorGUILayout.Popup("이징", (int)c.uvEase, KeyCurveLabels);
         }
         if (EditorGUI.EndChangeCheck())
         {
@@ -1703,6 +1731,15 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.CrtOff:
                 DrawSettingsFields("TV 꺼짐 모양", nameof(BossVictoryGlitchSettings.crtOffGlowColor));
+                break;
+            case BossVictoryTrack.NoiseScrollV:
+                EditorGUILayout.LabelField("보스 노이즈 텍스처 UV 를 수직으로 옮긴다(_NoiseST.w = 카메라 이동 누적 + 이 값). 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함. + = 위(카메라 위 이동과 같은 방향). 노이즈가 보이려면 '보스 노이즈' 세기 클립이 켜져 있어야 한다.", EditorStyles.wordWrappedMiniLabel);
+                DrawSettingsFields("보스 노이즈 모양", nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseTiling));
+                break;
+            case BossVictoryTrack.GroundCircle:
+                EditorGUILayout.LabelField("카메라 바로 아래 바닥(매 프레임 따라감, 높이 = 처치자 발 — '카메라 처치자로' 마커 전엔 처치자 발밑) 둘레 배경을 호박색 대신 흑백으로(246 복원). 반경 = 아래 반경 × 클립 세기 — 세기 키가 0 → 1 로 올라가는 동안 원이 커진다. 흑백·노란 틴트가 들어온 만큼만 보인다. 모양 값은 모든 캐릭터 공용.", EditorStyles.wordWrappedMiniLabel);
+                DrawSettingsFields("발밑 회색 원 모양(공용)", nameof(BossVictoryGlitchSettings.groundCircleRadius),
+                    nameof(BossVictoryGlitchSettings.groundCircleSoftness), nameof(BossVictoryGlitchSettings.groundCircleBrightness));
                 break;
             case BossVictoryTrack.CameraCut:
                 DrawSettingsFields("벽 숨김 기준(컷 공통)", nameof(BossVictoryGlitchSettings.wallFacingThreshold), nameof(BossVictoryGlitchSettings.wallSearchRadius));

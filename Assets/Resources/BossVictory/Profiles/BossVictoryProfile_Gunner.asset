@@ -39,6 +39,9 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     amber:
     - start: 0.3
       length: 5.3
@@ -55,6 +58,9 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     scanline:
     - start: 0.105
       length: 5.495
@@ -71,6 +77,9 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     bossNoise:
     - start: 0.12
       length: 5.48
@@ -87,6 +96,9 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     tear:
     - start: 0.09
       length: 0.16
@@ -106,6 +118,9 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     - start: 0.32
       length: 0.09
       fadeIn: 0
@@ -124,6 +139,9 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     smear:
     - start: 0.09
       length: 0.16
@@ -143,6 +161,9 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     - start: 0.32
       length: 0.09
       fadeIn: 0
@@ -161,6 +182,9 @@ MonoBehaviour:
       - u: 1
         value: 0
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     hudHide:
     - start: 0.08
       length: 5.52
@@ -177,6 +201,9 @@ MonoBehaviour:
       - u: 1
         value: 1
         curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     crtOff: []
     cameraCut:
     - start: 0.96
@@ -185,6 +212,9 @@ MonoBehaviour:
       fadeOut: 0
       weight: 1
       keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
     cameraCutShots:
     - anchor: 0
       keys:
@@ -212,6 +242,30 @@ MonoBehaviour:
       fadeOut: 0
       weight: 1
       keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+    noiseScrollV: []
+    groundCircle:
+    - start: 0.3
+      length: 5.2999997
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.11320756
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+    groundCircleSeeded: 1
     focusKillerTime: 0.2
     hideOthersTime: 0.2
     lobbyTransitionTime: 5.6

@@ -6,6 +6,8 @@
 //      좌우로 다른 길이만큼 밀린다(마스크도 같은 UV — 인물·보스 실루엣도 같이 찢긴다) + 찢긴 줄의 밝은 부분이 밀린 방향 뒤로 끌린다(스미어).
 //    색(글리치 아님): 흑백(Desat) → 배경만 호박색(플레이어 제외) → 보스 = 흑백 노이즈 텍스처(UV 는 카메라 이동으로만)
 //      → CRT 주사선.
+//    발밑 회색 원(246 복원 — 267 후속): 배경 중 처치자 발밑(_GroundCircle.xyz)에서 **수평** 거리 _GroundCircle.w 안(원기둥)은 호박색 대신 흑백
+//      (원래 명도 × _GroundCircleLook.y), 가장자리 _GroundCircleLook.x(m). 픽셀 월드 위치 = _CameraDepthTexture(찢긴 UV 그대로 — 원도 같이 찢긴다). 반경 0 = 끔.
 // ----------------------------------------------------------------------------
 Shader "Hidden/Rendering/BossVictoryGlitch"
 {
@@ -16,6 +18,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
         HLSLINCLUDE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
         ENDHLSL
 
         Pass
@@ -43,6 +46,22 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             float4 _NoiseST;      // xy 타일링, zw UV 오프셋(카메라 이동 누적 — 시간 흐름 없음)
             float4 _NoiseBright;
             float4 _NoiseDark;
+            float4 _GroundCircle;      // xyz 중심(월드), w 반경(m)
+            float4 _GroundCircleLook;  // x 가장자리 부드러움(m), y 흑백 밝기
+
+            // 발밑 회색 원 가중치(0 = 밖, 1 = 안). 수평(XZ) 거리만 본다 — 원기둥.
+            half GroundCircleMask(float2 uv)
+            {
+                float r = _GroundCircle.w;
+                if (r <= 0.0) return 0.0h;
+                float depth = SampleSceneDepth(saturate(uv));
+            #if !UNITY_REVERSED_Z
+                depth = lerp(UNITY_NEAR_CLIP_VALUE, 1.0, depth);
+            #endif
+                float3 wp = ComputeWorldSpacePosition(saturate(uv), depth, UNITY_MATRIX_I_VP);
+                float dist = distance(wp.xz, _GroundCircle.xz);
+                return (half)(1.0 - smoothstep(max(0.0, r - _GroundCircleLook.x), r, dist));
+            }
 
             float Hash(float2 p)
             {
@@ -112,6 +131,9 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half3 amber = lum * _AmberColor.rgb * 1.6h;
                 half3 graded = lerp(gray, amber, (half)_GlitchA.w);
                 graded = lerp(graded, lerp(col, lum.xxx, (half)max(_GlitchA.z, _GlitchA.w)), player);
+                // 발밑 회색 원 — 원 안 배경은 호박색 대신 흑백(밝기 배율). 흑백·호박이 들어오는 만큼만(플레이어는 위에서 이미 흑백).
+                half circle = GroundCircleMask(uv) * (1.0h - player);
+                graded = lerp(graded, lerp(col, (lum * (half)_GroundCircleLook.y).xxx, (half)max(_GlitchA.z, _GlitchA.w)), circle);
 
                 // 보스 — 흑백 노이즈(흰 = 밝은 색, 검 = 어두운 적갈색)
                 float2 nUV = _BossScreen.w > 0.5
