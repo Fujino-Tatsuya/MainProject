@@ -431,7 +431,7 @@ MonoBehaviour:
   - {fileID: 768617275354264640, guid: 09946a29a8149e944b20acf9967ee741, type: 3}
   autoPlayOnStart: 1
   autoLoop: 1
-  loopHoldSeconds: 1.5
+  loopHoldSeconds: 0
   restartDelaySeconds: 0.8
   endFallbackSeconds: 15
   killerAngle: 0

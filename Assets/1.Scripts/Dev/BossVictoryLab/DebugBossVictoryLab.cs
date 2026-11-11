@@ -44,7 +44,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     [SerializeField] bool autoPlayOnStart = true;
     [SerializeField] bool autoLoop = true;
     [Tooltip("한 바퀴 끝(결과 화면 전환 차단) 뒤 다시 시작까지(실제 초).")]
-    [SerializeField, Min(0f)] float loopHoldSeconds = 1.5f;
+    [SerializeField, Min(0f)] float loopHoldSeconds = 0f;
     [Tooltip("원상복구 뒤 처치까지(실제 초) — 카메라가 플레이 시점으로 돌아올 틈.")]
     [SerializeField, Min(0f)] float restartDelaySeconds = 0.8f;
     [Tooltip("처치 뒤 결과 차단 신호(호스트 화면이 타임라인 로비 전환 마커를 지남)가 이만큼 안 오면 끝난 것으로 본다(실제 초, 안전망 — 기본 연출 ≈ 5.6초 + 배속).")]
