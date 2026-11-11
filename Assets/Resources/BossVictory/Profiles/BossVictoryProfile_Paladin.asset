@@ -42,6 +42,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     amber:
     - start: 0.3
       length: 5.3
@@ -61,6 +65,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     scanline:
     - start: 0.105
       length: 5.495
@@ -80,6 +88,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     bossNoise:
     - start: 0.12
       length: 5.48
@@ -99,6 +111,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     tear:
     - start: 0.09
       length: 0.16
@@ -121,6 +137,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     - start: 0.32
       length: 0.09
       fadeIn: 0
@@ -142,6 +162,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     - start: 1.33
       length: 0.2
       fadeIn: 0
@@ -163,6 +187,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     smear:
     - start: 0.09
       length: 0.16
@@ -185,6 +213,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     - start: 0.32
       length: 0.09
       fadeIn: 0
@@ -206,6 +238,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     hudHide:
     - start: 0.08
       length: 5.52
@@ -225,6 +261,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     crtOff: []
     cameraCut:
     - start: 0.96
@@ -236,6 +276,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     - start: 5.57
       length: 0.1
       fadeIn: 0
@@ -245,6 +289,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     cameraCutShots:
     - anchor: 0
       keys:
@@ -294,6 +342,10 @@ MonoBehaviour:
       uvFrom: 0
       uvTo: 0
       uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     noiseScrollV:
     - start: 0.5
       length: 1.01
@@ -304,6 +356,85 @@ MonoBehaviour:
       uvFrom: 1
       uvTo: 0
       uvEase: 1
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    cameraBob:
+    - start: 1.23
+      length: 4.3700004
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.037735853
+        value: 1
+        curve: 0
+      - u: 0.9433962
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0.3
+      bobPeriod: 1
+      bobPhase: 0.25
+      bobDamping: 0
+    rectify:
+    - start: 1.42
+      length: 4.18
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.023809526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    rectifySeeded: 1
+    cameraBobSeeded: 1
+    groundCircle:
+    - start: 0.3
+      length: 5.2999997
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.11320756
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    groundCircleSeeded: 1
     focusKillerTime: 0.2
     hideOthersTime: 0.2
     lobbyTransitionTime: 5.6
