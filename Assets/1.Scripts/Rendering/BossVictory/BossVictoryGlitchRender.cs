@@ -65,11 +65,14 @@ public static class BossVictoryGlitchRender
     static readonly int IdRectifyUV = Shader.PropertyToID("_RectifyUV");           // 글자마다 아틀라스 xy 시작 · zw 크기
     static readonly int IdRectifyParams = Shader.PropertyToID("_RectifyParams");   // x 알파, y 외곽선 반두께(SDF), z 글자 수
     static readonly int IdRectifyColor = Shader.PropertyToID("_RectifyColor");
-    static readonly int IdFillRings = Shader.PropertyToID("_RectifyFillRings");       // 링 i — x 반지름(단어 높이 단위), y 알파
-    static readonly int IdFillColors = Shader.PropertyToID("_RectifyFillColors");
+    static readonly int IdFillRings = Shader.PropertyToID("_RectifyFillRings");       // 링 i(0~2 색 링 · 3 흰 원) — x 반지름(단어 높이 단위), y 알파, zw 중심(단어 UV)
+    static readonly int IdOrange = Shader.PropertyToID("_RectifyOrange");             // x 와이프 진행, y 들쭉날쭉, z 오른쪽→왼쪽(1), w 줄 굵기(px)
+    static readonly int IdOrangeLeft = Shader.PropertyToID("_RectifyOrangeLeft");
+    static readonly int IdOrangeRight = Shader.PropertyToID("_RectifyOrangeRight");   // a = 좌→우 보간 세기
+    static readonly int IdFillColors = Shader.PropertyToID("_RectifyFillColors");     // rgb 색, a 방사형 그라데이션 세기
     static readonly int IdFillRect = Shader.PropertyToID("_RectifyFillRect");         // 단어 사각형(뷰포트 min.xy · max.zw)
     static readonly int IdFillParams = Shader.PropertyToID("_RectifyFillParams");     // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
-    static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기, y 그라데이션 세기, zw 중심(단어 UV)
+    static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기
     static readonly int IdCircle = Shader.PropertyToID("_GroundCircle");          // xyz 중심(월드), w 반경(m)
     static readonly int IdScanFloor = Shader.PropertyToID("_ScanFloor");          // x 벽 normal.y, y 바닥 normal.y, z 바닥 남김, w 하늘 호박 명도 하한(267 후속)
     static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
@@ -197,8 +200,13 @@ public static class BossVictoryGlitchRender
     static Color[] _fillColors = new Color[0];
     static Vector2 _fillCenter = new Vector2(0.46f, 0.5f);
     static float _fillStartRadius, _fillDelay, _fillFade, _fillExpand = 0.6f, _fillSoft, _fillGradient, _scanSpacing = 0.003f, _scanDark;
-    static readonly Vector4[] _fillRings = new Vector4[BossVictoryRectifyFill.RingCount];
-    static readonly Vector4[] _fillRingColors = new Vector4[BossVictoryRectifyFill.RingCount];
+    static readonly Vector4[] _fillRings = new Vector4[BossVictoryRectifyFill.RingCount + 1];       // + 흰 원
+    static readonly Vector4[] _fillRingColors = new Vector4[BossVictoryRectifyFill.RingCount + 1];
+    static Color _whiteColor = Color.white;
+    static Vector2 _whiteCenter = new Vector2(0.46f, 0.5f);
+    static float _whiteStart = 0.2f, _whiteStartRadius, _whiteFade, _whiteExpand = 0.6f, _whiteGradient;
+    static float _orangeHold, _orangeWipe = 0.1f, _orangeJitter, _orangeRowPx = 4f, _orangeGradient;
+    static bool _orangeRightToLeft = true;
 
     static void ApplyFillLook(BossVictoryGlitchSettings s)
     {
@@ -212,6 +220,22 @@ public static class BossVictoryGlitchRender
         _fillGradient = Mathf.Clamp01(s.rectifyFillGradient);
         _scanSpacing = s.rectifyScanlineSpacing;
         _scanDark = Mathf.Clamp01(s.rectifyScanlineDark);
+        _whiteColor = s.rectifyWhiteColor;
+        _whiteCenter = s.rectifyWhiteCenter;
+        _whiteStart = s.rectifyWhiteStart;
+        _whiteStartRadius = s.rectifyWhiteStartRadius;
+        _whiteFade = s.rectifyWhiteFade;
+        _whiteExpand = s.rectifyWhiteExpand;
+        _whiteGradient = Mathf.Clamp01(s.rectifyWhiteGradient);
+        _orangeHold = s.rectifyOrangeHold;
+        _orangeWipe = s.rectifyOrangeWipe;
+        _orangeRightToLeft = s.rectifyOrangeRightToLeft;
+        _orangeJitter = Mathf.Clamp01(s.rectifyOrangeJitter);
+        _orangeRowPx = Mathf.Max(1f, s.rectifyOrangeRowPixels);
+        _orangeGradient = Mathf.Clamp01(s.rectifyOrangeGradient);
+        _composite.SetColor(IdOrangeLeft, s.rectifyOrangeLeft.linear);
+        Color right = s.rectifyOrangeRight.linear;
+        _composite.SetVector(IdOrangeRight, new Vector4(right.r, right.g, right.b, _orangeGradient));
     }
 
     // 링 3개 — 단어 사각형 UV(종횡비 보정, 단위 = 단어 높이). Rmax = 중심에서 네 모서리까지.
@@ -226,14 +250,27 @@ public static class BossVictoryGlitchRender
             BossVictoryRectifyFill.Ring r = opacity > 0f && i < _fillColors.Length
                 ? BossVictoryRectifyFill.Evaluate(i, f.RectifyFillElapsed, _fillDelay, _fillFade, _fillExpand)
                 : default;
-            _fillRings[i] = r.exists ? new Vector4(BossVictoryRectifyFill.Radius(r.grow, _fillStartRadius, rMax, _fillSoft), r.alpha, 0f, 0f) : Vector4.zero;
-            _fillRingColors[i] = i < _fillColors.Length ? (Vector4)_fillColors[i].linear : Vector4.zero;
+            _fillRings[i] = r.exists ? new Vector4(BossVictoryRectifyFill.Radius(r.grow, _fillStartRadius, rMax, _fillSoft), r.alpha, _fillCenter.x, _fillCenter.y) : Vector4.zero;
+            Color c = i < _fillColors.Length ? _fillColors[i].linear : Color.clear;
+            _fillRingColors[i] = new Vector4(c.r, c.g, c.b, _fillGradient);
         }
+        // 4번째 흰 원 — 값은 링과 따로.
+        BossVictoryRectifyFill.Ring w = opacity > 0f ? BossVictoryRectifyFill.WhiteRing(f.RectifyFillElapsed, _whiteStart, _whiteFade, _whiteExpand) : default;
+        float wMax = BossVictoryRectifyFill.MaxRadius(_whiteCenter, wordAspect);
+        int wi = BossVictoryRectifyFill.RingCount;
+        _fillRings[wi] = w.exists ? new Vector4(BossVictoryRectifyFill.Radius(w.grow, _whiteStartRadius, wMax, _fillSoft), w.alpha, _whiteCenter.x, _whiteCenter.y) : Vector4.zero;
+        Color wc = _whiteColor.linear;
+        _fillRingColors[wi] = new Vector4(wc.r, wc.g, wc.b, _whiteGradient);
+        // 주황 채움 — 흰 원이 다 퍼진 뒤 줄 단위 와이프.
+        float orange = opacity > 0f
+            ? BossVictoryRectifyFill.OrangeProgress(f.RectifyFillElapsed, BossVictoryRectifyFill.OrangeStart(_whiteStart, _whiteFade, _whiteExpand, _orangeHold), _orangeWipe)
+            : 0f;
+        _composite.SetVector(IdOrange, new Vector4(orange, _orangeJitter, _orangeRightToLeft ? 1f : 0f, _orangeRowPx));
         _composite.SetVectorArray(IdFillRings, _fillRings);
         _composite.SetVectorArray(IdFillColors, _fillRingColors);
         _composite.SetVector(IdFillRect, word);
         _composite.SetVector(IdFillParams, new Vector4(opacity, Mathf.Max(0f, _fillSoft), wordAspect, Mathf.Max(1f, _scanSpacing * Screen.height)));
-        _composite.SetVector(IdFillLook, new Vector4(_scanDark, _fillGradient, _fillCenter.x, _fillCenter.y));
+        _composite.SetVector(IdFillLook, new Vector4(_scanDark, 0f, 0f, 0f));
     }
 
     static float _noiseSpace;

@@ -127,6 +127,39 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Min(0f)] public float rectifyFillSoftness = 0.01f;
     [Tooltip("링 안 방사형 그라데이션 — 가장자리 색 = 색 × (1 − 세기), 중심은 원래 색.")]
     [Range(0f, 1f)] public float rectifyFillGradient = 0.35f;
+
+    [Header("RECTIFY 흰 원(4번째) — 링 3개와 값 분리(267 후속)")]
+    public Color rectifyWhiteColor = Color.white;
+    [Tooltip("흰 원 생성 시각(초, 'RECTIFY 안쪽 색' 클립 시작 기준).")]
+    [Min(0f)] public float rectifyWhiteStart = 0.2f;
+    [Tooltip("흰 원 중심(단어 사각형 UV 0~1).")]
+    public Vector2 rectifyWhiteCenter = new Vector2(0.46f, 0.5f);
+    [Tooltip("흰 원 시작 반지름(단어 높이 비율).")]
+    [Min(0f)] public float rectifyWhiteStartRadius = 0.15f;
+    [Tooltip("흰 원 페이드(초) — 시작 반지름 그대로 알파 0→1.")]
+    [Min(0f)] public float rectifyWhiteFade = 0.15f;
+    [Tooltip("흰 원 확장(초, easeOutCubic, 페이드 뒤).")]
+    [Min(0.01f)] public float rectifyWhiteExpand = 0.6f;
+    [Tooltip("흰 원 안 방사형 그라데이션 세기(0 = 단색).")]
+    [Range(0f, 1f)] public float rectifyWhiteGradient = 0f;
+
+    [Header("RECTIFY 주황 채움 — 흰 원이 다 퍼진 뒤(267 후속)")]
+    [Tooltip("흰 원이 다 퍼진 뒤 흰색으로 머무는 시간(초).")]
+    [Min(0f)] public float rectifyOrangeHold = 0.05f;
+    [Tooltip("흰 → 주황 와이프 시간(초) — 레퍼런스: 가로줄마다 들쭉날쭉한 경계가 한쪽에서 지나감(약 6프레임).")]
+    [Min(0f)] public float rectifyOrangeWipe = 0.1f;
+    [Tooltip("와이프 방향 — 켬 = 오른쪽에서 왼쪽(레퍼런스).")]
+    public bool rectifyOrangeRightToLeft = true;
+    [Tooltip("와이프 경계 줄마다 어긋남(단어 폭 비율).")]
+    [Range(0f, 1f)] public float rectifyOrangeJitter = 0.2f;
+    [Tooltip("와이프 줄 굵기(px).")]
+    [Min(1f)] public float rectifyOrangeRowPixels = 4f;
+    [Tooltip("주황 채움 왼쪽 색(W 쪽).")]
+    public Color rectifyOrangeLeft = new Color32(0xFF, 0xA5, 0x3A, 0xFF);
+    [Tooltip("주황 채움 오른쪽 색(T 쪽).")]
+    public Color rectifyOrangeRight = new Color32(0xF8, 0xE8, 0x62, 0xFF);
+    [Tooltip("좌→우 색 보간 세기(0 = 왼쪽 색만).")]
+    [Range(0f, 1f)] public float rectifyOrangeGradient = 1f;
     [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
     [Min(0.0005f)] public float rectifyScanlineSpacing = 0.003f;
     [Tooltip("안쪽 주사선 어둡기(0 = 없음).")]

@@ -1765,6 +1765,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     nameof(BossVictoryGlitchSettings.rectifyFillExpand), nameof(BossVictoryGlitchSettings.rectifyFillSoftness),
                     nameof(BossVictoryGlitchSettings.rectifyFillGradient), nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing),
                     nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
+                DrawSettingsFields("흰 원(4번째, 링과 따로)", nameof(BossVictoryGlitchSettings.rectifyWhiteColor), nameof(BossVictoryGlitchSettings.rectifyWhiteStart),
+                    nameof(BossVictoryGlitchSettings.rectifyWhiteCenter), nameof(BossVictoryGlitchSettings.rectifyWhiteStartRadius),
+                    nameof(BossVictoryGlitchSettings.rectifyWhiteFade), nameof(BossVictoryGlitchSettings.rectifyWhiteExpand),
+                    nameof(BossVictoryGlitchSettings.rectifyWhiteGradient));
+                DrawSettingsFields("주황 채움(흰 원 뒤)", nameof(BossVictoryGlitchSettings.rectifyOrangeHold), nameof(BossVictoryGlitchSettings.rectifyOrangeWipe),
+                    nameof(BossVictoryGlitchSettings.rectifyOrangeRightToLeft), nameof(BossVictoryGlitchSettings.rectifyOrangeJitter),
+                    nameof(BossVictoryGlitchSettings.rectifyOrangeRowPixels), nameof(BossVictoryGlitchSettings.rectifyOrangeLeft),
+                    nameof(BossVictoryGlitchSettings.rectifyOrangeRight), nameof(BossVictoryGlitchSettings.rectifyOrangeGradient));
                 break;
             case BossVictoryTrack.CameraBob:
                 EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);

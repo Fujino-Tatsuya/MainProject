@@ -160,4 +160,63 @@ public class BossVictoryRectifyTests
         Assert.AreEqual(2, dst.rectifyFill.Count, "복사 = 추가");
         Assert.AreEqual("RECTIFY 안쪽 색", BossVictoryTimeline.TrackLabel(BossVictoryTrack.RectifyFill));
     }
+
+    [Test]
+    public void 흰_원은_따로_정한_시각에_생겨_페이드_뒤_확장()
+    {
+        Assert.IsFalse(BossVictoryRectifyFill.WhiteRing(0.19f, 0.2f, 0.15f, 0.6f).exists);
+        BossVictoryRectifyFill.Ring w = BossVictoryRectifyFill.WhiteRing(0.2f + 0.075f, 0.2f, 0.15f, 0.6f);
+        Assert.IsTrue(w.exists);
+        Assert.AreEqual(0.5f, w.alpha, 1e-4f);
+        Assert.AreEqual(0f, w.grow, 1e-6f, "페이드 동안 크기 그대로");
+        w = BossVictoryRectifyFill.WhiteRing(0.2f + 0.15f + 0.3f, 0.2f, 0.15f, 0.6f);
+        Assert.AreEqual(0.875f, w.grow, 1e-5f);
+        Assert.IsFalse(BossVictoryRectifyFill.WhiteRing(-0.1f, 0f, 0.15f, 0.6f).exists, "클립 전 없음");
+    }
+
+    [Test]
+    public void 주황은_흰_원이_다_퍼지고_머문_뒤_와이프()
+    {
+        float start = BossVictoryRectifyFill.OrangeStart(0.2f, 0.15f, 0.6f, 0.05f);
+        Assert.AreEqual(1.0f, start, 1e-5f);
+        Assert.AreEqual(0f, BossVictoryRectifyFill.OrangeProgress(0.99f, start, 0.1f));
+        Assert.AreEqual(0.5f, BossVictoryRectifyFill.OrangeProgress(1.05f, start, 0.1f), 1e-4f);
+        Assert.AreEqual(1f, BossVictoryRectifyFill.OrangeProgress(3f, start, 0.1f), "끝까지 주황 유지");
+        Assert.AreEqual(1f, BossVictoryRectifyFill.OrangeProgress(1f, start, 0f), "와이프 0초 = 바로");
+    }
+
+    [Test]
+    public void 와이프는_진행_0이면_없고_1이면_전부_줄마다_어긋남()
+    {
+        for (float off = -0.5f; off <= 0.5f; off += 0.25f)
+            for (float x = 0f; x <= 1f; x += 0.1f)
+            {
+                Assert.IsFalse(BossVictoryRectifyFill.WipeCovered(x, 0f, 0.2f, off, true), $"진행 0 x={x} off={off}");
+                Assert.IsTrue(BossVictoryRectifyFill.WipeCovered(x, 1f, 0.2f, off, true), $"진행 1 x={x} off={off}");
+            }
+        Assert.IsTrue(BossVictoryRectifyFill.WipeCovered(0.95f, 0.3f, 0.2f, 0f, true), "오른쪽→왼쪽 — 오른쪽 먼저");
+        Assert.IsFalse(BossVictoryRectifyFill.WipeCovered(0.05f, 0.3f, 0.2f, 0f, true));
+        Assert.IsTrue(BossVictoryRectifyFill.WipeCovered(0.05f, 0.3f, 0.2f, 0f, false), "왼쪽→오른쪽 — 왼쪽 먼저");
+        Assert.AreNotEqual(BossVictoryRectifyFill.WipeCovered(0.5f, 0.5f, 0.2f, -0.5f, true),
+            BossVictoryRectifyFill.WipeCovered(0.5f, 0.5f, 0.2f, 0.5f, true), "줄마다 경계 어긋남");
+    }
+
+    [Test]
+    public void 주황_색은_왼쪽에서_오른쪽으로_보간_세기_0이면_왼쪽만()
+    {
+        Color l = new Color(1f, 0.5f, 0f), r = new Color(1f, 1f, 0f);
+        Assert.AreEqual(l, BossVictoryRectifyFill.OrangeColor(0f, l, r, 1f));
+        Assert.AreEqual(r, BossVictoryRectifyFill.OrangeColor(1f, l, r, 1f));
+        Assert.AreEqual(0.75f, BossVictoryRectifyFill.OrangeColor(0.5f, l, r, 1f).g, 1e-5f);
+        Assert.AreEqual(l, BossVictoryRectifyFill.OrangeColor(1f, l, r, 0f));
+        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        try
+        {
+            Assert.AreEqual(0.2f, s.rectifyWhiteStart, 1e-5f);
+            Assert.AreEqual(Color.white, s.rectifyWhiteColor);
+            Assert.IsTrue(s.rectifyOrangeRightToLeft);
+            Assert.AreEqual(1f, s.rectifyOrangeGradient, 1e-5f);
+        }
+        finally { Object.DestroyImmediate(s); }
+    }
 }

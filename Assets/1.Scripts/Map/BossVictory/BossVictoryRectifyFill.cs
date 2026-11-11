@@ -70,4 +70,37 @@ public static class BossVictoryRectifyFill
     /// <summary>현재 반지름 — 시작 반지름 → Rmax + 경계(다 퍼지면 모서리까지 완전히 덮도록). 단위 = 단어 높이.</summary>
     public static float Radius(float grow, float startRadius, float maxRadius, float softness) =>
         Mathf.Lerp(Mathf.Max(0f, startRadius), maxRadius + Mathf.Max(0f, softness), grow);
+
+    // ── 4번째 흰 원 · 주황 채움(267 후속) ──
+
+    /// <summary>흰 원 — 클립 시작 뒤 <paramref name="start"/> 초에 생김. 페이드 → 확장 순서는 링과 같다(값만 따로).</summary>
+    public static Ring WhiteRing(float elapsed, float start, float fade, float expand) =>
+        elapsed < 0f ? default : Evaluate(0, elapsed - Mathf.Max(0f, start), 0f, fade, expand);
+
+    /// <summary>주황 채움 시작 시각(클립 시작 기준) = 흰 원이 다 퍼진 뒤 + 유지.</summary>
+    public static float OrangeStart(float whiteStart, float whiteFade, float whiteExpand, float hold) =>
+        Mathf.Max(0f, whiteStart) + Mathf.Max(0f, whiteFade) + Mathf.Max(0f, whiteExpand) + Mathf.Max(0f, hold);
+
+    /// <summary>흰 → 주황 와이프 진행 0~1(시작 전 0, 와이프 0초면 시작 즉시 1).</summary>
+    public static float OrangeProgress(float elapsed, float orangeStart, float wipe)
+    {
+        if (elapsed < orangeStart) return 0f;
+        return wipe > 0f ? Mathf.Clamp01((elapsed - orangeStart) / wipe) : 1f;
+    }
+
+    /// <summary>
+    /// 줄 단위 들쭉날쭉 와이프 — 단어 UV x(0~1)가 덮였나. 시작 쪽부터 경계가 지나가고 줄마다 <paramref name="rowOffset"/>(−0.5~0.5) × 들쭉날쭉만큼
+    /// 앞뒤로 어긋난다. 진행 0 = 하나도 안 덮음, 1 = 전부 덮음(셰이더와 같은 식).
+    /// </summary>
+    public static bool WipeCovered(float x01, float progress, float jitter, float rowOffset, bool rightToLeft)
+    {
+        float j = Mathf.Max(0f, jitter);
+        float s = rightToLeft ? 1f - x01 : x01;
+        float edge = Mathf.Lerp(-j, 1f + j, Mathf.Clamp01(progress));
+        return s + rowOffset * j < edge;
+    }
+
+    /// <summary>주황 채움 색 — 왼쪽 → 오른쪽 보간(세기 0 = 왼쪽 색만).</summary>
+    public static Color OrangeColor(float x01, Color left, Color right, float strength) =>
+        Color.Lerp(left, Color.Lerp(left, right, Mathf.Clamp01(x01)), Mathf.Clamp01(strength));
 }
