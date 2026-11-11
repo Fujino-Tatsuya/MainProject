@@ -108,6 +108,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
    `ReportCheckServer(TraitCorridorN)` 을 보내고, 모델이 '전원 체크 / 첫 완료자 뒤 60초'로 연다. 0장 받은 사람(`Empty`)·특성 디렉터 없음은 도착 순간 바로 체크한다.
 5. 교착 방지 60초·타이머 만료·보스방 도착 때 미도착자를 `AddParticipantServer` 로 넣고 `AutoChooseAllPendingServer()` —
    🔴 **반드시 강제 이동·연출 잠금(`PlayerEncounterLock.IsCinematicLocked`) 전에** 호출한다(만료는 `Expired` 로 바뀐 프레임에 처리).
+6. 골라 둔 뒤 뜨는 목표 "특성 선택 완료 — 동료를 기다립니다"(`TUT_C_WAIT`)·대기 줄은 출구가 열리면 바뀌고, **보스 엘리베이터 연출이 시작되는 순간**(`BossTeleportManager.IsElevatorStarted` — 복제 시작 시각, 전 피어·늦은 합류 동일)에도 내린다. 연출 중엔 다시 안 그린다(할 일 264 — 규칙 `MapSceneTraitCorridorRules.ShouldClearWaitOnElevator`).
 
 ## 4. 수치 출처 — `PlayerTraitModifiers`(할 일 125 2/5)
 

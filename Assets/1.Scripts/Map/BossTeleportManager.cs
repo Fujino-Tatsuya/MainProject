@@ -157,6 +157,12 @@ public class BossTeleportManager : NetworkBehaviour
     /// <summary>카운트다운 진행 중인지 — 집결·강제 공통 (모든 피어에서 유효).</summary>
     public bool IsCountdownActive => _teleportAt.Value > 0d;
 
+    /// <summary>
+    /// 보스 엘리베이터 연출이 시작돼 아직 끝나지 않았는가 — 복제 시작 시각 기준이라 <b>모든 피어</b>에서 유효(늦은 합류도 같은 값).
+    /// 도착 완료·도착 무효·재도전 리셋에서 false 로 돌아간다. 서버 전용 <see cref="IsElevatorRunning"/> 과 달리 클라도 읽는다(할 일 264 — 복도 대기 문구 내리기).
+    /// </summary>
+    public bool IsElevatorStarted => _elevatorStartAt.Value > 0d;
+
     /// <summary>집결 n/m 의 n — 발판 위 + 쓰러짐 아님. 판정이 꺼져 있으면 0 (모든 피어에서 유효).</summary>
     public int GatheredCount => _gatheredCount.Value;
 
