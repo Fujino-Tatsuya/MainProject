@@ -14,7 +14,7 @@ using UnityEditor;
 /// <item>🔴 메시는 켜질 때 한 번, 에디터에서 점·값이 바뀔 때만 다시 만든다(매 프레임 생성 없음). 메시와 그것을 그리는 자식은 저장하지 않는다(HideAndDontSave)
 /// — 씬·프리팹에 구운 메시가 남지 않아 diff 가 없다.</item>
 /// <item>흐름·맥동·아이콘 위치/회전 = 셰이더 Lobby/FloorDashBelt 가 _Time 과 경로 표본 배열로. 수치·경로 표본 = <see cref="MaterialPropertyBlock"/>(머티리얼 복제 없음).</item>
-/// <item>늘 켜져 있다 — 배치·튜토리얼 연결은 아직 없음.</item>
+/// <item>이 컴포넌트는 늘 그린다. 존 안 켜고 끄기(패널 4개 활성 → 켬, 건틀렛 봇 처치 → 끔)는 GameObject 단위로 <see cref="ZoneDashBeltSwitch"/> 가 한다.</item>
 /// </list>
 /// 상세: Docs/tech/lobby-training.md "대시 벨트".
 /// </summary>

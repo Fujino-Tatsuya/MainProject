@@ -94,6 +94,9 @@ public sealed class ZoneBridgeGate : MonoBehaviour
 
     float _openProgress;   // 0 = 닫힘, 1 = 열림
 
+    // 존 안 대시 벨트(할 일 257) — 패널 전부 활성이면 켜고 건틀렛 봇 처치(G9) 뒤 영원히 끈다. 벨트가 없으면 null.
+    ZoneDashBeltSwitch _dashBelts;
+
     public void SetSlotID(int slotID) => SlotID = slotID;
 
     /// <summary>현재 개통 진행도(0~1). 매니저가 복제값으로 밀어 넣는다.</summary>
@@ -103,6 +106,7 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     {
         BuildMonitorScreens();
         BuildGapObstacle();
+        _dashBelts = ZoneDashBeltSwitch.TryCreate(transform, PanelCount);   // 처음엔 끔
         ApplyOpenProgress(0f);
     }
 
@@ -182,6 +186,7 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     void OnDestroy()
     {
         if (_highlightedPanel >= 0) SetPanelHighlighted(_highlightedPanel, false);
+        _dashBelts?.Dispose();
         foreach (MonitorScreen s in _screens)
             if (s != null && s.Material != null) Destroy(s.Material);
     }
@@ -362,6 +367,7 @@ public sealed class ZoneBridgeGate : MonoBehaviour
         // 활성 표시 = 모니터 화면 켜짐. 예전 바닥 링(ZoneInteractRing)은 임시였다 — 팀장 10-04 삭제
         // (클래스 파일은 Visual Scripting 생성 코드 AotStubs 가 참조해 남겨 둔다).
         SetScreen(index, activated, animate);
+        _dashBelts?.SetPanelActivated(index, activated);   // 같은 복제 마스크로 대시 벨트 켜고 끄기(257)
     }
 
     // ── 근접 외곽선(로컬 표시 — 매니저가 로컬 플레이어 기준으로 하나만 켠다) ──
