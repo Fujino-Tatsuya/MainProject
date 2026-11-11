@@ -25,14 +25,10 @@ MonoBehaviour:
     cameraZoomDelaySeconds: 0
     cameraZoomSeconds: 6
     cameraZoomEase: 3
-    walkSpeed: 4.5
+    walkSpeed: 4
     walkInterval: 0.4
-    hatchCloseSeconds: 0
-    descendSeconds: 2
-    descendDepth: 10
-    descendEase: 7
-    fadeOutSeconds: 0.6
-    fadeOutEase: 0
+    hatchState: DP_HatchLobbyOpenClose
+    launchState: DP_LaunchCycle
     launchFastSpeed: 6
     launchFastSpeed2: 1
     launchEndWaitSeconds: 0.5
@@ -48,22 +44,32 @@ MonoBehaviour:
     cameraZoomDelaySeconds: 0
     cameraZoomSeconds: 2.6
     cameraZoomEase: 3
+    cameraStartHeightOffset: 2
     skipApproach: 1
     fallHeight: 30
+    hoverHeight: 5
     fallSeconds: 0.6
     fallEase: 0
+    brakeDistance: 3
+    brakeSeconds: 0.8
+    brakeEase: 8
+    gearDeployState: DP_GearDeploy
+    freefallGravity: 9.81
     impactEffectScale: 1.5
     shakeAmplitude: 0.6
     shakeDuration: 0.35
-    settleSeconds: 0.4
+    hatchOpenState: DP_HatchStageOpen
+    wingFoldState: DP_WingFold
+    dissolveDelaySeconds: 1
     dissolveSeconds: 1
     letterboxOutSeconds: 0.5
     letterboxOutEase: 0
     hudRescanSeconds: 0
     startTimeoutSeconds: 120
-    podLandingOffset: {x: 0, y: 0, z: 0}
+    podLandingOffset: {x: 7, y: 0, z: -3}
     seatOffsets:
     - {x: -0.6, y: 0, z: 0.45}
     - {x: 0.6, y: 0, z: 0.45}
     - {x: 0, y: 0, z: -0.55}
     groundProbeHeight: 2
+    podGroundClearance: 0.25
