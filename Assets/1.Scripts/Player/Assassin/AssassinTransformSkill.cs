@@ -52,6 +52,14 @@ public sealed class AssassinTransformSkill : PlayerInstantSkill
     // 루프는 AssassinSkillView 가 AssassinState.TransformChanged 로 켠다(2026-10-14 민경).
     public override void OnClientPlay(Vector3 direction) { }
 
+    // 보스 처치 연출 표시 전용(267 후속) — 변신 오라(Blade Vortex)를 이 피어에서만 켠다. 실제 변신 상태·게이지는 안 건드린다.
+    // 처치 연출이 끝날 때까지 유지, 끝·취소면 AssassinSkillView 가 흩어지게 한다(새 RPC 없음 — 모든 피어가 같은 처치 상태로 각자).
+    public override void OnPresentationOnlyStart(Transform target)
+    {
+        AssassinSkillView view = owner != null ? owner.GetComponent<AssassinSkillView>() : null;
+        view?.PlayPresentationVortex();
+    }
+
     public override void OnEnd(SkillEndReason reason)
     {
         base.OnEnd(reason);

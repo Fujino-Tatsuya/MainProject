@@ -58,4 +58,14 @@ public class BossVictoryAimHideTests
         }
         finally { Object.DestroyImmediate(quad); }
     }
+
+    // 어쌔신 처치 오라(267 후속) — 켠 뒤 처치 연출이 끝나야 접는다.
+    [TestCase(false, false, false)]
+    [TestCase(false, true, false)]
+    [TestCase(true, true, false)]
+    [TestCase(true, false, true)]
+    public void 어쌔신_처치_오라는_연출이_끝나야_접는다(bool vortex, bool running, bool expected)
+    {
+        Assert.AreEqual(expected, AssassinSkillView.ShouldEndPresentationVortex(vortex, running));
+    }
 }

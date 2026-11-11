@@ -89,6 +89,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     private AssassinState state;
     private float enhancedSlashBaseScale = -1f;   // 강타 소켓 저작 배율(처음 한 번 읽음)
     private EffectHandle transformLoop;
+    private bool presentationVortex;   // 보스 처치 연출 오라(267 후속) — 연출 끝까지 실제 변신 해제와 무관하게 유지
     private EffectHandle circleStrikeLoop;
     private float circleStrikeDeadline;
     private EffectHandle stormSlashLoop;
@@ -311,8 +312,26 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
         stormSlashLoop = EffectHandle.None;
     }
 
+    /// <summary>
+    /// [이 피어] 보스 처치 연출 — 변신 오라(Assassin_R_BladeVortex)를 실제 변신 없이 켠다(267 후속, 이미 변신 중이면 그 루프 그대로).
+    /// 처치 연출이 끝나거나 취소되면(<see cref="BossVictoryGlitchPresentation.IsRunning"/> false) Update 가 실제 변신 상태로 되돌린다 — 아니면 outro 로 흩어짐.
+    /// </summary>
+    public void PlayPresentationVortex()
+    {
+        presentationVortex = true;
+        HandleTransformChanged(true);
+    }
+
+    /// <summary>처치 연출 오라를 접을 때인가 — 오라를 켰고 연출이 끝났다(순수 판단, EditMode).</summary>
+    public static bool ShouldEndPresentationVortex(bool presentationVortex, bool victoryRunning) => presentationVortex && !victoryRunning;
+
     private void Update()
     {
+        if (ShouldEndPresentationVortex(presentationVortex, BossVictoryGlitchPresentation.IsRunning))
+        {
+            presentationVortex = false;
+            HandleTransformChanged(state != null && state.IsTransformed);
+        }
         SyncEnhancedSlashScale();
         if (circleStrikeLoop.IsSet && Time.time >= circleStrikeDeadline)
             EndCircleStrike();
@@ -460,6 +479,9 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
             transformLoop = effects.PlayLooping(entry, transform, transformEffectOffset, transformEffectScale);
             return;
         }
+
+        if (presentationVortex)
+            return;   // 처치 연출 동안 실제 변신이 풀려도 오라 유지(끝나면 Update 가 접는다)
 
         if (transformLoop.IsSet && EffectManager.Instance != null)
             EffectManager.Instance.Release(transformLoop);

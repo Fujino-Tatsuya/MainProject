@@ -81,7 +81,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     public GameObject KillerObject => _running && _killer != null ? _killer.gameObject : null;
 
     /// <summary>[이 피어] 처치 연출 중인가 — 조준 표시 숨김 이유(267 후속). 복제된 처치 상태로 각 피어가 연 연출이라 늦은 참가자도 같다. 끝·취소(Teardown)·파괴면 false.</summary>
-    public static bool HidesCombatAim => Instance != null && Instance._running;
+    public static bool HidesCombatAim => IsRunning;
+
+    /// <summary>[이 피어] 처치 연출 진행 중(시작 ~ 끝·취소·파괴). 표시 전용 연출이 언제 접을지 본다(어쌔신 처치 오라 — 267 후속).</summary>
+    public static bool IsRunning => Instance != null && Instance._running;
 
     /// <summary>[이 피어] 이번 회차 처치자 캐릭터(모르면·나갔으면 None = 기본 프로필) — 타임라인 창이 Play 중 이 캐릭터 프로필을 따라간다(267).</summary>
     public TutorialCharacter KillerCharacter => _running ? _killerCharacter : TutorialCharacter.None;
