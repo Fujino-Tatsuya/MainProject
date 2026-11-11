@@ -67,17 +67,59 @@ public static class CursorUnitPick
         if (direct == CursorPickResult.ValidTarget || lenientRadius <= 0f)
         {
             unit = directUnit;
+#if UNITY_EDITOR
+            bool hasPointForTrace = TryGetGroundPoint(ray, groundMask, self, out Vector3 tracePoint);
+            Record(hasPointForTrace, tracePoint, lenientRadius, direct, unit, direct == CursorPickResult.ValidTarget);
+#endif
             return direct;
         }
 
         s_lenientCandidates.Clear();
-        if (TryGetGroundPoint(ray, groundMask, self, out Vector3 point))
+        bool hasPoint = TryGetGroundPoint(ray, groundMask, self, out Vector3 point);
+        if (hasPoint)
             CollectNearby(point, lenientRadius, mask, self, s_lenientCandidates);
 
         CursorPickResult result = Resolve(direct, directUnit, s_lenientCandidates, lenientRadius, out unit);
         s_lenientCandidates.Clear();
+#if UNITY_EDITOR
+        Record(hasPoint, point, lenientRadius, result, unit, false);
+#endif
         return result;
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// [에디터 전용·디버그] 널널한 판정 한 번의 결과 — 특성 랩 커서 범위 기즈모(<c>TraitLabCursorPickGizmo</c>)가 읽는다.
+    /// 판정을 다시 하지 않고 조준·호버 외곽선이 실제로 부른 그 결과를 그대로 보여 주려고 남긴다.
+    /// </summary>
+    public readonly struct Trace
+    {
+        public readonly int Frame;
+        public readonly bool HasGroundPoint;
+        public readonly Vector3 GroundPoint;
+        public readonly float Radius;
+        public readonly CursorPickResult Result;
+        public readonly Unit Unit;
+        public readonly bool DirectHit;   // true = 광선이 직접 맞음, false 이고 Unit 있음 = 반경으로 잡음
+
+        public Trace(int frame, bool hasGroundPoint, Vector3 groundPoint, float radius, CursorPickResult result, Unit unit, bool directHit)
+        {
+            Frame = frame;
+            HasGroundPoint = hasGroundPoint;
+            GroundPoint = groundPoint;
+            Radius = radius;
+            Result = result;
+            Unit = unit;
+            DirectHit = directHit;
+        }
+    }
+
+    /// <summary>[에디터 전용] 마지막 널널한 판정. Frame 이 오래됐으면 이번 프레임엔 판정이 안 돌았다(오너 아님·카메라 없음 등).</summary>
+    public static Trace LastTrace { get; private set; }
+
+    static void Record(bool hasPoint, Vector3 point, float radius, CursorPickResult result, Unit unit, bool directHit) =>
+        LastTrace = new Trace(Time.frameCount, hasPoint, point, radius, result, unit, directHit);
+#endif
 
     /// <summary>
     /// 순수 규칙 — 직접 맞음(ValidTarget)이 우선, 반경 0 이하면 직접 결과 그대로(예전 동작).
