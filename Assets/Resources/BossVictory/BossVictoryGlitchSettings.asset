@@ -26,6 +26,9 @@ MonoBehaviour:
   hideOthersTarget: 0
   amberColor: {r: 0.8235294, g: 0.6509804, b: 0.30588236, a: 1}
   scanlineCount: 360
+  scanlineFloorNormalMin: 0.55
+  scanlineFloorNormalMax: 0.8
+  scanlineFloorKeep: 0
   tearLinePixels: 1.75
   tearLineMaxMultiplier: 1.75
   tearMaxShift: 0.04
@@ -48,6 +51,20 @@ MonoBehaviour:
   rectifyCenterY: 0.58
   rectifyOutline: 0.005
   rectifyColor: {r: 1, g: 1, b: 1, a: 1}
+  rectifyFillColors:
+  - {r: 0.6901961, g: 0.4392157, b: 0.72156864, a: 1}
+  - {r: 0.3529412, g: 0.39215687, b: 0.6901961, a: 1}
+  - {r: 0.54901963, g: 0.78431374, b: 0.9098039, a: 1}
+  - {r: 0.41568628, g: 0.49411765, b: 0.5882353, a: 1}
+  - {r: 0.8784314, g: 0.5411765, b: 0.28235295, a: 1}
+  rectifyFillSeed: 267
+  rectifyFillStartRadius: 0.15
+  rectifyFillFade: 0.08
+  rectifyFillExpand: 0.35
+  rectifyFillNextAt: 0.6
+  rectifyFillSoftness: 0.04
+  rectifyScanlineSpacing: 0.003
+  rectifyScanlineDark: 0.25
   wallFacingThreshold: 0.3
   wallSearchRadius: 40
   crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}

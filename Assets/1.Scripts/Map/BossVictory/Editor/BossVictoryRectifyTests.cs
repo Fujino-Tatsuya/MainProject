@@ -80,4 +80,90 @@ public class BossVictoryRectifyTests
         }
         finally { BossVictoryRectifyText.Destroy(asset); }
     }
+
+    // ── 안쪽 색 — 원형 확장 색상 전환(267 후속) ──
+    const float Fade = 0.08f, Expand = 0.35f, NextAt = 0.6f;
+
+    [Test]
+    public void 안쪽색_주기는_페이드_더하기_확장_곱하기_다음원비율()
+    {
+        Assert.AreEqual(0.29f, BossVictoryRectifyFill.Period(Fade, Expand, NextAt), 1e-5f);
+        Assert.AreEqual(-1, BossVictoryRectifyFill.Latest(-0.01f, 0.29f));
+        Assert.AreEqual(0, BossVictoryRectifyFill.Latest(0f, 0.29f));
+        Assert.AreEqual(0, BossVictoryRectifyFill.Latest(0.28f, 0.29f));
+        Assert.AreEqual(3, BossVictoryRectifyFill.Latest(0.88f, 0.29f));
+        Assert.AreEqual(0.01f, BossVictoryRectifyFill.Period(0f, 0f, 0f), 1e-6f, "최소 간격");
+    }
+
+    [Test]
+    public void 안쪽색_원은_페이드_뒤_확장_ease_out_색은_차례로_반복()
+    {
+        BossVictoryRectifyFill.Circle c = BossVictoryRectifyFill.Evaluate(1, 0.2f, Fade, Expand, NextAt, 5);
+        Assert.IsFalse(c.exists, "원 1 은 0.29초에 생김");
+        c = BossVictoryRectifyFill.Evaluate(1, 0.29f + 0.04f, Fade, Expand, NextAt, 5);
+        Assert.IsTrue(c.exists);
+        Assert.AreEqual(0.5f, c.alpha, 1e-4f, "페이드 반");
+        Assert.AreEqual(0f, c.grow, 1e-6f, "페이드 동안 크기 그대로");
+        c = BossVictoryRectifyFill.Evaluate(1, 0.29f + Fade + Expand * 0.5f, Fade, Expand, NextAt, 5);
+        Assert.AreEqual(1f, c.alpha, 1e-6f);
+        Assert.Greater(c.grow, 0.5f, "ease-out — 반 시간에 반보다 더 감");
+        Assert.Less(c.grow, 1f);
+        c = BossVictoryRectifyFill.Evaluate(1, 0.29f + Fade + Expand + 0.01f, Fade, Expand, NextAt, 5);
+        Assert.AreEqual(1f, c.grow, 1e-6f);
+        for (int k = 0; k < 12; k++)
+            Assert.AreEqual(k % 5, BossVictoryRectifyFill.Evaluate(k, 10f, Fade, Expand, NextAt, 5).colorIndex);
+        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(-1, 1f, Fade, Expand, NextAt, 5).exists);
+    }
+
+    [Test]
+    public void 안쪽색_앞앞_원은_지금_원이_생길_때_이미_다_커져_바탕이_된다()
+    {
+        float period = BossVictoryRectifyFill.Period(Fade, Expand, NextAt);
+        for (int latest = 2; latest < 10; latest++)
+        {
+            float t = latest * period;   // 지금 원이 막 생긴 순간
+            BossVictoryRectifyFill.Circle base2 = BossVictoryRectifyFill.Evaluate(latest - 2, t, Fade, Expand, NextAt, 5);
+            Assert.AreEqual(1f, base2.grow, 1e-6f);
+            Assert.AreEqual(1f, base2.alpha, 1e-6f);
+        }
+    }
+
+    [Test]
+    public void 안쪽색_글자_점은_시드로_고정되고_범위_안()
+    {
+        for (int k = 0; k < 50; k++)
+        {
+            int g = BossVictoryRectifyFill.GlyphFor(k, 267, 7);
+            Assert.That(g, Is.InRange(0, 6));
+            Assert.AreEqual(g, BossVictoryRectifyFill.GlyphFor(k, 267, 7), "같은 시드 = 같은 글자");
+            Vector2 p = BossVictoryRectifyFill.PointInGlyph(k, 267);
+            Assert.That(p.x, Is.InRange(0.3f, 0.7f));
+            Assert.That(p.y, Is.InRange(0.25f, 0.75f));
+            Assert.AreEqual(p, BossVictoryRectifyFill.PointInGlyph(k, 267));
+        }
+        Assert.AreEqual(0, BossVictoryRectifyFill.GlyphFor(3, 267, 0));
+        Assert.AreEqual(0.15f, BossVictoryRectifyFill.Radius(0f, 0.15f, 2f), 1e-6f);
+        Assert.AreEqual(2f, BossVictoryRectifyFill.Radius(1f, 0.15f, 2f), 1e-6f);
+    }
+
+    [Test]
+    public void 안쪽색_기본_클립은_0_4초부터_4_5초까지_시작_기준_시간()
+    {
+        BossVictoryTimeline tl = BossVictoryTimeline.CreateDefault();
+        Assert.AreEqual(1, tl.rectifyFill.Count);
+        Assert.IsFalse(tl.TryActiveClip(BossVictoryTrack.RectifyFill, 0.39f, out _));
+        Assert.IsTrue(tl.TryActiveClip(BossVictoryTrack.RectifyFill, 1f, out BossVictoryClip c));
+        Assert.AreEqual(0.4f, c.start, 1e-6f);
+        Assert.AreEqual(4.5f, c.End, 1e-5f);
+        Assert.AreEqual(1f, c.Evaluate(1f), 1e-6f);
+        Assert.IsFalse(tl.TryActiveClip(BossVictoryTrack.RectifyFill, 4.6f, out _));
+        var old = new BossVictoryTimeline();
+        Assert.IsTrue(old.SeedRectifyFill());
+        old.rectifyFill.Clear();
+        Assert.IsFalse(old.SeedRectifyFill(), "지운 뒤 다시 안 넣음");
+        var dst = BossVictoryTimeline.CreateDefault();
+        dst.CopyClipFrom(tl, BossVictoryTrack.RectifyFill, 0);
+        Assert.AreEqual(2, dst.rectifyFill.Count, "복사 = 추가");
+        Assert.AreEqual("RECTIFY 안쪽 색", BossVictoryTimeline.TrackLabel(BossVictoryTrack.RectifyFill));
+    }
 }

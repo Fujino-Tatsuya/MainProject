@@ -7,6 +7,8 @@
 //    색(글리치 아님): 흑백(Desat) → 배경만 호박색(플레이어 제외) → 보스 = 흑백 노이즈 텍스처(UV 는 카메라 이동으로만)
 //      → CRT 주사선.
 //    발밑 회색 원(246 복원 — 267 후속): 배경 중 처치자 발밑(_GroundCircle.xyz)에서 **수평** 거리 _GroundCircle.w 안(원기둥)은 호박색 대신 흑백
+//    CRT 주사선 = 벽·하늘에만(267 후속): 깊이로 복원한 표면 법선 위쪽 성분이 _ScanFloor.x~y 사이에서 벽 → 바닥으로 부드럽게 빠진다.
+//      하늘(먼 평면)·플레이어·보스·RECTIFY 글자/안쪽 색 위는 예전처럼 전부 주사선.
 //    배경 글자 RECTIFY(267 후속): 글자마다 화면 사각형(_RectifyScreen)·아틀라스 UV(_RectifyUV) → SDF 외곽선만(|거리| < 반두께, 안 비움).
 //      플레이어·보스 마스크가 0 인 곳에만(인물·보스 뒤, 배경 앞) · 찢긴 UV(같이 찢김) · 들어오는 동안(알파 < 1) 가로줄이 무작위로 켜진다.
 //      (원래 명도 × _GroundCircleLook.y), 가장자리 _GroundCircleLook.x(m). 픽셀 월드 위치 = _CameraDepthTexture(찢긴 UV 그대로 — 원도 같이 찢긴다). 반경 0 = 끔.
@@ -56,9 +58,11 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             float4 _RectifyColor;
 
             // 배경 글자 외곽선 가중치(0~1).
-            half RectifyAt(float2 uv)
+            // x = 외곽선, y = 글자 안(채움 마스크).
+            half2 RectifyAt(float2 uv)
             {
                 half a = 0.0h;
+                half inside = 0.0h;
                 int n = (int)_RectifyParams.z;
                 [unroll] for (int i = 0; i < 8; i++)
                 {
@@ -70,12 +74,70 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                     // 안티앨리어싱 폭 = 화면 1px 의 SDF 값(도함수 없이 — 루프 안 분기)
                     float w = max(0.75 * _RectifyUV[i].w * _RectifyParams.w / max((r.w - r.y) * _ScreenParams.y, 1.0), 1e-4);
                     a = max(a, (half)(1.0 - smoothstep(_RectifyParams.y - w, _RectifyParams.y + w, abs(sd))));
+                    inside = max(inside, (half)smoothstep(-w, w, sd));
                 }
-                return a;
+                return half2(a, inside);
+            }
+
+            float4 _RectifyFillCircles[3];   // 오래된 순 — xy 중심(뷰포트), z 반지름(뷰포트 세로), w 알파
+            float4 _RectifyFillColors[3];
+            float4 _RectifyFillParams;       // x 불투명도, y 경계(뷰포트 세로), z 화면비, w 주사선 간격(px)
+            float4 _RectifyFillLook;         // x 주사선 어둡기
+
+            // 안쪽 색 — 원을 오래된 순으로 덮는다(경계 부드럽게). rgb = 색, a = 덮인 정도.
+            half4 RectifyFillAt(float2 uv)
+            {
+                half3 col = 0.0h;
+                half cov = 0.0h;
+                [unroll] for (int i = 0; i < 3; i++)
+                {
+                    float4 c = _RectifyFillCircles[i];
+                    if (c.w <= 0.0) continue;
+                    float d = length((uv - c.xy) * float2(_RectifyFillParams.z, 1.0));
+                    half k = (half)(c.w * (1.0 - smoothstep(c.z - _RectifyFillParams.y, c.z, d)));
+                    col = lerp(col, _RectifyFillColors[i].rgb, k);
+                    cov = cov + k * (1.0h - cov);
+                }
+                return half4(cov > 0.0001h ? col / cov : col, cov);   // 앞 덮기(premultiplied over) → 색 복원
             }
 
             float4 _GroundCircle;      // xyz 중심(월드), w 반경(m)
             float4 _GroundCircleLook;  // x 가장자리 부드러움(m), y 흑백 밝기
+            float4 _ScanFloor;         // x 벽 normal.y(이하 = 주사선 그대로), y 바닥 normal.y(이상 = 바닥), z 바닥에 남길 비율
+
+            float3 WorldAt(float2 uv, out float rawDepth)
+            {
+                rawDepth = SampleSceneDepth(saturate(uv));
+                float d = rawDepth;
+            #if !UNITY_REVERSED_Z
+                d = lerp(UNITY_NEAR_CLIP_VALUE, 1.0, d);
+            #endif
+                return ComputeWorldSpacePosition(saturate(uv), d, UNITY_MATRIX_I_VP);
+            }
+
+            // CRT 주사선 가중치(267 후속) — 1 = 벽·하늘(주사선), 0 = 바닥. 법선 = 이웃 깊이 4개 중 깊이 차가 작은 쪽으로
+            // 복원(물체 가장자리에서 뒤 배경과 섞이지 않게). 찢긴 UV 그대로라 줄이 찢기면 판정도 같이 밀린다.
+            half ScanSurfaceWeight(float2 uv)
+            {
+                float d0, dl, dr, dd, du;
+                float3 p = WorldAt(uv, d0);
+            #if UNITY_REVERSED_Z
+                if (d0 <= 1e-6) return 1.0h;            // 하늘(먼 평면)
+            #else
+                if (d0 >= 1.0 - 1e-6) return 1.0h;
+            #endif
+                float2 px = 1.0 / _ScreenParams.xy;
+                float3 pl = WorldAt(uv - float2(px.x, 0.0), dl);
+                float3 pr = WorldAt(uv + float2(px.x, 0.0), dr);
+                float3 pd = WorldAt(uv - float2(0.0, px.y), dd);
+                float3 pu = WorldAt(uv + float2(0.0, px.y), du);
+                float3 dx = abs(dl - d0) < abs(dr - d0) ? p - pl : pr - p;
+                float3 dy = abs(dd - d0) < abs(du - d0) ? p - pd : pu - p;
+                float3 n = normalize(cross(dy, dx));
+                if (dot(n, _WorldSpaceCameraPos - p) < 0.0) n = -n;   // 카메라 쪽 면
+                half floorW = (half)smoothstep(_ScanFloor.x, _ScanFloor.y, n.y);
+                return lerp(1.0h, (half)_ScanFloor.z, floorW);
+            }
 
             // 발밑 회색 원 가중치(0 = 밖, 1 = 안). 수평(XZ) 거리만 본다 — 원기둥.
             half GroundCircleMask(float2 uv)
@@ -163,12 +225,26 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half circle = GroundCircleMask(uv) * (1.0h - player);
                 graded = lerp(graded, lerp(col, (lum * (half)_GroundCircleLook.y).xxx, (half)max(_GlitchA.z, _GlitchA.w)), circle);
 
+                half rectCover = 0.0h;   // RECTIFY 글자·안쪽 색이 덮은 정도 — 그 위는 주사선 예전 그대로
                 // 배경 글자 RECTIFY — 인물·보스 뒤, 배경 앞. 들어오는 동안 가로줄(찢김 줄 굵기 × 2)이 알파 비율만큼 무작위로 켜진다.
                 if (_RectifyParams.x > 0.0001)
                 {
                     float revealRow = floor(ypx / (baseH * 2.0));
                     half reveal = _RectifyParams.x >= 0.999 ? 1.0h : (half)step(Hash(float2(revealRow, tick + 51.0)), _RectifyParams.x);
-                    half text = RectifyAt(uv) * reveal * (1.0h - player) * (1.0h - boss);
+                    half2 rt = RectifyAt(uv);
+                    half visible = reveal * (1.0h - player) * (1.0h - boss);
+                    // 안쪽 색(원형 확장) — 글자 안에서만 · 가는 가로 주사선. 외곽선은 그 위에.
+                    if (_RectifyFillParams.x > 0.0001)
+                    {
+                        half4 fill = RectifyFillAt(uv);
+                        half scanOn = (half)step(0.5, frac(ypx / _RectifyFillParams.w));
+                        half3 fillCol = fill.rgb * (1.0h - (half)_RectifyFillLook.x * scanOn);
+                        half fillW = rt.y * fill.a * (half)_RectifyFillParams.x * visible;
+                        graded = lerp(graded, fillCol, fillW);
+                        rectCover = fillW;
+                    }
+                    half text = rt.x * visible;
+                    rectCover = max(rectCover, text * (half)_RectifyColor.a);
                     graded = lerp(graded, _RectifyColor.rgb, text * (half)_RectifyColor.a);
                 }
 
@@ -181,9 +257,14 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half3 noiseCol = lerp(_NoiseDark.rgb, _NoiseBright.rgb, n);
                 graded = lerp(graded, noiseCol, boss * (half)_GlitchC.x);
 
-                // CRT 주사선
-                half scan = 0.5h + 0.5h * sin(uv0.y * _GlitchLook.x * 6.28318h);
-                graded *= lerp(1.0h, 0.72h + 0.28h * scan, (half)_GlitchB.x);
+                // CRT 주사선 — 벽·하늘에만(바닥 뺌). 플레이어·보스·RECTIFY 위는 예전처럼 늘 주사선.
+                if (_GlitchB.x > 0.0001)
+                {
+                    half surf = ScanSurfaceWeight(uv);
+                    half keep = max(surf, max(max(player, boss), rectCover));
+                    half scan = 0.5h + 0.5h * sin(uv0.y * _GlitchLook.x * 6.28318h);
+                    graded *= lerp(1.0h, 0.72h + 0.28h * scan, (half)_GlitchB.x * keep);
+                }
 
                 return half4(graded, 1.0h);
             }

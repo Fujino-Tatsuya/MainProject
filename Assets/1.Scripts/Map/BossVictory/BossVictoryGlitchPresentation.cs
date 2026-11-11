@@ -779,6 +779,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         // 발밑 회색 원(246 복원) — 반경 = 설정 반경 × 클립 세기, 중심 = 카메라 바로 아래 바닥(매 프레임, 높이 = 처치자 발). '카메라 처치자로' 마커 전엔 처치자 발밑(피어마다 카메라가 다른 구간).
         Camera circleCam = Camera.main;
         frame.Rectify = tl.Evaluate(BossVictoryTrack.Rectify, t);
+        frame.RectifyFill = tl.TryActiveClip(BossVictoryTrack.RectifyFill, t, out BossVictoryClip fillClip) ? fillClip.Evaluate(t) : 0f;
+        frame.RectifyFillElapsed = frame.RectifyFill > 0f ? t - fillClip.start : -1f;
         frame.GroundCircleCenter = BossVictoryTimeline.GroundCircleCenter(t, tl.focusKillerTime, _circleCenter,
             circleCam != null, circleCam != null ? circleCam.transform.position : Vector3.zero);
         frame.GroundCircleRadius = s.groundCircleRadius * tl.Evaluate(BossVictoryTrack.GroundCircle, t);

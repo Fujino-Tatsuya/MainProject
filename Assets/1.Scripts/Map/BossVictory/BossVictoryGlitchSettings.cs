@@ -46,6 +46,12 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("배경 호박색(sRGB).")]
     public Color amberColor = new Color32(0xD2, 0xA6, 0x4E, 0xFF);
     [Min(1f)] public float scanlineCount = 360f;
+    [Tooltip("CRT 주사선을 바닥에서 뺀다(267 후속) — 깊이로 복원한 표면 법선의 위쪽 성분(normal.y)이 이 값 이하 = 벽(주사선 그대로).")]
+    [Range(0f, 1f)] public float scanlineFloorNormalMin = 0.55f;
+    [Tooltip("normal.y 가 이 값 이상 = 바닥(주사선 없음). 사이는 부드럽게 섞는다. 하늘(먼 평면)·플레이어·보스·RECTIFY 는 늘 주사선.")]
+    [Range(0f, 1f)] public float scanlineFloorNormalMax = 0.8f;
+    [Tooltip("바닥에 남기는 주사선 비율(0 = 바닥 없음, 1 = 예전처럼 전체).")]
+    [Range(0f, 1f)] public float scanlineFloorKeep = 0f;
 
     [Header("가로줄 찢김 모양")]
     [Tooltip("찢김 줄 기본 굵기(px, 화면 해상도 기준).")]
@@ -98,6 +104,30 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("외곽선 두께(대문자 높이 비율). 안쪽은 비운다.")]
     [Range(0.005f, 0.1f)] public float rectifyOutline = 0.04f;
     public Color rectifyColor = Color.white;
+
+    [Header("RECTIFY 안쪽 색 — 원형 확장 색상 전환(267 후속, 켜는 구간 = 타임라인 'RECTIFY 안쪽 색' 클립)")]
+    [Tooltip("원 색 순서(반복) — 레퍼런스: 분홍 → 파랑 → 하늘 → 회청 → 주황.")]
+    public Color[] rectifyFillColors =
+    {
+        new Color32(0xB0, 0x70, 0xB8, 0xFF), new Color32(0x5A, 0x64, 0xB0, 0xFF), new Color32(0x8C, 0xC8, 0xE8, 0xFF),
+        new Color32(0x6A, 0x7E, 0x96, 0xFF), new Color32(0xE0, 0x8A, 0x48, 0xFF),
+    };
+    [Tooltip("원 위치 시드 — 원마다 글자 하나를 고르고 그 안 한 점(모든 피어·스크럽 같음).")]
+    public int rectifyFillSeed = 267;
+    [Tooltip("시작 반지름(대문자 높이 비율).")]
+    [Min(0f)] public float rectifyFillStartRadius = 0.15f;
+    [Tooltip("페이드(초) — 크기 그대로 알파 0→1.")]
+    [Min(0f)] public float rectifyFillFade = 0.08f;
+    [Tooltip("확장(초, ease-out) — 단어 전체를 덮는 반지름까지.")]
+    [Min(0.01f)] public float rectifyFillExpand = 0.35f;
+    [Tooltip("다음 원이 생기는 시점(확장 진행 비율).")]
+    [Range(0f, 1f)] public float rectifyFillNextAt = 0.6f;
+    [Tooltip("원 경계 부드러움(대문자 높이 비율).")]
+    [Min(0f)] public float rectifyFillSoftness = 0.04f;
+    [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
+    [Min(0.0005f)] public float rectifyScanlineSpacing = 0.003f;
+    [Tooltip("안쪽 주사선 어둡기(0 = 없음).")]
+    [Range(0f, 1f)] public float rectifyScanlineDark = 0.25f;
 
     // 카메라 컷 목록은 타임라인 '카메라 컷' 트랙(timeline.cameraCut·cameraCutShots — 255, 옛 cuts 배열 삭제). 예: 와이드(0.33·거리 16·각 22·방위 50) → 보스 클로즈업(1.67·7·6·−160) → 와이드(2.6).
     [Header("카메라 컷 벽 숨김(컷·컷별 켜기/끄기 = 타임라인 '카메라 컷' 트랙)")]

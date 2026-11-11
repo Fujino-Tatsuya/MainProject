@@ -1720,7 +1720,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor));
                 break;
             case BossVictoryTrack.Scanline:
-                DrawSettingsFields("주사선 모양", nameof(BossVictoryGlitchSettings.scanlineCount));
+                EditorGUILayout.LabelField("주사선은 벽·하늘에만 — 바닥(표면 법선이 위를 향함)은 뺀다. 플레이어·보스·RECTIFY 위는 늘 주사선.", EditorStyles.wordWrappedMiniLabel);
+                DrawSettingsFields("주사선 모양", nameof(BossVictoryGlitchSettings.scanlineCount),
+                    nameof(BossVictoryGlitchSettings.scanlineFloorNormalMin), nameof(BossVictoryGlitchSettings.scanlineFloorNormalMax),
+                    nameof(BossVictoryGlitchSettings.scanlineFloorKeep));
                 break;
             case BossVictoryTrack.BossNoise:
                 DrawSettingsFields("보스 노이즈 모양",
@@ -1754,6 +1757,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawSettingsFields("배경 글자 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFont), nameof(BossVictoryGlitchSettings.rectifyText),
                     nameof(BossVictoryGlitchSettings.rectifyWidth), nameof(BossVictoryGlitchSettings.rectifyCenterY),
                     nameof(BossVictoryGlitchSettings.rectifyOutline), nameof(BossVictoryGlitchSettings.rectifyColor));
+                break;
+            case BossVictoryTrack.RectifyFill:
+                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원형 확장 색상 전환 — 클립 시작부터 원이 주기마다 생겨(글자 하나 안 한 점, 시드 고정) 크기 그대로 알파 0→1 → ease-out 확장으로 이전 색을 덮는다. 색 순서 반복, 글자 안에서만, 외곽선은 위. 세기 = 채움 불투명도. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
+                DrawSettingsFields("안쪽 색 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFillColors), nameof(BossVictoryGlitchSettings.rectifyFillSeed),
+                    nameof(BossVictoryGlitchSettings.rectifyFillStartRadius), nameof(BossVictoryGlitchSettings.rectifyFillFade),
+                    nameof(BossVictoryGlitchSettings.rectifyFillExpand), nameof(BossVictoryGlitchSettings.rectifyFillNextAt),
+                    nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing),
+                    nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
                 break;
             case BossVictoryTrack.CameraBob:
                 EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);
