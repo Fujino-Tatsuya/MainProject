@@ -32,7 +32,7 @@ MonoBehaviour:
         sourceAttackTypes: 03000000
         sourceForms: 
         damageRatio: 0.25
-        delay: 0.15
+        delay: 0.4
         hitArea:
           origin: 0
           shapes: []
