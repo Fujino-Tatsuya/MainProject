@@ -67,6 +67,13 @@ public static class MapSceneTraitCorridorRules
         id == MapSceneTraitCorridorFlow.PickId || id == MapSceneTraitCorridorFlow.WaitId
         || id == MapSceneTraitCorridorFlow.NextId || id == MapSceneTraitCorridorFlow.GoPadId;
 
+    /// <summary>
+    /// 보스 엘리베이터 연출이 시작되면 복도 "특성 선택 완료 — 동료를 기다립니다"(대기 목표)를 내리는가(할 일 264).
+    /// 연출 중엔 복도 흐름이 대기 목표를 다시 그리지 않는다 — 내릴 대상은 이 흐름의 대기 목표뿐(다른 흐름이 띄운 목표는 그대로).
+    /// </summary>
+    public static bool ShouldClearWaitOnElevator(bool elevatorStarted, string currentObjectiveId) =>
+        elevatorStarted && currentObjectiveId == MapSceneTraitCorridorFlow.WaitId;
+
     /// <summary>그 게이트가 복도 입구면 복도 번호, 아니면 0.</summary>
     public static int CorridorOfEntryGate(MapSceneGate gate)
     {

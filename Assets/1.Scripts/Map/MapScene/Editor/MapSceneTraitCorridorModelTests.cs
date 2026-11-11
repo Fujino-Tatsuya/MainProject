@@ -169,6 +169,18 @@ public sealed class MapSceneTraitCorridorModelTests
         Assert.IsFalse(MapSceneTraitCorridorProgress.Resolve(2, false, Progress(MapSceneCheck.TraitCorridor1), false, MapSceneGate.G4_Zone3Entry).OwnsObjective);
     }
 
+    // ─── 엘리베이터 연출 시작 = 대기 문구 내림 (할 일 264) ─────────────────────
+
+    [Test]
+    public void 엘리베이터_연출이_시작되면_대기_목표만_내린다()
+    {
+        Assert.IsTrue(MapSceneTraitCorridorRules.ShouldClearWaitOnElevator(true, MapSceneTraitCorridorFlow.WaitId));
+        Assert.IsFalse(MapSceneTraitCorridorRules.ShouldClearWaitOnElevator(false, MapSceneTraitCorridorFlow.WaitId), "연출 전");
+        Assert.IsFalse(MapSceneTraitCorridorRules.ShouldClearWaitOnElevator(true, MapSceneTraitCorridorFlow.GoPadId), "발판 목표는 다른 흐름 정리 몫");
+        Assert.IsFalse(MapSceneTraitCorridorRules.ShouldClearWaitOnElevator(true, null), "목표 없음");
+        Assert.IsFalse(MapSceneTraitCorridorRules.ShouldClearWaitOnElevator(true, "TUT_Z4_BOSS"), "다른 흐름 목표");
+    }
+
     // ─── 출구 목표와 존 첫 진입 목표 순서 (S12) ──────────────────────────────
 
     [Test]

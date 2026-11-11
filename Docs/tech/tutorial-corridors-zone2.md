@@ -33,7 +33,7 @@
 | 타이머 만료·보스방 도착 | 서버 | `BossTimerManager.State` 가 Expired 로 바뀐 프레임·`BossRoomArrived` 에 진행 중 복도 라운드를 같은 방식(미도착자 포함)으로 자동 획득 — 강제 이동은 3초 경고 뒤라 연출 잠금보다 먼저 |
 | G10 | 서버 | `ShowSubtitleServer(TUT_B_PAD_WARN)` 전원 · 단계 BossEnter |
 | 단계 | 서버 | 입구 G3/G6/G9 → Corridor2/3/4(Corridor1 은 존1 흐름). 게이트 이벤트는 디렉터 Commit 안이라 다음 Update 에서 |
-| 목표 | 로컬 | 창이 떠 있으면 `TUT_C_PICK`, 골랐으면 `TUT_C_WAIT` + 대기 줄(`TUT_WAIT_PARTY`, 지금 차례 게이트가 이 복도 출구일 때). 라운드 전엔 앞 존 흐름의 "복도로" 유지 |
+| 목표 | 로컬 | 창이 떠 있으면 `TUT_C_PICK`, 골랐으면 `TUT_C_WAIT` + 대기 줄(`TUT_WAIT_PARTY`, 지금 차례 게이트가 이 복도 출구일 때). 라운드 전엔 앞 존 흐름의 "복도로" 유지. 보스 엘리베이터 연출이 시작되면(`BossTeleportManager.IsElevatorStarted`, 복제 시작 시각) `TUT_C_WAIT`·대기 줄을 내리고 연출 중엔 다시 안 그림(할 일 264 — 만료 강제 이동으로 G10 이 닫힌 채 타도) |
 | 출구 열림 | 로컬 | 이 흐름이 목표를 쓰던 클라만 `TUT_C_NEXT`(복도4 = `TUT_C4_GO_PAD`) 로 바꾸고 대기 줄을 지운다 |
 
 ## 복도1 쿨타임 초기화 (v8 C1-0 · V2)

@@ -25,6 +25,8 @@ using UnityEngine;
 ///  · 목표 = 창이 떠 있으면 "특성 고르기", 골랐으면 "동료 대기" + 대기 줄(TUT_WAIT_PARTY). 중간 지점 전에는 앞 존 흐름의 "복도로" 를 건드리지 않는다.
 ///  · 출구가 열리면 이 흐름이 쓰던 목표를 "다음 구역으로"(복도4 = 엘리베이터 발판으로) 바꾸고 손을 뗀다. 존 첫 진입 안내는 각 존 흐름 몫 —
 ///    다음 존 단계가 이미 보이면(같은 틱 반영) 그 존 목표를 덮지 않는다(<see cref="MapSceneTraitCorridorRules.ShouldShowExitObjective"/>). 단계 Finished 뒤엔 그리지 않는다.
+///  · 보스 엘리베이터 연출이 시작되는 순간(<see cref="BossTeleportManager.IsElevatorStarted"/> — 복제 시작 시각) 대기 목표(TUT_C_WAIT)·대기 줄을 내리고,
+///    연출 동안엔 다시 그리지 않는다(할 일 264 — <see cref="MapSceneTraitCorridorRules.ShouldClearWaitOnElevator"/>).
 ///  · 처음 그릴 때 안내 UI 가 비어 있으면(늦은 클라) <see cref="TutorialGuideUI.RebuildFromState"/>.
 ///  · 특성 창 교착 방지 게이지 — 복제 대기 상태(<see cref="MapSceneDirector.TryGetWait"/>)를 <see cref="TraitSelectionView.SetDeadline"/> 으로 넣는다
 ///    (표시 = <see cref="MapSceneTraitCorridorRules.ShouldShowTraitDeadline"/>). 특성 모듈은 디렉터를 모른다 — 의존은 이 흐름 → 특성 뷰 한 방향.
@@ -53,6 +55,7 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
     private TutorialGuideUI _ui;
     private int _ownedCorridor;
     private TraitSelectionView _traitView;
+    private bool _elevatorSeen;   // 이 피어가 본 보스 엘리베이터 연출 시작 여부(복제 시작 시각) — 켜지는 순간 대기 문구를 내린다(할 일 264)
 
     // ─── 부착(모든 피어) ───────────────────────────────────────────────────
 
@@ -151,6 +154,30 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
 
         // 특성 창이 늦게 깨어나면 게이지 값을 다시 넣는다.
         if (TraitSelectionView.Instance != _traitView) PushTraitDeadline();
+
+        // 보스 엘리베이터 연출이 시작되는 순간(복제 시작 시각 — 모든 피어·늦은 합류 동일) 복도 대기 문구를 내린다.
+        bool elevator = IsElevatorStarted;
+        if (elevator != _elevatorSeen)
+        {
+            _elevatorSeen = elevator;
+            if (elevator) ClearWaitOnElevator();
+            else Render();   // 재도전 리셋 등으로 연출이 끝났는데 아직 진행 중 복도면 다시 그린다
+        }
+    }
+
+    private static bool IsElevatorStarted => BossTeleportManager.Instance != null && BossTeleportManager.Instance.IsElevatorStarted;
+
+    // 엘리베이터 연출 시작 = 복도를 떠나 스테이지로 들어가는 순간 — "특성 선택 완료 — 동료를 기다립니다"·대기 줄을 내린다(할 일 264).
+    // 연출 동안엔 Render 가 대기 목표를 다시 쓰지 않는다. 연출 뒤엔 보스방 도착(Finished) 정리가 이어진다.
+    private void ClearWaitOnElevator()
+    {
+        TutorialGuideUI ui = TutorialGuideUI.Instance;
+        if (ui == null) return;
+        if (!MapSceneTraitCorridorRules.ShouldClearWaitOnElevator(true, ui.CaptureState().ObjectiveId)) return;
+        ui.SetObjective(null);
+        ui.ClearWait();
+        _ownedCorridor = 0;
+        Edit.Log("[Tutorial] 보스 엘리베이터 연출 시작 — 복도 대기 문구(TUT_C_WAIT) 내림.", this);
     }
 
     // ─── 서버: 라운드 ──────────────────────────────────────────────────────
@@ -407,6 +434,8 @@ public sealed class MapSceneTraitCorridorFlow : MonoBehaviour
         if (_director == null || _nm == null || !_director.IsTutorialActive || _director.IsFinished) return;
         TutorialGuideUI ui = TutorialGuideUI.Instance;
         if (ui == null) return;
+        // 보스 엘리베이터 연출 중(만료 강제 이동이면 복도4 출구가 닫힌 채다) — 내린 대기 문구를 다시 쓰지 않는다(할 일 264).
+        if (IsElevatorStarted) return;
 
         int corridor = MapSceneTraitCorridorRules.ActiveCorridor(_director.IsGateOpen);
         if (corridor == 0) return;
