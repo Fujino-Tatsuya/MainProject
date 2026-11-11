@@ -48,6 +48,7 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
         if (timeline == null) return;
         timeline.MigrateLegacyKillerActionEnd(backDashDuration, backDashIdleDelay);
         timeline.SeedGroundCircle();   // 발밑 회색 원 트랙 전 에셋 = 기본 클립 한 번(267 후속)
+        timeline.SeedCameraBob();      // 카메라 두둥실 트랙 전 에셋 = 기본 클립 한 번(267 후속)
         timeline.MigrateKeys();
     }
 

@@ -278,4 +278,25 @@ public sealed class BossVictoryTimelineTests
         Assert.AreEqual(2, dst.cameraBob.Count);
         Assert.AreEqual(0.2f, dst.cameraBob[1].bobAmplitude, 1e-6f);
     }
+
+    [Test]
+    public void 카메라_두둥실_기본_클립_한_번만_넣고_값은_레퍼런스()
+    {
+        BossVictoryTimeline tl = BossVictoryTimeline.CreateDefault();
+        Assert.AreEqual(1, tl.cameraBob.Count);
+        BossVictoryClip c = tl.cameraBob[0];
+        Assert.AreEqual(0.3f, c.start, 1e-5f);
+        Assert.AreEqual(BossVictoryTimeline.DefaultEnd, c.End, 1e-4f);
+        Assert.AreEqual(0.22f, c.bobAmplitude, 1e-6f);
+        Assert.AreEqual(1.6f, c.bobPeriod, 1e-6f);
+        Assert.AreEqual(0.25f, c.bobPhase, 1e-6f);
+        Assert.AreEqual(0f, tl.CameraBobOffset(0.29f), 1e-6f, "시작 전 0");
+        Assert.AreEqual(0.22f, tl.CameraBobOffset(0.3f + 1.6f), 1e-3f, "시작 뒤 한 주기(들어오기 끝난 뒤) = 꼭대기(위상 0.25)");
+
+        var old = new BossVictoryTimeline();
+        Assert.IsTrue(old.SeedCameraBob());
+        Assert.IsFalse(old.SeedCameraBob(), "멱등");
+        old.cameraBob.Clear();
+        Assert.IsFalse(old.SeedCameraBob(), "지운 뒤 다시 안 넣음");
+    }
 }

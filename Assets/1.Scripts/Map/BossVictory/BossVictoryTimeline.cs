@@ -147,6 +147,8 @@ public sealed class BossVictoryTimeline
     public List<BossVictoryClip> noiseScrollV = new List<BossVictoryClip>();
     /// <summary>카메라 두둥실 클립(267 후속) — <see cref="BossVictoryTrack.CameraBob"/>.</summary>
     public List<BossVictoryClip> cameraBob = new List<BossVictoryClip>();
+    // 옛 에셋(이 트랙 전)에 기본 두둥실 클립을 한 번 넣었는가 — 지운 뒤엔 다시 안 넣음(<see cref="SeedCameraBob"/>).
+    [SerializeField, HideInInspector] bool cameraBobSeeded;
     /// <summary>발밑 회색 원 클립(246 복원 — 267 후속) — 세기 = 반경 비율. 페이드 인 = 0 → 목표 반경으로 커짐.</summary>
     public List<BossVictoryClip> groundCircle = new List<BossVictoryClip>();
     // 옛 에셋(이 트랙 전)에 기본 원 클립을 한 번 넣었는가 — 넣은 뒤 사용자가 지우면 그대로 둔다(<see cref="SeedGroundCircle"/>).
@@ -590,6 +592,27 @@ public sealed class BossVictoryTimeline
         return new Vector3(cameraPos.x, killerFloor.y, cameraPos.z);
     }
 
+    /// <summary>카메라 두둥실 기본 클립 — 0.3~5.6초, 들어올 때 0.2초·나갈 때 0.3초, 레퍼런스 값(0.22%·1.6초·위상 0.25).</summary>
+    public static BossVictoryClip DefaultCameraBobClip()
+    {
+        BossVictoryClip c = BossVictoryClip.Make(DefaultGroundCircleStart, DefaultEnd - DefaultGroundCircleStart, 0.2f, 0.3f);
+        c.bobAmplitude = DefaultBobAmplitude;
+        c.bobPeriod = DefaultBobPeriod;
+        c.bobPhase = 0.25f;
+        return c;
+    }
+
+    /// <summary>이 트랙 전 에셋이면 기본 두둥실 클립을 한 번 넣는다(멱등 — 지운 뒤엔 다시 안 넣음). 세기 키 이관 전에 부른다. 넣었으면 true.</summary>
+    public bool SeedCameraBob()
+    {
+        if (cameraBobSeeded) return false;
+        cameraBobSeeded = true;
+        cameraBob ??= new List<BossVictoryClip>();
+        if (cameraBob.Count > 0) return false;
+        cameraBob.Add(DefaultCameraBobClip());
+        return true;
+    }
+
     public bool SeedGroundCircle()
     {
         if (groundCircleSeeded) return false;
@@ -634,6 +657,7 @@ public sealed class BossVictoryTimeline
         tl.finisherStartTime = DefaultFinisherStart;
         tl.slowStartTime = 0f;
         tl.SeedGroundCircle();
+        tl.SeedCameraBob();
         tl.MigrateKeys();   // 효과 세기 클립 = 세기 키(같은 화면 — 255 후속 6)
         return tl;
     }
