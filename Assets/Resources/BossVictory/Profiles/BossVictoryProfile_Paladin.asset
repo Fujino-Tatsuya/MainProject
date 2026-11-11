@@ -191,6 +191,31 @@ MonoBehaviour:
       bobPeriod: 0
       bobPhase: 0
       bobDamping: 0
+    - start: 1.97
+      length: 0.2
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     smear:
     - start: 0.09
       length: 0.16
@@ -411,8 +436,8 @@ MonoBehaviour:
       bobDamping: 0
     rectifySeeded: 1
     rectifyFill:
-    - start: 0.4
-      length: 4.1
+    - start: 1.42
+      length: 4.18
       fadeIn: 0
       fadeOut: 0
       weight: 1
