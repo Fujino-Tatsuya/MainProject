@@ -25,8 +25,19 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
     [SerializeField] private Color blockedColor = new Color(0.35f, 0.35f, 0.35f, 0.75f);
 
+    [Tooltip("대시 아이콘(마스크 밑 Icon_Dash). 비면 슬롯 루트(cooldownFill 의 부모)의 Icon_mask 첫 자식을 쓴다. 쿨다운 아이콘 연출(할 일 259) 대상.")]
+    [SerializeField] private Image icon;
+
+    [Tooltip("쿨다운 아이콘 연출(할 일 259) — 충전 0 동안 어둡게, 충전이 하나 차는 순간 펄스·번쩍.")]
+    [SerializeField] private CooldownIconFeedbackSettings cooldownFeedback = new CooldownIconFeedbackSettings();
+
     private PlayerDashController dash;
     private bool isBlocked;
+
+    private CooldownIconFeedback feedback;
+    private int lastCharge;
+    private int lastMaxCharge;
+    private bool hasChargeBaseline;
 
     // 슬롯 루트 아래 Graphic 원래 색. SetBlocked가 되돌릴 수 있도록 캐시한다.
     private Graphic[] graphics;
@@ -40,7 +51,14 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
     public void Bind(Player player)
     {
         dash = player != null ? player.GetComponent<PlayerDashController>() : null;
+        hasChargeBaseline = false;   // 바인딩이 바뀐 프레임의 충전 변화는 연출하지 않는다
         Refresh();
+    }
+
+    private void OnDisable()
+    {
+        feedback?.Stop();
+        hasChargeBaseline = false;
     }
 
     /// <summary>
@@ -88,6 +106,7 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         }
 
         cooldownBody.Apply(cooldownFill, total > 0f ? remaining / total : 0f);
+        TickCooldownFeedback(charge, maxCharge);
 
         if (remainingText != null)
         {
@@ -103,6 +122,29 @@ public class DashCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
             chargeText.text = showCharge ? FormatCharge(charge, maxCharge) : string.Empty;
         }
+    }
+
+    // 충전식 기준(할 일 259): 어둡게 = 충전 0(대시 불가) 동안, 펄스·번쩍 = 충전이 하나 늘어난 순간(0→1·1→2 모두).
+    // 충전 1개 이상 남은 재충전 중에는 어둡게 하지 않는다 — 쓸 수 있는 상태라서. 덮개 진행 표시는 그대로.
+    private void TickCooldownFeedback(int charge, int maxCharge)
+    {
+        if (feedback == null)
+        {
+            Image target = icon != null
+                ? icon
+                : CooldownIconFeedback.FindIcon(cooldownFill != null ? cooldownFill.transform.parent : null);
+            if (target == null)
+                return;
+            feedback = new CooldownIconFeedback(target);
+        }
+
+        bool gained = CooldownIconFeedbackRules.ChargeGained(hasChargeBaseline, lastCharge, lastMaxCharge, charge, maxCharge);
+        bool dim = dash != null && maxCharge > 0 && charge <= 0;
+        hasChargeBaseline = true;
+        lastCharge = charge;
+        lastMaxCharge = maxCharge;
+
+        feedback.Tick(dim, gained, cooldownFeedback, Time.unscaledDeltaTime);
     }
 
     public static string FormatRemaining(float remaining) => remaining <= 0f
