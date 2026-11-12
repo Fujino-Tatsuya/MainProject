@@ -205,17 +205,22 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     private EffectHandle _victorySwordFx;
     private float _victoryFallingScale = 1f;   // 처치 연출 동안만 1 이 아니다
+    private Vector3 _victoryFallingOffset;     // 처치 연출 낙하 자리 = 보스 기준 오프셋(0 = 보스 아래)
+    private float _victoryFallingLife;         // 처치 연출 낙하 검 수명(초, 0 = 엔트리 수명)
     private EffectHandle _victoryStrikeHandle; // 배율을 바꾼 낙하 검(수명이 끝나면 Update 가 Local 파트 배율을 되돌린다)
     private readonly List<Transform> _scaledStrikeParts = new List<Transform>();
     private readonly List<Vector3> _scaledStrikeBase = new List<Vector3>();
     private static readonly List<GameObject> s_strikeInstances = new List<GameObject>();
     private static readonly List<ParticleSystem> s_strikeSystems = new List<ParticleSystem>();
 
-    /// <summary>[이 피어] 보스 처치 연출 시작 — 손 검에 번개(<paramref name="handLightning"/>), 이 연출의 낙하 검 배율(<paramref name="fallingSwordScale"/>). 이미 켜져 있으면 걷고 다시.</summary>
-    public void BeginVictorySword(bool handLightning, float fallingSwordScale)
+    /// <summary>[이 피어] 보스 처치 연출 시작 — 손 검에 번개(<paramref name="handLightning"/>), 이 연출의 낙하 검 배율(<paramref name="fallingSwordScale"/>)·
+    /// 낙하 자리(보스 기준 <paramref name="fallingOffset"/>)·수명(<paramref name="fallingLife"/> 초, 0 = 엔트리). 이미 켜져 있으면 걷고 다시.</summary>
+    public void BeginVictorySword(bool handLightning, float fallingSwordScale, Vector3 fallingOffset = default, float fallingLife = 0f)
     {
         EndVictorySword();
         _victoryFallingScale = Mathf.Max(0.01f, fallingSwordScale);
+        _victoryFallingOffset = fallingOffset;
+        _victoryFallingLife = Mathf.Max(0f, fallingLife);
         if (!handLightning)
             return;
 
@@ -238,6 +243,8 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
             EffectManager.Instance.Release(_victorySwordFx);
         _victorySwordFx = EffectHandle.None;
         _victoryFallingScale = 1f;
+        _victoryFallingOffset = Vector3.zero;
+        _victoryFallingLife = 0f;
     }
 
     private void Update()
@@ -450,12 +457,14 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     /// </summary>
     public void PlayTargetStrikeAtLocal(Transform target, float playRate)
     {
-        LockTargetPosition(target, target != null ? target.position : transform.position);
-        PlayTargetStrikeLocal(playRate, _victoryFallingScale);   // 처치 연출 낙하 검 배율(269) — 평소 R 경로는 1
+        // 낙하 자리 = 보스 기준 오프셋(처치 연출 프로필 칸 — 0 이면 보스 아래), 그 아래 바닥. 보스 위치·회전은 복제라 모든 피어 같다.
+        Vector3 point = target != null ? BossVictoryKillerMoves.BossPoint(target.position, target.rotation, _victoryFallingOffset) : transform.position;
+        LockTargetPosition(null, point);
+        PlayTargetStrikeLocal(playRate, _victoryFallingScale, _victoryFallingLife);   // 처치 연출 낙하 검 배율(269)·수명 — 평소 R 경로는 1·엔트리 수명
         ScaleStrikeLocalParts(_victoryFallingScale);
     }
 
-    private void PlayTargetStrikeLocal(float playRate, float scaleMultiplier = 1f)
+    private void PlayTargetStrikeLocal(float playRate, float scaleMultiplier = 1f, float lifeOverride = 0f)
     {
         if (targetStrike == null || EffectManager.Instance == null) return;
 
@@ -463,7 +472,7 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         // 둘이 어긋나면 "표식 옆에 칼이 꽂히는" 그림이 된다.
         // 원샷이라 엔트리 수명 뒤에 매니저가 알아서 반납한다. 핸들은 도중에 걷을 때만 쓴다.
         _targetStrikeHandle = EffectManager.Instance.PlayRecallable(targetStrike, _targetPosition, Quaternion.identity,
-            targetStrikeScale * scaleMultiplier, 0f, playRate);
+            targetStrikeScale * scaleMultiplier, lifeOverride, playRate);
     }
 
     /// <summary>

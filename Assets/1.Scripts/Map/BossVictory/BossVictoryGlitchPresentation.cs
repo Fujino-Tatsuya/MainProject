@@ -459,7 +459,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_killer == null || !UsesKillerSword(_profile)) return;
         if (!_killer.TryGetComponent(out PaladinSkillView sword)) return;
         _killerSword = sword;
-        sword.BeginVictorySword(_profile.handSwordLightning, _profile.fallingSwordScale);
+        sword.BeginVictorySword(_profile.handSwordLightning, _profile.fallingSwordScale, _profile.fallingSwordOffset, _profile.fallingSwordLife);
     }
 
     void EndKillerSword()
@@ -468,9 +468,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerSword = null;
     }
 
-    /// <summary>프로필이 처치자 검 연출(손 검 번개 또는 낙하 검 배율 ≠ 1)을 쓰는가(순수 판단, EditMode).</summary>
+    /// <summary>프로필이 처치자 검 연출(손 검 번개 · 낙하 검 배율 ≠ 1 · 낙하 자리 오프셋 · 낙하 검 수명)을 쓰는가(순수 판단, EditMode).</summary>
     public static bool UsesKillerSword(BossVictoryProfile profile) =>
-        profile != null && (profile.handSwordLightning || !Mathf.Approximately(profile.fallingSwordScale, 1f));
+        profile != null && (profile.handSwordLightning || !Mathf.Approximately(profile.fallingSwordScale, 1f) ||
+                            profile.fallingSwordOffset != Vector3.zero || profile.fallingSwordLife > 0f);
 
     /// <summary>
     /// [이 피어] 처치자를 따라가는 이펙트 하나를 이번 회차 느려짐(처치자 이펙트 배율)에서 뺀다 — 원래 속도(1)로 계속 흐른다(269 사용자 결정: 어쌔신 처치 오라·팔라딘 손 검 번개).

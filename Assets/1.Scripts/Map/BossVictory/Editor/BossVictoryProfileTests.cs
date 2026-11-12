@@ -209,6 +209,14 @@ public sealed class BossVictoryProfileTests
             p.fallingSwordScale = 1f;
             p.handSwordLightning = true;
             Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(p), "손 검 번개만");
+            p.handSwordLightning = false;
+            p.fallingSwordOffset = new Vector3(2f, 0f, 1f);
+            Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(p), "낙하 자리 오프셋만");
+            p.fallingSwordOffset = Vector3.zero;
+            p.fallingSwordLife = 1.5f;
+            Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(p), "낙하 검 수명만");
+            p.fallingSwordLife = 0f;
+            Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(p), "다 기본 = 끔");
         }
         finally { Object.DestroyImmediate(p); }
     }
