@@ -44,6 +44,10 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     public bool handSwordLightning;
     [Tooltip("처치 연출의 낙하 검(R 마무리 낙뢰 FX_Lightening_Strike — 하늘에서 떨어지는 검) 크기 배율(1 = 그대로). 이 연출에서만 — 평소 R 은 그대로.")]
     [Min(0.01f)] public float fallingSwordScale = 1f;
+    [Tooltip("처치 연출의 낙하 검이 떨어지는 자리 = 보스 기준 오프셋(+Z = 보스 정면, 보스 수평 회전 따라감). 높이는 무시하고 그 아래 바닥에 꽂힌다. 0 = 지금처럼 보스 아래. 타임라인 창이 열려 있으면 Scene 뷰 핸들로 끈다. 이 연출에서만.")]
+    public Vector3 fallingSwordOffset;
+    [Tooltip("처치 연출의 낙하 검 수명(초) — 생기는 시각은 그대로(처치 연출 스킬 클립 Custom0 이벤트), 이 시간 뒤 걷는다. 0 = 엔트리 수명 그대로. 엔트리보다 길게 잡으면 파티클이 끝난 뒤 빈 시간만 늘어난다. 이 연출에서만.")]
+    [Min(0f)] public float fallingSwordLife;
 
     [Header("처치자 이동(272 — 백대쉬 / 순간이동 Q(어쌔신) / 후퇴 차징(거너)). 이동은 처치자 오너가 실제로, 다른 피어는 복제 위치. 특성 연출 없음")]
     [Tooltip("백대쉬 = 지금 흐름(백대쉬 → 처치 연출 스킬). 순간이동 = 타임라인 '어쌔신 순간이동·Q 이동' 클립마다 그 시작 지점으로 순간이동 → 클립 길이 동안 아래 Q 상태로 도착 지점까지(처치 연출 스킬 대신, 마지막 뒤 정지 프레임). " +

@@ -25,6 +25,8 @@ MonoBehaviour:
   finisherWithBackDash: 0
   handSwordLightning: 0
   fallingSwordScale: 1
+  fallingSwordOffset: {x: 0, y: 0, z: 0}
+  fallingSwordLife: 0
   killerMove: 2
   teleportMoveState: Assassin_Q_DashStrike_Transformed
   teleportMoveEase:
@@ -397,7 +399,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 4.35
+    - start: 5.38
       length: 1.9500003
       fadeIn: 0
       fadeOut: 0

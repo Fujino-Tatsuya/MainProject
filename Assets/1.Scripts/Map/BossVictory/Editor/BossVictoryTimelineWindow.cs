@@ -1633,7 +1633,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 어쌔신 순간이동·Q 이동 클립(272 후속) — 모든 클립 두 점·경로 + '#n' 표시, 선택한 클립만 밝게 + 핸들.
     void OnSceneGUI(SceneView view)
     {
-        if (_profile == null || _profile.killerMove != BossVictoryKillerMove.TeleportDash) return;
+        if (_profile == null) return;
+        bool dash = _profile.killerMove == BossVictoryKillerMove.TeleportDash;
+        bool sword = ShowsFallingSword(_profile);
+        if (!dash && !sword) return;
         if (!TryGetBossPose(out Vector3 bossPos, out Quaternion bossRot, out string source)) return;
         List<BossVictoryClip> clips = Timeline.assassinDash;
 
@@ -1641,7 +1644,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Handles.DrawWireDisc(bossPos, Vector3.up, 0.6f);
         Handles.DrawAAPolyLine(2f, bossPos, bossPos + BossVictoryKillerMoves.Yaw(bossRot) * Vector3.forward * 1.5f);   // 보스 정면(+Z)
         Handles.Label(bossPos + Vector3.up * 0.8f, $"기준: {source}");
-        if (clips == null || clips.Count == 0) return;
+        if (sword) DrawFallingSwordHandle(bossPos, bossRot);
+        if (!dash || clips == null || clips.Count == 0) return;
 
         int selected = _selTrack == (int)BossVictoryTrack.AssassinDash && HasClipSelection ? _selIndex : -1;
         var order = new List<int>(clips.Count);
@@ -1680,6 +1684,30 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     }
 
     static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, c.a * a);
+
+    // 처치 연출 낙하 검 자리(팔라딘 — 프로필 fallingSwordOffset): 보스 기준 점 + 바닥까지 세로선 + 끌기 핸들(높이 0 으로 저장).
+    static bool ShowsFallingSword(BossVictoryProfile p) =>
+        p.killerMove != BossVictoryKillerMove.TeleportDash && (BossVictoryGlitchPresentation.UsesKillerSword(p) || p.finisherSlot == PlayerSkillSlot.Ultimate);
+
+    void DrawFallingSwordHandle(Vector3 bossPos, Quaternion bossRot)
+    {
+        Vector3 point = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, FlatOffset(_profile.fallingSwordOffset));
+        Handles.color = FallingSwordColor;
+        Handles.DrawWireDisc(point, Vector3.up, 0.7f);
+        Handles.DrawAAPolyLine(3f, point, point + Vector3.up * 3f);
+        Handles.Label(point + Vector3.up * 3.2f, _profile.fallingSwordLife > 0f ? $"낙하 검 · 수명 {_profile.fallingSwordLife:0.##}초" : "낙하 검 · 수명 = 엔트리");
+        EditorGUI.BeginChangeCheck();
+        Vector3 moved = Handles.PositionHandle(point, Quaternion.identity);
+        if (!EditorGUI.EndChangeCheck()) return;
+        Undo.RecordObject(_profile, "처치 연출 낙하 검 자리");
+        _profile.fallingSwordOffset = FlatOffset(BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, moved));
+        EditorUtility.SetDirty(_profile);
+        if (ProfileIsAsset) AssetDatabase.SaveAssetIfDirty(_profile);
+        _profileSo?.Update();
+        Repaint();
+    }
+
+    static readonly Color FallingSwordColor = new Color(1f, 0.85f, 0.3f);
 
     const string SubjectsKey = "BossVictoryTimeline.LastSubjects";
 
@@ -1927,7 +1955,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawClipNodeOptions(BossVictoryMarker.FinisherStart);
                 DrawProfileFields("처치 연출 스킬 칸(이 캐릭터 프로필)", nameof(BossVictoryProfile.finisherSlot));
                 DrawProfileFields("처치자 검(269 · 팔라딘만, 이 캐릭터 프로필) — 손 검 번개 = 연출 시작~끝 · 낙하 검 배율 = 이 연출의 R 낙하 검",
-                    nameof(BossVictoryProfile.handSwordLightning), nameof(BossVictoryProfile.fallingSwordScale));
+                    nameof(BossVictoryProfile.handSwordLightning), nameof(BossVictoryProfile.fallingSwordScale),
+                    nameof(BossVictoryProfile.fallingSwordOffset), nameof(BossVictoryProfile.fallingSwordLife));
+                EditorGUILayout.LabelField("낙하 검 자리 = 보스 기준(+Z = 보스 정면, 바닥에 꽂힘) — 이 창이 열려 있으면 Scene 뷰 노란 원 핸들로 끈다. 생기는 시각 = 처치 연출 스킬 클립 Custom0 이벤트, 수명 0 = 엔트리 그대로.", EditorStyles.wordWrappedMiniLabel);
                 break;
             case BossVictoryMarker.SlowStart:
                 DrawProfileFields("처치자 End 후 배율", nameof(BossVictoryProfile.killerAfterFinisherScale));

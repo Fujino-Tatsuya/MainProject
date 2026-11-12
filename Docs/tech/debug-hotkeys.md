@@ -26,7 +26,7 @@
 | 키 | 기능 | 파일 | 게이트 | 변경 전 릴리스 | 겹침 |
 |---|---|---|---|---|---|
 | F1 | 캐릭터 순환 팔라딘 → 어쌔신 → 거너(호스트, 같은 자리 재스폰) — **DebugInterruptLab·DebugTraitLab·DebugBossVictory 씬 전용**(보스 처치 연출 랩은 실행 중에 붙이고, 바뀌면 처음부터 — [boss-victory-character-profiles.md §4](boss-victory-character-profiles.md))(특성 랩은 바꾸기 직전 보유 특성을 비운다). [dash-interrupt.md §10.1](dash-interrupt.md) · [tutorial-traits.md §13](tutorial-traits.md) | `Dev/InterruptLab/DebugCharacterCycle.cs` (씬 배치형) | DEV_HOTKEYS | — (신규, 할 일 115 C6 · 135) | |
-| F2 | 타격점 계산 방식 순환(피격 이펙트 종류 순환 F1 은 2026-11-06 삭제 — 일반 몹·보스 공통 `EffectCatalog.HitEffect` 하나) | `Dev/HitVFXDebugHUD.cs` (씬 배치형) | DEV_HOTKEYS | ✗ | |
+| F2 | 타격점 계산 방식 순환(피격 이펙트 종류 순환 F1 은 2026-11-06 삭제 — 일반 몹·보스 공통 `EffectCatalog.HitEffect` 하나) · **DebugBossVictory 씬**: 보스 처치 연출 처음부터(F7 과 같음 — HitVFXDebugHUD 는 이 씬에 없어 안 겹침) | `Dev/HitVFXDebugHUD.cs` (씬 배치형) · `Dev/BossVictoryLab/DebugBossVictoryLab.cs` | DEV_HOTKEYS | ✗ | |
 | F3 | 23호 다음 행동 = 점프·점프·점프 콤보 예약(호스트) — 3번째 착지 간파 창 확인용 | `Dev/DevBossAttackHotkeys.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F4 | 살아 있는 보스(23호·웰즈) 체력 최대치의 10% 깎기(호스트) — 정상 피해 경로라 페이즈 전환이 실제처럼 난다 | `Dev/DevBossHpCut.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |
 | F5 | 보스방 진입 패드로 파티 워프 | `Dev/DevBossEntranceWarp.cs` (자동 생성) | DEV_HOTKEYS | ✗ | |

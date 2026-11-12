@@ -14,7 +14,7 @@ using UnityEngine;
 /// 랩이 더하는 것: 등장 연출 없이 보스 세우기 · 표시용 팀원(몸뿐인 복제본) · 결과 화면 전환 차단 → 원상복구 → 처음부터 · 배속/일시정지.
 ///
 /// <list type="bullet">
-/// <item>F7 = 처음부터 다시 · F8 = 일시정지/재개 · F1 = 처치자(내 플레이어) 캐릭터 순환(<see cref="DebugCharacterCycle"/> 재사용 — 랩이 실행 중에 붙인다, 바뀌면 처음부터, 267 캐릭터별 프로필 미리보기) · 패널 = 자동 반복·배속·막타 각도/거리/방향·팀원 수.</item>
+/// <item>F7·F2 = 처음부터 다시 · F8 = 일시정지/재개 · F1 = 처치자(내 플레이어) 캐릭터 순환(<see cref="DebugCharacterCycle"/> 재사용 — 랩이 실행 중에 붙인다, 바뀌면 처음부터, 267 캐릭터별 프로필 미리보기) · 패널 = 자동 반복·배속·막타 각도/거리/방향·팀원 수.</item>
 /// <item>처치 연출 = ZZZ 글리치(PLAN-boss-victory-glitch — 처치 판정 즉시 글리치·처치자 하던 동작 ×0.5 → 백대쉬 → 처치 연출 스킬 → 유지 → CRT 꺼짐). 옛 카메라 무빙·프리셋·슬라이더·주황·회색 원은 Legacy(연결 끊음).</item>
 /// <item>타임라인 창(<c>Tools/Boss Victory/처치 연출 타임라인</c>) — 재생 헤드를 끌면 일시정지 + 그 시각 화면 고정, ▶·⏮(= F7). 고친 클립·마커는 SO 에 바로 저장.</item>
 /// <item>끝 = 호스트 화면이 타임라인 로비 전환 마커(기본 = CRT 꺼짐 끝)를 지나 결과 전환 순간 → 랩이 차단하고 원상복구 → 처음부터. 패널은 재생 중 접힌다(CRT 꺼짐 캡처에 안 찍히게 — "패널 숨김" 끄면 계속 보임).</item>
@@ -27,6 +27,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 {
     const string Tag = "[BossVictoryLab]";
     const KeyCode ReplayKey = KeyCode.F7;
+    const KeyCode ReplayKeyAlt = KeyCode.F2;   // F7 과 같음(처음부터) — 손 가까운 키
     const KeyCode PauseKey = KeyCode.F8;
     const int MaxTeammates = 2;   // 플레이어 1~3명 = 막타 + 팀원 0~2
     static readonly float[] SpeedPresets = { 0.1f, 0.25f, 0.5f, 1f };
@@ -181,7 +182,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         }
         _localPlayerId = localId;
 
-        if (Input.GetKeyDown(ReplayKey)) Replay();
+        if (Input.GetKeyDown(ReplayKey) || Input.GetKeyDown(ReplayKeyAlt)) Replay();
         if (Input.GetKeyDown(PauseKey)) _paused = !_paused;
 
         TickClock();
@@ -478,7 +479,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
 
         GUI.enabled = ready;
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("처음부터 (F7)")) Replay();
+        if (GUILayout.Button("처음부터 (F2·F7)")) Replay();
         if (GUILayout.Button(_paused ? "재개 (F8)" : "일시정지 (F8)")) _paused = !_paused;
         GUILayout.EndHorizontal();
         autoLoop = GUILayout.Toggle(autoLoop, " 자동 반복(끝나면 원상복구 → 처음부터)");
@@ -531,7 +532,7 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
         const float w = 260f, h = 26f;
         GUILayout.BeginArea(new Rect(Screen.width - w - 10f, Screen.height - h - 10f, w, h));
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"랩 재생 중 {t} · F1 · F7 · F8");
+        GUILayout.Label($"랩 재생 중 {t} · F1 · F2·F7 · F8");
         if (GUILayout.Button("패널", GUILayout.Width(50f))) hidePanelDuringPlay = false;
         GUILayout.EndHorizontal();
         GUILayout.EndArea();

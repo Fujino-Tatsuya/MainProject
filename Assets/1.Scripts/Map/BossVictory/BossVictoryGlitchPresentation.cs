@@ -105,6 +105,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 처치 연출 중인가 — 조준 표시 숨김 이유(267 후속). 복제된 처치 상태로 각 피어가 연 연출이라 늦은 참가자도 같다. 끝·취소(Teardown)·파괴면 false.</summary>
     public static bool HidesCombatAim => IsRunning;
 
+    /// <summary>[이 피어] 처치 연출 중인가 — 피해·힐 숫자 제거 이유(연출때 데미지 플로팅 제거). <see cref="FloatingDamageSpawner"/> 가 매 프레임 읽어 새 숫자를 막고 떠 있던 숫자를 지운다. 끝·취소(Teardown)·파괴면 false(누수 없음).</summary>
+    public static bool HidesDamageNumbers => IsRunning;
+
     /// <summary>[이 피어] 처치 연출 진행 중(시작 ~ 끝·취소·파괴). 표시 전용 연출이 언제 접을지 본다(어쌔신 처치 오라 — 267 후속).</summary>
     public static bool IsRunning => Instance != null && Instance._running;
 
@@ -359,6 +362,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         TickBoss();
         TickAnimators();
         SampleClipTiming();
+        if (_killerSword != null) _killerSword.SetVictoryFallingOffset(_profile.fallingSwordOffset);   // 창 Scene 핸들로 끌면 떨어진 낙하 검도 바로 옮김(보면서 세팅)
         if (_glitchOn) TickGlitch();
     }
 
@@ -456,7 +460,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         if (_killer == null || !UsesKillerSword(_profile)) return;
         if (!_killer.TryGetComponent(out PaladinSkillView sword)) return;
         _killerSword = sword;
-        sword.BeginVictorySword(_profile.handSwordLightning, _profile.fallingSwordScale);
+        sword.BeginVictorySword(_profile.handSwordLightning, _profile.fallingSwordScale, _profile.fallingSwordOffset, _profile.fallingSwordLife);
     }
 
     void EndKillerSword()
@@ -465,9 +469,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerSword = null;
     }
 
-    /// <summary>프로필이 처치자 검 연출(손 검 번개 또는 낙하 검 배율 ≠ 1)을 쓰는가(순수 판단, EditMode).</summary>
+    /// <summary>프로필이 처치자 검 연출(손 검 번개 · 낙하 검 배율 ≠ 1 · 낙하 자리 오프셋 · 낙하 검 수명)을 쓰는가(순수 판단, EditMode).</summary>
     public static bool UsesKillerSword(BossVictoryProfile profile) =>
-        profile != null && (profile.handSwordLightning || !Mathf.Approximately(profile.fallingSwordScale, 1f));
+        profile != null && (profile.handSwordLightning || !Mathf.Approximately(profile.fallingSwordScale, 1f) ||
+                            profile.fallingSwordOffset != Vector3.zero || profile.fallingSwordLife > 0f);
 
     /// <summary>
     /// [이 피어] 처치자를 따라가는 이펙트 하나를 이번 회차 느려짐(처치자 이펙트 배율)에서 뺀다 — 원래 속도(1)로 계속 흐른다(269 사용자 결정: 어쌔신 처치 오라·팔라딘 손 검 번개).
