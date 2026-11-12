@@ -1,6 +1,6 @@
 # 플로팅 데미지(피해 숫자) — 실제 동작 기준 설계
 
-갱신 2026-11-06 (할 일 242 — 디버그 씬 §12), 2026-11-02 (할 일 174 — 제압 가속 합산 §3.1), 2026-10-29 (할 일 154). 코드: `Assets/1.Scripts/UI/Combat/FloatingDamage/`, 수치: `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset`.
+갱신 2026-11-12 (할 일 268 — 판정 크기 배율·맞은 반대쪽·외곽선 알파·힐 숫자 §13), 2026-11-06 (할 일 242 — 디버그 씬 §12), 2026-11-02 (할 일 174 — 제압 가속 합산 §3.1), 2026-10-29 (할 일 154). 코드: `Assets/1.Scripts/UI/Combat/FloatingDamage/`, 수치: `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset`.
 
 **출처** — 기획 「Re:C 데미지 숫자 표기 v0.2」(§3 구간 · §4 위치 · §5 흐름, 수치는 임시값)
 + 은희 결정(2026-10-01: 누적 숫자는 대상을 따라감 · 누적 구간은 합계로 판정)
@@ -13,14 +13,14 @@
 | 항목 | 동작 |
 |---|---|
 | 그리는 곳 | 스포너가 직접 만드는 **Screen Space Overlay** Canvas(`FloatingDamageCanvas`, 1920×1080 기준 · 높이 맞춤 · 정렬 50). Canvas 단위 = 기획 px |
-| 글자 | TMP 아님 — **이미지 숫자**(`FloatingDamageDigitSet` 스프라이트, 외곽선 색도 DigitSet). 굵은 변형 스프라이트 없음 → 기획의 "높음 = 한 단계 굵게"는 표현 안 함 |
-| 생성점 | 대상의 **몸 중심**(§2) 을 화면에 투영 + 픽셀 오프셋 합산 |
+| 글자 | TMP 아님 — **이미지 숫자**(`FloatingDamageDigitSet` 스프라이트, 외곽선 색도 DigitSet, 외곽선 알파 = DigitSet × `outlineAlpha` 0.8 × 숫자 알파 — §13.3). 굵은 변형 스프라이트 없음 → 기획의 "높음 = 한 단계 굵게"는 표현 안 함 |
+| 생성점 | 대상의 **몸 중심**(§2) 을 화면에 투영 + 픽셀 오프셋 합산. 공격자(힐이면 힐한 사람)가 있으면 **화면 x 로 반대쪽**에 밀어 뜨고 그쪽으로 흐른다(§13.2) |
 | 흐름 | 단발 = 뜨고 떨어지며 사라짐 / 누적(Multi) = 한 숫자에 합산하다 사라짐(§3) / 제압 가속 중 = 공격자·대상별 하나로 전부 합산(§3.1) |
-| 크기·색 | 피해 강도 3구간(낮음/중간/높음) — 대상 등급별 %(§4) |
+| 크기·색 | 피해 강도 3구간(낮음/중간/높음) — 대상 등급별 %(§4) × **판정(Hurtbox) 크기 배율** 0.8~1.6(§13.1) |
 | 줌 | **카메라 줌과 무관** — 크기·픽셀 오프셋 고정(§7: 넣었다가 뺐음, 154) |
 | 해상도 | 높이 맞춤 + 실제 px 하한 16(§4, 154) |
 | 간파 중 | 내 강 시도 ~ 성공 섬광 끝 동안 내 화면만 숨김(§5, 154) |
-| 데이터 | 서버가 피해마다 `ClientDamageDealtClientRpc` 로 실제 감소량 + 공격자 + 공격 종류를 보냄(§6) |
+| 데이터 | 서버가 피해마다 `ClientDamageDealtClientRpc` 로 실제 감소량 + 공격자(clientId·몬스터면 NetworkObjectId) + 공격 종류를 보냄(§6). 회복은 `ClientHealedClientRpc`(§13.4) |
 | 수치 원본 | SO 에셋. **xlsx(GameData) 미연결** |
 
 ## 2. 생성 위치 — 앵커 + 픽셀 오프셋
@@ -38,7 +38,7 @@
 ### 2-2. 픽셀 오프셋 합산 (Canvas 단위 = 1080p px, +y = 위)
 
 ```
-x = 투영x + style.offset.x + scatter.x + shake
+x = 투영x + style.offset.x + scatter.x + shake + side × (sidePush + sideDrift × 흐름)   ← side 는 §13.2
 y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 → 화면 가장자리 여백(60, 30) 안으로 클램프
 ```
@@ -116,7 +116,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 | 중간 | 주황 (1, 0.55, 0.1) | ×1.0 | ×1.1 → 0.08s | 없음 |
 | 높음 | 빨강 (1, 0.2, 0.15) | ×1.4 | ×1.63 → 0.12s (OutBack) | 3px 0.08s |
 
-- 크기 배율의 100% = `popupStyles[kind].height`(Damage 36px · ShieldDamage 34px).
+- 크기 배율의 100% = `popupStyles[kind].height`(Damage 36px · ShieldDamage 34px). 여기에 판정 크기 배율(§13.1)을 곱한다 — 아래 표는 배율 1(플레이어 크기) 기준.
 - **해상도 하한(154)** — Canvas 가 높이 맞춤(1080 기준)이라 숫자 실제 px = 높이 × 유지 크기 × 팀원 배율 × (화면 높이 ÷ 1080).
   이 값이 `minScreenPixelHeight`(기본 **16 실제 px**)보다 작으면 그 높이까지 같은 배율로 키운다(`FloatingDamageMinPixelPolicy`, 등장 확대·펀치 비율은 그대로, 0 = 끔).
   16 근거: 1080p 내 낮음(18px)은 그대로 두고, 그보다 작은 팀원 낮음(13.5px)·720p 낮음(12px)부터 올린다(16px = 흔한 본문 글자 최소 크기).
@@ -166,6 +166,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 - **보호막 숫자(141)**: `PopupKind.ShieldDamage`, 밝은 하늘색 **#7FD8FF**, 높이 34px, **+64px 위**(HP 숫자와 안 겹치게).
 - HP 를 거치지 않는 흡수(23호 자폭 실드)는 파생 클래스가 `Unit.ReportAbsorbedShieldDamage` 로 같은 RPC 를 보낸다.
 - 훈련 더미는 자체 `TrainingDummyDamagePresenter` 로 같은 스포너에 넣는다.
+- RPC 인자(268): `ClientDamageDealtClientRpc(hp, shield, attackerClientId, attackerObjectId, attackType, hitPattern)` — `attackerObjectId` = 플레이어가 아닌 공격자 Unit 의 NetworkObjectId(반대쪽 연출 기준점, §13.2). 회복 RPC 는 §13.4. RPC 목록 = [networking.md](networking.md) '표시용 전투 알림 RPC'.
 
 ## 7. 카메라 줌 배율 — 넣었다가 뺐음 (154)
 
@@ -190,6 +191,8 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 | `FloatingDamageTier` / `FloatingDamageAccumulationPolicy` | 구간 판정·강조 간격 / 누적 방식(`FloatingDamageAccumulation`)·누적 키·제압 가속 유지 |
 | `FloatingDamageDigitSet` / `FloatingDamageNumberView` | 이미지 글꼴 / 글자 Image |
 | `FloatingDamageAnchor` | 대상별 생성점(§2-3) |
+| `FloatingDamageHurtboxScale` | 판정 크기 측정 `FloatingDamageHurtboxMeasure` · 배율 규칙 `FloatingDamageHurtboxScalePolicy`(§13.1) |
+| `FloatingDamageSource` | 반대쪽 기준점 — clientId → 플레이어 / NetworkObjectId → 몬스터 위치(§13.2). 규칙 `FloatingDamageSidePolicy`·외곽선 `FloatingDamageOutlinePolicy` 는 `FloatingDamageSettings.cs` |
 
 ## 10. xlsx
 `FloatingDamageSettings` 는 `GameData.xlsx` 에 **연결하지 않는다**(시트 없음, 154 결정 7). 튜닝은 에셋 인스펙터에서.
@@ -223,6 +226,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
   | `Z` `X` `C` | 구간 낮음·중간·높음(패널에서 '직접' = 값 입력) |
   | `H` `S` `B` | HP · 보호막 · 둘 다(보호막 → HP 순, 게임과 같음). 회복·상태·텍스트는 패널 버튼 |
   | `T` | 내 공격 ↔ 팀원 공격(표시 필터 '내 데미지 강조'면 팀원 = ×0.75·흐리게) |
+  | `A` | 공격자 자리 없음 → 왼쪽 → 오른쪽 → 정면(268 — 숫자는 반대쪽, 없음·정면 = 위로만). 자리 = 대상 생성점에서 카메라 좌우(바닥 평면) `sourceDistance` 3m, 정면 = 카메라 쪽. 기즈모 빨간 구 = 마지막 공격자 자리 |
   | `F` | 카메라 = 선택 대상 중심 |
 - **구간 기준 최대 체력**: 네트워크 없이는 Unit 최대 체력이 0 이라 구동기 칸 `groups[i].baseMaxHp` 를 쓴다(요청 `baseMaxHpOverride` — 게임 경로는 안 씀). 기본 = 데이터 값 23호 레이드 2880(1인) · 팔라딘 220 · 휴머노이드 90.
 - **숫자 크기 고치기** = 설정 SO `Assets/9.ScriptableObject/UI/FloatingDamageSettings.asset` — `popupStyles[kind].height`(HP 36·보호막 34)·`tierLooks[*].holdScale`·`spawnOffset` 등.
@@ -236,7 +240,49 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
 - **기즈모**: 노란 구 = 앵커 점, 초록 구 = 앵커 없음(콜라이더 중심), 선 = 대상 발 → 생성점. 에디트 모드 씬 뷰에서도 보이고, Game 뷰는 Gizmos 켬일 때.
 - 🔴 Dev Boot(호스트)로 열지 말 것 — 씬에 놓인 `Player_Paladin` 이 호스트 소유로 스폰되면 "내 플레이어"로 걸러져 숫자가 안 뜰 수 있고, 호스트 플레이어·카메라가 따로 생긴다(11-06 로그 — 오디오 리스너 3개). 씬을 열고 그냥 ▶.
 - 알려진 한계: 꺼진 스크립트도 `Awake` 는 돈다(네트워크 없는 경고가 콘솔에 날 수 있음 — 숫자와 무관) · 플레이어·몬스터에는 앵커가 없어 콜라이더 중심 · 앵커 '저장'은 에디터에서만.
+- 패널(268): 방금 숫자의 판정 크기(m)·배율·반대쪽 방향, 설정 칸 외곽선 알파·반대쪽 밀기/흐름/문턱을 보여 준다. 회복 숫자는 '회복' 버튼(흐름 무관 늘 합산).
 - 테스트: `Assets/Tests/EditMode/FloatingDamage/Editor/FloatingDamageDebugLabTests.cs`(메뉴 `Tools/Tests/데미지 숫자 EditMode 테스트 실행`).
+
+## 13. 판정 크기 배율 · 맞은 반대쪽 · 외곽선 알파 · 힐 숫자 (할 일 268, 2026-11-12)
+
+계획서 [PLAN-floating-damage-hurtbox-side-heal.md](../history/PLANS/PLAN-floating-damage-hurtbox-side-heal.md). 수치 칸은 전부 `FloatingDamageSettings`(xlsx 미연결, §10).
+
+### 13.1 판정(Hurtbox) 크기 배율
+- 배율 = clamp(sqrt(대상 판정 크기 ÷ `hurtboxReferenceSize`), `hurtboxScaleMin` 0.8, `hurtboxScaleMax` 1.6). 구간 크기 × 팀원 배율 × **이 배율** → 그다음 해상도 하한(§4). 카메라 줌과 무관.
+- **판정 크기** = 대상이 주인(`Hurtbox.OwnerUnit`)인 Hurtbox 의 **켜진 콜라이더** 월드 경계 상자를 합친 것의 **대각선 길이(m)** — 높이와 수평 폭을 함께 본다.
+  자식 Unit(23호 안의 웰즈)의 Hurtbox 는 뺀다. Hurtbox 가 없거나 전부 꺼져 있으면 루트 콜라이더, 그것도 없으면 배율 1.
+- 기준 `hurtboxReferenceSize` **1.7** = `Player.prefab` 캡슐(반경 0.2·높이 1.6 → 0.4×1.6×0.4 대각선 1.697). 0 = 끔.
+- 프리팹 값 계산: 플레이어 1.0 · 일반 몬스터(반경 0.5·높이 2, 대각선 2.45) ≈ 1.2 · 23호(반경 1.7·높이 5.78, 7.52) = 1.6(최대에 걸림).
+- 스포너가 대상별 **마지막 측정값을 기억**해 판정이 잠깐 꺼진 순간(무적 등)에도 크기가 튀지 않는다. 숫자 생성 때 1회 — 누적 숫자는 첫 값 유지.
+
+### 13.2 맞은 반대쪽에 뜨기
+- 생성 순간 대상 생성점과 **공격자 본인 위치**(투사체도 공격자 본인)를 화면에 투영해 x 를 비교(Canvas 단위 = 1080p px) — 공격자가 왼쪽이면 숫자는 오른쪽.
+  차이가 `sideFrontThreshold` **24px** 이하(거의 정면)거나 공격자가 없으면 지금처럼 위로만.
+- 위치: 생성 때 `sidePush` **40px** 밀고, `sideDriftDuration` **0.6초** 동안 `sideDriftEase`(OutCubic)로 `sideDrift` **30px** 더 흐른 뒤 머문다. 상승·하강(§3)은 그대로 같이 돈다.
+- **누적 숫자는 처음 정한 방향을 유지**(방향은 생성 때 1회).
+- 공격자 위치 찾기(`FloatingDamageSource`, 각 피어) — 새 RPC 없음, 기존 피해 RPC 인자만 1개 추가:
+  - 플레이어 공격자 = RPC 의 `attackerClientId` → `PlayerLifeCycleController.Active` 에서 그 OwnerClientId 의 플레이어.
+  - 몬스터·보스 공격자 = RPC 의 `attackerObjectId`(서버가 `hitContext.sourceUnit` → 없으면 `sourceTransform` 부모 Unit, 플레이어 아님) → `SpawnManager.SpawnedObjects`. **이미 디스폰됐으면 위로만.**
+  - 장판·도트·추락·비율 피해(`ReceiveAttack` 을 안 타는 경로)는 둘 다 없음 → 위로만.
+- 힐은 기준 = 힐한 사람(§13.4), 자기 회복은 위로만.
+
+### 13.3 외곽선 알파
+- 외곽선 알파 = DigitSet `outlineColor.a` × `outlineAlpha`(**0.8**) × 숫자 알파(팀원 최대 알파 200/255·페이드 포함) — `FloatingDamageOutlinePolicy.Alpha`.
+
+### 13.4 힐 숫자 — 새 RPC `Unit.ClientHealedClientRpc(int healed, ulong healerClientId)`
+- 서버 `Unit.HealHp(amount, countInStats, healerClientId)` 의 **실제 회복량 &gt; 0** 이고 `countInStats` 가 true 일 때만 전 피어에 보낸다 → 이벤트 `Unit.ClientHealedAttributed(HealReceivedInfo)` → `FloatingDamagePresenter` 가 `PopupKind.Heal`(초록 `popupStyles` 색 (0.28, 1, 0.38))로 띄운다. 회복량 0(풀피) = 안 보냄.
+- **대상 회복**: 회복 스킬·특성 회복(`PlayerTraitEffects.HealServer`)·초과 회복 아군 전달(회복 주체 = 시전자)·소생.
+  소생 = `PlayerLifeCycleController.TryCompleteRevive` 가 `Unit.Revive(reportHeal: true)` — 회복량 = 최대 체력 − 직전 체력, 회복 주체 = 자기 자신(위로만).
+- **제외**: 플레이어 기본 체력 재생·로비 훈련 보정(`countInStats: false`) · 재합류 체력 복원(`SetCurrentHealthOnServer`) · 전멸 리스폰·몬스터 재사용 등 `Revive()`(= `reportHeal` false) · 훈련 더미 리필(`TrainingDummy.ReportsHealNumbers` false).
+- 표시 필터는 피해와 같다(내 힐 = 크게, 팀원끼리 = ×0.75·흐리게, 끄기·내 것만 동일). 로컬 플레이어가 받은 회복은 띄우지 않는다(피해와 같음 — 팀원 화면에서만 보인다).
+- 누적: **늘 힐한 사람·대상별 합산**(Multi 키 = 힐한 사람 + `AttackType.Default` + 대상 + Heal) — 피해 숫자와 같은 값 갱신·펀치·유지·흐려짐. 제압 가속 합산(§3.1)은 타지 않는다(`FloatingDamageAccumulationPolicy.Resolve(kind, …)`).
+  구간(크기)은 피해처럼 합계 ÷ 최대 체력으로 판정하고, 색은 늘 Heal 스타일 색. 판정 크기 배율·반대쪽도 그대로 적용.
+
+### 13.5 알려진 한계
+- 보스 숫자가 1.6배가 되면 보호막·HP 숫자 세로 간격(`popupStyles[ShieldDamage].offset` 64px 고정)이 상대적으로 좁아진다. 기존 EditMode `ShieldAndHpNumbers_DoNotOverlapVertically` 는 268 전부터 실패 중 — 에셋 튜닝값(가장 큰 유지 크기·`spawnScatter.y`) 기준 필요 간격 65.8px > 64px. 268 범위에서는 안 고친다.
+- 반대쪽 방향은 생성 순간 위치로 한 번 정한다 — 누적 중 공격자가 반대편으로 돌아가도 방향은 그대로(사양).
+- 몬스터 투사체가 공격자 Unit 을 `sourceUnit`·부모로 안 들고 오면 위로만 뜬다.
+- 소생의 회복 주체는 따로 기록되지 않아 자기 회복(위로만)으로 본다.
 
 ## 역사
 2026-08-05 초안은 World-space TMP · NetworkVariable 복제 기반 · "체력바 옆 Active 상태머신"을 검토했으나, 구현은
