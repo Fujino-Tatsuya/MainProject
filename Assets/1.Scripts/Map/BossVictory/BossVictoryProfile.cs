@@ -46,7 +46,7 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Min(0.01f)] public float fallingSwordScale = 1f;
     [Tooltip("처치 연출의 낙하 검이 떨어지는 자리 = 보스 기준 오프셋(+Z = 보스 정면, 보스 수평 회전 따라감). 높이는 무시하고 그 아래 바닥에 꽂힌다. 0 = 지금처럼 보스 아래. 타임라인 창이 열려 있으면 Scene 뷰 핸들로 끈다. 이 연출에서만.")]
     public Vector3 fallingSwordOffset;
-    [Tooltip("처치 연출의 낙하 검 수명(초) — 생기는 시각은 그대로(처치 연출 스킬 클립 Custom0 이벤트), 이 시간 뒤 걷는다. 0 = 엔트리 수명 그대로. 엔트리보다 길게 잡으면 파티클이 끝난 뒤 빈 시간만 늘어난다. 이 연출에서만.")]
+    [Tooltip("처치 연출의 낙하 검이 꽂힌 채 화면에 남는 시간(초) — 생기는 시각은 그대로(처치 연출 스킬 클립 Custom0 이벤트), 꽂혀 아직 선명할 때(엔트리 길이 × 0.75) 멈췄다가 이 시간 뒤 원래 끝 연출(페이드)로 사라진다. 처치 연출이 끝나면(로비 전환·취소) 남은 검은 걷는다. 0 = 엔트리 그대로(2.2초). 이 연출에서만.")]
     [Min(0f)] public float fallingSwordLife;
 
     [Header("처치자 이동(272 — 백대쉬 / 순간이동 Q(어쌔신) / 후퇴 차징(거너)). 이동은 처치자 오너가 실제로, 다른 피어는 복제 위치. 특성 연출 없음")]
