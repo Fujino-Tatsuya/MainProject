@@ -93,4 +93,117 @@ public sealed class WeaponTransformRelaySecondaryTests
             hasState |= s.state.name == PaladinShieldGripAuthoring.UltimateState;
         Assert.IsTrue(hasState, "궁 상태가 0층에 있다");
     }
+
+    // ── 미리보기(보면서 세팅) ──
+
+    static (GameObject root, Transform socket, Transform shield, Transform handle, Transform elbow, WeaponTransformRelay relay) Rig()
+    {
+        var root = new GameObject("GripRig");
+        var bone = new GameObject("bone").transform;
+        bone.SetParent(root.transform, false);
+        var socket = new GameObject(PaladinShieldGripAuthoring.HandSocketName).transform;
+        socket.SetParent(bone, false);
+        var elbow = new GameObject(PaladinShieldGripAuthoring.ElbowSocketName).transform;
+        elbow.SetParent(bone, false);
+        elbow.localPosition = new Vector3(1f, 0f, 0f);
+        var slot = new GameObject("PlayerWaeponSlot").transform;
+        slot.SetParent(root.transform, false);
+        var shield = new GameObject(PaladinShieldGripAuthoring.ShieldName).transform;
+        shield.SetParent(slot, false);
+        var handle = new GameObject(PaladinShieldGripAuthoring.HandleName).transform;
+        handle.SetParent(shield, false);
+        handle.localPosition = new Vector3(0f, 0f, 0.5f);
+        var relay = slot.gameObject.AddComponent<WeaponTransformRelay>();
+        var so = new SerializedObject(relay);
+        SerializedProperty follows = so.FindProperty("follows");
+        follows.arraySize = 1;
+        SerializedProperty f = follows.GetArrayElementAtIndex(0);
+        f.FindPropertyRelative("target").objectReferenceValue = socket;
+        f.FindPropertyRelative("weapon").objectReferenceValue = shield;
+        f.FindPropertyRelative("secondaryHandle").objectReferenceValue = handle;
+        f.FindPropertyRelative("secondaryTarget").objectReferenceValue = elbow;
+        f.FindPropertyRelative("secondaryState").stringValue = PaladinShieldGripAuthoring.UltimateState;
+        f.FindPropertyRelative("secondaryBlend").floatValue = 0.1f;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return (root, socket, shield, handle, elbow, relay);
+    }
+
+    [Test]
+    public void 미리보기_가중치로_보정을_켜고_끈다()
+    {
+        var rig = Rig();
+        try
+        {
+            rig.relay.previewWeight = 1f;
+            rig.relay.ApplyNow();
+            Vector3 dir = (rig.handle.position - rig.shield.position).normalized;
+            Assert.AreEqual(1f, Vector3.Dot(dir, Vector3.right), Tolerance, "켜기 = 손잡이2 가 ElbowSocket 쪽");
+            rig.relay.previewWeight = 0f;
+            rig.relay.ApplyNow();
+            Assert.AreEqual(0f, Quaternion.Angle(rig.socket.rotation, rig.shield.rotation), Tolerance, "끄기 = 손 소켓 그대로");
+            rig.relay.previewWeight = -1f;
+            rig.relay.ApplyNow();
+            Assert.AreEqual(0f, Quaternion.Angle(rig.socket.rotation, rig.shield.rotation), Tolerance, "미리보기 아님(Play 아님) = 보정 없음");
+            Assert.IsTrue(rig.relay.TryGetSecondary(out Transform w, out Transform h, out Transform e, out float blend));
+            Assert.AreSame(rig.shield, w);
+            Assert.AreSame(rig.handle, h);
+            Assert.AreSame(rig.elbow, e);
+            Assert.AreEqual(0.1f, blend, Tolerance);
+        }
+        finally { Object.DestroyImmediate(rig.root); }
+    }
+
+    [Test]
+    public void 프리팹에_저장할_값을_손잡이2_ElbowSocket_블렌드에_넣는다()
+    {
+        var rig = Rig();
+        try
+        {
+            Assert.IsTrue(PaladinShieldGripAuthoring.ApplyGrip(rig.root, new Vector3(0.1f, 0.2f, 0.3f), new Vector3(-0.4f, 0f, 0.05f), 0.25f));
+            Assert.AreEqual(new Vector3(0.1f, 0.2f, 0.3f), rig.handle.localPosition);
+            Assert.AreEqual(new Vector3(-0.4f, 0f, 0.05f), rig.elbow.localPosition);
+            rig.relay.TryGetSecondary(out _, out _, out _, out float blend);
+            Assert.AreEqual(0.25f, blend, Tolerance);
+            Object.DestroyImmediate(rig.handle.gameObject);
+            Assert.IsFalse(PaladinShieldGripAuthoring.ApplyGrip(rig.root, Vector3.zero, Vector3.zero, 0.1f), "손잡이2 없으면 false");
+        }
+        finally { Object.DestroyImmediate(rig.root); }
+    }
+
+    [Test]
+    public void 미리보기를_끄면_애니_자세와_방패가_원래대로()
+    {
+        var rig = Rig();
+        var clip = new AnimationClip();
+        clip.SetCurve("bone", typeof(Transform), "localPosition.x", AnimationCurve.Linear(0f, 0f, 1f, 2f));
+        Transform bone = rig.root.transform.Find("bone");
+        Vector3 shieldPos = rig.shield.localPosition;
+        Quaternion shieldRot = rig.shield.localRotation;
+        try
+        {
+            PaladinShieldGripPreview.Start();
+            PaladinShieldGripPreview.Sample(rig.root, clip, 0.5f, rig.shield);
+            Assert.AreEqual(1f, bone.localPosition.x, Tolerance, "샘플링 = 클립 자세");
+            rig.relay.previewWeight = 1f;
+            rig.relay.ApplyNow();
+            Assert.AreNotEqual(shieldPos, rig.shield.localPosition, "방패가 따라감");
+        }
+        finally
+        {
+            PaladinShieldGripPreview.Stop();
+            rig.relay.previewWeight = -1f;
+        }
+        try
+        {
+            Assert.IsFalse(PaladinShieldGripPreview.Active);
+            Assert.AreEqual(0f, bone.localPosition.x, Tolerance, "끄면 본 원복");
+            Assert.AreEqual(shieldPos, rig.shield.localPosition, "방패 위치 원복");
+            Assert.AreEqual(0f, Quaternion.Angle(shieldRot, rig.shield.localRotation), Tolerance, "방패 회전 원복");
+        }
+        finally
+        {
+            Object.DestroyImmediate(rig.root);
+            Object.DestroyImmediate(clip);
+        }
+    }
 }

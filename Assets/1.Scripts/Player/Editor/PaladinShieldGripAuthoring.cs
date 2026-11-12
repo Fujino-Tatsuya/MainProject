@@ -79,6 +79,50 @@ public static class PaladinShieldGripAuthoring
         finally { PrefabUtility.UnloadPrefabContents(root); }
     }
 
+    /// <summary>
+    /// 런타임(Play 중)에서 맞춘 손잡이2·ElbowSocket 로컬 위치·블렌드를 Player_Paladin.prefab 에 저장한다(미리보기 창 '프리팹에 저장').
+    /// 프리팹을 디스크에서 읽어 이 세 값만 바꿔 저장 — 프리팹에 이미 있던 다른 변경은 그대로 남는다.
+    /// </summary>
+    public static bool SaveGripToPrefab(Vector3 handleLocal, Vector3 elbowLocal, float blend)
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            if (!ApplyGrip(root, handleLocal, elbowLocal, blend))
+            {
+                Debug.LogError("[PaladinShieldGrip] 프리팹에 손잡이2·ElbowSocket·relay 가 없다 — 먼저 'Tools/Player/팔라딘 방패 손잡이2 연결'.");
+                return false;
+            }
+            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Debug.Log($"[PaladinShieldGrip] 프리팹에 저장 — 손잡이2 {handleLocal} · ElbowSocket {elbowLocal} · 블렌드 {blend:0.###}초");
+            return true;
+        }
+        finally { PrefabUtility.UnloadPrefabContents(root); }
+    }
+
+    /// <summary>열린 프리팹 내용(<paramref name="root"/>)에 손잡이2·ElbowSocket 로컬 위치와 방패 줄 블렌드를 넣는다(저장은 부른 쪽). 못 찾으면 false.</summary>
+    public static bool ApplyGrip(GameObject root, Vector3 handleLocal, Vector3 elbowLocal, float blend)
+    {
+        Transform shield = Find(root.transform, ShieldName);
+        Transform handle = shield != null ? shield.Find(HandleName) : null;
+        Transform elbow = Find(root.transform, ElbowSocketName);
+        WeaponTransformRelay relay = root.GetComponentInChildren<WeaponTransformRelay>(true);
+        if (handle == null || elbow == null || relay == null)
+            return false;
+        handle.localPosition = handleLocal;
+        elbow.localPosition = elbowLocal;
+        var so = new SerializedObject(relay);
+        SerializedProperty follows = so.FindProperty("follows");
+        for (int i = 0; i < follows.arraySize; i++)
+        {
+            SerializedProperty f = follows.GetArrayElementAtIndex(i);
+            if (f.FindPropertyRelative("weapon").objectReferenceValue == shield)
+                f.FindPropertyRelative("secondaryBlend").floatValue = Mathf.Max(0f, blend);
+        }
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return true;
+    }
+
     public static Transform Find(Transform root, string name)
     {
         if (root.name == name) return root;

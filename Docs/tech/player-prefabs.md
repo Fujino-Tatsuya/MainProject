@@ -127,7 +127,7 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 | `FirstMeleeInterruptSkill.hitboxAnchor` | ❌ | **수동 배선 필수.** 비면 런타임 에러 (`FirstMeleeInterruptSkill.cs:87`) |
 | `TrailTransform.weaponTrailEffect` (무기 FBX 안) | ❌ | 무기 궤적. Armature 의 `WeaponTrailEffect` 를 가리킨다 |
 | `WeaponTransformRelay.weapon` (`PlayerWaeponSlot` 아래) | ❌ | 무기는 Armature 밖(`PlayerWaeponSlot`)에 있고 소켓만 Armature 안에 있다 |
-| `WeaponTransformRelay` 보조 고정점(팔라딘 방패, 11-12) | ❌ | 방패 줄의 `secondaryHandle`=방패 자식 `손잡이2` · `secondaryTarget`=`forearm_stretch.l/ElbowSocket` · `secondaryState`=`Garen_Ultimate_Skill`(0층 지금/다음 상태) · 블렌드 0.1초. 그 상태 동안만 손잡이1(손 소켓) 축으로 방패를 돌려 손잡이2 가 팔꿈치를 향함(거리 보정 없음, 인게임 R·처치 연출 R 모두, 네트워크 없음). 메뉴 `Tools/Player/팔라딘 방패 손잡이2 연결`(있으면 위치 유지) · 테스트 `WeaponTransformRelaySecondaryTests` |
+| `WeaponTransformRelay` 보조 고정점(팔라딘 방패, 11-12) | ❌ | 방패 줄의 `secondaryHandle`=방패 자식 `손잡이2` · `secondaryTarget`=`forearm_stretch.l/ElbowSocket` · `secondaryState`=`Garen_Ultimate_Skill`(0층 지금/다음 상태) · 블렌드 0.1초. 그 상태 동안만 손잡이1(손 소켓) 축으로 방패를 돌려 손잡이2 가 팔꿈치를 향함(거리 보정 없음, 인게임 R·처치 연출 R 모두, 네트워크 없음). 메뉴 `Tools/Player/팔라딘 방패 손잡이2 연결`(있으면 위치 유지) · 테스트 `WeaponTransformRelaySecondaryTests` · **보면서 맞추기** = `Tools/Player/팔라딘 방패 손잡이 미리보기`(Play 아님: 프리팹 모드 + 궁 클립 AnimationMode 샘플링·슬라이더·▶·보정 토글, Scene 핸들로 손잡이2·ElbowSocket 이동 → 프리팹 저장, 끄면 자세 원복 / Play 중: 런타임에서 옮기고 '프리팹에 저장') |
 
 🔴 **`transform.Find("Armature")` 에 의존하는 곳이 3군데 있다** — `PlayerMovement.cs:38`,
 `PlayerSoulController.cs:175`, `PlayableCharacterVisual.cs:30`.

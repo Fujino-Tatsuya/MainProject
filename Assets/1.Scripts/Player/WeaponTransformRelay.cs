@@ -46,7 +46,16 @@ public sealed class WeaponTransformRelay : MonoBehaviour
     [Tooltip("보조 고정 상태를 읽을 Animator. 비우면 같은 캐릭터(부모) 아래에서 찾는다.")]
     [SerializeField] private Animator animator;
 
-    private void LateUpdate()
+    /// <summary>
+    /// 에디터 미리보기 가중치(손잡이 미리보기 창) — 0 이상이면 Animator 상태 대신 이 값으로 보조 고정(Play 아닐 때만). 음수 = 미리보기 아님.
+    /// 저장되지 않는다.
+    /// </summary>
+    [System.NonSerialized] public float previewWeight = -1f;
+
+    private void LateUpdate() => ApplyNow();
+
+    /// <summary>지금 자세로 따라가기 + 보조 고정을 바로 적용한다(미리보기 창이 애니 샘플링 직후 부른다).</summary>
+    public void ApplyNow()
     {
         if (follows == null)
             return;
@@ -64,13 +73,36 @@ public sealed class WeaponTransformRelay : MonoBehaviour
         }
     }
 
+    /// <summary>보조 고정이 설정된 첫 줄(무기·손잡이2·보조 대상·블렌드). 없으면 false.</summary>
+    public bool TryGetSecondary(out Transform weapon, out Transform handle, out Transform secondaryTarget, out float blend)
+    {
+        weapon = handle = secondaryTarget = null;
+        blend = 0f;
+        if (follows == null)
+            return false;
+        for (int i = 0; i < follows.Length; i++)
+        {
+            if (follows[i].weapon == null || follows[i].secondaryHandle == null || follows[i].secondaryTarget == null)
+                continue;
+            weapon = follows[i].weapon;
+            handle = follows[i].secondaryHandle;
+            secondaryTarget = follows[i].secondaryTarget;
+            blend = follows[i].secondaryBlend;
+            return true;
+        }
+        return false;
+    }
+
     private void ApplySecondary(ref WeaponFollow f, Transform weapon)
     {
         if (f.secondaryHandle == null || f.secondaryTarget == null)
             return;
 
-        bool on = Application.isPlaying && IsInState(ResolveAnimator(), StateHash(ref f));
-        f.weight = StepWeight(f.weight, on, f.secondaryBlend, Time.unscaledDeltaTime);
+        if (!Application.isPlaying && previewWeight >= 0f)
+            f.weight = Mathf.Clamp01(previewWeight);
+        else
+            f.weight = StepWeight(f.weight, Application.isPlaying && IsInState(ResolveAnimator(), StateHash(ref f)),
+                f.secondaryBlend, Time.unscaledDeltaTime);
         if (f.weight <= 0f)
             return;
 
