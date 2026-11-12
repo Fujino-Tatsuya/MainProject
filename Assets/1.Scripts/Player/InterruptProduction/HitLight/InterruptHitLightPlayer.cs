@@ -106,6 +106,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
     private GameObject _root;
     private Volume _bloomVolume;
     private Volume _gradeVolume;
+    private LensFlareComponentSRP _ghost; // 렌즈 고스트(할 일 270 — 제압 SO 에만 모양이 있다)
     private InterruptHitLightFx _playedFx; // 마지막으로 튼 월드 이펙트(V1·V2 와 V3 는 인스턴스가 다르다)
     private float _startTime;
     private InterruptHitLightRequest _request;
@@ -166,6 +167,10 @@ public sealed class InterruptHitLightPlayer : IDisposable
     public float BloomWeight => _bloomVolume != null && _bloomVolume.enabled ? _bloomVolume.weight : 0f;
     /// <summary>지금 색 보정(채도) Volume 가중치(꺼짐 = 0) — 확인용.</summary>
     public float GradeWeight => _gradeVolume != null && _gradeVolume.enabled ? _gradeVolume.weight : 0f;
+    /// <summary>지금 렌즈 고스트 세기(꺼짐 = 0, 할 일 270) — 확인용.</summary>
+    public float GhostIntensity => _ghost != null && _ghost.enabled ? _ghost.intensity : 0f;
+    /// <summary>렌즈 고스트 컴포넌트(없으면 null) — 확인용.</summary>
+    public LensFlareComponentSRP Ghost => _ghost;
 
     /// <summary>성공 순간 시작(<paramref name="now"/> = 실시간, <paramref name="frame"/> = 렌더 프레임). 돌던 연출은 새 것으로 바뀐다.</summary>
     public void Begin(in InterruptHitLightRequest request, float now, int frame = 0)
@@ -226,10 +231,55 @@ public sealed class InterruptHitLightPlayer : IDisposable
         VolumeProfile grade = look != null ? _assets.GradeFor(_request) : null;
         _gradeVolume = ApplyVolume(_gradeVolume, "Grade", grade, InterruptHitLightRules.GradeWeight(look, grade, elapsed));
         ApplyDarkAdapt(look, elapsed);
+        ApplyGhost(look, elapsed);
         ApplyWhiteout(frame);
 
         if (InterruptHitLightRules.Finished(look, grade, elapsed) && _whiteoutFrames == 0)
             Finish();
+    }
+
+    // 렌즈 고스트(할 일 270) — 단계 SO 에 모양이 있을 때만(제압). 광원 = 월드 이펙트 위치(적중 라이트), 곡선대로 서서히 사라진다.
+    // 렌더 기능(DarkAdaptationFeature)이 켜진 플레어를 카메라 컬러에 더한다 — 모든 피어가 자기 화면에서.
+    private void ApplyGhost(InterruptHitLightLook look, float elapsed)
+    {
+        float amount = InterruptHitLightRules.GhostAmount(look, elapsed);
+        if (amount <= 0f)
+        {
+            HideGhost();
+            return;
+        }
+
+        if (_ghost == null)
+        {
+            EnsureRoot();
+            var ghostObject = new GameObject("Ghost");
+            ghostObject.transform.SetParent(_root.transform, false);
+            ghostObject.SetActive(false);
+            _ghost = ghostObject.AddComponent<LensFlareComponentSRP>();
+            // 탑다운 카메라 거리와 무관하게 같은 세기·크기 — 거리·화면 가장자리 감쇠 끔, 가림 판정 없음(② 플레어와 같은 설정).
+            _ghost.useOcclusion = false;
+            _ghost.allowOffScreen = true;
+            _ghost.attenuationByLightShape = false;
+            _ghost.distanceAttenuationCurve = AnimationCurve.Constant(0f, 1f, 1f);
+            _ghost.scaleByDistanceCurve = AnimationCurve.Constant(0f, 1f, 1f);
+            _ghost.radialScreenAttenuationCurve = AnimationCurve.Constant(0f, 1f, 1f);
+            _ghost.enabled = false;
+            ghostObject.SetActive(true);
+        }
+
+        _ghost.transform.position = Placement.Position;
+        _ghost.lensFlareData = look.GhostFlare;
+        _ghost.intensity = amount * look.GhostIntensity;
+        _ghost.scale = look.GhostScale;
+        _ghost.enabled = true;
+        DarkAdaptationState.HitLightGhostFlare = true;
+    }
+
+    private void HideGhost()
+    {
+        if (_ghost != null)
+            _ghost.enabled = false;
+        DarkAdaptationState.HitLightGhostFlare = false;
     }
 
     // V2 화이트아웃 — 시작 프레임부터 N 프레임 동안 ③ 그림, 그다음 프레임에 숨김.
@@ -328,6 +378,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
         _root = null;
         _bloomVolume = null;
         _gradeVolume = null;
+        _ghost = null;
         _playedFx = null;
     }
 
@@ -337,6 +388,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
         SetWeight(_bloomVolume, 0f);
         SetWeight(_gradeVolume, 0f);
         ReleaseDarkAdapt();
+        HideGhost();
         HideWhiteout();
         _whiteoutFrames = 0;
     }
@@ -429,12 +481,18 @@ public static class InterruptHitLightRules
     /// <summary>진행기 길이 — 곡선 길이 중 가장 긴 것. 색 보정은 프로필이 있을 때만 센다(V1·V2 는 비어 있다).</summary>
     public static float Duration(InterruptHitLightLook look) => Duration(look, look != null ? look.GradeProfile : null);
 
-    /// <summary><see cref="Duration(InterruptHitLightLook)"/> — 색 보정 프로필을 따로 받는다.</summary>
+    /// <summary><see cref="Duration(InterruptHitLightLook)"/> — 색 보정 프로필을 따로 받는다. 렌즈 고스트(270)는 모양이 있을 때만 센다(제압 SO).</summary>
     public static float Duration(InterruptHitLightLook look, VolumeProfile grade) =>
         look == null
             ? 0f
             : Mathf.Max(Mathf.Max(Mathf.Max(look.LightDuration, look.BloomDuration), Mathf.Max(look.DarkAdaptDuration, look.SceneDimDuration)),
-                grade != null ? look.GradeDuration : 0f);
+                Mathf.Max(grade != null ? look.GradeDuration : 0f, look.GhostFlare != null ? look.GhostDuration : 0f));
+
+    /// <summary>렌즈 고스트 세기 배율(할 일 270) — 모양(<see cref="InterruptHitLightLook.GhostFlare"/>)이 있으면 곡선대로 [0, 1], 없거나 끝이면 0.</summary>
+    public static float GhostAmount(InterruptHitLightLook look, float elapsed) =>
+        look != null && look.GhostFlare != null
+            ? Mathf.Clamp01(InterruptEffectLight.Pulse(look.GhostCurve, 1f, elapsed, look.GhostDuration))
+            : 0f;
 
     /// <summary>색 보정(채도) Volume 가중치(194 후속 V3) — 프로필이 있으면 곡선대로 [0, 1], 없거나 끝이면 0.</summary>
     public static float GradeWeight(InterruptHitLightLook look, float elapsed) => GradeWeight(look, look != null ? look.GradeProfile : null, elapsed);
