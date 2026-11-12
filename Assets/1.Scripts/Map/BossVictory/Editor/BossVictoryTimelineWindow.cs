@@ -59,6 +59,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     float _inspectorHeight = DefaultInspectorHeight;
     bool _splitDragging;
     Vector2 _timelineScroll;
+    Rect _bodyVisible;          // 트랙 스크롤 뷰 안 좌표의 보이는 칸(267 후속 — 밖을 누른 이벤트 무시)
+    int _rulerControlId = -1;   // 시간 눈금 재생 헤드 끌기 hotControl
     Vector2 _inspectorScroll;
 
     float MaxInspectorHeight => Mathf.Max(MinInspectorHeight, position.height - EditorStyles.toolbar.fixedHeight - SplitterHeight - MinTimelineHeight);
@@ -153,32 +155,52 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             FitAll();
         }
 
+        // 타임라인 영역(267 후속 — 스크롤바): 위 시간 눈금 = 세로 고정·가로(_scrollTime) 따라감 · 왼쪽 이름 열 = 세로 따라감·가로 고정 ·
+        // 세로 = 스크롤 뷰(트랙이 넘치면 막대, 맨 밑에 트랙 1칸 여유) · 가로 = 시간 스크롤 막대(확대해서 넘칠 때만, 맨 아래 고정).
         int rows = BossVictoryTimeline.Tracks.Length + BossVictoryTimeline.Markers.Length;
-        float contentHeight = RulerHeight + rows * RowHeight + 16f;
+        float contentHeight = rows * RowHeight + RowHeight;
         float inspectorHeight = Mathf.Clamp(_inspectorHeight, MinInspectorHeight, MaxInspectorHeight);
         float timelineHeight = Mathf.Max(MinTimelineHeight, position.height - EditorStyles.toolbar.fixedHeight - SplitterHeight - inspectorHeight);
         Rect view = GUILayoutUtility.GetRect(position.width, timelineHeight, GUILayout.ExpandWidth(true));
-        bool scrolls = contentHeight > view.height;
-        Rect content = new Rect(0f, 0f, view.width - (scrolls ? 15f : 0f), contentHeight);
-        _timelineScroll = GUI.BeginScrollView(view, _timelineScroll, content, false, false);
-        Rect area = content;
-        Rect labels = new Rect(area.x, area.y + RulerHeight, LabelWidth, rows * RowHeight);
-        Rect lanes = new Rect(area.x + LabelWidth, area.y + RulerHeight, area.width - LabelWidth, rows * RowHeight);
-        Rect ruler = new Rect(lanes.x, area.y, lanes.width, RulerHeight);
-        Rect scroll = new Rect(lanes.x, lanes.yMax, lanes.width, 16f);
+        float vBarWidth = GUI.skin.verticalScrollbar.fixedWidth > 0f ? GUI.skin.verticalScrollbar.fixedWidth : 15f;
+        float hBarHeight = GUI.skin.horizontalScrollbar.fixedHeight > 0f ? GUI.skin.horizontalScrollbar.fixedHeight : 15f;
+        bool vBar = false, hBar = false;
+        for (int pass = 0; pass < 2; pass++)   // 막대 둘이 서로 폭·높이를 줄이므로 두 번
+        {
+            vBar = contentHeight > view.height - RulerHeight - (hBar ? hBarHeight : 0f);
+            hBar = NeedsTimeScrollbar(view.width - LabelWidth - (vBar ? vBarWidth : 0f));
+        }
+        float laneWidth = Mathf.Max(1f, view.width - LabelWidth - (vBar ? vBarWidth : 0f));
+        Rect ruler = new Rect(view.x + LabelWidth, view.y, laneWidth, RulerHeight);
+        Rect body = new Rect(view.x, view.y + RulerHeight, view.width, Mathf.Max(1f, view.height - RulerHeight - (hBar ? hBarHeight : 0f)));
+        Rect scroll = new Rect(ruler.x, body.yMax, laneWidth, hBarHeight);
 
-        HandleView(lanes, ruler);
+        // 시간 눈금(스크롤 뷰 밖, 창 좌표) — 휠 줌·가운데 끌기·재생 헤드 누르기.
+        HandleView(ruler, ruler);
+        HandleRulerScrub(ruler);
+        EditorGUI.DrawRect(new Rect(view.x, view.y, LabelWidth, RulerHeight), new Color(0.13f, 0.13f, 0.13f));
+        if (vBar) EditorGUI.DrawRect(new Rect(ruler.xMax, view.y, vBarWidth, RulerHeight), new Color(0.13f, 0.13f, 0.13f));
+        DrawRuler(ruler);
+        DrawPlayhead(ruler);
+
+        Rect content = new Rect(0f, 0f, LabelWidth + laneWidth, contentHeight);
+        _timelineScroll.x = 0f;
+        _timelineScroll = GUI.BeginScrollView(body, _timelineScroll, content, false, false);
+        _bodyVisible = new Rect(0f, _timelineScroll.y, LabelWidth + laneWidth, body.height);   // 스크롤 뷰 안 좌표의 보이는 칸 — 밖(눈금·인스펙터)을 누른 것은 무시
+        Rect labels = new Rect(0f, 0f, LabelWidth, rows * RowHeight);
+        Rect lanes = new Rect(LabelWidth, 0f, laneWidth, rows * RowHeight);
+
+        HandleView(new Rect(lanes.x, _bodyVisible.y, lanes.width, _bodyVisible.height), lanes);
         HandleLabelClick(labels);
         HandleEdit(lanes, ruler);
         if (!HasClipSelection) _selIndex = -1;   // Undo 로 목록이 줄었으면
         DrawRows(labels, lanes);
-        DrawRuler(ruler);
         DrawTrackClips(lanes);
         DrawMarkers(lanes);
-        DrawPlayhead(ruler, lanes);
+        DrawPlayhead(lanes);
         AddCursorRects(lanes);
-        DrawScrollbar(scroll);
         GUI.EndScrollView(false);   // 휠은 줌(HandleView) — 세로는 스크롤 막대로
+        if (hBar) DrawScrollbar(scroll);
 
         DrawSplitter();
         _inspectorScroll = EditorGUILayout.BeginScrollView(_inspectorScroll, GUILayout.Height(inspectorHeight));
@@ -191,7 +213,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void HandleLabelClick(Rect labels)
     {
         Event e = Event.current;
-        if (e.type != EventType.MouseDown || e.button != 0 || !labels.Contains(e.mousePosition)) return;
+        if (e.type != EventType.MouseDown || e.button != 0 || !labels.Contains(e.mousePosition) || !_bodyVisible.Contains(e.mousePosition)) return;
         int row = Mathf.FloorToInt((e.mousePosition.y - labels.y) / RowHeight);
         int markers = BossVictoryTimeline.Markers.Length;
         if (row < markers) Select(-1, -1, row);
@@ -246,11 +268,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return new Rect(x0, r.y + 2f, Mathf.Max(2f, x1 - x0), r.height - 4f);
     }
 
-    // 휠 = 마우스 위치 기준 줌 · 가운데 버튼 끌기 = 이동
-    void HandleView(Rect lanes, Rect ruler)
+    // 휠 = 마우스 위치 기준 줌 · 가운데 버튼 끌기 = 이동. view = 받는 칸(눈금 = 창 좌표, 트랙 = 스크롤 뷰 안의 보이는 칸), lanes = 시간 ↔ x 기준(같은 좌표계).
+    void HandleView(Rect view, Rect lanes)
     {
         Event e = Event.current;
-        Rect view = new Rect(ruler.x, ruler.y, lanes.width, ruler.height + lanes.height);
         if (e.type == EventType.ScrollWheel && view.Contains(e.mousePosition))
         {
             float anchor = XToTime(lanes, e.mousePosition.x);
@@ -514,18 +535,35 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return false;
     }
 
-    void DrawPlayhead(Rect ruler, Rect lanes)
+    // 재생 헤드 세로 선 — 눈금(창 좌표)과 트랙(스크롤 뷰 안) 에 따로 그린다. r = 그 칸(x 기준 = r.x).
+    void DrawPlayhead(Rect r)
     {
-        float x = TimeToX(lanes, _playhead);
-        if (x < lanes.x || x > lanes.xMax) return;
-        EditorGUI.DrawRect(new Rect(x - 0.5f, ruler.y, 1.5f, ruler.height + lanes.height), new Color(1f, 0.3f, 0.3f));
+        float x = TimeToX(r, _playhead);
+        if (x < r.x || x > r.xMax) return;
+        EditorGUI.DrawRect(new Rect(x - 0.5f, r.y, 1.5f, r.height), new Color(1f, 0.3f, 0.3f));
     }
+
+    float TimeScrollTotal(float visible) => Mathf.Max(Timeline.Duration + 1f, _scrollTime + visible);
+
+    // 가로 막대가 필요한가 — 전체 시간(끝 + 1초)이 보이는 폭보다 길거나 이미 옆으로 밀려 있으면.
+    bool NeedsTimeScrollbar(float laneWidth) => _scrollTime > 0f || TimeScrollTotal(laneWidth / _pixelsPerSecond) > laneWidth / _pixelsPerSecond + 0.0001f;
 
     void DrawScrollbar(Rect r)
     {
         float visible = r.width / _pixelsPerSecond;
-        float total = Mathf.Max(Timeline.Duration + 1f, _scrollTime + visible);
-        _scrollTime = GUI.HorizontalScrollbar(r, _scrollTime, visible, 0f, total);
+        _scrollTime = GUI.HorizontalScrollbar(r, _scrollTime, visible, 0f, TimeScrollTotal(visible));
+    }
+
+    // 시간 눈금 누르기·끌기 = 재생 헤드(스크롤 뷰 밖이라 따로). 끌기·놓기는 HandleEdit 의 Playhead 끌기가 이어 받는다.
+    void HandleRulerScrub(Rect ruler)
+    {
+        _rulerControlId = GUIUtility.GetControlID(FocusType.Passive);
+        Event e = Event.current;
+        if (e.type != EventType.MouseDown || e.button != 0 || !ruler.Contains(e.mousePosition)) return;
+        _drag = DragMode.Playhead;
+        GUIUtility.hotControl = _rulerControlId;
+        SetPlayhead(XToTime(ruler, e.mousePosition.x));
+        e.Use();
     }
 
     // ── 선택·편집 ────────────────────────────────────────────────────────
@@ -883,15 +921,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
         switch (e.type)
         {
-            case EventType.MouseDown when e.button == 0:
-                if (ruler.Contains(e.mousePosition))
-                {
-                    _drag = DragMode.Playhead;
-                    GUIUtility.hotControl = controlId;
-                    SetPlayhead(XToTime(lanes, e.mousePosition.x));
-                    e.Use();
-                }
-                else if (lanes.Contains(e.mousePosition))
+            case EventType.MouseDown when e.button == 0 && _bodyVisible.Contains(e.mousePosition):   // 시간 눈금 누르기 = HandleRulerScrub(스크롤 뷰 밖)
+                if (lanes.Contains(e.mousePosition))
                 {
                     if (e.clickCount == 2 && TryAddKeyAt(lanes, e.mousePosition))
                     {
@@ -911,11 +942,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 if (_dragRecorded) Save();
                 EndDragUndo();
                 _drag = DragMode.None;
-                if (GUIUtility.hotControl == controlId) GUIUtility.hotControl = 0;
+                if (GUIUtility.hotControl == controlId || GUIUtility.hotControl == _rulerControlId) GUIUtility.hotControl = 0;
                 _dragRecorded = false;
                 e.Use();
                 break;
-            case EventType.ContextClick when lanes.Contains(e.mousePosition):
+            case EventType.ContextClick when lanes.Contains(e.mousePosition) && _bodyVisible.Contains(e.mousePosition):
                 ShowContextMenu(lanes, e.mousePosition);
                 e.Use();
                 break;
