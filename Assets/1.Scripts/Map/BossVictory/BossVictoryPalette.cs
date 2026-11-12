@@ -69,7 +69,7 @@ public static class BossVictoryPaletteCalc
     public const float NeutralSaturation = 0.02f;
     const float Epsilon = 1e-4f;
 
-    /// <summary>팔라딘·거너·어쌔신·기본 기준 색(= 지금 공용 설정 amberColor #D6AB69).</summary>
+    /// <summary>팔라딘·거너·어쌔신·코드 기본값 기준 색(= 지금 공용 설정 amberColor #D6AB69).</summary>
     public static readonly Color DefaultBaseColor = new Color32(0xD6, 0xAB, 0x69, 0xFF);
     /// <summary>대비 기준 색 직접 지정 기본(= 지금 TV 꺼짐 발광 파랑).</summary>
     public static readonly Color DefaultContrastColor = new Color(0.25f, 0.62f, 1f, 1f);

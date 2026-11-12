@@ -91,7 +91,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 처치 연출 진행 중(시작 ~ 끝·취소·파괴). 표시 전용 연출이 언제 접을지 본다(어쌔신 처치 오라 — 267 후속).</summary>
     public static bool IsRunning => Instance != null && Instance._running;
 
-    /// <summary>[이 피어] 이번 회차 처치자 캐릭터(모르면·나갔으면 None = 기본 프로필) — 타임라인 창이 Play 중 이 캐릭터 프로필을 따라간다(267).</summary>
+    /// <summary>[이 피어] 이번 회차 처치자 캐릭터(모르면·나갔으면 None = 기본 프로필, 비면 코드 기본값) — 타임라인 창이 Play 중 이 캐릭터 프로필을 따라간다(267).</summary>
     public TutorialCharacter KillerCharacter => _running ? _killerCharacter : TutorialCharacter.None;
 
     /// <summary>[이 피어] 이번 회차가 쓰는 프로필(연출 중이 아니면 null).</summary>
@@ -387,7 +387,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             else _others.Add(p.gameObject);
         }
         // 프로필 = 처치자 캐릭터(복제된 KillerClientId → 그 Player 의 프리팹 해시 → 로스터 캐릭터, 새 복제 값 없음 — 늦은 참가자·호스트 로비 전환도 같은 프로필).
-        // 처치자를 못 찾으면(나감 등) 기본 프로필(267).
+        // 처치자를 못 찾으면(나감 등) 기본 프로필 — 정본은 칸이 비어 코드 기본값(267, 11-12).
         _killerCharacter = _killer != null ? TutorialLocalPlayerInfo.ResolveCharacter(_killer) : TutorialCharacter.None;
         _profile = _settings.ProfileFor(_killerCharacter);
         _palette = BossVictoryPaletteCalc.Compute(_settings, _profile);   // 271 — 새 복제 없음(같은 KillerClientId → 같은 프로필 → 같은 색)

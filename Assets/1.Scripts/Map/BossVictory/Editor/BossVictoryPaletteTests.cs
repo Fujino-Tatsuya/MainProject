@@ -63,21 +63,36 @@ public sealed class BossVictoryPaletteTests
     }
 
     [Test]
-    public void 팔라딘_기준이면_공용_색_그대로_에셋()
+    // 세 캐릭터 프로필 기준 색은 사용자가 튜닝한다(11-12) — 값은 고정하지 않고, '기준 색 = 공용 호박색이면 공용 색 그대로' 관계만 본다.
+    // 코드 기본값(처치자 없음·표에 없는 캐릭터 — 기본 프로필 에셋은 11-12 삭제)은 값 그대로 #D6AB69 → 공용 색 그대로.
+    public void 기준_색이_공용_호박색이면_공용_색_그대로_에셋()
     {
         var s = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(SettingsPath);
         Assert.IsNotNull(s, SettingsPath);
         Color[] reference = BossVictoryPaletteCalc.ReferenceColors(s);
-        foreach (TutorialCharacter character in new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin, TutorialCharacter.None })
+
+        BossVictoryProfile code = s.ProfileFor(TutorialCharacter.None);
+        AssertColor(BossVictoryPaletteCalc.DefaultBaseColor, code.baseColor, "코드 기본값 기준 색 = #D6AB69");
+        AssertSameAsReference(reference, BossVictoryPaletteCalc.Compute(s, code), "코드 기본값", true);
+
+        foreach (TutorialCharacter character in new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin })
         {
             BossVictoryProfile p = s.ProfileFor(character);
-            AssertColor(BossVictoryPaletteCalc.DefaultBaseColor, p.baseColor, $"{character} 기준 색 = #D6AB69");
-            BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(s, p);
-            foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots)
-            {
-                AssertColor(reference[(int)slot], palette[slot], $"{character} {slot}");
-                Assert.IsFalse(palette.IsManual(slot), $"{character} {slot} 기본 = 자동");
-            }
+            BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;   // 그 프로필의 직접 지정만 살리고 기준·대비는 공용 기준
+            inputs.BaseColor = s.amberColor;
+            inputs.ContrastHueOffset = BossVictoryPaletteCalc.ReferenceContrastHueOffset(s);
+            inputs.Overrides = p.paletteOverrides;
+            AssertSameAsReference(reference, BossVictoryPaletteCalc.Compute(reference, inputs), character.ToString(), false);
+        }
+    }
+
+    static void AssertSameAsReference(Color[] reference, BossVictoryPalette palette, string who, bool allAuto)
+    {
+        foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots)
+        {
+            if (allAuto) Assert.IsFalse(palette.IsManual(slot), $"{who} {slot} = 자동");
+            if (palette.IsManual(slot)) continue;
+            AssertColor(reference[(int)slot], palette[slot], $"{who} {slot}");
         }
     }
 

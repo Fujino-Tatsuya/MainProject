@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4746dfe25f278299b295f57c9881699, type: 3}
   m_Name: BossVictoryGlitchSettings
   m_EditorClassIdentifier: Assembly-CSharp::BossVictoryGlitchSettings
-  defaultProfile: {fileID: 11400000, guid: 3cd2425b4ee2c595e772d8d5d21e0dff, type: 2}
+  defaultProfile: {fileID: 0}
   characterProfiles:
   - character: 1
     profile: {fileID: 11400000, guid: 1fd77fcfa89fedfa1e26ef33d7101c6b, type: 2}

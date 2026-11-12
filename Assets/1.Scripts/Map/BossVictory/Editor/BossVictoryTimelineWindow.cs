@@ -98,13 +98,17 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Undo.undoRedoPerformed -= OnUndoRedo;
     }
 
-    // ── 캐릭터별 프로필(267) — 도구 막대 드롭다운(기본·팔라딘·거너·어쌔신). Play 중 연출이 돌면 실제 처치자 캐릭터를 따라간다. ──
-    static readonly TutorialCharacter[] Characters = { TutorialCharacter.None, TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin };
-    static readonly string[] CharacterLabels = { "기본", "팔라딘", "거너", "어쌔신" };
+    // ── 캐릭터별 프로필(267) — 도구 막대 드롭다운(팔라딘·거너·어쌔신 — 기본 프로필 에셋은 11-12 삭제, 표에 없는 캐릭터 = 코드 기본값). Play 중 연출이 돌면 실제 처치자 캐릭터를 따라간다. ──
+    static readonly TutorialCharacter[] Characters = { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin };
+    static readonly string[] CharacterLabels = { "팔라딘", "거너", "어쌔신" };
     [SerializeField] TutorialCharacter _character;
     BossVictoryProfile _profile;
 
-    static string CharacterLabel(TutorialCharacter c) => CharacterLabels[Mathf.Max(0, System.Array.IndexOf(Characters, c))];
+    static string CharacterLabel(TutorialCharacter c)
+    {
+        int i = System.Array.IndexOf(Characters, c);
+        return i >= 0 ? CharacterLabels[i] : "코드 기본값";   // None = 처치자를 못 찾은 회차(실제 처치자 따라갈 때만)
+    }
 
     // 실제 처치자(랩 재생 중) — 없으면 false.
     static bool TryLiveKiller(out TutorialCharacter character, out BossVictoryProfile profile)
@@ -115,7 +119,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return profile != null;
     }
 
-    // 지금 편집할 프로필 — 실제 처치자 → 드롭다운 캐릭터 프로필(표에 없으면 기본 프로필).
+    // 지금 편집할 프로필 — 실제 처치자 → 드롭다운 캐릭터 프로필(표에 없으면 코드 기본값 — 저장 안 됨, 배너 안내).
     void ResolveProfile()
     {
         BossVictoryProfile before = _profile;
@@ -124,7 +128,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             _character = live;
             _profile = liveProfile;
         }
-        else _profile = _settings != null ? _settings.ProfileFor(_character) : null;
+        else
+        {
+            if (System.Array.IndexOf(Characters, _character) < 0) _character = TutorialCharacter.Paladin;   // 옛 '기본' 선택·처치자 없던 회차 뒤 → 팔라딘
+            _profile = _settings != null ? _settings.ProfileFor(_character) : null;
+        }
         if (_profile == before) return;
         _finisherClipKey = _bossHitClipKey = null;
         _finisherEstimate = null;
@@ -2082,7 +2090,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
     }
 
-    // 캐릭터 → Variant(클립 미리보기). 기본 프로필은 팔라딘 몸으로 보여 준다.
+    // 캐릭터 → Variant(클립 미리보기). 코드 기본값(처치자 없음)은 팔라딘 몸으로 보여 준다.
     static string VariantPath(TutorialCharacter c) => c switch
     {
         TutorialCharacter.Gunner => "Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab",
@@ -2095,7 +2103,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         float dash = Timeline.finisherStartTime;
         var parts = new List<string>();
-        // 지금 프로필의 스킬 칸으로 — 기본 프로필이면 세 캐릭터 몸, 캐릭터 프로필이면 그 캐릭터 몸만(267).
+        // 지금 프로필의 스킬 칸으로 — 코드 기본값(처치자 없음)이면 세 캐릭터 몸, 캐릭터 프로필이면 그 캐릭터 몸만(267).
         TutorialCharacter[] bodies = _character == TutorialCharacter.None
             ? new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin }
             : new[] { _character };
@@ -2295,7 +2303,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         {
             _finisherClipKey = key;
             _finisherClipCache = FinisherClipOf(key as GameObject);
-            _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : _character == TutorialCharacter.None ? "기본(팔라딘 몸)" : CharacterLabel(_character);
+            _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : _character == TutorialCharacter.None ? "코드 기본값(팔라딘 몸)" : CharacterLabel(_character);
         }
         clip = _finisherClipCache;
         who = _finisherWhoCache;
@@ -2512,21 +2520,22 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (live) GUILayout.Label("실제 처치자", EditorStyles.miniLabel, GUILayout.Width(56f));
     }
 
-    // 지금 편집 중인 프로필 한 줄 — 표에 없는 캐릭터는 기본 프로필을 쓴다(고치면 기본이 바뀐다) · 만들기 버튼.
+    // 지금 편집 중인 프로필 한 줄 — 표에 없는 캐릭터는 코드 기본값(저장 안 됨)을 쓴다 · 만들기 버튼(코드 기본값으로 새 에셋).
     void DrawProfileBanner()
     {
-        bool own = _character == TutorialCharacter.None || _settings.HasOwnProfile(_character);
+        bool own = _character != TutorialCharacter.None && _settings.HasOwnProfile(_character);
         using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
         {
-            string who = _character == TutorialCharacter.None ? "기본 프로필" : $"{CharacterLabel(_character)} 프로필";
-            string text = !ProfileIsAsset
-                ? "기본 프로필 에셋이 비어 코드 기본값으로 보인다 — 고쳐도 저장되지 않는다. 'Tools/Boss Victory/캐릭터별 프로필 만들기 (267)'."
-                : own
-                    ? $"편집 중: {who} — {_profile.name}{(_character == TutorialCharacter.None ? " (표에 없는 캐릭터가 쓴다)" : "")}"
-                    : $"{CharacterLabel(_character)} 은(는) 표에 프로필이 없어 기본 프로필({_profile.name})을 쓴다 — 여기서 고치면 기본이 바뀐다.";
+            string text = own
+                ? $"편집 중: {CharacterLabel(_character)} 프로필 — {_profile.name}"
+                : _character == TutorialCharacter.None
+                    ? "이번 회차는 처치자를 못 찾아 코드 기본값 프로필로 돈다 — 고쳐도 저장되지 않는다."
+                    : !ProfileIsAsset
+                        ? $"{CharacterLabel(_character)} 은(는) 표에 프로필이 없어 코드 기본값으로 돈다 — 고쳐도 저장되지 않는다. 오른쪽 버튼으로 프로필을 만든다."
+                        : $"{CharacterLabel(_character)} 은(는) 표에 프로필이 없어 공용 '기본 프로필' 칸의 {_profile.name} 을 쓴다 — 여기서 고치면 그 에셋이 바뀐다.";
             GUILayout.Label(text, EditorStyles.wordWrappedMiniLabel);
             if (ProfileIsAsset && GUILayout.Button("선택", EditorStyles.miniButton, GUILayout.Width(40f))) EditorGUIUtility.PingObject(_profile);
-            if (!own && _settings.defaultProfile != null && GUILayout.Button("이 캐릭터 프로필 만들기(기본 복제)", EditorStyles.miniButton, GUILayout.Width(190f)))
+            if (!own && _character != TutorialCharacter.None && GUILayout.Button("이 캐릭터 프로필 만들기(코드 기본값)", EditorStyles.miniButton, GUILayout.Width(200f)))
             {
                 BossVictoryProfileAuthoring.CreateCharacterProfile(_settings, _character);
                 ResolveProfile();
@@ -2626,13 +2635,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         PopupWindow.Show(new Rect(_pendingCopyAt, Vector2.one), new CopyToCharactersPopup(this, nodes));
     }
 
-    // 복사 대상 후보 — 기본 + 세 캐릭터 중 지금 프로필이 아닌 것. 표에 프로필이 없는 캐릭터는 고를 수 없다(null).
+    // 복사 대상 후보 — 세 캐릭터 중 지금 프로필이 아닌 것. 표에 프로필이 없는 캐릭터는 고를 수 없다(null).
     List<(string label, BossVictoryProfile profile)> CopyTargets()
     {
         var list = new List<(string, BossVictoryProfile)>();
         foreach (TutorialCharacter c in Characters)
         {
-            BossVictoryProfile p = c == TutorialCharacter.None ? _settings.defaultProfile : _settings.HasOwnProfile(c) ? _settings.ProfileFor(c) : null;
+            BossVictoryProfile p = _settings.HasOwnProfile(c) ? _settings.ProfileFor(c) : null;
             if (p != null && p == _profile) continue;
             list.Add((CharacterLabel(c), p));
         }
