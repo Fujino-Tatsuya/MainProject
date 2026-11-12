@@ -315,9 +315,8 @@
 | Strings | `UI.Result.Survival` | `생존 시간  {time}` | `Survival Time  {time}` | ko 처럼 공백 두 칸 유지 · `{time}` = mm:ss |
 | Strings | `UI.Result.PlayerSlot` | `P{n}` | `P{n}` | 기호 — 같음 |
 | Strings | `UI.TrainingDummy.Hp` | `{hp} / {max}` | `{hp} / {max}` | 기호 — 같음 |
-| Strings | `UI.Loading.Tip1` | `으아ㅏㅏㅏㅏ` | `Waaaaaah` | 문구 교체 후보 |
-| Strings | `UI.Loading.Tip2` | `커피ㅣㅣㅣㅣ` | `Coffeeeee` | 문구 교체 후보 |
-| Strings | `UI.Loading.Tip3` | `밥 뭐 먹지....` | `What's for lunch....` | 문구 교체 후보 |
+| Strings | ~~`UI.Loading.Tip1`~`Tip3`~~ | | | 275(11-12) 삭제 — 시트 행 78~80 지울 것 |
+| Strings | `UI.Loading.TipDashInterrupt` | `Tip. 간파는 준비 동작이 있습니다... 대쉬와 간파를 동시에 쓴다면....?` | `Tip. Interrupt has a wind-up... What if you dash and interrupt at the same time....?` | 275 확정(ko·en 사용자 확정) — 시트 행 추가 대기 |
 | Strings | `UI.Loading.Ready1` | `Enter...` | `Enter...` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 |
 | Strings | `UI.Loading.Ready2` | `All players are ready.` | `All players are ready.` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 |
 | Strings | `UI.Loading.Ready3` | `Starting...` | `Starting...` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 |
