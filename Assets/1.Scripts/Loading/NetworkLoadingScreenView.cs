@@ -28,8 +28,15 @@ public class NetworkLoadingScreenView : MonoBehaviour
     };
     [SerializeField] private float tooltipInterval = 3f;
     [SerializeField] private float imageInterval = 5f;
+    [Tooltip("단계 상태 문구 최소 표시 시간(초) — 그 사이 지나간 단계는 건너뛴다. 준비(Ready) 문구는 기다리지 않는다(275 후속).")]
+    [SerializeField] private float minimumStatusSeconds = 1f;
+    [Tooltip("준비(Ready) 문구 순환 간격(초) — 예전 0.5초 고정(275 후속).")]
+    [SerializeField] private float readyMessageInterval = 1.5f;
 
     private NetworkLoadingPhase _phase;
+    private bool _hasPhase;
+    private float _readyStartedAt;
+    private float _statusShownAt = float.NegativeInfinity;
     private float _progress;
     private int _tooltipIndex;
     private int _imageIndex;
@@ -90,7 +97,19 @@ public class NetworkLoadingScreenView : MonoBehaviour
 
     public void SetPhase(NetworkLoadingPhase phase)
     {
+        // 흐름이 진행률마다 같은 단계로 다시 부른다 — 바뀔 때만 처리.
+        if (_hasPhase && phase == _phase)
+        {
+            return;
+        }
+
+        _hasPhase = true;
         _phase = phase;
+        if (phase == NetworkLoadingPhase.Ready)
+        {
+            _readyStartedAt = Time.unscaledTime;
+        }
+
         ApplyPhaseText();
     }
 
@@ -102,7 +121,7 @@ public class NetworkLoadingScreenView : MonoBehaviour
 
     private void Relabel()
     {
-        ApplyPhaseText();
+        ApplyPhaseText(force: true);
         ApplyTooltip();
     }
 
@@ -150,10 +169,8 @@ public class NetworkLoadingScreenView : MonoBehaviour
                 AdvanceImage();
             }
 
-            if (_phase == NetworkLoadingPhase.Ready)
-            {
-                ApplyPhaseText();
-            }
+            // 준비 문구 순환 · 최소 표시 시간에 막혀 미뤄진 단계 문구를 매 프레임 다시 맞춘다(같으면 대입 안 함).
+            ApplyPhaseText();
 
             yield return null;
         }
@@ -194,14 +211,27 @@ public class NetworkLoadingScreenView : MonoBehaviour
         }
     }
 
-    private void ApplyPhaseText()
+    private void ApplyPhaseText(bool force = false)
     {
         if (statusText == null)
         {
             return;
         }
 
-        statusText.text = _phase == NetworkLoadingPhase.Ready ? GetReadyMessage() : PhaseText(_phase);
+        string next = _phase == NetworkLoadingPhase.Ready ? GetReadyMessage() : PhaseText(_phase);
+        if (next == statusText.text)
+        {
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (!force && !LoadingStatusTextRule.CanSwitch(_phase, now - _statusShownAt, minimumStatusSeconds))
+        {
+            return;
+        }
+
+        statusText.text = next;
+        _statusShownAt = now;
     }
 
     /// <summary>준비(Ready) 밖 단계의 상태 문구 — <c>UI.Loading.*</c>. 완료면 빈 글자.</summary>
@@ -225,7 +255,7 @@ public class NetworkLoadingScreenView : MonoBehaviour
             return UiStrings.LoadingReady1.Text;
         }
 
-        var index = Mathf.FloorToInt(Time.unscaledTime * 2f) % readyMessages.Length;
+        var index = LoadingStatusTextRule.ReadyIndex(Time.unscaledTime - _readyStartedAt, readyMessageInterval, readyMessages.Length);
         return TableText(UiStrings.LoadingReadyMessages, readyMessages, index);
     }
 
