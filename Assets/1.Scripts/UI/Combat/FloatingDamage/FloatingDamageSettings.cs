@@ -175,6 +175,16 @@ public struct FloatingPopupRequest
         hasSource = FloatingDamageSource.TryGetPlayerPosition(sourceClientId, target, out sourceWorld);
         return this;
     }
+
+    /// <summary>
+    /// 피해 숫자 기준점 — 플레이어 공격자는 clientId, 아니면 공격자 NetworkObjectId(몬스터·보스). 둘 다 못 찾으면 없음(위로만).
+    /// </summary>
+    public FloatingPopupRequest WithAttackerSource(ulong sourceClientId, ulong sourceObjectId)
+    {
+        hasSource = FloatingDamageSource.TryGetPlayerPosition(sourceClientId, target, out sourceWorld) ||
+                    FloatingDamageSource.TryGetObjectPosition(sourceObjectId, target, out sourceWorld);
+        return this;
+    }
 }
 
 [Serializable]

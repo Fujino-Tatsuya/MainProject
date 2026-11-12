@@ -13,14 +13,23 @@ public readonly struct DamageDealtInfo
     public readonly AttackType attackType;
     public readonly AttackHitPattern hitPattern;
 
+    /// <summary>
+    /// 플레이어가 아닌 공격자 Unit(몬스터·보스)의 NetworkObjectId — 피해 숫자 반대쪽 연출 기준점(268).
+    /// 플레이어 공격자는 <see cref="attackerClientId"/> 를 쓰므로 여기는 없음(<see cref="NoAttackerObject"/>).
+    /// </summary>
+    public readonly ulong attackerObjectId;
+
+    public const ulong NoAttackerObject = ulong.MaxValue;
+
     public DamageDealtInfo(int amount, DamageChannel channel, ulong attackerClientId,
-        AttackType attackType, AttackHitPattern hitPattern)
+        AttackType attackType, AttackHitPattern hitPattern, ulong attackerObjectId = NoAttackerObject)
     {
         this.amount = amount;
         this.channel = channel;
         this.attackerClientId = attackerClientId;
         this.attackType = attackType;
         this.hitPattern = hitPattern;
+        this.attackerObjectId = attackerObjectId;
     }
 }
 
@@ -77,6 +86,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     Coroutine _shieldExpiryRoutine;
     bool _deathNotified;
     ulong _damageAttackerClientId = ulong.MaxValue;
+    ulong _damageAttackerObjectId = DamageDealtInfo.NoAttackerObject; // 플레이어가 아닌 공격자 Unit(268 반대쪽 연출)
     AttackType _damageAttackType = AttackType.None;
     AttackHitPattern _damageHitPattern = AttackHitPattern.Single;
 
@@ -148,7 +158,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 표시용 피해량은 체력 클램프 전 최종값이다. NetworkVariable 변화량으로는 막타 초과분을
         // 복원할 수 없으므로, 피해가 확정되는 이 지점에서 전 피어에 전달한다.
         if (IsSpawned && (hpDealt > 0 || shieldDealt > 0))
-            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId,
+            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId, _damageAttackerObjectId,
                 (byte)_damageAttackType, (byte)_damageHitPattern);
 
         // 진단 — Health 의 기존 로그는 대상 이름이 없어서 누구의 체력이 줄었는지 알 수 없었다.
@@ -244,9 +254,11 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 공격자 귀속은 이 ReceiveAttack이 적용하는 피해에만 유효하다. 추락·비율·직접 피해처럼
         // ApplyHealthDamage를 곧바로 타는 경로는 기본값(공격자 없음)을 유지한다.
         ulong previousAttackerClientId = _damageAttackerClientId;
+        ulong previousAttackerObjectId = _damageAttackerObjectId;
         AttackType previousAttackType = _damageAttackType;
         AttackHitPattern previousHitPattern = _damageHitPattern;
         _damageAttackerClientId = ResolveAttackerClientId(hitContext);
+        _damageAttackerObjectId = ResolveAttackerObjectId(hitContext);
         _damageAttackType = attackInfo.attackType;
         _damageHitPattern = attackInfo.hitPattern;
         try
@@ -256,6 +268,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         finally
         {
             _damageAttackerClientId = previousAttackerClientId;
+            _damageAttackerObjectId = previousAttackerObjectId;
             _damageAttackType = previousAttackType;
             _damageHitPattern = previousHitPattern;
         }
@@ -279,7 +292,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         if (!IsServer || !IsSpawned || amount <= 0) return;
 
-        ClientDamageDealtClientRpc(0, amount, ResolveAttackerClientId(hitContext),
+        ClientDamageDealtClientRpc(0, amount, ResolveAttackerClientId(hitContext), ResolveAttackerObjectId(hitContext),
             (byte)attackInfo.attackType, (byte)attackInfo.hitPattern);
     }
 
@@ -301,6 +314,21 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         return sourcePlayer != null && sourcePlayer.IsSpawned
             ? sourcePlayer.OwnerClientId
             : ulong.MaxValue;
+    }
+
+    /// <summary>
+    /// 플레이어가 아닌 공격자 Unit(몬스터·보스)의 NetworkObjectId — 피해 숫자 반대쪽 연출 기준점(268).
+    /// 플레이어 공격자는 clientId 경로를 쓰므로 없음. 공격자 본인 기준이라 Unit 만 본다(투사체 오브젝트 자신은 안 씀).
+    /// </summary>
+    static ulong ResolveAttackerObjectId(AttackHitContext hitContext)
+    {
+        Unit source = hitContext.sourceUnit;
+        if (source == null && hitContext.sourceTransform != null)
+            source = hitContext.sourceTransform.GetComponentInParent<Unit>();
+
+        return source != null && !(source is Player) && source.IsSpawned
+            ? source.NetworkObjectId
+            : DamageDealtInfo.NoAttackerObject;
     }
 
     /// <summary>
@@ -818,7 +846,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     [ClientRpc]
-    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId,
+    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId, ulong attackerObjectId,
         byte attackType, byte hitPattern)
     {
         AttackType resolvedAttackType = (AttackType)attackType;
@@ -827,12 +855,12 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (shieldDamage > 0)
             ClientDamagedAttributed?.Invoke(new DamageDealtInfo(
                 shieldDamage, DamageChannel.Shield, attackerClientId,
-                resolvedAttackType, resolvedHitPattern));
+                resolvedAttackType, resolvedHitPattern, attackerObjectId));
 
         if (hpDamage > 0)
             ClientDamagedAttributed?.Invoke(new DamageDealtInfo(
                 hpDamage, DamageChannel.Hp, attackerClientId,
-                resolvedAttackType, resolvedHitPattern));
+                resolvedAttackType, resolvedHitPattern, attackerObjectId));
 
         if (shieldDamage > 0 || hpDamage > 0)
             ClientHitAttributed?.Invoke(attackerClientId);

@@ -61,7 +61,7 @@ public sealed class FloatingDamagePresenter : MonoBehaviour
             : PopupKind.Damage;
         spawner.Submit(new FloatingPopupRequest(_unit, kind, damage.amount, fromLocalPlayer,
                 damage.attackerClientId, damage.attackType, damage.hitPattern)
-            .WithPlayerSource(damage.attackerClientId)); // 반대쪽 연출 기준점(268)
+            .WithAttackerSource(damage.attackerClientId, damage.attackerObjectId)); // 반대쪽 연출 기준점(268)
     }
 
     bool IsLocalPlayerTarget()
