@@ -25,6 +25,11 @@ MonoBehaviour:
   hurtboxScaleMax: 1.6
   spawnOffset: -33
   spawnScatter: {x: 12, y: 0.9}
+  sidePush: 40
+  sideDrift: 30
+  sideDriftDuration: 0.6
+  sideDriftEase: 8
+  sideFrontThreshold: 24
   riseDuration: 0.2
   riseDistance: 24
   fallDistance: 0

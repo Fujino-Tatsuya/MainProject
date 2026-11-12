@@ -89,6 +89,34 @@ public static class FloatingDamageMinPixelPolicy
 }
 
 /// <summary>
+/// 맞은 반대쪽에 뜨기(할 일 268) — 화면 x 로 공격자가 왼쪽이면 숫자는 오른쪽(+1), 오른쪽이면 왼쪽(-1).
+/// 기준점이 없거나 화면 x 차이가 문턱 안(거의 정면)이면 0 = 지금처럼 위로만.
+/// </summary>
+public static class FloatingDamageSidePolicy
+{
+    public static int Side(bool hasSource, float targetScreenX, float sourceScreenX, float frontThreshold)
+    {
+        if (!hasSource)
+            return 0;
+
+        float dx = targetScreenX - sourceScreenX;
+        if (Mathf.Abs(dx) <= Mathf.Max(0f, frontThreshold))
+            return 0;
+
+        return dx > 0f ? 1 : -1;
+    }
+
+    /// <summary>가로 오프셋(px) = 방향 × (생성 밀기 + 흐름 × 흐름 진행 0~1).</summary>
+    public static float OffsetX(int side, float spawnPush, float drift, float driftProgress01)
+    {
+        if (side == 0)
+            return 0f;
+
+        return side * (spawnPush + drift * Mathf.Clamp01(driftProgress01));
+    }
+}
+
+/// <summary>
 /// 외곽선 알파(할 일 268) = DigitSet 외곽선 색 알파 × Settings 외곽선 알파 × 지금 숫자 알파(팀원 최대 알파·페이드 포함).
 /// </summary>
 public static class FloatingDamageOutlinePolicy
@@ -116,6 +144,13 @@ public struct FloatingPopupRequest
     /// </summary>
     public int baseMaxHpOverride;
 
+    /// <summary>
+    /// 반대쪽 연출(268) 기준점 — 공격자(힐이면 힐한 사람) 본인의 월드 위치. 투사체도 공격자 본인.
+    /// 없으면(<see cref="hasSource"/> false — 몬스터·장판·도트·자기 회복) 위로만 뜬다.
+    /// </summary>
+    public bool hasSource;
+    public Vector3 sourceWorld;
+
     /// <summary>구간 판정 기준 최대 체력 — 덮어쓰기가 있으면 그것, 없으면 대상 최대 체력(대상 없으면 0).</summary>
     public int BaseMaxHp => baseMaxHpOverride > 0 ? baseMaxHpOverride : target != null ? target.MaxHp : 0;
 
@@ -130,6 +165,15 @@ public struct FloatingPopupRequest
         this.attackType = attackType;
         this.hitPattern = hitPattern;
         baseMaxHpOverride = 0;
+        hasSource = false;
+        sourceWorld = default;
+    }
+
+    /// <summary>공격자 플레이어(<paramref name="sourceClientId"/>)를 찾으면 그 위치를 기준점으로 단다. 자기 자신·못 찾음 = 없음.</summary>
+    public FloatingPopupRequest WithPlayerSource(ulong sourceClientId)
+    {
+        hasSource = FloatingDamageSource.TryGetPlayerPosition(sourceClientId, target, out sourceWorld);
+        return this;
     }
 }
 
@@ -246,6 +290,17 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Tooltip("좌우 ±x / 위아래 ±y 무작위 분산.")]
     [SerializeField] Vector2 spawnScatter = new Vector2(12f, 6f);
 
+    [Header("맞은 반대쪽 (268, px · 초)")]
+    [Tooltip("공격자 반대쪽으로 생성 위치를 미는 거리. 0 이면 생성 때 밀지 않는다.")]
+    [SerializeField, DataTableIgnore] float sidePush = 40f;
+    [Tooltip("뜨는 동안 같은 방향으로 더 흘러가는 거리.")]
+    [SerializeField, DataTableIgnore] float sideDrift = 30f;
+    [Tooltip("흐름에 걸리는 시간. 누적 숫자는 다 흐른 뒤 그 자리에 머문다.")]
+    [SerializeField, Min(0.01f), DataTableIgnore] float sideDriftDuration = 0.6f;
+    [SerializeField, DataTableIgnore] Ease sideDriftEase = Ease.OutCubic;
+    [Tooltip("정면 판정 문턱 — 대상과 공격자의 화면 x 차이가 이 안이면 위로만 뜬다.")]
+    [SerializeField, Min(0f), DataTableIgnore] float sideFrontThreshold = 24f;
+
     [Header("움직임 (px · 초)")]
     [SerializeField, Min(0.01f)] float riseDuration = 0.2f;
     [SerializeField] float riseDistance = 24f;
@@ -318,6 +373,11 @@ public sealed class FloatingDamageSettings : ScriptableObject
     public int CanvasSortingOrder => canvasSortingOrder;
     public Vector2 ScreenEdgePadding => screenEdgePadding;
     public float MinScreenPixelHeight => minScreenPixelHeight;
+    public float SidePush => sidePush;
+    public float SideDrift => sideDrift;
+    public float SideDriftDuration => sideDriftDuration;
+    public Ease SideDriftEase => sideDriftEase;
+    public float SideFrontThreshold => sideFrontThreshold;
     public float SpawnOffset => spawnOffset;
     public Vector2 SpawnScatter => spawnScatter;
     public float RiseDuration => riseDuration;

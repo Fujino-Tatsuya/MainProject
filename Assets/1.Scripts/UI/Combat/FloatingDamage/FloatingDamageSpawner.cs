@@ -82,9 +82,31 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         _livePopups.Add(popup);
         if (canAccumulate)
             _activeByKey[key] = popup;
-        popup.Initialize(request, accumulation, settings, style, tier, ResolveAnchor(request.target),
+        Vector3 anchor = ResolveAnchor(request.target);
+        popup.Initialize(request, accumulation, settings, style, tier, anchor,
             settings.HurtboxScale(ResolveHurtboxSize(request.target)),
+            ResolveSide(request, anchor),
             _canvas, _emphasisGate, ReleasePopup);
+    }
+
+    /// <summary>
+    /// 맞은 반대쪽(268) — 생성 순간 대상 생성점과 공격자 위치의 화면 x 로 정한다(누적 숫자는 이 첫 방향을 유지).
+    /// 비교는 Canvas 단위(1080p px)라 문턱이 해상도와 무관하다.
+    /// </summary>
+    int ResolveSide(FloatingPopupRequest request, Vector3 anchor)
+    {
+        Camera camera = Camera.main;
+        if (!request.hasSource || camera == null)
+            return 0;
+
+        Vector3 target = camera.WorldToScreenPoint(anchor);
+        Vector3 source = camera.WorldToScreenPoint(request.sourceWorld);
+        if (target.z <= 0f || source.z <= 0f)
+            return 0;
+
+        float scaleFactor = Mathf.Max(0.0001f, _canvas.scaleFactor);
+        return FloatingDamageSidePolicy.Side(true, target.x / scaleFactor, source.x / scaleFactor,
+            settings.SideFrontThreshold);
     }
 
     /// <summary>
