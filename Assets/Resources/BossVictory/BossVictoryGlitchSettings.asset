@@ -62,7 +62,7 @@ MonoBehaviour:
   rectifyFillFade: 0.15
   rectifyFillExpand: 0.5
   rectifyFillSoftness: 0.01
-  rectifyFillGradient: 0.35
+  rectifyFillGradient: 1
   rectifyFillCoversOutline: 1
   rectifyWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   rectifyWhiteStart: 0.3
