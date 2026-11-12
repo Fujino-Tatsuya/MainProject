@@ -127,6 +127,8 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Min(0f)] public float rectifyFillSoftness = 0.01f;
     [Tooltip("링 안 방사형 그라데이션 — 가장자리 색 = 색 × (1 − 세기), 중심은 원래 색.")]
     [Range(0f, 1f)] public float rectifyFillGradient = 0.35f;
+    [Tooltip("색(링·흰 원·주황 채움)이 지나간 자리는 흰 외곽선도 그 색으로 덮는다 — 채움을 외곽선 바깥 경계까지 넓힌다(267 후속). 끄면 예전처럼 안쪽만 칠하고 외곽선은 늘 흰색.")]
+    public bool rectifyFillCoversOutline = true;
 
     [Header("RECTIFY 흰 원(4번째) — 링 3개와 값 분리(267 후속)")]
     public Color rectifyWhiteColor = Color.white;

@@ -63,6 +63,7 @@ MonoBehaviour:
   rectifyFillExpand: 0.5
   rectifyFillSoftness: 0.01
   rectifyFillGradient: 0.35
+  rectifyFillCoversOutline: 1
   rectifyWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   rectifyWhiteStart: 0.3
   rectifyWhiteCenter: {x: 0.46, y: 0.5}

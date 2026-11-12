@@ -58,11 +58,12 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             float4 _RectifyColor;
 
             // 배경 글자 외곽선 가중치(0~1).
-            // x = 외곽선, y = 글자 안(채움 마스크).
-            half2 RectifyAt(float2 uv)
+            // x = 외곽선, y = 글자 안(채움 마스크), z = 외곽선 바깥 경계까지(안 ∪ 외곽선 — 색이 외곽선을 덮을 때 채움 마스크, 바깥 가장자리 AA 유지).
+            half3 RectifyAt(float2 uv)
             {
                 half a = 0.0h;
                 half inside = 0.0h;
+                half outer = 0.0h;
                 int n = (int)_RectifyParams.z;
                 [unroll] for (int i = 0; i < 8; i++)
                 {
@@ -75,8 +76,9 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                     float w = max(0.75 * _RectifyUV[i].w * _RectifyParams.w / max((r.w - r.y) * _ScreenParams.y, 1.0), 1e-4);
                     a = max(a, (half)(1.0 - smoothstep(_RectifyParams.y - w, _RectifyParams.y + w, abs(sd))));
                     inside = max(inside, (half)smoothstep(-w, w, sd));
+                    outer = max(outer, (half)smoothstep(-_RectifyParams.y - w, -_RectifyParams.y + w, sd));
                 }
-                return half2(a, inside);
+                return half3(a, inside, outer);
             }
 
             float4 _RectifyFillRings[4];     // 링 i(0~2 색 링 · 3 흰 원) — x 반지름(단어 높이 단위), y 알파, zw 중심(단어 UV)
@@ -86,7 +88,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             float4 _RectifyOrangeRight;      // a = 좌→우 보간 세기
             float4 _RectifyFillRect;         // 단어 사각형(뷰포트 min.xy · max.zw)
             float4 _RectifyFillParams;       // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
-            float4 _RectifyFillLook;         // x 주사선 어둡기
+            float4 _RectifyFillLook;         // x 주사선 어둡기, y 색이 외곽선도 덮음(1 켬 · 0 = 안쪽만, 외곽선은 늘 흰색)
 
             // 안쪽 색 Ring Wipe Fill — 링을 생성 순으로 덮는다(painter's order). 링 안 방사형 그라데이션(중심 = 원래 색 → 가장자리 어둡게).
             // 첫 링 전 = 비어 있음(a 0 → 외곽선만). rgb = 색, a = 덮인 정도.
@@ -255,9 +257,10 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 {
                     float revealRow = floor(ypx / (baseH * 2.0));
                     half reveal = _RectifyParams.x >= 0.999 ? 1.0h : (half)step(Hash(float2(revealRow, tick + 51.0)), _RectifyParams.x);
-                    half2 rt = RectifyAt(uv);
+                    half3 rt = RectifyAt(uv);
+                    half fillCover = 0.0h;   // 색이 닿은 정도(외곽선 덮기 켬일 때만) — 외곽선은 남은 만큼만 흰색
                     half visible = reveal * (1.0h - player) * (1.0h - boss);
-                    rectMask = max(rt.x, rt.y) * visible;
+                    rectMask = max(rt.x, rt.z) * visible;
                     // 안쪽 색(원형 확장) — 글자 안에서만 · 가는 가로 주사선(rectifyScanlineDark, 기본 0 = 끔). 외곽선은 그 위에.
                     if (_RectifyFillParams.x > 0.0001)
                     {
@@ -277,10 +280,13 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                         }
                         half scanOn = (half)step(0.5, frac(ypx / _RectifyFillParams.w));
                         half3 fillCol = fill.rgb * (1.0h - (half)_RectifyFillLook.x * scanOn);
-                        half fillW = rt.y * fill.a * (half)_RectifyFillParams.x * visible;
+                        half coverOutline = (half)step(0.5, _RectifyFillLook.y);
+                        half fillShape = lerp(rt.y, rt.z, coverOutline);   // 덮기 켬 = 외곽선 바깥 경계까지
+                        half fillW = fillShape * fill.a * (half)_RectifyFillParams.x * visible;
+                        fillCover = fill.a * (half)_RectifyFillParams.x * coverOutline;
                         graded = lerp(graded, fillCol, fillW);
                     }
-                    half text = rt.x * visible;
+                    half text = rt.x * visible * (1.0h - fillCover);   // 색이 지나간 자리는 외곽선도 그 색(첫 링 전 = 흰 외곽선만)
                     graded = lerp(graded, _RectifyColor.rgb, text * (half)_RectifyColor.a);
                 }
 

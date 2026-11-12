@@ -72,7 +72,7 @@ public static class BossVictoryGlitchRender
     static readonly int IdFillColors = Shader.PropertyToID("_RectifyFillColors");     // rgb 색, a 방사형 그라데이션 세기
     static readonly int IdFillRect = Shader.PropertyToID("_RectifyFillRect");         // 단어 사각형(뷰포트 min.xy · max.zw)
     static readonly int IdFillParams = Shader.PropertyToID("_RectifyFillParams");     // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
-    static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기
+    static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기, y 색이 외곽선도 덮음
     static readonly int IdCircle = Shader.PropertyToID("_GroundCircle");          // xyz 중심(월드), w 반경(m)
     static readonly int IdScanFloor = Shader.PropertyToID("_ScanFloor");          // x 벽 normal.y, y 바닥 normal.y, z 바닥 남김, w 하늘 호박 명도 하한(267 후속)
     static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
@@ -207,6 +207,7 @@ public static class BossVictoryGlitchRender
     static float _whiteStart = 0.2f, _whiteStartRadius, _whiteFade, _whiteExpand = 0.6f, _whiteGradient;
     static float _orangeHold, _orangeWipe = 0.1f, _orangeJitter, _orangeRowPx = 4f, _orangeGradient;
     static bool _orangeRightToLeft = true;
+    static bool _fillCoversOutline = true;
 
     static void ApplyFillLook(BossVictoryGlitchSettings s)
     {
@@ -218,6 +219,7 @@ public static class BossVictoryGlitchRender
         _fillExpand = s.rectifyFillExpand;
         _fillSoft = s.rectifyFillSoftness;
         _fillGradient = Mathf.Clamp01(s.rectifyFillGradient);
+        _fillCoversOutline = s.rectifyFillCoversOutline;
         _scanSpacing = s.rectifyScanlineSpacing;
         _scanDark = Mathf.Clamp01(s.rectifyScanlineDark);
         _whiteColor = s.rectifyWhiteColor;
@@ -270,7 +272,7 @@ public static class BossVictoryGlitchRender
         _composite.SetVectorArray(IdFillColors, _fillRingColors);
         _composite.SetVector(IdFillRect, word);
         _composite.SetVector(IdFillParams, new Vector4(opacity, Mathf.Max(0f, _fillSoft), wordAspect, Mathf.Max(1f, _scanSpacing * Screen.height)));
-        _composite.SetVector(IdFillLook, new Vector4(_scanDark, 0f, 0f, 0f));
+        _composite.SetVector(IdFillLook, new Vector4(_scanDark, _fillCoversOutline ? 1f : 0f, 0f, 0f));
     }
 
     static float _noiseSpace;
