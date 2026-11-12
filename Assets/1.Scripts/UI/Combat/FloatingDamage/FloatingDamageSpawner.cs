@@ -14,6 +14,7 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
     readonly Dictionary<FloatingDamageAccumulationKey, FloatingDamagePopup> _activeByKey = new();
     readonly List<FloatingDamagePopup> _livePopups = new();
     readonly FloatingDamageEmphasisGate _emphasisGate = new();
+    readonly Dictionary<int, float> _hurtboxSizeById = new();
     ObjectPool<FloatingDamagePopup> _pool;
     Canvas _canvas;
 
@@ -82,7 +83,25 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         if (canAccumulate)
             _activeByKey[key] = popup;
         popup.Initialize(request, accumulation, settings, style, tier, ResolveAnchor(request.target),
+            settings.HurtboxScale(ResolveHurtboxSize(request.target)),
             _canvas, _emphasisGate, ReleasePopup);
+    }
+
+    /// <summary>
+    /// 대상 판정 크기(m, 268). 판정이 잠깐 꺼진 순간(무적 구간 등)에도 크기가 튀지 않게 마지막으로 잰 값을 대상별로 기억한다.
+    /// </summary>
+    public float ResolveHurtboxSize(Unit target)
+    {
+        if (target == null)
+            return 0f;
+
+        int id = target.GetInstanceID();
+        float size = FloatingDamageHurtboxMeasure.Measure(target);
+        if (size > 0f)
+            _hurtboxSizeById[id] = size;
+        else
+            _hurtboxSizeById.TryGetValue(id, out size);
+        return size;
     }
 
     void OnEnable()

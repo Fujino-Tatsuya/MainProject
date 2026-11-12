@@ -233,6 +233,13 @@ public sealed class FloatingDamageSettings : ScriptableObject
              "등장 확대·펀치 비율은 그대로. 0 = 끔. 기본 16 = 1080p 내 낮음(36×0.5 = 18px)은 그대로, 팀원 낮음(13.5px)·720p 낮음(12px)부터 올린다.")]
     [SerializeField, Min(0f)] float minScreenPixelHeight = 16f;
 
+    [Header("판정 크기 배율 (268)")]
+    [Tooltip("기준 판정 크기(m) = 플레이어 Hurtbox 경계 상자 대각선. 배율 = clamp(sqrt(대상 판정 크기 ÷ 이 값), 최소, 최대).\n" +
+             "기본 1.7 = Player.prefab 캡슐(반경 0.2·높이 1.6 → 0.4×1.6×0.4). 0 = 끔(배율 1). 카메라 줌과 무관.")]
+    [SerializeField, Min(0f), DataTableIgnore] float hurtboxReferenceSize = 1.7f;
+    [SerializeField, Min(0.01f), DataTableIgnore] float hurtboxScaleMin = 0.8f;
+    [SerializeField, Min(0.01f), DataTableIgnore] float hurtboxScaleMax = 1.6f;
+
     [Header("생성 위치 (px)")]
     [Tooltip("몸 중심에서 화면 위쪽으로.")]
     [SerializeField] float spawnOffset = 20f;
@@ -300,6 +307,13 @@ public sealed class FloatingDamageSettings : ScriptableObject
     public float TeammateScaleMultiplier => teammateScaleMultiplier;
     public float TeammateAlpha => teammateAlpha;
     public float OutlineAlpha => outlineAlpha;
+    public float HurtboxReferenceSize => hurtboxReferenceSize;
+    public float HurtboxScaleMin => hurtboxScaleMin;
+    public float HurtboxScaleMax => hurtboxScaleMax;
+
+    /// <summary>판정 크기(m) → 숫자 크기 배율(268).</summary>
+    public float HurtboxScale(float targetSize) =>
+        FloatingDamageHurtboxScalePolicy.Multiplier(targetSize, hurtboxReferenceSize, hurtboxScaleMin, hurtboxScaleMax);
     public Vector2 ReferenceResolution => referenceResolution;
     public int CanvasSortingOrder => canvasSortingOrder;
     public Vector2 ScreenEdgePadding => screenEdgePadding;

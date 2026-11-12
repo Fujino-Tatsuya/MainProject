@@ -75,6 +75,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         FloatingPopupStyle style,
         FloatingDamageTier tier,
         Vector3 anchorWorld,
+        float hurtboxScale,
         Canvas canvas,
         FloatingDamageEmphasisGate emphasisGate,
         Action<FloatingDamagePopup> release)
@@ -118,7 +119,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
             request.fromLocalPlayer,
             settings.TeammateScaleMultiplier,
             settings.TeammateAlpha);
-        _displayScaleMultiplier = displayDecision.scaleMultiplier;
+        // 판정 크기 배율(268) — 구간 크기·팀원 배율과 곱한다. 생성 때 1회(누적 숫자도 첫 값 유지).
+        _displayScaleMultiplier = displayDecision.scaleMultiplier * Mathf.Max(0.01f, hurtboxScale);
         _displayAlphaMultiplier = displayDecision.alphaMultiplier;
         _alpha = _baseColor.a * _displayAlphaMultiplier;
 

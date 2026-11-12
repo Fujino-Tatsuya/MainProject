@@ -20,6 +20,9 @@ MonoBehaviour:
   canvasSortingOrder: 50
   screenEdgePadding: {x: 60, y: 30}
   minScreenPixelHeight: 16
+  hurtboxReferenceSize: 1.7
+  hurtboxScaleMin: 0.8
+  hurtboxScaleMax: 1.6
   spawnOffset: -33
   spawnScatter: {x: 12, y: 0.9}
   riseDuration: 0.2
