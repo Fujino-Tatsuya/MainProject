@@ -183,6 +183,106 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     {
         TraitSkillFx.Raised -= HandleTraitFx;
         StopTargetFloorLocal();
+        EndVictorySword();
+        RestoreStrikeParts();
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  보스 처치 연출 — 손 검 번개·낙하 검 배율(할 일 269)
+    // ═════════════════════════════════════════════════════════════════
+    //
+    // 처치자가 팔라딘이면 BossVictoryGlitchPresentation 이 시작(Begin) 때 켜고 정리(Teardown) 때 끈다 — 복제된 처치 상태로
+    // 각 피어가 연 연출이라 RPC 없이 모든 피어(늦은 참가자 포함) 같다. 값은 처치자 프로필 칸(handSwordLightning·fallingSwordScale).
+    //
+    // 손 검 번개 = R 칼날 전기와 같은 엔트리(swordElectric.Effect)·같은 소켓(손 검 메쉬)을 쓰되 <b>핸들은 따로</b> 든다 —
+    // 처치 연출 스킬(R 표시 전용)이 끝나며 OnEnd → StopUltimateVfxLocal 이 swordElectric 을 끄는데, 같은 소켓 플레이어를 쓰면 그때 같이 꺼진다.
+    // 손 검 크기는 안 바꾼다. 느려짐(처치자 이펙트 배율)에서 뺀다(BossVictoryGlitchPresentation.KeepRealtime).
+    //
+    // 낙하 검 = R 마무리 낙뢰(targetStrike, FX_Lightening_Strike 의 HolySword)를 표시 전용 경로(PlayTargetStrikeAtLocal)에서만 배율을 곱해 재생 — 평소 R 은 그대로.
+    // 🔴 매니저 배율은 인스턴스 루트 localScale 만 키우는데, 이 프리팹의 칼 파트(HolySword·SwordGlow·SwordTwinkle)는 scalingMode Local 이라
+    //    부모 배율을 무시한다 — 루트만 키우면 칼 크기는 그대로고 낙하 시작점(15m)만 두 배로 올라가 칼이 공중(15m)에서 멈춘다.
+    //    그래서 Local 파트는 자기 localScale 도 같은 배율로 키우고(크기·낙하 거리 모두 두 배 → 바닥에 닿음), 이펙트가 풀로 돌아가면 원래 값으로 되돌린다.
+
+    private EffectHandle _victorySwordFx;
+    private float _victoryFallingScale = 1f;   // 처치 연출 동안만 1 이 아니다
+    private EffectHandle _victoryStrikeHandle; // 배율을 바꾼 낙하 검(수명이 끝나면 Update 가 Local 파트 배율을 되돌린다)
+    private readonly List<Transform> _scaledStrikeParts = new List<Transform>();
+    private readonly List<Vector3> _scaledStrikeBase = new List<Vector3>();
+    private static readonly List<GameObject> s_strikeInstances = new List<GameObject>();
+    private static readonly List<ParticleSystem> s_strikeSystems = new List<ParticleSystem>();
+
+    /// <summary>[이 피어] 보스 처치 연출 시작 — 손 검에 번개(<paramref name="handLightning"/>), 이 연출의 낙하 검 배율(<paramref name="fallingSwordScale"/>). 이미 켜져 있으면 걷고 다시.</summary>
+    public void BeginVictorySword(bool handLightning, float fallingSwordScale)
+    {
+        EndVictorySword();
+        _victoryFallingScale = Mathf.Max(0.01f, fallingSwordScale);
+        if (!handLightning)
+            return;
+
+        Transform sword = swordElectric != null ? swordElectric.Socket : null;
+        if (sword == null || swordElectric.Effect == null)
+        {
+            Edit.LogWarning("[PaladinSkillView] 처치 연출 손 검 번개 — swordElectric 소켓·엔트리가 비어 건너뛴다.", this);
+            return;
+        }
+        if (!EffectManager.TryGet(out EffectManager effects, this))
+            return;
+        _victorySwordFx = effects.PlayLooping(swordElectric.Effect, sword, Vector3.zero, swordElectric.Scale);
+        BossVictoryGlitchPresentation.KeepRealtime(_victorySwordFx);
+    }
+
+    /// <summary>[이 피어] 처치 연출 끝·취소 — 손 검 번개 걷기, 낙하 검 배율 1(이미 떨어진 검은 수명대로 두고 끝나면 파트 배율 복구). 켜져 있지 않으면 no-op.</summary>
+    public void EndVictorySword()
+    {
+        if (_victorySwordFx.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.Release(_victorySwordFx);
+        _victorySwordFx = EffectHandle.None;
+        _victoryFallingScale = 1f;
+    }
+
+    private void Update()
+    {
+        // 배율을 바꾼 낙하 검이 풀로 돌아갔으면(원샷 수명 끝·걷힘) Local 파트 배율을 되돌린다 — 다음 R 에 남지 않게.
+        if (_scaledStrikeParts.Count > 0 && (EffectManager.Instance == null || EffectManager.Instance.GetInstances(_victoryStrikeHandle, s_strikeInstances) == 0))
+            RestoreStrikeParts();
+    }
+
+    // 표시 전용 낙하 검 — 루트 배율은 매니저가, Local 파트는 여기서(위 설명).
+    private void ScaleStrikeLocalParts(float factor)
+    {
+        RestoreStrikeParts();
+        _victoryStrikeHandle = _targetStrikeHandle;
+        if (Mathf.Approximately(factor, 1f) || EffectManager.Instance == null) return;
+        EffectManager.Instance.GetInstances(_targetStrikeHandle, s_strikeInstances);
+        foreach (GameObject instance in s_strikeInstances)
+        {
+            instance.GetComponentsInChildren(true, s_strikeSystems);
+            foreach (ParticleSystem ps in s_strikeSystems)
+            {
+                Transform t = ps.transform;
+                if (t == instance.transform || ps.main.scalingMode != ParticleSystemScalingMode.Local || HasScaledAncestor(t, instance.transform))
+                    continue;
+                _scaledStrikeParts.Add(t);
+                _scaledStrikeBase.Add(t.localScale);
+                t.localScale *= factor;
+            }
+        }
+    }
+
+    private bool HasScaledAncestor(Transform t, Transform root)
+    {
+        for (Transform p = t.parent; p != null && p != root; p = p.parent)
+            if (_scaledStrikeParts.Contains(p)) return true;
+        return false;
+    }
+
+    private void RestoreStrikeParts()
+    {
+        for (int i = 0; i < _scaledStrikeParts.Count; i++)
+            if (_scaledStrikeParts[i] != null) _scaledStrikeParts[i].localScale = _scaledStrikeBase[i];
+        _scaledStrikeParts.Clear();
+        _scaledStrikeBase.Clear();
+        _victoryStrikeHandle = EffectHandle.None;
     }
 
     /// <summary>
@@ -344,7 +444,18 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     [Rpc(SendTo.ClientsAndHost)]
     private void PlayTargetStrikeRpc(float playRate) => PlayTargetStrikeLocal(playRate);
 
-    private void PlayTargetStrikeLocal(float playRate)
+    /// <summary>
+    /// [이 피어] 표시 전용 재생(보스 처치 연출)의 마무리 낙뢰 — 서버 경로가 없어 표식도 안 깔렸으니 자리를 여기서 고정하고(표식과 같은 규칙: 대상 아래 바닥)
+    /// 같은 엔트리를 떨어뜨린다. 표식은 깔지 않는다. 각 피어 로컬, RPC 없음.
+    /// </summary>
+    public void PlayTargetStrikeAtLocal(Transform target, float playRate)
+    {
+        LockTargetPosition(target, target != null ? target.position : transform.position);
+        PlayTargetStrikeLocal(playRate, _victoryFallingScale);   // 처치 연출 낙하 검 배율(269) — 평소 R 경로는 1
+        ScaleStrikeLocalParts(_victoryFallingScale);
+    }
+
+    private void PlayTargetStrikeLocal(float playRate, float scaleMultiplier = 1f)
     {
         if (targetStrike == null || EffectManager.Instance == null) return;
 
@@ -352,7 +463,7 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         // 둘이 어긋나면 "표식 옆에 칼이 꽂히는" 그림이 된다.
         // 원샷이라 엔트리 수명 뒤에 매니저가 알아서 반납한다. 핸들은 도중에 걷을 때만 쓴다.
         _targetStrikeHandle = EffectManager.Instance.PlayRecallable(targetStrike, _targetPosition, Quaternion.identity,
-            targetStrikeScale, 0f, playRate);
+            targetStrikeScale * scaleMultiplier, 0f, playRate);
     }
 
     /// <summary>
@@ -370,18 +481,8 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     private void PlayTargetFloorLocal(Transform target, Vector3 fallbackPosition, float playRate)
     {
-        // 🔴 자리를 **딱 한 번** 뽑아 고정한다. 표식도 마무리 낙뢰도 여기만 본다.
-        //    대상 트랜스폼을 찾았으면 그걸 쓴다 — 서버가 실어 보낸 좌표보다
-        //    "이 피어가 지금 그리고 있는 위치"에 가깝다(보간 차이를 안 탄다).
-        _targetPosition = target != null ? target.position : fallbackPosition;
-
-        // 대상 아래 바닥으로 내린다 — 표식도 마무리 낙뢰도 바닥에 꽂힌다.
-        // 송전탑(BossChargingPylon)처럼 루트가 올라와 있는 대상도 바닥 기준이 된다.
-        // GroundProbe 는 Unit 계층 콜라이더를 건너뛰므로 대상 자신은 바닥으로 잡히지 않는다.
-        // 바닥에 서 있는 대상은 SurfaceOffset(0.05m)만큼만 달라진다. 못 찾으면 대상 위치 그대로.
         // 표식 엔트리가 비어 있어도 낙뢰가 이 자리를 쓰므로 아래 early return 보다 먼저 한다.
-        if (GroundProbe.TryFindGround(_targetPosition, 0, out RaycastHit ground, out _))
-            _targetPosition.y = GroundProbe.SurfaceY(ground);
+        LockTargetPosition(target, fallbackPosition);
 
         // 재시전으로 두 겹이 되지 않게 먼저 회수한다(EffectSocketPlayer.Play 와 같은 규칙).
         StopTargetFloorLocal();
@@ -393,6 +494,21 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         //    같이 돈다(2026-09-30 반려 사유). 회전만 빼는 옵션은 EffectManager 에 없다.
         _targetFloorHandle = EffectManager.Instance.PlayLooping(
             targetFloor, _targetPosition, Quaternion.identity, targetFloorScale, 0f, playRate);
+    }
+
+    private void LockTargetPosition(Transform target, Vector3 fallbackPosition)
+    {
+        // 🔴 자리를 **딱 한 번** 뽑아 고정한다. 표식도 마무리 낙뢰도 여기만 본다.
+        //    대상 트랜스폼을 찾았으면 그걸 쓴다 — 서버가 실어 보낸 좌표보다
+        //    "이 피어가 지금 그리고 있는 위치"에 가깝다(보간 차이를 안 탄다).
+        _targetPosition = target != null ? target.position : fallbackPosition;
+
+        // 대상 아래 바닥으로 내린다 — 표식도 마무리 낙뢰도 바닥에 꽂힌다.
+        // 송전탑(BossChargingPylon)처럼 루트가 올라와 있는 대상도 바닥 기준이 된다.
+        // GroundProbe 는 Unit 계층 콜라이더를 건너뛰므로 대상 자신은 바닥으로 잡히지 않는다.
+        // 바닥에 서 있는 대상은 SurfaceOffset(0.05m)만큼만 달라진다. 못 찾으면 대상 위치 그대로.
+        if (GroundProbe.TryFindGround(_targetPosition, 0, out RaycastHit ground, out _))
+            _targetPosition.y = GroundProbe.SurfaceY(ground);
     }
 
     /// <summary>[전 피어] 칼 꽂기(Stick)는 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.</summary>

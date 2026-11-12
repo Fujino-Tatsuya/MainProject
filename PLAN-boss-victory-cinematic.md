@@ -1,5 +1,7 @@
 # PLAN — 보스 B 승리 연출 (BOSS DOWN)
 
+> 🔶 **11-09 교체됨** — 처치 연출은 ZZZ 글리치([PLAN-boss-victory-glitch.md](PLAN-boss-victory-glitch.md))로 바뀌고, 이 문서의 카메라 무빙·주황·회색 원·프리셋·슬라이더 코드는 각 `Legacy/` 로 옮겨 연결을 끊었다. 아래는 기록.
+
 > 상태: ✅ 경석 승인(2026-10-27 — Q1~Q3 권장안, R1~R6 문서대로) → ✅ 구현(10-27, 미커밋) · 컴파일 0 · 전투 EditMode 402/0(승리 규칙 38 추가) · ⏳ 경석 Play · ⏳ MPPM. 브랜치 `feature/SettingsDdol`(development `6135a330` 위).
 > **11-06 할 일 200 1차 정리 → [§10](#10-할-일-200--엔딩-연출-1차-정리-11-06-사용자-결정--브랜치-featurebossvictoryrework1)** — 추가 연출 구간·단색 배경·이펙트 단색·색 원복/글리치/타이포/디졸브 삭제·234 벽 제한 삭제 → 벽 숨김. 앞 절과 다르면 §10 이 맞다.
 > 기획 원본: `C:\Users\user\Downloads\보스_승리연출_v02_프로그래머_전달사양.md`(2026-10-26, 콘티 v02) — 이 문서의 시간·색·배치 수치를 시작값으로 쓴다.
@@ -224,3 +226,62 @@
 | P + 2.00 | 2.00 | 슬로모션 해제 · 카메라 32° 로 상승 시작 · `sfxResume` | 배율 1 · 전원 연출 잠금(스킬 취소) |
 | P + 3.20 | 3.20 | 32° 구도 유지 | 결과 하한 |
 | 사망 클립 끝 + `DelayAfterClipEnd` | — | 보스 사망 자세로 남음(디졸브 없음) | `ServerDeathSequenceCompleted` → +1초 결과 화면 |
+
+### 10.4 반복 디버그 씬 — 할 일 244 (11-06, 브랜치 `feature/BossVictoryDebugScene`)
+처치 연출을 처음부터 끝까지 반복해서 보며 수치를 맞추는 랩. 200 결과(승리 연출 중 구역 벽 투명화 끔 포함)는 그대로다.
+
+**씬** `Assets/0.Scenes/Debug/DebugBossVictory.unity` — 빌드 목록(EditorBuildSettings)에 넣지 않는다. 씬에 든 것 = 방향광·Global Volume(맵씬 복사) · `CameraSwitcher` · `EffectManager` · `FloatingDamageSpawner` · `BossVictoryLab`(`Dev/BossVictoryLab/DebugBossVictoryLab`). **네트워크 오브젝트는 씬에 두지 않고** 랩이 런타임에 만든다:
+- 보스방 지형 = `bossroom.prefab` 복제(벽 포함 — 벽 숨김 판정을 실제 벽으로 본다, 안의 송전탑 NetworkObject 는 꺼 둠).
+- 보스 디렉터 = `BossEncounterDirector.prefab` 을 호스트가 뜨면 스폰 → **23호 B(`TwentyThree_Raid`, 웰즈 포함)를 실게임 스폰 경로(`SpawnBossServer`)로** 착지점에 세운다(등장 연출 없이, 서버 FSM 은 멈춘 채 — 서 있기만).
+- 막타 = Dev Boot 가 띄운 내 플레이어(툴바 캐릭터). 팀원 = 몸·무기만 남긴 표시용 복제본(`CharacterSelectPreviewPool.CreatePreviewObject`, 네트워크·입력·물리 없음) 0~2명.
+
+**실행** 툴바 Dev Boot 드롭다운에서 `DebugBossVictory` → ▶(솔로 호스트). 툴바 보스 = **B**(기본값)여야 연출이 뜬다(A 면 패널이 알려 준다).
+
+**한 바퀴(실게임 경로)** 원상복구 → 보스·막타·팀원 배치 → 0.8초(카메라 복귀) → 막타 공격 애니(`killerAttackState`, 없으면 생략) → 막타 준비(`DevPrepareFinalBlowServer` — F11 과 같음) → **내 플레이어가 준 피해 한 대**(`ReceiveAttack`) → Died → `HandleBossDefeated` → `TryStartVictoryServer` → 사망 표현 → 결과 대기. 결과 화면으로 넘어갈 순간에 랩이 전환을 막고 1.5초 뒤 처음부터(자동 반복 끄면 거기서 멈춤).
+
+**조작**(패널 = 화면 왼쪽 위)
+| 항목 | 내용 |
+|---|---|
+| F7 / 처음부터 | 원상복구 후 다시 |
+| F8 / 일시정지 | 멈춤·재개 |
+| 자동 반복 | 끝나면 원상복구 → 처음부터 |
+| 배속 ×0.1·0.25·0.5·1 | 느리게 보기 |
+| 점프(슬라이더·0.72·2.00·3.20) | 처음부터 다시 돌려 그 **단계 시각**까지 빨리 감은 뒤(최대 ×8) 멈춘다 — 애니·사망 대기·벽 숨김까지 그 시각의 실제 상태 |
+| 막타 각도·거리·방향 보정 | 보스 기준(0° = 화면 아래, + = 시계 방향). 구도 후보가 바뀐다. 다음 재생에 반영 |
+| 팀원 0~2명·캐릭터 ▶ | 플레이어 1~3명. 팀원 위치 = 막타 기준 로컬(`teammateOffsets`) |
+| 표시 | 단계 시각·경과·추가 연출 구간·단계 이름·배속 |
+
+**설정 값** `Resources/BossVictory/BossVictoryConfig.asset` 인스펙터(패널 "설정 SO 선택")에서 바꾸면 **다음 재생에 반영**(서버 구도·추가 연출 구간·색 켜기는 처치 순간에 읽고, 슬로 배율·벽 기준 등 몇 칸은 바로). 🔴 **SO 라 Play 를 끝내도 값이 남는다** — 원하지 않으면 git 으로 되돌린다.
+
+**배속·점프 원리** 표시(카메라·색·단계)는 서버 시각 기준 경과, 애니·서버 사망 대기는 게임 시간이다. 랩은 Time.timeScale 을 바꾸면서 매 프레임 복제 상태의 처치 시각(`StartServerTime`)을 (실제 Δ − 게임 Δ)만큼 밀어 둘을 같은 시계로 묶는다(`BossVictoryLabRules.ClockShift`).
+
+**실게임 코드 변경(동작 불변)**
+- `BossEncounterDirector.Victory.cs` partial 메서드 2개(`DevAppendVictoryTeammates` · `DevBlockResultTransition`) 선언 + 호출 1곳씩(`TryStartVictoryServer` 팀원 목록 끝 · `TickResultTransition` 하한 검사 뒤). 구현은 `BossEncounterDirector.Dev.cs`(`UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS`)에만 — 릴리스 빌드엔 C# 이 호출째 지운다.
+- `Dev.cs`: 표시용 팀원 목록·결과 차단 플래그·`DevSpawnVictoryBossServer`·`DevResetVictoryServer`·`DevShiftVictoryClockServer`.
+- `BossVictoryPresentation`: 복제 상태가 **꺼지면 정리**(실게임은 한 번 켜지면 씬 끝까지라 영향 없음) · 개발 빌드에서만 표시용 팀원도 팀원 단색 마스크.
+
+**알려진 한계**
+- 씬에 `BossTeleportManager`·`MapSceneManager` 가 없어 디렉터 스폰 때 `BossTeleportManager를 찾지 못했습니다` 오류 1줄이 뜬다(정상).
+- 조명은 맵씬 방향광·Global Volume 만 복사했다(라이트맵·물·안개 없음). 보스방 안 조명(LGT_*)은 프리팹에 있어 그대로다.
+- 팀원 복제본은 Idle 자세 그대로(공격 클립 홀드 없음). 막타 공격 상태 이름은 캐릭터마다 다르다(팔라딘 `Default_Attack1` — 없는 이름이면 그냥 서서 처치).
+- 보스방 NavMesh 가 없어 보스 에이전트는 꺼 둔 채다(서 있기만 하므로 무관).
+- 호스트 1인 전용(클라 창은 패널만 보인다).
+
+**구도 프리셋 — 244 후속 A (11-06 사용자 결정)** Config 의 카메라 구도 규칙 값 묶음(부감 24°/32°·FOV·기준 화면비·거리 범위·간격·종료 거리 배수·몸 높이·방위각 후보)을 이름 붙여 저장·불러오기·삭제한다.
+- 목록 = git 추적 SO `Assets/1.Scripts/Dev/BossVictoryLab/BossVictoryCameraPresets.asset`(클래스 `BossVictoryCameraPresets` — 팀 공유). 기본 항목 `기본(200)` = 지금 값. 랩 `cameraPresets` 칸에 연결돼 있다.
+- 패널 아래 "구도 프리셋": 이름 칸 + [현재 값 저장](같은 이름 = 덮어씀) · 항목마다 [불러오기]·[삭제]. 불러오면 **Config 에 덮어써 다음 재생부터**(구도는 처치 순간 서버가 고른다). 에디터에선 저장·불러오기·삭제 때 두 SO 를 바로 디스크에 쓴다.
+- 런타임 게임 코드는 이 SO 를 읽지 않는다(Config 만).
+
+**카메라 구도 슬라이더 — 244 추가 (11-06 사용자)** 패널 "카메라 구도"(프리셋 바로 위, 같은 묶음): 정지/끝 부감·FOV·기준 화면비·최소/최대 거리·거리 간격·끝 거리 배수·몸 높이 슬라이더(값 표시 + [기본 n] = 코드 기본값) · 방위각 후보 항목별 슬라이더(+ 추가 / − 삭제 / 기본값) · [구도 전부 기본값으로]. Config 를 직접 고친다(SetDirty — 프로젝트 저장 때 남는다). 구도는 처치 순간 서버가 고르므로 **다음 재생부터** — 옆에 [바로 다시 재생 (F7)].
+- **라이브** 토글: 켜면 값을 바꿀 때마다 진행 중 연출 구도도 다시 계산(`BossEncounterDirector.DevRecomposeVictoryServer` — 처치 순간 기억한 막타·타격점·보스·팀원 위치 + 지금 Config 로 `Compose` → 복제 상태의 정지·끝 구도·FOV 덮어씀). 방위·거리 후보도 다시 고르므로 다음 재생과 같은 구도다. 기억은 partial `DevRememberVictorySubjects`(Dev.cs 에만 구현 — 릴리스엔 호출째 없음).
+
+### 10.5 발밑 회색 원 — 할 일 246 (11-06, 브랜치 `feature/BossVictoryDebugScene`)
+주황 틴트 동안 막타 발밑 둘레는 주황 대신 흑백.
+- **중심** = 표시가 시작되는 순간(처치 확정) 막타 플레이어(`KillerClientId`) 위치. 그 피어에서 못 찾으면 타격점. 이후 고정.
+- **범위** = 중심에서 **수평(XZ) 거리**만 본다 — 위에서 봤을 때 원 안에 드는 바닥·벽·소품 전부, 높이 한도 없음(원기둥). 픽셀 월드 위치는 합성 패스가 `_CameraDepthTexture` 로 되살린다(합성 패스 `ConfigureInput(Depth)`).
+- **모습** = 배경 픽셀만: 원래 명도(조명 결과, 무늬 유지) × 밝기 배율의 흑백. 인물·보스·이펙트 단색은 그대로. 가장자리는 반경 안쪽 "부드러움"(m)에 걸쳐 흑백 → 주황. 원래 화면과의 섞임(`_Weight`, 0.72–0.80 들어옴)은 그 위에 그대로.
+- **커짐** = 주황이 들어오기 시작하는 단계 0.72초(`DescendEnd`)부터 반경 0 → 목표, smoothstep(`BossVictoryRules.GroundCircleRadius`). 커지는 시간 0 = 바로 목표.
+- **Config 칸**(`BossVictoryConfig` "발밑 회색 원") `groundCircleRadius` 6m(0 = 끔) · `groundCircleGrowSeconds` 0.6초 · `groundCircleSoftness` 1m · `groundCircleBrightness` ×1. 표시가 매 프레임 읽어 재생 중에도 바로 반영.
+- **랩** 패널 아래 "발밑 회색 원" 슬라이더 4개(반경 0–20·커지는 시간 0–3·부드러움 0–5·밝기 0–2)가 Config 를 직접 고친다(SetDirty — 프로젝트 저장 때 디스크에 남는다). 커지는 모습 = '0.72' 점프 → 재개(F8), 느리게는 배속 ×0.25.
+- 파일: `BossVictoryConfig`·`BossVictoryRules.GroundCircleRadius`(+EditMode 테스트 2)·`BossVictoryRender.SetGroundCircle`·`BossVictoryComposite.shader`·`BossVictoryPresentation`(중심 저장·매 프레임 설정).
+- 한계: 하늘·깊이 없는 픽셀은 원 밖으로 본다. 반투명(이펙트)은 깊이에 안 써서 그 뒤 바닥 기준으로 판정되지만 이펙트는 어차피 단색 쪽이 이긴다.

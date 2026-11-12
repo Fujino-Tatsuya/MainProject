@@ -474,6 +474,23 @@ public class EffectManager : MonoBehaviour
         return released;
     }
 
+    /// <summary>
+    /// 지금 재생 중인 이펙트를 전부 outro 없이 즉시 반납한다(이 피어). 반납한 수.
+    /// 보스 처치 연출(PLAN-boss-victory-glitch Q11)이 처치 판정 순간 모든 스킬 이펙트·장판 표시를 걷는 데 쓴다 — 그 뒤 처치자 처치 연출 이펙트만 새로 뜬다.
+    /// </summary>
+    public int ReleaseAllImmediate()
+    {
+        int released = 0;
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            ActiveEffect active = _slots[i];
+            if (!active.inUse) continue;
+            Recycle(active);
+            released++;
+        }
+        return released;
+    }
+
     #endregion
 
     #region 히트스톱
@@ -503,6 +520,45 @@ public class EffectManager : MonoBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// 핸들 하나의 재생 속도 배율을 바꾼다(<see cref="SetPlayRateForTarget"/> 의 한 개 판본). 수명이 끝난 핸들은 조용한 no-op.
+    /// 쓰는 곳: 보스 처치 연출 — 처치자를 따라가는 이펙트 중 느려짐에서 빼는 것(어쌔신 처치 오라·팔라딘 손 검 번개, 269).
+    /// </summary>
+    public void SetPlayRate(EffectHandle handle, float rate)
+    {
+        if (!TryResolve(handle, out ActiveEffect active)) return;
+
+        active.playRate = rate;
+        for (int p = 0; p < active.instances.Count; p++)
+        {
+            GameObject instance = active.instances[p].go;
+            DriverOf(instance)?.SetPlayRate(instance, rate);
+        }
+    }
+
+    /// <summary>
+    /// [읽기 전용] <paramref name="root"/> 또는 그 자식을 추종 중인 재생 이펙트의 렌더러를 <paramref name="into"/> 에 더한다(지우지 않음).
+    /// 쓰는 곳: 보스 처치 연출 '처치자 외 숨김 — 팀원 + 붙은 이펙트'(매 프레임 다시 모아 끄고, 빠진 것은 다시 켠다).
+    /// </summary>
+    public void CollectFollowingRenderers(Transform root, List<Renderer> into)
+    {
+        if (root == null || into == null) return;
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            ActiveEffect active = _slots[i];
+            if (!active.inUse || active.follow == null || !active.follow.IsChildOf(root)) continue;
+            for (int p = 0; p < active.instances.Count; p++)
+            {
+                GameObject instance = active.instances[p].go;
+                if (instance == null) continue;
+                instance.GetComponentsInChildren(true, s_rendererScratch);
+                into.AddRange(s_rendererScratch);
+            }
+        }
+    }
+
+    static readonly List<Renderer> s_rendererScratch = new List<Renderer>();
 
     /// <summary>
     /// 핸들이 가리키는 <b>재생 중인 파트 인스턴스</b>들을 <paramref name="buffer"/>에 채운다.

@@ -33,6 +33,9 @@ public sealed class TrainingDummy : Unit
 
     public override MonsterRank Rank => rank;
 
+    // 더미는 스스로 체력을 채운다 — 리필에 초록 힐 숫자를 띄우지 않는다(268).
+    protected override bool ReportsHealNumbers => false;
+
     [Header("회복 — 이 시간 동안 안 맞으면 되돌아온다")]
     [SerializeField, Min(0f)] float regenDelay = 3f;
     [SerializeField, Min(0.01f)] float regenDuration = 1f;

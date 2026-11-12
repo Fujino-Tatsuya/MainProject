@@ -56,6 +56,17 @@ public sealed class BossVictoryConfig : ScriptableObject
     [Tooltip("반투명 패스(이펙트·무기 궤적)가 바꾼 색 차이를 이펙트 픽셀로 보는 배율 — 클수록 옅은 이펙트도 단색이 된다.")]
     [Min(0f)] public float effectDetectGain = 6f;
 
+    [Header("발밑 회색 원(할 일 246 — 막타 발밑 둘레는 주황 대신 흑백)")]
+    [Tooltip("원 목표 반경(m, 수평 거리). 막타가 처치한 순간 서 있던 자리가 중심이고, 위에서 봤을 때 원 안에 드는 것(바닥·벽·소품 — 높이 한도 없음)은 " +
+             "주황 틴트 대신 원래 무늬를 살린 흑백이 된다. 인물·보스·이펙트 단색은 그대로. 0 = 끔.")]
+    [Min(0f)] public float groundCircleRadius = 6f;
+    [Tooltip("원이 0 → 목표 반경으로 커지는 시간(초). 주황이 들어오기 시작하는 단계 0.72초부터 잰다. 0 = 바로 목표 반경.")]
+    [Min(0f)] public float groundCircleGrowSeconds = 0.6f;
+    [Tooltip("원 가장자리 부드러움(m) — 반경 안쪽으로 이만큼에 걸쳐 흑백 → 주황으로 넘어간다.")]
+    [Min(0f)] public float groundCircleSoftness = 1f;
+    [Tooltip("원 안 흑백 밝기 배율(원래 명도 × 이 값).")]
+    [Min(0f)] public float groundCircleBrightness = 1f;
+
     [Header("슬로모션(경석 10-27 — 완전 정지 대신)")]
     [Tooltip("슬로모션 구간(단계 0.12–2.00) 동안 인물·보스 재생 배율(0 = 완전 정지). 보스 사망 연출 서버 대기도 같은 배율로 센다.")]
     [Range(0f, 1f)] public float slowMotionScale = 0.1f;

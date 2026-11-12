@@ -98,7 +98,7 @@ public class PlayerAimIndicator : NetworkBehaviour
         if (IsNetworkActive && !IsOwner)
             return;
 
-        ApplyInterruptHide(indicatorRenderer, InterruptProductionDirector.CombatUiHidden);
+        ApplyInterruptHide(indicatorRenderer, ShouldHide(InterruptProductionDirector.CombatUiHidden, BossVictoryGlitchPresentation.HidesCombatAim));
         PlaceIndicator();
     }
 
@@ -106,6 +106,12 @@ public class PlayerAimIndicator : NetworkBehaviour
     /// 간파 암전·섬광 동안 쿼드를 숨긴다(A5, 할 일 179 후속 2). 렌더러만 끄므로 꺼진 동안 암전 마스크(비트 4)·섬광 실루엣(비트 7)에도
     /// 그려지지 않는다 — 플레이어 루트를 태깅하면 이 쿼드도 비트를 받아 흰 사각형 실루엣이 됐다. 조준·배치 계산은 그대로 돈다.
     /// </summary>
+    /// <summary>
+    /// 숨김 이유 합치기 — 간파 암전·섬광(A5) 또는 보스 처치 연출(267 후속). 매 프레임 두 이유를 다시 읽어 OR 하므로
+    /// 한쪽이 끝나도 다른 쪽이 남아 있으면 계속 숨는다(서로 덮어쓰지 않음). 둘 다 끝나면 다시 보인다.
+    /// </summary>
+    public static bool ShouldHide(bool interruptHidden, bool bossVictoryHidden) => interruptHidden || bossVictoryHidden;
+
     public static void ApplyInterruptHide(Renderer quad, bool hidden)
     {
         if (quad != null && quad.enabled == hidden)

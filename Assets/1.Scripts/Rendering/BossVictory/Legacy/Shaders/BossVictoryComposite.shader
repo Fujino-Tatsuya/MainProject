@@ -7,6 +7,9 @@
 //    · 반투명이 바꾼 픽셀  = 이펙트·무기 궤적 → 같은 방식의 단색 램프(_EffectColor) — 할 일 200 D2 "이펙트까지 전부 단색"
 //                          (차이 = |씬 − 반투명 전| 최대 채널 × _EffectGain, 옅은 이펙트는 그만큼만 섞인다)
 //    · 그 밖(배경)        = 단색 _BgColor(#EAAD70)로 **틴트**(_BgTint, 기본 34% — 배경이 비친다). 할 일 200 D1: 위/아래 그라데이션 두 색 → 단색.
+//    · 발밑 회색 원(할 일 246) = 배경 중 막타 발밑(_GroundCircle.xyz)에서 **수평** 거리 _GroundCircle.w 안(높이 한도 없음 — 원기둥)은
+//                          주황 틴트 대신 흑백(원래 명도 × _GroundCircleLook.y). 가장자리 _GroundCircleLook.x(m)에 걸쳐 섞는다.
+//                          픽셀 월드 위치 = _CameraDepthTexture 로 되살림. 반경 0 = 끔. 인물·보스·이펙트 단색은 그대로.
 //  _Weight 로 원래 화면과 섞는다(단계 0.72–0.80 들어옴, 이후 씬 끝까지 유지 — 할 일 200 D3).
 //  글리치는 할 일 200 D4 로 뺐다(나중에 TV 글리치로 교체 예정 — 넣을 자리 = 이 셰이더 Frag 맨 끝).
 //
@@ -34,6 +37,7 @@ Shader "Hidden/Rendering/BossVictoryComposite"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             TEXTURE2D_X(_VictoryIdTex);
             TEXTURE2D_X(_VictoryPreTex);
@@ -49,6 +53,22 @@ Shader "Hidden/Rendering/BossVictoryComposite"
             float4 _BossColor;
             float4 _EffectColor;
             float4 _ShadowColor;
+            float4 _GroundCircle;      // xyz 중심(월드), w 반경(m)
+            float4 _GroundCircleLook;  // x 가장자리 부드러움(m), y 흑백 밝기
+
+            // 발밑 회색 원 가중치(0 = 밖, 1 = 안). 수평(XZ) 거리만 본다 — 원기둥.
+            half GroundCircleMask(float2 uv)
+            {
+                float r = _GroundCircle.w;
+                if (r <= 0.0) return 0.0h;
+                float depth = SampleSceneDepth(uv);
+            #if !UNITY_REVERSED_Z
+                depth = lerp(UNITY_NEAR_CLIP_VALUE, 1.0, depth);
+            #endif
+                float3 wp = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
+                float dist = distance(wp.xz, _GroundCircle.xz);
+                return (half)(1.0 - smoothstep(max(0.0, r - _GroundCircleLook.x), r, dist));
+            }
 
             half4 Frag(Varyings input) : SV_Target
             {
@@ -77,6 +97,9 @@ Shader "Hidden/Rendering/BossVictoryComposite"
 
                 // 배경 — 단색 주황 쪽으로 틴트(배경이 비친다).
                 half3 bg = lerp(scene, _BgColor.rgb, (half)_BgTint);
+                // 발밑 회색 원(246) — 원 안 배경은 주황 대신 흑백(원래 무늬 유지).
+                half3 gray = (lum * (half)_GroundCircleLook.y).xxx;
+                bg = lerp(bg, gray, GroundCircleMask(uv));
 
                 half3 victory = id.a > 0.5h ? person : lerp(bg, effectMono, effect);
                 return half4(lerp(scene, victory, (half)_Weight), 1.0h);

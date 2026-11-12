@@ -85,6 +85,24 @@ public sealed class InterruptHitLightLook : ScriptableObject
     [Tooltip("화면 빛줄기 재질 — 깊이 무시·맨 위(M_InterruptHitLight_Rays_Screen). 비면 프리팹 재질 그대로(바닥·캐릭터에 가려질 수 있다)")]
     [SerializeField] private Material rayScreenMaterial;
 
+    [Header("렌즈 고스트 — 제압 간파 전용(할 일 270, 모든 피어)")]
+    [Tooltip("렌즈 고스트 모양(LensFlareDataSRP — 광원↔화면 중심 직선 위에 맺히는 작은 원·육각형 상, LF_InterruptSuppressGhost). 광원 = 적중 라이트 위치. 비면 고스트 없음 — 제압 SO 에만 넣는다")]
+    [SerializeField] private LensFlareDataSRP ghostFlare;
+    [Tooltip("고스트 세기 배율(LensFlareComponentSRP.intensity, 곡선 1 일 때). 요소별 색·세기는 에셋 칸")]
+    [SerializeField, Min(0f)] private float ghostIntensity = 1f;
+    [Tooltip("고스트 크기 배율(LensFlareComponentSRP.scale)")]
+    [SerializeField, Min(0f)] private float ghostScale = 1f;
+    [Tooltip("고스트가 서서히 사라지는 시간(초, 실시간) — 기본 = 제압 성공 슬로우 길이(히트스톱 0.08 + 진입 1.2 + 유지 0.35 + 복귀 0.25). 슬로우를 바꾸면 같이 맞춘다")]
+    [SerializeField, Min(0f)] private float ghostDuration = 1.88f;
+    [Tooltip("고스트 세기 곡선 — 가로 = 진행(0~1), 세로 = 세기 배율. 끝에서 0 이 되게")]
+    [SerializeField] private AnimationCurve ghostCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+    [Tooltip("광원 위치 오프셋(월드, m) — 고스트 줄의 출발점(광원)을 옮긴다. 상 전체가 함께 움직인다")]
+    [SerializeField] private Vector3 ghostSourceOffset = Vector3.zero;
+    [Tooltip("직선 위치 오프셋 — 모든 상의 Position(광원 0 → 화면 중심 1 → 반대편)에 더한다. + = 반대편 쪽으로 밀림")]
+    [SerializeField] private float ghostAxisOffset = 0f;
+    [Tooltip("화면 오프셋(x, y) — 모든 상의 Position Offset 에 더한다(직선에서 옆으로 비껴 놓기)")]
+    [SerializeField] private Vector2 ghostScreenOffset = Vector2.zero;
+
     public Color LightColor => lightColor;
     public int WhiteoutFrames => whiteoutFrames;
     public float LightIntensity => lightIntensity;
@@ -121,6 +139,15 @@ public sealed class InterruptHitLightLook : ScriptableObject
     public float RayScreenLength => rayScreenLength;
     public float RayScreenBrightness => rayScreenBrightness;
     public Material RayScreenMaterial => rayScreenMaterial;
+
+    public LensFlareDataSRP GhostFlare => ghostFlare;
+    public float GhostIntensity => ghostIntensity;
+    public float GhostScale => ghostScale;
+    public float GhostDuration => ghostDuration;
+    public AnimationCurve GhostCurve => ghostCurve;
+    public Vector3 GhostSourceOffset => ghostSourceOffset;
+    public float GhostAxisOffset => ghostAxisOffset;
+    public Vector2 GhostScreenOffset => ghostScreenOffset;
 
     /// <summary>적중 순간 1 → 끝 0 으로 부드럽게 줄어드는 기본 곡선(Q5 — 약 0.9초에 걸쳐 복귀).</summary>
     public static AnimationCurve Decay() =>

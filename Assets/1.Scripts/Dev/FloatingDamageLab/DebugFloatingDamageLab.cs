@@ -32,6 +32,9 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
 
     public enum KindChoice { Hp, Shield, HpAndShield, Heal, Status, Text }
 
+    /// <summary>공격자(힐이면 힐한 사람) 자리 — 맞은 반대쪽 연출(268) 확인용. 없음 = 몬스터·장판·도트·자기 회복처럼 위로만.</summary>
+    public enum SourceChoice { None, Left, Right, Front }
+
     [SerializeField] TargetGroup[] groups = Array.Empty<TargetGroup>();
 
     [Header("카메라 — 실제 플레이 카메라(PlayerFollowCamera)와 같은 값")]
@@ -47,6 +50,8 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
     [SerializeField, Min(0.05f)] float autoInterval = 0.6f;
     [SerializeField, Range(2, 20)] int multiHits = 6;
     [SerializeField, Min(0.02f)] float multiHitInterval = 0.1f;
+    [Tooltip("공격자 자리 — 대상 생성점에서 화면 좌우(카메라 오른쪽 방향, 바닥 평면)로 이 거리(m). 정면 = 카메라 쪽.")]
+    [SerializeField, Min(0.1f)] float sourceDistance = 3f;
 
     sealed class Entry
     {
@@ -63,6 +68,9 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
     int _tier = 1; // 0 낮음 · 1 중간 · 2 높음 · 3 직접
     string _customAmount = "123";
     bool _fromLocalPlayer = true;
+    SourceChoice _source = SourceChoice.Left;
+    Vector3 _lastSource;
+    bool _hasLastSource;
     bool _auto;
     float _nextAutoAt;
     bool _panelVisible = true;
@@ -147,6 +155,7 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
         if (keyboard.sKey.wasPressedThisFrame) _kind = KindChoice.Shield;
         if (keyboard.bKey.wasPressedThisFrame) _kind = KindChoice.HpAndShield;
         if (keyboard.tKey.wasPressedThisFrame) _fromLocalPlayer = !_fromLocalPlayer;
+        if (keyboard.aKey.wasPressedThisFrame) _source = (SourceChoice)(((int)_source + 1) % 4);
         if (keyboard.fKey.wasPressedThisFrame) followSelected = !followSelected;
         if (keyboard.f1Key.wasPressedThisFrame) _panelVisible = !_panelVisible;
     }
@@ -244,6 +253,13 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
         {
             baseMaxHpOverride = entry.baseMaxHp,
         };
+        // 공격자 자리(268) — 네트워크가 없어 clientId 로 못 찾으니 기준점을 직접 단다(게임은 Presenter 가 단다).
+        Vector3 cameraRight = viewCamera != null ? viewCamera.transform.right : Vector3.right;
+        Vector3 cameraBack = viewCamera != null ? -viewCamera.transform.forward : Vector3.back;
+        request.hasSource = DebugFloatingDamageLabRules.TryGetSource(_source, FloatingDamageSpawner.ResolveAnchor(entry.unit),
+            cameraRight, cameraBack, sourceDistance, out request.sourceWorld);
+        _hasLastSource = request.hasSource;
+        _lastSource = request.sourceWorld;
         spawner.Submit(request);
         _lastShot = DescribeShot(spawner.Settings, request, kind);
     }
@@ -258,11 +274,17 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
         float display = FloatingDamageDisplayPolicy.Evaluate(settings.DisplayFilter, request.fromLocalPlayer,
             settings.TeammateScaleMultiplier, settings.TeammateAlpha).scaleMultiplier;
         float canvasScale = Screen.height / Mathf.Max(1f, settings.ReferenceResolution.y);
-        float steady = style.height * look.holdScale * display;
+        // 판정 크기 배율(268) — 스포너와 같은 측정·같은 식.
+        FloatingDamageSpawner spawner = FloatingDamageSpawner.Instance;
+        float hurtboxSize = spawner != null ? spawner.ResolveHurtboxSize(request.target) : 0f;
+        float hurtbox = settings.HurtboxScale(hurtboxSize);
+        float steady = style.height * look.holdScale * display * hurtbox;
         float floor = FloatingDamageMinPixelPolicy.Multiplier(settings.MinScreenPixelHeight, steady, canvasScale);
         string floorNote = floor > 1f ? $" — [!] 해상도 하한 {settings.MinScreenPixelHeight:0}px 에 걸려 높이를 바꿔도 안 변함" : string.Empty;
-        return $"방금: {kind} {request.amount} → 구간 {tier}\n" +
-               $"  높이 {style.height:0.#} × 유지 {look.holdScale:0.##} × 팀원 {display:0.##} = {steady:0.#} (화면 {steady * canvasScale * floor:0}px){floorNote}";
+        string side = !request.hasSource ? "위로만(공격자 없음)" : _source == SourceChoice.Front ? "정면 → 위로만" : $"공격자 {_source} → 숫자 반대쪽";
+        return $"방금: {kind} {request.amount} → 구간 {tier} · {side}\n" +
+               $"  판정 크기 {hurtboxSize:0.##}m ÷ 기준 {settings.HurtboxReferenceSize:0.##} → 배율 {hurtbox:0.##} (최소 {settings.HurtboxScaleMin:0.##}·최대 {settings.HurtboxScaleMax:0.##})\n" +
+               $"  높이 {style.height:0.#} × 유지 {look.holdScale:0.##} × 팀원 {display:0.##} × 판정 {hurtbox:0.##} = {steady:0.#} (화면 {steady * canvasScale * floor:0}px){floorNote}";
     }
 
     // ---- 화면 ----
@@ -297,6 +319,8 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
         if (_tier == 3)
             _customAmount = GUILayout.TextField(_customAmount);
         _fromLocalPlayer = GUILayout.Toggle(_fromLocalPlayer, " 내 공격 (끄면 팀원 공격 — T)");
+        GUILayout.Label("공격자 자리 (A 전환 — 숫자는 반대쪽에, 없음·정면 = 위로만)");
+        _source = (SourceChoice)GUILayout.Toolbar((int)_source, new[] { "없음", "왼쪽", "오른쪽", "정면" });
 
         GUILayout.Space(4);
         if (GUILayout.Button("띄우기 (Space)", GUILayout.Height(30)))
@@ -342,13 +366,38 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
             GUILayout.Label(_lastShot);
         GUILayout.Label($"  몸 중심 위 spawnOffset {settings.SpawnOffset:0.#}px");
 #if UNITY_EDITOR
+        // 268 칸 슬라이더 — 끌면 SO 에 바로 저장(Play 가 끝나도 남음), 다음 숫자부터 반영.
+        GUILayout.Label("  외곽선·판정 크기·반대쪽 (268, 끌면 바로 저장)");
+        SliderRow(settings, "outlineAlpha", "외곽선 알파", 0f, 1f);
+        SliderRow(settings, "hurtboxReferenceSize", "판정 기준 크기 m (0=끔)", 0f, 5f);
+        SliderRow(settings, "hurtboxScaleMin", "판정 배율 최소", 0.1f, 2f);
+        SliderRow(settings, "hurtboxScaleMax", "판정 배율 최대", 0.5f, 4f);
+        SliderRow(settings, "sidePush", "반대쪽 밀기 px", 0f, 150f);
+        SliderRow(settings, "sideDrift", "반대쪽 흐름 px", 0f, 150f);
+        SliderRow(settings, "sideDriftDuration", "흐름 시간 초", 0.01f, 2f);
+        SliderRow(settings, "sideFrontThreshold", "정면 문턱 px", 0f, 100f);
         if (GUILayout.Button("설정 SO 인스펙터에서 열기"))
         {
             Selection.activeObject = settings;
             EditorGUIUtility.PingObject(settings);
         }
+#else
+        GUILayout.Label($"  외곽선 알파 {settings.OutlineAlpha:0.##} · 반대쪽 밀기 {settings.SidePush:0.#}px + 흐름 {settings.SideDrift:0.#}px / {settings.SideDriftDuration:0.##}초 · 정면 문턱 {settings.SideFrontThreshold:0.#}px");
 #endif
     }
+
+#if UNITY_EDITOR
+    void SliderRow(FloatingDamageSettings settings, string field, string label, float min, float max)
+    {
+        float current = DebugFloatingDamageLabEditing.GetFloat(settings, field);
+        GUILayout.BeginHorizontal();
+        GUILayout.Label($"  {label} {current:0.##}", GUILayout.Width(190));
+        float next = GUILayout.HorizontalSlider(current, min, max);
+        GUILayout.EndHorizontal();
+        if (!Mathf.Approximately(next, current))
+            _status = DebugFloatingDamageLabEditing.SetFloat(settings, field, next);
+    }
+#endif
 
     void StyleRow(FloatingDamageSettings settings, PopupKind kind, string label)
     {
@@ -406,6 +455,14 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
         if (groups == null)
             return;
 
+        // 마지막 숫자의 공격자 자리(268) — 빨간 구 + 대상 생성점까지 선.
+        if (Application.isPlaying && _hasLastSource && Selected != null && Selected.unit != null)
+        {
+            Gizmos.color = new Color(1f, 0.3f, 0.3f, 1f);
+            Gizmos.DrawSphere(_lastSource, 0.2f);
+            Gizmos.DrawLine(_lastSource, FloatingDamageSpawner.ResolveAnchor(Selected.unit));
+        }
+
         foreach (TargetGroup group in groups)
         {
             if (group == null || group.root == null)
@@ -438,6 +495,29 @@ public static class DebugFloatingDamageLabRules
             _ => highPercent * 1.5f,
         };
         return Mathf.Max(1, Mathf.RoundToInt(Mathf.Max(0, baseMaxHp) * percent / 100f));
+    }
+
+    /// <summary>
+    /// 공격자 자리(268) — 대상 생성점에서 카메라 오른쪽(바닥 평면) ± 거리, 정면 = 카메라 쪽(뒤쪽, 바닥 평면). 없음 = false(위로만).
+    /// </summary>
+    public static bool TryGetSource(DebugFloatingDamageLab.SourceChoice choice, Vector3 targetPoint,
+        Vector3 cameraRight, Vector3 cameraBack, float distance, out Vector3 source)
+    {
+        Vector3 right = Flat(cameraRight);
+        Vector3 back = Flat(cameraBack);
+        switch (choice)
+        {
+            case DebugFloatingDamageLab.SourceChoice.Left: source = targetPoint - right * distance; return true;
+            case DebugFloatingDamageLab.SourceChoice.Right: source = targetPoint + right * distance; return true;
+            case DebugFloatingDamageLab.SourceChoice.Front: source = targetPoint + back * distance; return true;
+            default: source = default; return false;
+        }
+    }
+
+    static Vector3 Flat(Vector3 v)
+    {
+        v.y = 0f;
+        return v.sqrMagnitude > 1e-6f ? v.normalized : Vector3.zero;
     }
 
     /// <summary>누적 한 번 값 — 합계(한 번 값 × 횟수)가 넘치지 않게 내림, 최소 1.</summary>

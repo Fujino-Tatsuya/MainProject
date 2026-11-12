@@ -550,6 +550,24 @@ public class GunnerTraitTier34Tests
     }
 
     [Test]
+    public void EchoBombVisuals_BoneTracking_PureRules()
+    {
+        // 11-12 민경 — 모델만 뜨는 클립(23호 점프 이륙)에서도 구체가 몸 뼈를 따라간다.
+        Quaternion rot = Quaternion.Euler(0f, 90f, 0f);
+        var bodyPoint = new Vector3(0f, 2f, 0f);
+        var bone = new Vector3(0f, 1.5f, 0.2f);
+        Vector3 offset = GunnerEchoBombTargets.TrackOffset(bodyPoint, bone, rot);
+
+        Vector3 rest = GunnerEchoBombTargets.TrackedPoint(bone, rot, offset);
+        Assert.Less(Vector3.Distance(bodyPoint, rest), 1e-4f, "뼈가 그대로면 예전 몸 점(콜라이더) 그대로");
+
+        Vector3 lifted = GunnerEchoBombTargets.TrackedPoint(bone + Vector3.up * 3f, rot, offset);
+        Assert.Less(Vector3.Distance(bodyPoint + Vector3.up * 3f, lifted), 1e-4f, "뼈가 뜬 만큼 따라 뜬다");
+
+        Assert.IsTrue(GunnerEchoBombTargets.IsBodyVisible(null), "몸 렌더러를 못 찾으면(또는 파괴) 보인다");
+    }
+
+    [Test]
     public void Echo_TooltipFormula_MatchesRuntimeDamage()
     {
         // {dmg} = 현재 Q 원래 발 × 0.25(GunnerTraitTooltip.EchoQDamage) — 단발 Q 의 예정 합계 = 원래 발 1발.

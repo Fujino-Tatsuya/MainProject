@@ -309,9 +309,9 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         // 등장 시네마틱 로컬 표시(카메라·레터박스·비네팅·독백·스킵 UI·스킵 입력) — 모든 피어. 씬 무수정(런타임 부착).
         if (GetComponent<BossIntroPresentation>() == null)
             gameObject.AddComponent<BossIntroPresentation>();
-        // 보스 B 승리 연출 로컬 표시(PLAN-boss-victory-cinematic) — 모든 피어, 런타임 부착.
-        if (GetComponent<BossVictoryPresentation>() == null)
-            gameObject.AddComponent<BossVictoryPresentation>();
+        // 보스 처치 연출(ZZZ 글리치, PLAN-boss-victory-glitch) 로컬 표시 — 모든 피어, 런타임 부착. 옛 BossVictoryPresentation 은 Legacy.
+        if (GetComponent<BossVictoryGlitchPresentation>() == null)
+            gameObject.AddComponent<BossVictoryGlitchPresentation>();
 
         // 보스 BGM(PLAN-sound-mix 3단계) — 복제 단계를 모든 피어가 보고 각자 튼다. 늦게 들어와도 지금 단계로 맞춘다.
         phase.OnValueChanged += HandlePhaseBgm;
@@ -1070,29 +1070,58 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
 
     private void TickSkid(NetworkObject po, PlayerMotor motor, Player player, double now, double endAt)
     {
+        if (!StepSkid(player, motor, _motion.SkidDir, _motion.SkidDistance, _motion.StartAt, _motion.Duration, now,
+                      ref _motion.SkidDone, ref _motion.ReactionPlayed, ref _motion.IdleRestored))
+            return;
+        motor.PassThroughUnitsOverride = false;
+        _motion = default;
+    }
+
+    /// <summary>[등장 연출 밀림 설정] 밀림 거리(m) — 보스 처치 연출 백대쉬가 같은 값을 쓴다(PLAN-boss-victory-glitch).</summary>
+    public float IntroSkidDistance => impactSkidDistance;
+
+    /// <summary>[등장 연출 밀림 설정] 밀림 시간(초) — 보스 처치 연출 백대쉬가 같은 값을 쓴다.</summary>
+    public float IntroSkidDuration => impactSkidDuration;
+
+    /// <summary>밀림 끝 → Idle 복귀까지 더 기다리는 시간(초) — 등장 연출 상수. 처치 연출 백대쉬는 설정 SO backDashIdleDelay(기본 = 이 값, 255 후속 4).</summary>
+    public static float SkidIdleDelay => ReactionIdleDelay;
+
+    /// <summary>
+    /// 등장 연출 밀림(백대쉬) 한 걸음 — 등장 연출(오너 FixedUpdate)과 보스 처치 연출 백대쉬가 같이 쓴다.
+    /// 처음 한 번 리액션 상태(<see cref="SkidReactionStates"/> 중 있는 것) → 시간 비율만큼 <paramref name="dir"/> 로 밀기(<paramref name="motor"/> 가 null 이면
+    /// 애니만 — 오너가 아닌 피어) → 밀림 끝 + <paramref name="idleDelay"/>(기본 <see cref="ReactionIdleDelay"/> — 처치 연출은 설정 SO 백대쉬 후 대기) 에 Idle. 반환 = 끝났다(Idle 복귀까지).
+    /// <paramref name="ease"/> = 진행 곡선(null = <see cref="BossIntroFormation.SkidEase"/> — 등장 연출. 처치 연출 백대쉬는 설정 SO 곡선).
+    /// <paramref name="animate"/> = false 면 이동만(리액션·Idle 애니 없음 — 처치 연출 스킬과 백대쉬가 같이 갈 때, 267 후속).
+    /// </summary>
+    public static bool StepSkid(Player player, PlayerMotor motor, Vector3 dir, float distance, double startAt, float duration, double now,
+                                ref float done, ref bool reactionPlayed, ref bool idleRestored, System.Func<float, float> ease = null,
+                                float idleDelay = ReactionIdleDelay, bool animate = true)
+    {
         Animator animator = player != null ? player.CharacterAnimator : null;
-        if (!_motion.ReactionPlayed)
+        if (!reactionPlayed && animate)
         {
-            _motion.ReactionPlayed = true;
+            reactionPlayed = true;
             if (player != null) player.SetAnimatorMoving(false);
             CrossFadeFirstExisting(animator, SkidReactionStates);
         }
 
-        float t = _motion.Duration > 0f ? (float)((now - _motion.StartAt) / _motion.Duration) : 1f;
-        float eased = BossIntroFormation.SkidEase(t);
-        float step = (eased - _motion.SkidDone) * _motion.SkidDistance;
-        _motion.SkidDone = eased;
-        if (step > 0f) motor.AddGroundedDisplacement(_motion.SkidDir * step);
+        float t = duration > 0f ? (float)((now - startAt) / duration) : 1f;
+        float eased = ease != null ? ease(Mathf.Clamp01(t)) : BossIntroFormation.SkidEase(t);
+        float step = (eased - done) * distance;
+        done = eased;
+        if (step > 0f && motor != null) motor.AddGroundedDisplacement(dir * step);
 
-        if (now < endAt + ReactionIdleDelay) return;
-        if (!_motion.IdleRestored)
+        if (now < startAt + duration + idleDelay) return false;
+        if (!idleRestored && animate)
         {
-            _motion.IdleRestored = true;
+            idleRestored = true;
             CrossFadeFirstExisting(animator, IdleStates);
         }
-        motor.PassThroughUnitsOverride = false;
-        _motion = default;
+        return true;
     }
+
+    /// <summary>Idle 상태(<see cref="IdleStates"/> 중 있는 것)로 CrossFade — 보스 처치 연출이 처치자 평타 클립 끝에서 하던 동작을 끊을 때(255 후속 4).</summary>
+    public static void CrossFadeIdle(Animator animator) => CrossFadeFirstExisting(animator, IdleStates);
 
     private static void CrossFadeFirstExisting(Animator animator, string[] states)
     {
@@ -1427,8 +1456,14 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         if (_resultTransitionAt <= 0d || NetworkManager.ServerTime.Time < _resultTransitionAt)
             return;
 
-        // 승리 연출(3.20초)이 끝나기 전엔 넘어가지 않는다 — 짧은 사망 클립·FX 누락에서도 연출이 잘리지 않게(C6).
+        // 승리 연출(처치 연출 → 유지 → CRT 꺼짐)이 호스트 화면에서 끝나기 전엔 넘어가지 않는다(PLAN-boss-victory-glitch 6단계).
         if (HoldsResultForVictory())
+            return;
+
+        // 디버그 랩(244)이 결과 화면 대신 처음부터 다시 돌릴 때만 막는다(Dev.cs 구현 — 릴리스엔 호출째 없다).
+        bool devBlock = false;
+        DevBlockResultTransition(ref devBlock);
+        if (devBlock)
             return;
 
         _resultTransitionAt = 0d;

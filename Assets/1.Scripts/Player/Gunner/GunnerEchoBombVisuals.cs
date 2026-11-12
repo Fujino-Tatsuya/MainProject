@@ -63,14 +63,60 @@ public static class GunnerEchoBombTargets
     {
         Collider body = unit.GetComponent<CapsuleCollider>();
         if (body == null) body = unit.GetComponentInChildren<Collider>();
-        if (body == null) return unit.transform.position + Vector3.up;
+        // 꺼진 콜라이더의 bounds 는 원점·크기 0 이다(23호 체공 중 피격 콜라이더 끔) — 발 + 1m 로 대신한다.
+        if (body == null || !body.enabled) return unit.transform.position + Vector3.up;
 
         return body.bounds.center;
     }
+
+    /// <summary>
+    /// 구체가 따라갈 몸 뼈와 몸 렌더러(11-12 민경). 애니메이션 클립·코드가 <b>모델만</b> 움직이고 루트·콜라이더는 그대로인 경우
+    /// (23호 점프 이륙 — 클립 + <c>TwentyThreeBoss.JumpRise</c>)에도 구체가 몸을 따라가게 한다.
+    /// 뼈 = 휴머노이드면 Hips, 아니면 정점이 가장 많은 SkinnedMeshRenderer 의 rootBone, 그것도 없으면 루트가 아닌 Animator 오브젝트.
+    /// 몸 렌더러 = 그 SkinnedMeshRenderer(꺼지면 구체도 숨긴다 — 23호 체공 중 모델 숨김). 뼈를 못 찾으면 false(콜라이더 몸 점만 쓴다).
+    /// </summary>
+    public static bool TryFindBody(Unit unit, out Transform bone, out Renderer body)
+    {
+        bone = null;
+        body = null;
+        if (unit == null) return false;
+
+        SkinnedMeshRenderer best = null;
+        int bestVertices = -1;
+        foreach (SkinnedMeshRenderer skinned in unit.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            if (skinned == null || skinned.sharedMesh == null) continue;
+            int vertices = skinned.sharedMesh.vertexCount;
+            if (vertices > bestVertices) { best = skinned; bestVertices = vertices; }
+        }
+        body = best;
+
+        Animator animator = unit.GetComponentInChildren<Animator>();
+        if (animator != null && animator.isHuman) bone = animator.GetBoneTransform(HumanBodyBones.Hips);
+        if (bone == null && best != null) bone = best.rootBone;
+        if (bone == null && animator != null && animator.transform != unit.transform) bone = animator.transform;
+        return bone != null;
+    }
+
+    /// <summary>
+    /// 뼈를 따라가는 점 — 뼈 위치 + 루트 회전으로 돌린 기준 오프셋. 기준 오프셋(<see cref="TrackOffset"/>)은 구체가 대상을 처음 찾은 순간
+    /// (콜라이더 몸 점 − 뼈 위치)라 평소 자리는 예전(콜라이더 몸 점)과 같고, 뼈가 움직인 만큼만 따라간다. 순수 계산 — 테스트용.
+    /// </summary>
+    public static Vector3 TrackedPoint(Vector3 bonePosition, Quaternion rootRotation, Vector3 rootLocalOffset) =>
+        bonePosition + rootRotation * rootLocalOffset;
+
+    /// <summary><see cref="TrackedPoint"/> 의 기준 오프셋 — (몸 점 − 뼈 위치)를 루트 로컬 회전으로. 순수 계산 — 테스트용.</summary>
+    public static Vector3 TrackOffset(Vector3 bodyPoint, Vector3 bonePosition, Quaternion rootRotation) =>
+        Quaternion.Inverse(rootRotation) * (bodyPoint - bonePosition);
+
+    /// <summary>몸 렌더러가 보이는가 — 없거나(못 찾음·파괴) 켜져 있으면 true. 꺼졌으면 구체도 숨긴다.</summary>
+    public static bool IsBodyVisible(Renderer body) =>
+        body == null || (body.enabled && body.gameObject.activeInHierarchy);
 }
 
 /// <summary>
 /// [전 피어] 잔류 포격 에너지 폭탄 표시(할 일 149) — 폭탄마다 VFX 프리팹 하나를 복제해 대상 몸 점을 매 프레임 따라가게 한다(이동·넉백 포함).
+/// 11-12 민경: 몸 점은 몸 뼈를 따라간다(클립·코드가 모델만 띄우는 23호 점프 이륙 포함). 대상 몸 렌더러가 꺼지면 구체도 숨긴다(<see cref="GunnerEchoBombTargets.TryFindBody"/>).
 /// 겉모습·애니·블룸은 프리팹 안에서 꾸민다. 몸 메시에 가려지지 않게 하려면 프리팹 머티리얼이 깊이 무시(ZTest Always)여야 한다(149 후속 6).
 /// 대상이 사라지면 마지막 위치에 남았다가 폭탄이 빠질 때 그 자리를 돌려준다(폭발 연출 위치). 런타임 메시·텍스처 생성 없음 — 프리팹만 복제한다.
 /// Q 적중 순간 예비 구체(<see cref="AddPreview(ulong)"/>)를 먼저 띄우고, 서버 부착(<see cref="Add(int, ulong)"/>)이 같은 대상이면 그 구체를 이어받는다.
@@ -95,6 +141,11 @@ public sealed class GunnerEchoBombVisuals
         public float ExpireAt;
         // 한계 돌파 색(그 Q 시전의 단계) — 인스턴스를 만들 때·바뀔 때 칠한다. None = 원래 색.
         public EffectTint Tint;
+        // 몸 뼈 추종(11-12 민경) — 대상을 처음 찾은 순간 한 번 찾고 기준 오프셋을 잡는다. 뼈가 없으면 콜라이더 몸 점 그대로.
+        public bool BodySearched;
+        public Transform Bone;
+        public Renderer Body;
+        public Vector3 BoneOffset;
     }
 
     // 🔴 서버 부착(Add) 순간 켜는 프리팹 자식 이름 — 폭발 직전 고조(FX_EchoBomb_Orb, 11-03 민경). 예비 구체에서는 꺼 둔다.
@@ -305,7 +356,7 @@ public sealed class GunnerEchoBombVisuals
         if (orb.Target != null && orb.Target.IsSpawned)
         {
             orb.Found = true;
-            orb.LastPosition = PointFor(orb.Target);
+            orb.LastPosition = TrackedPointFor(orb);
             if (orb.Instance == null && prefab != null && IsShowTime(Time.time, orb.ShowAt))
             {
                 orb.Instance = UnityEngine.Object.Instantiate(prefab, orb.LastPosition, Quaternion.identity);
@@ -314,7 +365,33 @@ public sealed class GunnerEchoBombVisuals
         }
 
         if (orb.Instance != null)
+        {
             orb.Instance.transform.position = orb.LastPosition;
+            // 대상 몸이 숨으면(23호 체공 — 모델 렌더러 끔) 구체도 숨긴다. 대상이 사라졌으면(Body 파괴) 마지막 자리에 보인다.
+            bool visible = GunnerEchoBombTargets.IsBodyVisible(orb.Body);
+            if (orb.Instance.activeSelf != visible)
+                orb.Instance.SetActive(visible);
+        }
+    }
+
+    // 구체 점 — 몸 뼈를 찾았으면 뼈를 따라가고(모델만 움직이는 클립·이륙 상승 포함), 아니면 콜라이더 몸 점. 둘 다 + 월드 오프셋.
+    // ⚠️ 기준 오프셋은 대상을 처음 찾은 순간 잡는다 — 그 순간이 이미 모델만 떠오른 중(23호 이륙 중 적중)이면
+    //    그 구체는 그만큼 낮게 붙는다(다음 폭탄은 새로 잡는다).
+    private Vector3 TrackedPointFor(Orb orb)
+    {
+        Unit target = orb.Target;
+        Vector3 bodyPoint = GunnerEchoBombTargets.BodyPoint(target);
+        if (!orb.BodySearched)
+        {
+            orb.BodySearched = true;
+            if (GunnerEchoBombTargets.TryFindBody(target, out orb.Bone, out orb.Body))
+                orb.BoneOffset = GunnerEchoBombTargets.TrackOffset(bodyPoint, orb.Bone.position, target.transform.rotation);
+        }
+
+        Vector3 point = orb.Bone != null
+            ? GunnerEchoBombTargets.TrackedPoint(orb.Bone.position, target.transform.rotation, orb.BoneOffset)
+            : bodyPoint;
+        return OrbPoint(point, offset);
     }
 
     // 겉모습 — 서버 부착 뒤면 고조 자식(Arm) 켜기, 한계 돌파 색. 인스턴스가 아직 없으면 만들 때 다시 부른다.

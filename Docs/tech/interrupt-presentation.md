@@ -944,6 +944,7 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 | 중심 점 크기 | 프리팹 `Core` Start Size | 0.45 | 그대로 | ×2.5 = 1.125 |
 | 화이트아웃 | SO `whiteoutFrames` + 디렉터 `suppressWhiteout` | 0 | 0 | **3프레임**(본인 화면, 기존 V2 화이트아웃 경로 재사용) |
 | 성공 슬로우 | 슬로우 SO | ③(중립) | ③(중립) | **③-2** (§9.8) |
+| 렌즈 고스트(11-12 할 일 270) | SO `ghostFlare`·`ghost*` | 없음 | 없음 | **원·육각형 5개**, 슬로우 끝까지 사라짐 (§9.11) |
 
 - 값은 **시작값**(사용자 Play 튜닝 전제) — 3단계 ×2.5 는 화면을 날릴 수 있다. 블룸·라이트가 과하면 그 칸만 낮춘다. 인스펙터에서 단계 에셋을 직접 고치면 되고, 저작 메뉴는 있는 에셋을 덮지 않는다.
 - **화이트아웃 끄기(쉽게 빼기)**: 디렉터 `suppressWhiteout` 끔(또는 랩 토글) **또는** 제압 SO `whiteoutFrames` 0 — 둘 중 하나만 꺼도 안 나온다. 코드 삭제 불필요.
@@ -969,6 +970,18 @@ A7(179/192 후속): `SelectMaskMode` 4경우(칸 × 대상 찾음)·`SelectMaskR
 - **세 단계 모두**: 일반·대쉬·제압 단계 SO·프리팹(`V3`·`V3/Dash`·`V3/Suppress`)을 복제하지 않고, 디렉터가 재생 요청(`InterruptHitLightRequest.FxOverride`)에 같은 값을 얹는다 → `InterruptHitLightFx.Play(…, fxOverride)`. 다음 재생(다른 캐릭터)은 덮어쓰기 없이 기본대로.
 - **캐릭터 구분 = 시전자**: `BeginHitLight` 가 성공 사건의 `CasterClientId` 로 그 플레이어의 간파 스킬을 찾아 `GunnerInterruptSkill` 이면 얹는다(`CasterHitLightOverride`). 모든 피어가 자기 스폰 목록으로 같은 답 — 새 복제 값·RPC 없음.
 - 테스트: `InterruptHitLightCasterOverrideTests`(메뉴 슬로우 EditMode 묶음) — 기본값 · 숨김/라이트 색 재생 · 다음 재생 원복 · 프리팹 칸.
+
+### 9.11 제압 간파 렌즈 고스트 (할 일 270, 2026-11-12)
+
+- **사용자 결정(11-12)**: 제압 간파(3단계)만, 적중 순간 광원 반대쪽 — 광원↔화면 중심 직선 위 — 에 작은 색 상(파랑·자주·초록)이 줄지어 맺힌다. 원(테두리 무지개빛) + 육각형(조리개) 섞어 5개, 은은하게(가산·낮은 세기). **광원 쪽 빛은 없다**(상만) — 스타버스트 `LF_InterruptHitFlashStarburst.asset` 은 그대로. 적중 순간 켜져 제압 성공 슬로우 끝까지 서서히 사라지고, **모든 피어**에 보인다(V3 와 같음). 일반·대쉬 간파는 변화 없음.
+- **에셋** = `Assets/5.VFX/Interrupt/HitFlash/LF_InterruptSuppressGhost.asset`(LensFlareDataSRP, 셰이더 신설 없음). 요소 위치 = 광원(0)→화면 중심(1)→반대편(>1) 축 위 0.55·0.9·1.3·1.65·2.05 — 육각형(Polygon 6변) 3개 + 원(Circle, 방사 그라데이션으로 가장자리 파랑→자주→초록 띠) 2개. 요소별 색·크기·세기는 에셋 인스펙터에서 바로 고친다. 저작 메뉴 `Tools/Interrupt/제압 간파 렌즈 고스트 에셋 만들기 (270)`(`InterruptSuppressGhostAuthoring` — 없을 때만 만들고 빈 SO 칸만 잇는다).
+- **튜닝 칸 = 제압 단계 SO** `V3/Suppress/InterruptHitLightLook_V3_Suppress.asset` 헤더 '렌즈 고스트': `ghostFlare`(모양 — **비우면 고스트 끔**) · `ghostIntensity`(세기 배율, 1) · `ghostScale`(크기 배율, 1) · `ghostDuration`(1.88초 실시간 = 제압 성공 슬로우 0.08+1.2+0.35+0.25 — **슬로우를 바꾸면 같이 맞춘다**) · `ghostCurve`(사라짐 곡선, EaseInOut 1→0). 일반·대쉬 SO 는 `ghostFlare` 가 비어 있어 안 켜진다(빈 단계 칸 = 1단계 대체도 같음).
+- **오프셋**(같은 SO): `ghostSourceOffset`(광원 위치 월드 m — 상 전체가 함께 이동) · `ghostAxisOffset`(모든 상 Position 에 더함 — + = 반대편 쪽) · `ghostScreenOffset`(모든 상 Position Offset 에 더함 — 직선에서 옆으로). 직선·화면 오프셋이 0 이 아니면 재생마다 에셋 복제본을 만들어 매 프레임 더한다(Play 중 SO 칸 조정 바로 보임, 에셋 원본은 안 바뀜).
+- **경로 — 새 RPC 없음**: 기존 단계 선택(오너 판정 순간 제압 예측 / 서버 표식 비트, §8.2) → `InterruptHitLightPlayer.Begin` 이 단계 SO 를 읽어 적중 라이트 위치(`Placement.Position`, 틈 수직 기본)에 `LensFlareComponentSRP` 하나를 켜고 `Tick`(실시간)마다 `InterruptHitLightRules.GhostAmount` 로 세기를 낮춘다. 끝·강제 리셋 = 끔. 진행기 길이(`Duration`)에 고스트 시간이 들어간다.
+- **그리기**: PC URP 에셋은 Data Driven Lens Flare 가 꺼져 있어(`PC_RPAsset` `m_SupportDataDrivenLensFlare: 0`) URP 가 플레어를 그리지 않는다 → `DarkAdaptationFeature` 에 **고스트 패스 하나**(`Interrupt HitLight GhostFlare`, 모드 `GhostFlare`, 켬 = `DarkAdaptationState.HitLightGhostFlare`)를 붙여 켜진 플레어를 카메라 컬러(HDR, 후처리 전)에 더한다 — 뒤의 블룸·색 보정·톤매핑이 고스트에도 걸린다. ② 플레어 층(V0)과 같은 SRP core 그리기 함수를 공유한다. 평소엔 패스 없음.
+- **DebugInterruptLab**: 튜닝 패널 '간파 단계' 의 `제압 간파` 재현 / '단계별 적중 라이트' 제압 줄 `재생` 이 같은 경로라 바로 보인다(이 화면만).
+- **알려진 한계**: Mobile URP 에셋은 Data Driven Lens Flare 가 켜져 있어 모바일 렌더러에선 URP 와 이 패스가 둘 다 그릴 수 있다(PC 전용 게임이라 그대로). 고스트 패스는 그 순간 켜진 플레어를 모두 그리지만 ② 플레어(V0 경로)와 동시에 켜지지 않는다.
+- 테스트: `InterruptSuppressGhostTests`(메뉴 슬로우 EditMode 묶음) — 에셋 5개(원·육각형·가산·광원 쪽 없음·반대편 포함) · 제압 SO 에만 연결 · 디렉터 제압 단계만 · 세기 곡선 · 진행기 켜고 끔 · 렌더 모드.
 
 ## 10. 카메라 대상 중심 (할 일 196)
 

@@ -484,6 +484,42 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// 매 프레임 복제하면 낭비다. 시작 시각만 맞으면 그림은 충분히 같다
     /// (과열 단계를 각 피어가 계산하는 것과 같은 방식이다).
     /// </summary>
+    /// <summary>Q 발사 애니 상태 이름(처치 연출 End 검사 — 267 후속).</summary>
+    public string ChargeFireStateName => chargeFireStateName;
+
+    /// <summary>[이 피어] 보스 처치 연출 — 특성 없는 기본 충전(색 단계 0). RPC 아님.</summary>
+    public void BeginPresentationCharge(float maxChargeTime)
+    {
+        BeginCharge(maxChargeTime);
+        chargeTint = OverdriveTint(0);
+        if (chargeLoopPlayer != null) chargeLoopPlayer.SetTint(chargeTint);
+    }
+
+    /// <summary>
+    /// [이 피어] 보스 처치 연출 — Q 발사 연출만(267 후속). 판정·상태 전환(Focus → Skill)·특성(잔류 포격·광폭·과열 색) 없음, RPC 아님.
+    /// 순서는 실제 발사와 같다: 충전 지우기 → 방출 섬광 → 레이저 → Gunner_Q_Fire(그 End 이벤트 = 처치 연출 스킬 End).
+    /// </summary>
+    public void PlayPresentationChargeLaser(Vector3 origin, Vector3 end, float width, bool stopped)
+    {
+        EffectTint tint = OverdriveTint(0);
+        EndCharge();
+        if (chargeVentPlayer != null)
+        {
+            FaceForward(chargeVentPlayer);
+            chargeVentPlayer.SetTint(tint);
+            chargeVentPlayer.PlayOnce();
+        }
+        Tint(chargeBeamPlayer, tint);
+        Tint(chargeEndPlayer, tint);
+        PlayChargeBeam(origin, end, width, stopped, null);
+        if (animator != null && animator.runtimeAnimatorController != null && !string.IsNullOrEmpty(chargeFireStateName))
+        {
+            int hash = Animator.StringToHash(chargeFireStateName);
+            if (animator.HasState(0, hash))
+                animator.CrossFadeInFixedTime(hash, 0.05f, 0);
+        }
+    }
+
     public void BeginCharge(float maxChargeTime)
     {
         chargeMaxTime = Mathf.Max(0.01f, maxChargeTime);

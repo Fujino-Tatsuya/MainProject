@@ -15,12 +15,21 @@ MonoBehaviour:
   displayFilter: 2
   teammateScaleMultiplier: 0.75
   teammateAlpha: 0.78431374
+  outlineAlpha: 0.8
   referenceResolution: {x: 1920, y: 1080}
   canvasSortingOrder: 50
   screenEdgePadding: {x: 60, y: 30}
   minScreenPixelHeight: 16
+  hurtboxReferenceSize: 1.7
+  hurtboxScaleMin: 0.8
+  hurtboxScaleMax: 1.6
   spawnOffset: -33
   spawnScatter: {x: 12, y: 0.9}
+  sidePush: 40
+  sideDrift: 30
+  sideDriftDuration: 0.6
+  sideDriftEase: 8
+  sideFrontThreshold: 24
   riseDuration: 0.2
   riseDistance: 24
   fallDistance: 0

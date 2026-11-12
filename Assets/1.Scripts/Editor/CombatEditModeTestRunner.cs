@@ -45,7 +45,19 @@ internal static class CombatEditModeTestRunner
         "^MonsterOverheadHealthBar", // MonsterOverheadHealthBarVisibilityTests — 몬스터 발밑 체력바 표시·부착 판단
         "^MonsterInspectorCatalog", // MonsterInspectorCatalogTests — 몬스터 데이터 인스펙터 칸 사전(PLAN-monster-data-inspector)
         "^MonsterStatusEffectVfx", // MonsterStatusEffectVfxSetTests — 몬스터 머리 위 기절 이펙트 표(팔라딘 Q 경직)
-        "^BossVictoryRules" // BossVictoryRulesTests — 보스 B 승리 연출 타임라인·곡선·구도(PLAN-boss-victory-cinematic)
+        "^BossVictoryRules", // BossVictoryRulesTests(Legacy) — 옛 보스 B 승리 연출 타임라인·곡선·구도(PLAN-boss-victory-cinematic)
+        "^BossVictoryLab", // BossVictoryLabRulesTests — 처치 연출 반복 디버그 랩 배치·씬 격리(할 일 244)
+        "^BossVictoryFinisher", // BossVictoryFinisherTests — 처치 연출 스킬 클립 End 이벤트(PLAN-boss-victory-glitch Q9)
+        "^BossVictoryCameraCut", // BossVictoryCameraCutTests — 처치 연출 카메라 컷 고르기·구도(PLAN-boss-victory-glitch 4단계)
+        "^BossVictoryBossTimeScale", // BossVictoryBossTimeScaleTests — 처치 연출 보스 노드 배율(마지막 노드가 이김)·23호 피격 애니 상태(PLAN-boss-victory-glitch 255 후속 5)
+        "^BossVictoryKillerSequence", // BossVictoryKillerSequenceTests — 처치자 순서 노드 단계 판정·기본값·옛 마커 이관(PLAN-boss-victory-glitch 255 후속 4)
+        "^BossVictoryBackDash", // BossVictoryBackDashTests — 처치 연출 백대쉬 기본값 = 등장 밀림·방향 보정(PLAN-boss-victory-glitch 255 후속 3)
+        "^BossVictoryClipTiming", // BossVictoryClipTimingTests — 클립 노드 클립 시간 ↔ 타임라인 초 실측 변환(255 후속 — 타임라인/실제 시각 어긋남)
+        "^BossVictoryKeys", // BossVictoryKeysTests — 처치 연출 타임라인 키·옛 페이드/2점 컷 이관(PLAN-boss-victory-glitch 255 후속 6)
+        "^BossVictoryAnimTrim", // BossVictoryAnimTrimTests — 처치 연출 스킬 클립 끝 자르기 프레임·멈춤·느려짐 판정(PLAN-boss-victory-glitch 255 후속 7)
+        "^BossVictoryProfile", // BossVictoryProfileTests — 캐릭터별 처치 연출 프로필 표 고르기·폴백·에셋 연결(할 일 267)
+        "^BossVictoryRectify", // BossVictoryRectifyTests — 배경 글자 RECTIFY 배치·기본 클립·폰트 아틀라스(할 일 267 후속)
+        "^BossVictoryTimeline" // BossVictoryTimelineTests — 처치 연출 타임라인 클립 평가·기본값 = 옛 곡선(PLAN-boss-victory-glitch 타임라인 창)
     };
 
     const string Tag = "[CombatTests]";

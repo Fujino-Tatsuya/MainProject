@@ -13,14 +13,36 @@ public readonly struct DamageDealtInfo
     public readonly AttackType attackType;
     public readonly AttackHitPattern hitPattern;
 
+    /// <summary>
+    /// 플레이어가 아닌 공격자 Unit(몬스터·보스)의 NetworkObjectId — 피해 숫자 반대쪽 연출 기준점(268).
+    /// 플레이어 공격자는 <see cref="attackerClientId"/> 를 쓰므로 여기는 없음(<see cref="NoAttackerObject"/>).
+    /// </summary>
+    public readonly ulong attackerObjectId;
+
+    public const ulong NoAttackerObject = ulong.MaxValue;
+
     public DamageDealtInfo(int amount, DamageChannel channel, ulong attackerClientId,
-        AttackType attackType, AttackHitPattern hitPattern)
+        AttackType attackType, AttackHitPattern hitPattern, ulong attackerObjectId = NoAttackerObject)
     {
         this.amount = amount;
         this.channel = channel;
         this.attackerClientId = attackerClientId;
         this.attackType = attackType;
         this.hitPattern = hitPattern;
+        this.attackerObjectId = attackerObjectId;
+    }
+}
+
+/// <summary>모든 피어에서 받은 회복 알림(268 힐 숫자) — 실제 오른 체력 + 회복 주체 clientId(자기 회복 = 대상 자신).</summary>
+public readonly struct HealReceivedInfo
+{
+    public readonly int amount;
+    public readonly ulong healerClientId;
+
+    public HealReceivedInfo(int amount, ulong healerClientId)
+    {
+        this.amount = amount;
+        this.healerClientId = healerClientId;
     }
 }
 
@@ -77,6 +99,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     Coroutine _shieldExpiryRoutine;
     bool _deathNotified;
     ulong _damageAttackerClientId = ulong.MaxValue;
+    ulong _damageAttackerObjectId = DamageDealtInfo.NoAttackerObject; // 플레이어가 아닌 공격자 Unit(268 반대쪽 연출)
     AttackType _damageAttackType = AttackType.None;
     AttackHitPattern _damageHitPattern = AttackHitPattern.Single;
 
@@ -148,7 +171,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 표시용 피해량은 체력 클램프 전 최종값이다. NetworkVariable 변화량으로는 막타 초과분을
         // 복원할 수 없으므로, 피해가 확정되는 이 지점에서 전 피어에 전달한다.
         if (IsSpawned && (hpDealt > 0 || shieldDealt > 0))
-            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId,
+            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId, _damageAttackerObjectId,
                 (byte)_damageAttackType, (byte)_damageHitPattern);
 
         // 진단 — Health 의 기존 로그는 대상 이름이 없어서 누구의 체력이 줄었는지 알 수 없었다.
@@ -244,9 +267,11 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 공격자 귀속은 이 ReceiveAttack이 적용하는 피해에만 유효하다. 추락·비율·직접 피해처럼
         // ApplyHealthDamage를 곧바로 타는 경로는 기본값(공격자 없음)을 유지한다.
         ulong previousAttackerClientId = _damageAttackerClientId;
+        ulong previousAttackerObjectId = _damageAttackerObjectId;
         AttackType previousAttackType = _damageAttackType;
         AttackHitPattern previousHitPattern = _damageHitPattern;
         _damageAttackerClientId = ResolveAttackerClientId(hitContext);
+        _damageAttackerObjectId = ResolveAttackerObjectId(hitContext);
         _damageAttackType = attackInfo.attackType;
         _damageHitPattern = attackInfo.hitPattern;
         try
@@ -256,6 +281,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         finally
         {
             _damageAttackerClientId = previousAttackerClientId;
+            _damageAttackerObjectId = previousAttackerObjectId;
             _damageAttackType = previousAttackType;
             _damageHitPattern = previousHitPattern;
         }
@@ -279,7 +305,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         if (!IsServer || !IsSpawned || amount <= 0) return;
 
-        ClientDamageDealtClientRpc(0, amount, ResolveAttackerClientId(hitContext),
+        ClientDamageDealtClientRpc(0, amount, ResolveAttackerClientId(hitContext), ResolveAttackerObjectId(hitContext),
             (byte)attackInfo.attackType, (byte)attackInfo.hitPattern);
     }
 
@@ -301,6 +327,21 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         return sourcePlayer != null && sourcePlayer.IsSpawned
             ? sourcePlayer.OwnerClientId
             : ulong.MaxValue;
+    }
+
+    /// <summary>
+    /// 플레이어가 아닌 공격자 Unit(몬스터·보스)의 NetworkObjectId — 피해 숫자 반대쪽 연출 기준점(268).
+    /// 플레이어 공격자는 clientId 경로를 쓰므로 없음. 공격자 본인 기준이라 Unit 만 본다(투사체 오브젝트 자신은 안 씀).
+    /// </summary>
+    static ulong ResolveAttackerObjectId(AttackHitContext hitContext)
+    {
+        Unit source = hitContext.sourceUnit;
+        if (source == null && hitContext.sourceTransform != null)
+            source = hitContext.sourceTransform.GetComponentInParent<Unit>();
+
+        return source != null && !(source is Player) && source.IsSpawned
+            ? source.NetworkObjectId
+            : DamageDealtInfo.NoAttackerObject;
     }
 
     /// <summary>
@@ -374,7 +415,22 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         int healed = _health.HealHp(healAmount);
         _currentHp.Value = _health.CurrentHealth;
         ReportServerHeal(this, healed, countInStats, healerClientId);
+        // 힐 숫자(268) — 통계에 넣는 회복만(기본 체력 재생·훈련 보정 = countInStats false 는 안 띄움). 0 회복(풀피)은 안 보낸다.
+        if (countInStats)
+            SendHealNumber(healed, healerClientId);
         return healed;
+    }
+
+    /// <summary>
+    /// 힐 숫자(268)를 띄우는 Unit 인가. 훈련 더미처럼 체력을 스스로 채우는 대상은 false 로 덮어쓴다.
+    /// </summary>
+    protected virtual bool ReportsHealNumbers => true;
+
+    /// <summary>[서버] 실제 회복량 &gt; 0 일 때만 전 피어에 힐 숫자 알림을 보낸다.</summary>
+    void SendHealNumber(int healed, ulong healerClientId)
+    {
+        if (healed > 0 && IsSpawned && ReportsHealNumbers)
+            ClientHealedClientRpc(healed, healerClientId);
     }
 
     /// <summary>실제 회복량을 통계 채널에 알린다(회복 주체 = 대상 자신). 비집계 회복·0 회복은 발행하지 않는다(EditMode 테스트 대상).</summary>
@@ -400,10 +456,22 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// </summary>
     public void Revive()
     {
+        Revive(false);
+    }
+
+    /// <summary>
+    /// 체력을 최대치로 회복시킨다. <paramref name="reportHeal"/> = 힐 숫자(268)를 띄울지 — 플레이어 소생(Soul → Alive)만 true.
+    /// 회복량 = 최대 체력 − 직전 체력, 회복 주체 = 자기 자신(위로만 뜬다). 몬스터 재사용·전멸 리스폰 등은 false.
+    /// </summary>
+    public void Revive(bool reportHeal)
+    {
         if (!IsServer) return; // 서버에서만 체력 회복 처리
+        int previous = _health.CurrentHealth;
         _health.Revive();
         _currentHp.Value = _health.CurrentHealth;
         _deathNotified = false;
+        if (reportHeal)
+            SendHealNumber(_health.CurrentHealth - previous, OwnerClientId);
     }
 
     /// <summary>
@@ -818,7 +886,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     [ClientRpc]
-    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId,
+    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId, ulong attackerObjectId,
         byte attackType, byte hitPattern)
     {
         AttackType resolvedAttackType = (AttackType)attackType;
@@ -827,15 +895,28 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (shieldDamage > 0)
             ClientDamagedAttributed?.Invoke(new DamageDealtInfo(
                 shieldDamage, DamageChannel.Shield, attackerClientId,
-                resolvedAttackType, resolvedHitPattern));
+                resolvedAttackType, resolvedHitPattern, attackerObjectId));
 
         if (hpDamage > 0)
             ClientDamagedAttributed?.Invoke(new DamageDealtInfo(
                 hpDamage, DamageChannel.Hp, attackerClientId,
-                resolvedAttackType, resolvedHitPattern));
+                resolvedAttackType, resolvedHitPattern, attackerObjectId));
 
         if (shieldDamage > 0 || hpDamage > 0)
             ClientHitAttributed?.Invoke(attackerClientId);
+    }
+
+    /// <summary>
+    /// 모든 피어 — 서버가 실제로 체력을 올린 회복마다(회복 스킬·특성 회복·아군 전달·소생) 낸다. 힐 숫자(268)용.
+    /// 기본 체력 재생·훈련 보정·재합류 복원·훈련 더미 리필은 오지 않는다.
+    /// </summary>
+    public event Action<HealReceivedInfo> ClientHealedAttributed;
+
+    [ClientRpc]
+    void ClientHealedClientRpc(int healed, ulong healerClientId)
+    {
+        if (healed > 0)
+            ClientHealedAttributed?.Invoke(new HealReceivedInfo(healed, healerClientId));
     }
     #endregion
 

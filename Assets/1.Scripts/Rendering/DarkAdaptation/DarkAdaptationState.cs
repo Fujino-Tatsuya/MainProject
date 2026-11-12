@@ -55,6 +55,14 @@ public static class DarkAdaptationState
         HitFlashFlareTarget = null;
     }
 
+    // ---- 제압 간파 렌즈 고스트(모든 피어, 할 일 270) — InterruptHitLightPlayer 가 쓴다 ----
+
+    /// <summary>
+    /// 켜진 LensFlareComponentSRP(제압 간파 렌즈 고스트)를 카메라 컬러(HDR, 후처리 전)에 바로 더한다. PC URP 에셋은 Data Driven Lens Flare 가 꺼져 있어
+    /// 이 패스가 없으면 고스트가 그려지지 않는다. false 면 패스 없음.
+    /// </summary>
+    public static bool HitLightGhostFlare;
+
     // 도메인 리로드를 끈 Play 진입에서도 이전 값이 남지 않게.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetOnLoad()
@@ -62,6 +70,7 @@ public static class DarkAdaptationState
         Clear();
         ClearMask();
         ClearHitFlash();
+        HitLightGhostFlare = false;
     }
 }
 
@@ -78,6 +87,8 @@ public enum DarkAdaptationMode
     RadialBlur = 4,
     /// <summary>적중 섬광 렌즈 플레어 층(오너, 할 일 132 §15) — 플레어만 외부 RT 에.</summary>
     FlareLayer = 8,
+    /// <summary>제압 간파 렌즈 고스트(모든 피어, 할 일 270) — 켜진 플레어를 카메라 컬러(HDR, 후처리 전)에 바로 더한다.</summary>
+    GhostFlare = 16,
 }
 
 /// <summary>모드 선택·덮개 색 순수 로직(EditMode 테스트 대상).</summary>
@@ -103,6 +114,16 @@ public static class DarkAdaptationModes
             mode |= DarkAdaptationMode.RadialBlur;
         if (hasFlareTarget)
             mode |= DarkAdaptationMode.FlareLayer;
+        return mode;
+    }
+
+    /// <summary>렌즈 고스트까지(할 일 270) — 고스트가 켜져 있으면 고스트 패스.</summary>
+    public static DarkAdaptationMode Select(float luminanceIntensity, float maskIntensity, bool hasMaskTarget,
+        float blurStrength, bool hasFlareTarget, bool ghostFlare)
+    {
+        DarkAdaptationMode mode = Select(luminanceIntensity, maskIntensity, hasMaskTarget, blurStrength, hasFlareTarget);
+        if (ghostFlare)
+            mode |= DarkAdaptationMode.GhostFlare;
         return mode;
     }
 

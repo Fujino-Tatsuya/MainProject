@@ -135,7 +135,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     }
     public bool IsSkillActive => activeSkill != null;
     // 전 피어 — 실행 중(관찰자는 PlaySkillClientRpc~EndSkillClientRpc) 스킬이 공격속도를 타면 Animator.speed = 배율(할 일 91 T5).
-    public bool ScalesAnimatorWithAttackSpeed => activeSkill != null && activeSkill.ScalesWithAttackSpeed;
+    // 표시 전용 재생(보스 처치 연출 스킬)도 같은 규칙 — 실제 시전과 같은 재생 속도(PLAN-boss-victory-glitch, 11-09 사용자).
+    public bool ScalesAnimatorWithAttackSpeed => presentationSkill != null
+        ? presentationSkill.ScalesWithAttackSpeed
+        : activeSkill != null && activeSkill.ScalesWithAttackSpeed;
     /// <summary>[오너] 스킬 실행 중이거나 시전 요청 응답을 기다리는 중 — 이때 못 쓴 입력은 선입력 버퍼에 남긴다(할 일 44).</summary>
     public bool IsBusy => IsSkillActive || isRequestingSkill;
     public event Action<PlayerSkillSlot> SlotBindingChanged;
@@ -890,6 +893,14 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // 먼저 이 피어 로컬(오너 이동·연출)로 넘기고, 판정 경로(OnAnimationEvent)는 서버만 처리한다.
     public void HandleAnimationEvent(SkillAnimationEventType eventType)
     {
+        // 표시 전용 재생이 0층을 쥔 동안 들어오는 이벤트는 그 클립(처치 연출 스킬) 것이다 — 남아 있는 실제 스킬(서버가 안 끊은 처치자 스킬)로 보내지 않는다.
+        if (presentationPoseHeld)
+        {
+            if (presentationSkill != null)
+                HandlePresentationOnlyEvent(eventType);
+            return;
+        }
+
         if (eventType == SkillAnimationEventType.Hit && activeSkill != null)
         {
             // 첫 Hit — 간파 클립 Hit 시각을 읽어 다음 예측·판정의 Hit 지연에 쓴다(할 일 191).
@@ -912,6 +923,62 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             return;
 
         activeSkill?.OnAnimationEvent(eventType);
+    }
+
+    // ── 표시 전용 재생(보스 처치 연출 — PLAN-boss-victory-glitch Q9) ──
+    // 각 피어가 자기 화면의 막타 캐릭터에 스킬 애니·이펙트만 튼다. 서버 승인·판정·쿨다운·자원·RPC 없음 —
+    // activeSkill 장부에 올리지 않고, 애니 이벤트는 표시 경로(OnLocalAnimationEvent)만 받는다. End 이벤트에서 끝(OnEnd Completed)을 알린다.
+    private PlayerSkillBase presentationSkill;
+    // 표시 전용 재생 시작 ~ StopPresentationOnly(연출 정리) — End 뒤에도 클립이 느리게 이어지므로 정리까지 쥔다(255 후속 4).
+    private bool presentationPoseHeld;
+
+    /// <summary>[이 피어] 표시 전용 재생이 0층 자세를 쥐고 있다 — 실행 중이던 스킬이 늦게 끝나도 자세 복귀(Idle CrossFade)·애니 이벤트 전달을 하지 않는다.</summary>
+    public bool PresentationPoseHeld => presentationPoseHeld;
+
+    /// <summary>[이 피어] 표시 전용으로 재생 중인 스킬(없으면 null).</summary>
+    public PlayerSkillBase PresentationSkill => presentationSkill;
+
+    /// <summary>[이 피어] 표시 전용 스킬이 자기 클립의 End 이벤트에 닿았다(인자 = 그 스킬).</summary>
+    public event System.Action<PlayerSkillBase> PresentationSkillEnded;
+
+    /// <summary>
+    /// [이 피어·표시 전용] <paramref name="skill"/> 의 애니(<see cref="PlayerSkillData.AnimatorStateName"/>)와 이펙트(<see cref="PlayerSkillBase.OnClientPlay"/>)만 재생한다.
+    /// 실행 중인 스킬이 남아 있어도 바로 튼다(255 후속 4) — 그 스킬이 늦게 끝나며 하는 0층 자세 복귀는 <see cref="PresentationPoseHeld"/> 동안 막는다.
+    /// 끝 = 그 클립의 Skill End 이벤트 → <see cref="PresentationSkillEnded"/>.
+    /// <paramref name="target"/> = 대상 지정 스킬의 표시용 대상(서버 OnServerStart 가 안 도니 스킬이 대상 자리 연출을 각자 그리게 — <see cref="PlayerSkillBase.OnPresentationOnlyStart"/>).
+    /// </summary>
+    public bool PlayPresentationOnly(PlayerSkillBase skill, Vector3 direction, Transform target = null)
+    {
+        if (skill == null || skill.Data == null) return false;
+        presentationSkill = skill;
+        presentationPoseHeld = true;
+        if (movement != null && direction.sqrMagnitude > 0.0001f)
+            movement.RotateImmediately(direction);
+        player?.SetAnimatorMoving(false);
+        if (animator != null && !string.IsNullOrEmpty(skill.Data.AnimatorStateName))
+            animator.CrossFadeInFixedTime(Animator.StringToHash(skill.Data.AnimatorStateName), 0.05f);
+        skill.OnClientPlay(direction);
+        skill.OnPresentationOnlyStart(target);
+        return true;
+    }
+
+    /// <summary>[이 피어] 표시 전용 재생을 끝 이벤트 없이 접고 0층 자세를 놓는다(연출 정리 — End 뒤에도 부른다). End 알림은 올리지 않는다.</summary>
+    public void StopPresentationOnly()
+    {
+        PlayerSkillBase skill = presentationSkill;
+        presentationSkill = null;
+        presentationPoseHeld = false;
+        skill?.OnEnd(SkillEndReason.Cancelled);
+    }
+
+    private void HandlePresentationOnlyEvent(SkillAnimationEventType eventType)
+    {
+        PlayerSkillBase skill = presentationSkill;
+        skill.OnLocalAnimationEvent(eventType);
+        if (eventType != SkillAnimationEventType.End || presentationSkill != skill) return;
+        presentationSkill = null;
+        skill.OnEnd(SkillEndReason.Completed);
+        PresentationSkillEnded?.Invoke(skill);
     }
 
     // ── 서버 처리 ──
@@ -1862,6 +1929,10 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
     // 상체 전용 스킬은 0층을 건드리지 않는다(상체 레이어 가중치는 스킬 OnEnd 가 내린다). 이동 중이면 IsMoving 만 되살려 하체 Run_Loop 를 잇는다.
     private void ReturnBasePoseAfterSkill(PlayerSkillBase skill, SkillEndReason reason)
     {
+        // 처치 연출 스킬(표시 전용)이 0층을 쥔 동안 — 서버가 안 끊은 이전 스킬이 늦게 끝나도 그 애니를 Idle 로 덮지 않는다(255 후속 4).
+        if (presentationPoseHeld)
+            return;
+
         if (animator == null || animator.runtimeAnimatorController == null)
             return;
 

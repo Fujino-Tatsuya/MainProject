@@ -49,6 +49,7 @@ public sealed class BossVictoryPresentation : MonoBehaviour
 
     private readonly List<Renderer> _tagged = new List<Renderer>();
     private bool _renderOn;
+    private Vector3 _circleCenter;   // 발밑 회색 원(246) 중심 — 표시 시작 순간 막타 발밑(없으면 타격점)
 
     private readonly List<Animator> _animators = new List<Animator>();
     private readonly List<float> _animatorSpeeds = new List<float>();   // 늦추기 전 원래 속도
@@ -91,7 +92,12 @@ public sealed class BossVictoryPresentation : MonoBehaviour
     {
         if (_director == null || !_director.IsSpawned) return;
         BossEncounterDirector.VictoryState v = _director.Victory;
-        if (!v.Active) return;
+        if (!v.Active)
+        {
+            // 실게임에선 한 번 켜지면 씬이 끝날 때까지 켜져 있다 — 꺼지는 건 디버그 랩(244) 원상복구뿐.
+            if (_running) Teardown();
+            return;
+        }
 
         if (v.Sequence != _sequence)
         {
@@ -149,14 +155,26 @@ public sealed class BossVictoryPresentation : MonoBehaviour
 
         // 마스크 대상 — 막타 / 팀원(사망 포함, D7) / 보스.
         GameObject bossGo = FindSpawned(v.BossNetworkObjectId);
+        _circleCenter = v.HitPoint;
         foreach (Player p in FindObjectsByType<Player>(FindObjectsSortMode.None))
         {
             if (p == null) continue;
+            if (p.OwnerClientId == v.KillerClientId) _circleCenter = p.transform.position;
             uint bit = p.OwnerClientId == v.KillerClientId ? BossVictoryRender.KillerMask : BossVictoryRender.TeammateMask;
             BossVictoryRender.Tag(p.gameObject, bit, _tagged);
             CollectAnimators(p.gameObject, isPlayer: true);
             CollectOutlines(p.gameObject);
         }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        // 디버그 랩(244) 표시용 팀원 복제본 — Player 가 아니라 위 루프에 안 잡힌다. 비어 있으면 실게임과 같다.
+        foreach (GameObject mate in BossEncounterDirector.DevVictoryExtraTeammates)
+        {
+            if (mate == null || !mate.activeInHierarchy) continue;
+            BossVictoryRender.Tag(mate, BossVictoryRender.TeammateMask, _tagged);
+            CollectAnimators(mate, isPlayer: true);
+            CollectOutlines(mate);
+        }
+#endif
         if (bossGo != null)
         {
             BossVictoryRender.Tag(bossGo, BossVictoryRender.BossMask, _tagged);
@@ -229,7 +247,14 @@ public sealed class BossVictoryPresentation : MonoBehaviour
         ApplyOutlines(zero: true);
 
         // 색 — 씬 끝까지 유지(D3).
-        if (_renderOn) BossVictoryRender.SetWeight(BossVictoryRules.ColorWeight(t));
+        if (_renderOn)
+        {
+            BossVictoryRender.SetWeight(BossVictoryRules.ColorWeight(t));
+            // 발밑 회색 원(246) — 주황이 들어오는 단계 0.72초부터 반경 0 → 목표.
+            BossVictoryRender.SetGroundCircle(_circleCenter,
+                BossVictoryRules.GroundCircleRadius(t, _cfg.groundCircleRadius, _cfg.groundCircleGrowSeconds),
+                _cfg.groundCircleSoftness, _cfg.groundCircleBrightness);
+        }
 
         // 사운드(K4 — 키가 비면 무음)
         if (!_sfxHitStopPlayed && t >= BossVictoryRules.FreezeStart) { _sfxHitStopPlayed = true; PlaySfx(_cfg.sfxHitStop, v.HitPoint); }
