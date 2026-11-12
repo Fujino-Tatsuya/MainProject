@@ -57,6 +57,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     Player _killer;
     GameObject _boss;
     PlayerSkillController _killerSkills;
+    PaladinSkillView _killerSword;   // 손 검 번개·낙하 검 배율을 켠 팔라딘(269 — 프로필 칸, 정리 때 끈다)
+    static readonly List<EffectHandle> s_realtimeFx = new List<EffectHandle>();   // 처치자 이펙트 느려짐에서 뺀 핸들(269 — 이번 회차만)
 
     // 처치자 순서(255 후속 4): 하던 동작 ×0.5 → (대기) → 백대쉬(등장 연출 밀림 재사용, ×1) → 처치 연출 스킬(×1) → 느려짐 ×0.1. 각 단계 시각 = 타임라인 노드.
     BossVictoryKillerSequence.Step _killerStep;
@@ -335,6 +337,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     void Begin(BossEncounterDirector.VictoryState v)
     {
+        s_realtimeFx.Clear();
         _settings = BossVictoryGlitchSettings.Load();
         _state = v;
         _running = true;
@@ -384,6 +387,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _circleCenter = _killer != null ? _killer.transform.position : v.HitPoint;   // 발밑 회색 원 — 처치자 발밑(높이 기준 + 마커 전 중심), 시작 순간 고정
 
         int cleared = ClearEffectsLocal();
+        BeginKillerSword();   // 소거 뒤 — 처치자 검 번개·크기(269, 팔라딘만)
 
         if (_killer != null) CollectAnimators(_killer.gameObject, Role.Killer);
         for (int i = 0; i < _others.Count; i++) CollectAnimators(_others[i], Role.Other);
@@ -402,6 +406,41 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         Edit.Log($"[BossVictory] 글리치 연출 시작 — 회차 {v.Sequence} · 막타 client {v.KillerClientId} · 팀원 {_others.Count} · " +
                  $"Animator {_animators.Count} · 이펙트 소거 {cleared} · 프로필 {_profile.name}({_killerCharacter})", this);
     }
+
+    // 처치자 손 검 번개·낙하 검 배율(269) — 프로필 칸이 켜져 있고 처치자가 팔라딘(PaladinSkillView)일 때만. 시작 ~ 정리(끝·취소·파괴) 동안.
+    // 복제된 처치 상태로 각 피어가 Begin 하므로 새 RPC 없이 모든 피어·늦은 참가자 같다. 다른 캐릭터는 PaladinSkillView 가 없어 무시된다.
+    void BeginKillerSword()
+    {
+        _killerSword = null;
+        if (_killer == null || !UsesKillerSword(_profile)) return;
+        if (!_killer.TryGetComponent(out PaladinSkillView sword)) return;
+        _killerSword = sword;
+        sword.BeginVictorySword(_profile.handSwordLightning, _profile.fallingSwordScale);
+    }
+
+    void EndKillerSword()
+    {
+        if (_killerSword != null) _killerSword.EndVictorySword();
+        _killerSword = null;
+    }
+
+    /// <summary>프로필이 처치자 검 연출(손 검 번개 또는 낙하 검 배율 ≠ 1)을 쓰는가(순수 판단, EditMode).</summary>
+    public static bool UsesKillerSword(BossVictoryProfile profile) =>
+        profile != null && (profile.handSwordLightning || !Mathf.Approximately(profile.fallingSwordScale, 1f));
+
+    /// <summary>
+    /// [이 피어] 처치자를 따라가는 이펙트 하나를 이번 회차 느려짐(처치자 이펙트 배율)에서 뺀다 — 원래 속도(1)로 계속 흐른다(269 사용자 결정: 어쌔신 처치 오라·팔라딘 손 검 번개).
+    /// 연출 중이 아니면 무시. 정리(Teardown)·다음 회차 시작 때 비운다. 표시만(각 피어), 새 RPC 없음.
+    /// </summary>
+    public static void KeepRealtime(EffectHandle handle)
+    {
+        if (!IsRunning || !handle.IsSet || s_realtimeFx.Contains(handle)) return;
+        s_realtimeFx.Add(handle);
+        if (EffectManager.Instance != null) EffectManager.Instance.SetPlayRate(handle, 1f);
+    }
+
+    /// <summary>[이 피어] 이번 회차 느려짐에서 뺀 이펙트인가(EditMode·진단).</summary>
+    public static bool IsKeptRealtime(EffectHandle handle) => s_realtimeFx.Contains(handle);
 
     // 처치 판정 즉시 이 피어 표시 소거(Q11). 서버 판정 장판·투사체는 디렉터가 서버에서 디스폰한다(TryStartVictoryServer).
     int ClearEffectsLocal()
@@ -1324,7 +1363,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     void SetEffectRate(Transform root, float rate)
     {
-        if (EffectManager.TryGet(out EffectManager effects, this)) effects.SetPlayRateForTarget(root, rate);
+        if (EffectManager.TryGet(out EffectManager effects, this)) {
+            effects.SetPlayRateForTarget(root, rate);
+            for (int i = 0; i < s_realtimeFx.Count; i++) effects.SetPlayRate(s_realtimeFx[i], 1f);   // 느려짐에서 뺀 이펙트(269)
+        }
         foreach (ParticleSystem ps in root.GetComponentsInChildren<ParticleSystem>(true))
         {
             if (ps == null) continue;
@@ -1350,6 +1392,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _bossHitAnimators.Clear();
         _bossPlayedAnimators.Clear();
         EndDash();
+        EndKillerSword();
+        s_realtimeFx.Clear();
 
         if (_killerSkills != null)
         {

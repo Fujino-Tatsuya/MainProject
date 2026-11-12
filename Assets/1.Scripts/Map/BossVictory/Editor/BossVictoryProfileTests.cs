@@ -158,4 +158,36 @@ public sealed class BossVictoryProfileTests
             Assert.AreNotSame(s.defaultProfile, s.ProfileFor(c), $"{c} 는 기본과 다른 에셋");
         }
     }
+
+    // 처치자 손 검 번개·낙하 검 2배(269) — 팔라딘 프로필만 켬, 나머지는 안 씀.
+    [Test]
+    public void 팔라딘만_손_검_번개와_낙하_검_2배()
+    {
+        var s = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(SettingsPath);
+        Assert.IsNotNull(s, SettingsPath);
+        BossVictoryProfile paladin = s.ProfileFor(TutorialCharacter.Paladin);
+        Assert.IsTrue(paladin.handSwordLightning, "팔라딘 = 손 검 번개");
+        Assert.AreEqual(1.25f, paladin.fallingSwordScale, 1e-5f, "팔라딘 = 낙하 검 1.25배");
+        Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(paladin));
+        Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.defaultProfile), "기본 = 안 씀");
+        Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.ProfileFor(TutorialCharacter.Gunner)), "거너 = 안 씀");
+        Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.ProfileFor(TutorialCharacter.Assassin)), "어쌔신 = 안 씀");
+    }
+
+    [Test]
+    public void 검_연출_사용_판단()
+    {
+        var p = ScriptableObject.CreateInstance<BossVictoryProfile>();
+        try
+        {
+            Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(null));
+            Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(p), "코드 기본값 = 끔·배율 1");
+            p.fallingSwordScale = 2f;
+            Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(p), "낙하 검 배율만");
+            p.fallingSwordScale = 1f;
+            p.handSwordLightning = true;
+            Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(p), "손 검 번개만");
+        }
+        finally { Object.DestroyImmediate(p); }
+    }
 }

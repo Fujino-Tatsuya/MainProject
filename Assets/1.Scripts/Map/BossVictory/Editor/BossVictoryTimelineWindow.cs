@@ -1777,6 +1777,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             case BossVictoryMarker.FinisherStart:
                 DrawClipNodeOptions(BossVictoryMarker.FinisherStart);
                 DrawProfileFields("처치 연출 스킬 칸(이 캐릭터 프로필)", nameof(BossVictoryProfile.finisherSlot));
+                DrawProfileFields("처치자 검(269 · 팔라딘만, 이 캐릭터 프로필) — 손 검 번개 = 연출 시작~끝 · 낙하 검 배율 = 이 연출의 R 낙하 검",
+                    nameof(BossVictoryProfile.handSwordLightning), nameof(BossVictoryProfile.fallingSwordScale));
                 break;
             case BossVictoryMarker.SlowStart:
                 DrawProfileFields("처치자 End 후 배율", nameof(BossVictoryProfile.killerAfterFinisherScale));

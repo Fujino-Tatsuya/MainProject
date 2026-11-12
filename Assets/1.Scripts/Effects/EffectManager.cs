@@ -522,6 +522,22 @@ public class EffectManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 핸들 하나의 재생 속도 배율을 바꾼다(<see cref="SetPlayRateForTarget"/> 의 한 개 판본). 수명이 끝난 핸들은 조용한 no-op.
+    /// 쓰는 곳: 보스 처치 연출 — 처치자를 따라가는 이펙트 중 느려짐에서 빼는 것(어쌔신 처치 오라·팔라딘 손 검 번개, 269).
+    /// </summary>
+    public void SetPlayRate(EffectHandle handle, float rate)
+    {
+        if (!TryResolve(handle, out ActiveEffect active)) return;
+
+        active.playRate = rate;
+        for (int p = 0; p < active.instances.Count; p++)
+        {
+            GameObject instance = active.instances[p].go;
+            DriverOf(instance)?.SetPlayRate(instance, rate);
+        }
+    }
+
+    /// <summary>
     /// [읽기 전용] <paramref name="root"/> 또는 그 자식을 추종 중인 재생 이펙트의 렌더러를 <paramref name="into"/> 에 더한다(지우지 않음).
     /// 쓰는 곳: 보스 처치 연출 '처치자 외 숨김 — 팀원 + 붙은 이펙트'(매 프레임 다시 모아 끄고, 빠진 것은 다시 켠다).
     /// </summary>
