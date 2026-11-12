@@ -48,7 +48,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Min(1f)] public float scanlineCount = 360f;
     [Tooltip("CRT 주사선을 바닥에서 뺀다(267 후속) — 깊이로 복원한 표면 법선의 위쪽 성분(normal.y)이 이 값 이하 = 벽(주사선 그대로).")]
     [Range(0f, 1f)] public float scanlineFloorNormalMin = 0.55f;
-    [Tooltip("normal.y 가 이 값 이상 = 바닥(주사선 없음). 사이는 부드럽게 섞는다. 하늘(먼 평면)·플레이어·보스·RECTIFY 는 늘 주사선.")]
+    [Tooltip("normal.y 가 이 값 이상 = 바닥(주사선 없음). 사이는 부드럽게 섞는다. 하늘(먼 평면)·플레이어·보스는 늘 주사선, RECTIFY 글자 위는 주사선 없음.")]
     [Range(0f, 1f)] public float scanlineFloorNormalMax = 0.8f;
     [Tooltip("바닥에 남기는 주사선 비율(0 = 바닥 없음, 1 = 예전처럼 전체).")]
     [Range(0f, 1f)] public float scanlineFloorKeep = 0f;
@@ -162,8 +162,8 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Range(0f, 1f)] public float rectifyOrangeGradient = 1f;
     [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
     [Min(0.0005f)] public float rectifyScanlineSpacing = 0.003f;
-    [Tooltip("안쪽 주사선 어둡기(0 = 없음).")]
-    [Range(0f, 1f)] public float rectifyScanlineDark = 0.25f;
+    [Tooltip("안쪽 주사선 어둡기(0 = 없음 — 기본, 267 후속 사용자 요청으로 RECTIFY 위 주사선을 뺐다. 다시 켜려면 0.25 근처).")]
+    [Range(0f, 1f)] public float rectifyScanlineDark = 0f;
 
     // 카메라 컷 목록은 타임라인 '카메라 컷' 트랙(timeline.cameraCut·cameraCutShots — 255, 옛 cuts 배열 삭제). 예: 와이드(0.33·거리 16·각 22·방위 50) → 보스 클로즈업(1.67·7·6·−160) → 와이드(2.6).
     [Header("카메라 컷 벽 숨김(컷·컷별 켜기/끄기 = 타임라인 '카메라 컷' 트랙)")]

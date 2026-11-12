@@ -79,7 +79,7 @@ MonoBehaviour:
   rectifyOrangeRight: {r: 0.972549, g: 0.9098039, b: 0.38431373, a: 1}
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
-  rectifyScanlineDark: 0.25
+  rectifyScanlineDark: 0
   wallFacingThreshold: 0.3
   wallSearchRadius: 40
   crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}

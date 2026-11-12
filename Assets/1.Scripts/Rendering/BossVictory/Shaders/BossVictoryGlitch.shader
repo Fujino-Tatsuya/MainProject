@@ -8,7 +8,7 @@
 //      → CRT 주사선.
 //    발밑 회색 원(246 복원 — 267 후속): 배경 중 처치자 발밑(_GroundCircle.xyz)에서 **수평** 거리 _GroundCircle.w 안(원기둥)은 호박색 대신 흑백
 //    CRT 주사선 = 벽·하늘에만(267 후속): 깊이로 복원한 표면 법선 위쪽 성분이 _ScanFloor.x~y 사이에서 벽 → 바닥으로 부드럽게 빠진다.
-//      하늘(먼 평면)·플레이어·보스·RECTIFY 글자/안쪽 색 위는 예전처럼 전부 주사선.
+//      하늘(먼 평면)·플레이어·보스 위는 전부 주사선. RECTIFY 글자 마스크(외곽선 포함) 위는 주사선 없음(267 후속).
 //    배경 글자 RECTIFY(267 후속): 글자마다 화면 사각형(_RectifyScreen)·아틀라스 UV(_RectifyUV) → SDF 외곽선만(|거리| < 반두께, 안 비움).
 //      플레이어·보스 마스크가 0 인 곳에만(인물·보스 뒤, 배경 앞) · 찢긴 UV(같이 찢김) · 들어오는 동안(알파 < 1) 가로줄이 무작위로 켜진다.
 //      (원래 명도 × _GroundCircleLook.y), 가장자리 _GroundCircleLook.x(m). 픽셀 월드 위치 = _CameraDepthTexture(찢긴 UV 그대로 — 원도 같이 찢긴다). 반경 0 = 끔.
@@ -249,7 +249,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half circle = GroundCircleMask(uv) * (1.0h - player);
                 graded = lerp(graded, lerp(col, (lum * (half)_GroundCircleLook.y).xxx, (half)max(_GlitchA.z, _GlitchA.w)), circle);
 
-                half rectCover = 0.0h;   // RECTIFY 글자·안쪽 색이 덮은 정도 — 그 위는 주사선 예전 그대로
+                half rectMask = 0.0h;    // RECTIFY 글자 마스크(외곽선 포함, 보이는 만큼) — 그 위는 CRT 주사선을 뺀다(267 후속)
                 // 배경 글자 RECTIFY — 인물·보스 뒤, 배경 앞. 들어오는 동안 가로줄(찢김 줄 굵기 × 2)이 알파 비율만큼 무작위로 켜진다.
                 if (_RectifyParams.x > 0.0001)
                 {
@@ -257,7 +257,8 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                     half reveal = _RectifyParams.x >= 0.999 ? 1.0h : (half)step(Hash(float2(revealRow, tick + 51.0)), _RectifyParams.x);
                     half2 rt = RectifyAt(uv);
                     half visible = reveal * (1.0h - player) * (1.0h - boss);
-                    // 안쪽 색(원형 확장) — 글자 안에서만 · 가는 가로 주사선. 외곽선은 그 위에.
+                    rectMask = max(rt.x, rt.y) * visible;
+                    // 안쪽 색(원형 확장) — 글자 안에서만 · 가는 가로 주사선(rectifyScanlineDark, 기본 0 = 끔). 외곽선은 그 위에.
                     if (_RectifyFillParams.x > 0.0001)
                     {
                         half4 fill = RectifyFillAt(uv);
@@ -278,10 +279,8 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                         half3 fillCol = fill.rgb * (1.0h - (half)_RectifyFillLook.x * scanOn);
                         half fillW = rt.y * fill.a * (half)_RectifyFillParams.x * visible;
                         graded = lerp(graded, fillCol, fillW);
-                        rectCover = fillW;
                     }
                     half text = rt.x * visible;
-                    rectCover = max(rectCover, text * (half)_RectifyColor.a);
                     graded = lerp(graded, _RectifyColor.rgb, text * (half)_RectifyColor.a);
                 }
 
@@ -294,11 +293,11 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half3 noiseCol = lerp(_NoiseDark.rgb, _NoiseBright.rgb, n);
                 graded = lerp(graded, noiseCol, boss * (half)_GlitchC.x);
 
-                // CRT 주사선 — 벽·하늘에만(바닥 뺌). 플레이어·보스·RECTIFY 위는 예전처럼 늘 주사선.
+                // CRT 주사선 — 벽·하늘에만(바닥 뺌). 플레이어·보스 위는 늘 주사선, RECTIFY 글자 마스크 위는 뺀다.
                 if (_GlitchB.x > 0.0001)
                 {
                     half surf = ScanSurfaceWeight(uv);
-                    half keep = max(surf, max(max(player, boss), rectCover));
+                    half keep = max(surf, max(player, boss)) * (1.0h - rectMask);
                     half scan = 0.5h + 0.5h * sin(uv0.y * _GlitchLook.x * 6.28318h);
                     graded *= lerp(1.0h, 0.72h + 0.28h * scan, (half)_GlitchB.x * keep);
                 }

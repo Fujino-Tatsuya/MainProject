@@ -1720,7 +1720,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor));
                 break;
             case BossVictoryTrack.Scanline:
-                EditorGUILayout.LabelField("주사선은 벽·하늘에만 — 바닥(표면 법선이 위를 향함)은 뺀다. 플레이어·보스·RECTIFY 위는 늘 주사선.", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("주사선은 벽·하늘에만 — 바닥(표면 법선이 위를 향함)은 뺀다. 플레이어·보스 위는 늘 주사선, RECTIFY 글자 위는 뺀다.", EditorStyles.wordWrappedMiniLabel);
                 DrawSettingsFields("주사선 모양", nameof(BossVictoryGlitchSettings.scanlineCount),
                     nameof(BossVictoryGlitchSettings.scanlineFloorNormalMin), nameof(BossVictoryGlitchSettings.scanlineFloorNormalMax),
                     nameof(BossVictoryGlitchSettings.scanlineFloorKeep));
