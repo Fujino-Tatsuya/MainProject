@@ -25,7 +25,7 @@ MonoBehaviour:
   timeline:
     desaturate:
     - start: 0.105
-      length: 5.495
+      length: 7.095
       fadeIn: 0.09
       fadeOut: 0
       weight: 1
@@ -48,7 +48,7 @@ MonoBehaviour:
       bobDamping: 0
     amber:
     - start: 0.3
-      length: 5.3
+      length: 6.8999996
       fadeIn: 0.15
       fadeOut: 0
       weight: 1
@@ -306,7 +306,7 @@ MonoBehaviour:
       bobPhase: 0
       bobDamping: 0
     - start: 5.57
-      length: 0.1
+      length: 1.6199999
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -483,7 +483,7 @@ MonoBehaviour:
     groundCircleSeeded: 1
     focusKillerTime: 0.2
     hideOthersTime: 0.2
-    lobbyTransitionTime: 5.6
+    lobbyTransitionTime: 7.19
     backDashStartTime: 0.2
     finisherStartTime: 0.65
     finisherTrimSeconds: 4.9333334

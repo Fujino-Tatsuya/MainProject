@@ -55,14 +55,13 @@ MonoBehaviour:
   rectifyFillColors:
   - {r: 1, g: 0.1764706, b: 0.7058824, a: 1}
   - {r: 0.22745098, g: 0.41960785, b: 1, a: 1}
-  - {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
   rectifyFillCenter: {x: 0.46, y: 0.5}
   rectifyFillStartRadius: 0.15
   rectifyFillDelay: 0.1
   rectifyFillFade: 0.15
   rectifyFillExpand: 0.5
   rectifyFillSoftness: 0.01
-  rectifyFillGradient: 1
+  rectifyFillGradient: 0
   rectifyFillCoversOutline: 1
   rectifyWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   rectifyWhiteStart: 0.3
