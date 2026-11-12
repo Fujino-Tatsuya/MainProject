@@ -73,15 +73,15 @@ public static class UiStrings
     public static readonly UiString LoadingWaitingForPlayers = new UiString("UI.Loading.WaitingForPlayers", "Waiting for players...", "2.LoadingScene — 상태: 플레이어 대기(코드)");
     public static readonly UiString LoadingActivating = new UiString("UI.Loading.Activating", "Starting...", "2.LoadingScene — 상태: 씬 활성화(코드)");
     public static readonly UiString LoadingStandBy = new UiString("UI.Loading.StandBy", "Stand by...", "2.LoadingScene — 상태: 그 밖(코드)");
-    public static readonly UiString LoadingTip1 = new UiString("UI.Loading.Tip1", "으아ㅏㅏㅏㅏ", "2.LoadingScene — 팁 1번째(tooltipTable[0]) · 문구 교체 후보");
-    public static readonly UiString LoadingTip2 = new UiString("UI.Loading.Tip2", "커피ㅣㅣㅣㅣ", "2.LoadingScene — 팁 2번째(tooltipTable[1]) · 문구 교체 후보");
-    public static readonly UiString LoadingTip3 = new UiString("UI.Loading.Tip3", "밥 뭐 먹지....", "2.LoadingScene — 팁 3번째(tooltipTable[2]) · 문구 교체 후보");
     public static readonly UiString LoadingReady1 = new UiString("UI.Loading.Ready1", "Enter...", "2.LoadingScene — 전원 준비 순환 문구 1(readyMessages[0])");
     public static readonly UiString LoadingReady2 = new UiString("UI.Loading.Ready2", "All players are ready.", "2.LoadingScene — 전원 준비 순환 문구 2(readyMessages[1])");
     public static readonly UiString LoadingReady3 = new UiString("UI.Loading.Ready3", "Starting...", "2.LoadingScene — 전원 준비 순환 문구 3(readyMessages[2])");
 
-    /// <summary>로딩 팁 — 순서 = 씬 <c>tooltipTable</c> 칸 순서.</summary>
-    public static readonly IReadOnlyList<UiString> LoadingTips = new[] { LoadingTip1, LoadingTip2, LoadingTip3 };
+    // 275(11-12) — 임시 장난 팁 Tip1~3 삭제. 옛 키(UI.Loading.Tip1~3)는 시트에 옛 문구 행이 남아 있을 수 있어 재사용하지 않는다.
+    public static readonly UiString LoadingTipDashInterrupt = new UiString("UI.Loading.TipDashInterrupt", "Tip. 간파는 준비 동작이 있습니다... 대쉬와 간파를 동시에 쓴다면....?", "2.LoadingScene — 팁: 대쉬 간파 조작(tooltipTable[0])");
+
+    /// <summary>로딩 팁 — 순서 = 씬 <c>tooltipTable</c> 칸 순서. 새 팁은 씬 칸과 키를 같은 순서로 넣는다. 씬 표가 비면 팁 글자가 빈 채로 숨는다.</summary>
+    public static readonly IReadOnlyList<UiString> LoadingTips = new[] { LoadingTipDashInterrupt };
 
     /// <summary>전원 준비 순환 문구 — 순서 = 씬 <c>readyMessages</c> 칸 순서.</summary>
     public static readonly IReadOnlyList<UiString> LoadingReadyMessages = new[] { LoadingReady1, LoadingReady2, LoadingReady3 };
