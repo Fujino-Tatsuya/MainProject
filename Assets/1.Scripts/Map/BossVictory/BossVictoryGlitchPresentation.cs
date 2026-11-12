@@ -362,6 +362,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         TickBoss();
         TickAnimators();
         SampleClipTiming();
+        if (_killerSword != null) _killerSword.SetVictoryFallingOffset(_profile.fallingSwordOffset);   // 창 Scene 핸들로 끌면 떨어진 낙하 검도 바로 옮김(보면서 세팅)
         if (_glitchOn) TickGlitch();
     }
 
