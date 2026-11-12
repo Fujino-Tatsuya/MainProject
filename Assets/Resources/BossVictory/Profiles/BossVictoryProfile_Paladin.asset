@@ -24,7 +24,9 @@ MonoBehaviour:
   backDashIdleDelay: 0.35
   finisherWithBackDash: 1
   handSwordLightning: 1
-  fallingSwordScale: 1.25
+  fallingSwordScale: 1.5
+  fallingSwordOffset: {x: 0, y: 0, z: -1}
+  fallingSwordLife: 10000
   killerMove: 0
   teleportMoveState: Assassin_Q_DashStrike_Transformed
   teleportMoveEase:
@@ -316,7 +318,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 0.96
+    - start: 0.68
       length: 0.2
       fadeIn: 0
       fadeOut: 0
@@ -343,8 +345,8 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 2.16
-      length: 0.28999996
+    - start: 2.31
+      length: 0.099999905
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -370,34 +372,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 3.64
-      length: 0.2
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
-      keys:
-      - u: 0
-        value: 0
-        curve: 1
-      - u: 0.5
-        value: 1
-        curve: 0
-      - u: 0.5
-        value: 1
-        curve: 1
-      - u: 1
-        value: 0
-        curve: 0
-      uvFrom: 0
-      uvTo: 0
-      uvEase: 0
-      bobAmplitude: 0
-      bobPeriod: 0
-      bobPhase: 0
-      bobDamping: 0
-      dashFrom: {x: 0, y: 0, z: 0}
-      dashTo: {x: 0, y: 0, z: 0}
-    - start: 4.82
+    - start: 3.93
       length: 1.9500003
       fadeIn: 0
       fadeOut: 0
