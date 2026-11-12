@@ -45,6 +45,34 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Tooltip("처치 연출의 낙하 검(R 마무리 낙뢰 FX_Lightening_Strike — 하늘에서 떨어지는 검) 크기 배율(1 = 그대로). 이 연출에서만 — 평소 R 은 그대로.")]
     [Min(0.01f)] public float fallingSwordScale = 1f;
 
+    [Header("처치자 이동(272 — 백대쉬 / 순간이동 Q(어쌔신) / 후퇴 차징(거너)). 이동은 처치자 오너가 실제로, 다른 피어는 복제 위치. 특성 연출 없음")]
+    [Tooltip("백대쉬 = 지금 흐름(백대쉬 → 처치 연출 스킬). 순간이동 = '백대쉬 시작' 마커에 보스 기준 순간이동 지점으로 → 아래 Q 상태로 도착 지점까지(처치 연출 스킬 대신). " +
+             "후퇴 차징 = 제자리 — 보스와 '후퇴 거리'보다 가까우면 백대쉬 시작에 후퇴 스킬(E) 표시 + 백대쉬, 'Q 차징 시작' 마커에 처치 연출 스킬(Q) / 멀면 백대쉬 시작 시각에 바로 Q.")]
+    public BossVictoryKillerMove killerMove = BossVictoryKillerMove.BackDash;
+
+    [Tooltip("[순간이동] 순간이동 지점 = 보스 위치 + 보스 수평 회전 × 이 오프셋(m, +Z = 보스 정면). 타임라인 창이 열려 있으면 Scene 뷰에서 끌어 고친다.")]
+    public Vector3 teleportOffset = new Vector3(-3f, 0f, 2.5f);
+    [Tooltip("[순간이동] 도착 지점(보스 기준 오프셋 — 순간이동 지점과 같은 식). Q 이동이 이 점에서 끝난다.")]
+    public Vector3 arrivalOffset = new Vector3(3f, 0f, 2.5f);
+    [Tooltip("[순간이동] 순간이동 직후 Q 대신 트는 애니 상태(기본 = Combo_Attack_03_04 를 든 상태). 이 클립의 End 는 '스킬 끝'이 아니다 — 이동만 끝낸다. " +
+             "정지 프레임 = 타임라인 '처치 연출 스킬' 클립 끝 자르기(기본 71프레임).")]
+    public string teleportMoveState = BossVictoryKillerMoves.DefaultTeleportMoveState;
+    [Tooltip("[순간이동] 이동 구간 — Custom0 → End(기본) / Custom0 → 정지 프레임.")]
+    public BossVictoryMoveInterval teleportMoveInterval = BossVictoryMoveInterval.Custom0ToEnd;
+    [Tooltip("[순간이동] 이동 곡선(가로 = 이동 구간 0~1, 세로 = 순간이동 지점 → 도착 지점 0~1).")]
+    public AnimationCurve teleportMoveEase = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+
+    [Tooltip("[후퇴 차징] 처치 순간 보스와 수평 거리(m)가 이보다 짧으면 후퇴 스킬 + 백대쉬(백대쉬 칸 그대로, 보스 반대쪽) 뒤 Q 차징. 같거나 멀면 바로 Q 차징. 각 피어가 자기 화면의 처치자 위치로 판정.")]
+    [Min(0f)] public float retreatDistance = 5f;
+    [Tooltip("[후퇴 차징] 가까울 때 백대쉬와 같이 표시로만 트는 스킬 칸(거너 E 냉각 백스텝 — 애니·이펙트만, 이동은 백대쉬).")]
+    public PlayerSkillSlot retreatSkillSlot = PlayerSkillSlot.Sub;
+    [Tooltip("[후퇴 차징] Q 차징 구체 시작 크기(배율 — 거너 평소 0.25).")]
+    [Min(0f)] public float chargeScaleFrom = 0.25f;
+    [Tooltip("[후퇴 차징] Q 차징 구체 목표 크기 — 최대 충전(발사 순간)에 이 크기. 레이저 폭은 그대로.")]
+    [Min(0f)] public float chargeScaleTo = 1f;
+    [Tooltip("[후퇴 차징] 차징 구체 성장 곡선(가로 = 충전 0~1, 세로 = 시작 → 목표 0~1).")]
+    public AnimationCurve chargeScaleCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+
     [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 캐릭터를 골라 편집)")]
     [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
     public BossVictoryTimeline timeline = BossVictoryTimeline.CreateDefault();

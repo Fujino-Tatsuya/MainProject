@@ -34,6 +34,7 @@ public enum BossVictoryMarker
     BossHitAnim,      // 보스 피격 애니 시작 — 설정 SO 상태(23호 getowned = Boss_23_ParryHit_InPlace)를 처음부터, 보스 ×1(상태 이름이 비면 없음 — 255 후속 5)
     BossFreeze,       // 보스 정지 — 보스 배율 0(그 자세로). 0 = 끔
     BossSlow,         // 보스 슬로우 — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End)
+    ChargeStart,      // Q 차징 시작(거너 — 처치자 이동 '후퇴 차징'이고 보스와 가까울 때만, 할 일 272). 기본(-1) = 백대쉬 시작 + 0.2초
 }
 
 /// <summary>
@@ -181,6 +182,14 @@ public sealed class BossVictoryTimeline
     [Min(0f)] public float bossFreezeTime;
     [Tooltip("보스 슬로우(초) — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End).")]
     [Min(0f)] public float bossSlowTime;
+    [Tooltip("Q 차징 시작(초, 거너 후퇴 차징 — 보스와 가까워 E·백대쉬를 할 때만, 할 일 272). 음수 = 자동(백대쉬 시작 + 0.2초). 멀면 백대쉬 시작 시각에 바로 차징.")]
+    public float chargeStartTime = -1f;
+
+    /// <summary>Q 차징 시작 기본 = 백대쉬 시작 뒤 이 초(할 일 272).</summary>
+    public const float DefaultChargeDelay = 0.2f;
+
+    /// <summary>Q 차징 시작 실제 시각 — 칸이 음수(자동)면 백대쉬 시작 + <see cref="DefaultChargeDelay"/>.</summary>
+    public float ChargeStartTime => chargeStartTime >= 0f ? chargeStartTime : backDashStartTime + DefaultChargeDelay;
 
     // 옛 '처치자 동작 끝 → 백대쉬' 마커(255) — 읽기만 해서 처치자 평타 클립 끝·백대쉬 시작·스킬 연출 시작으로 옮긴다(255 후속 4, 설정 SO OnAfterDeserialize). 옮긴 뒤 0.
     [SerializeField, HideInInspector] float killerActionEndTime;   // 칸 이름 그대로(옛 에셋 값을 읽는다)
@@ -222,6 +231,7 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.BossHitAnim => bossHitAnimTime,
         BossVictoryMarker.BossFreeze => bossFreezeTime,
         BossVictoryMarker.BossSlow => bossSlowTime,
+        BossVictoryMarker.ChargeStart => ChargeStartTime,
         _ => throw new ArgumentOutOfRangeException(nameof(marker)),
     };
 
@@ -239,6 +249,7 @@ public sealed class BossVictoryTimeline
             case BossVictoryMarker.BossHitAnim: bossHitAnimTime = time; break;
             case BossVictoryMarker.BossFreeze: bossFreezeTime = time; break;
             case BossVictoryMarker.BossSlow: bossSlowTime = time; break;
+            case BossVictoryMarker.ChargeStart: chargeStartTime = time; break;
         }
     }
 
@@ -297,6 +308,7 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.BossHitAnim => "보스 피격 애니 시작",
         BossVictoryMarker.BossFreeze => "보스 정지",
         BossVictoryMarker.BossSlow => "보스 슬로우",
+        BossVictoryMarker.ChargeStart => "Q 차징 시작(거너)",
         _ => marker.ToString(),
     };
 
