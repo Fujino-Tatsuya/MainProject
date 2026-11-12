@@ -16305,7 +16305,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyTrainingWeaponCheck
   ShowTopMostFoldoutHeaderGroup: 1
-  targetPrefab: {fileID: 1499259539980126395, guid: 5d7b685ab112ee143a4618eb498caa31, type: 3}
+  targetPrefab: {fileID: 8155414042483826542, guid: 26d8835d24d838241a99114a48ad460e, type: 3}
   targetSpots: {fileID: 1723340350}
 --- !u!114 &1218973571
 MonoBehaviour:
@@ -16335,7 +16335,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyTrainingSparring
   ShowTopMostFoldoutHeaderGroup: 1
-  sparringPrefab: {fileID: 6005120945834550011, guid: 8c25c4b94f916ea4c917ff6823904939, type: 3}
+  sparringPrefab: {fileID: 4329531598611607449, guid: 1f9d8cf0417d8764194bc19878832538, type: 3}
   arena: {fileID: 1333274533}
 --- !u!114 &1218973573
 MonoBehaviour:
