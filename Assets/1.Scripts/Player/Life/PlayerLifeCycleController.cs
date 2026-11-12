@@ -199,8 +199,8 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         }
 
         // HP와 Unit.Died 재발행 잠금을 먼저 복구한 뒤 Hurtbox/입력 소비자가
-        // Alive 복제 상태에 반응하도록 한다.
-        deathSource.Revive();
+        // Alive 복제 상태에 반응하도록 한다. 소생은 힐 숫자(268)를 띄운다(회복량 = 최대 − 직전, 자기 회복이라 위로만).
+        deathSource.Revive(reportHeal: true);
         lifeState.Value = PlayerLifeState.Alive;
         return true;
     }

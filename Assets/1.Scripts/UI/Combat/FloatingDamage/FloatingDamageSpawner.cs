@@ -60,8 +60,9 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         }
 
         // 제압 가속 중인 공격자의 피해는 Multi 여부와 무관하게 대상별 숫자 하나로 합친다(할 일 174). 상태이상은 복제값이라 전 피어 같다.
+        // 힐 숫자(268)는 늘 힐한 사람·대상별 합산.
         FloatingDamageAccumulation accumulation = FloatingDamageAccumulationPolicy.Resolve(
-            request.hitPattern, SuppressHastePresence.IsActiveForClient(request.attackerClientId));
+            request.kind, request.hitPattern, SuppressHastePresence.IsActiveForClient(request.attackerClientId));
         bool canAccumulate = FloatingDamageAccumulationPolicy.TryCreateKey(
             request.attackerClientId,
             request.attackType,
