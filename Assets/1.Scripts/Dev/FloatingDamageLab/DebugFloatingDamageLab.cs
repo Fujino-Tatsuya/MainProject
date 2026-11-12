@@ -365,15 +365,39 @@ public sealed class DebugFloatingDamageLab : MonoBehaviour
         if (!string.IsNullOrEmpty(_lastShot))
             GUILayout.Label(_lastShot);
         GUILayout.Label($"  몸 중심 위 spawnOffset {settings.SpawnOffset:0.#}px");
-        GUILayout.Label($"  외곽선 알파 outlineAlpha {settings.OutlineAlpha:0.##} · 반대쪽 밀기 {settings.SidePush:0.#}px + 흐름 {settings.SideDrift:0.#}px / {settings.SideDriftDuration:0.##}초 · 정면 문턱 {settings.SideFrontThreshold:0.#}px");
 #if UNITY_EDITOR
+        // 268 칸 슬라이더 — 끌면 SO 에 바로 저장(Play 가 끝나도 남음), 다음 숫자부터 반영.
+        GUILayout.Label("  외곽선·판정 크기·반대쪽 (268, 끌면 바로 저장)");
+        SliderRow(settings, "outlineAlpha", "외곽선 알파", 0f, 1f);
+        SliderRow(settings, "hurtboxReferenceSize", "판정 기준 크기 m (0=끔)", 0f, 5f);
+        SliderRow(settings, "hurtboxScaleMin", "판정 배율 최소", 0.1f, 2f);
+        SliderRow(settings, "hurtboxScaleMax", "판정 배율 최대", 0.5f, 4f);
+        SliderRow(settings, "sidePush", "반대쪽 밀기 px", 0f, 150f);
+        SliderRow(settings, "sideDrift", "반대쪽 흐름 px", 0f, 150f);
+        SliderRow(settings, "sideDriftDuration", "흐름 시간 초", 0.01f, 2f);
+        SliderRow(settings, "sideFrontThreshold", "정면 문턱 px", 0f, 100f);
         if (GUILayout.Button("설정 SO 인스펙터에서 열기"))
         {
             Selection.activeObject = settings;
             EditorGUIUtility.PingObject(settings);
         }
+#else
+        GUILayout.Label($"  외곽선 알파 {settings.OutlineAlpha:0.##} · 반대쪽 밀기 {settings.SidePush:0.#}px + 흐름 {settings.SideDrift:0.#}px / {settings.SideDriftDuration:0.##}초 · 정면 문턱 {settings.SideFrontThreshold:0.#}px");
 #endif
     }
+
+#if UNITY_EDITOR
+    void SliderRow(FloatingDamageSettings settings, string field, string label, float min, float max)
+    {
+        float current = DebugFloatingDamageLabEditing.GetFloat(settings, field);
+        GUILayout.BeginHorizontal();
+        GUILayout.Label($"  {label} {current:0.##}", GUILayout.Width(190));
+        float next = GUILayout.HorizontalSlider(current, min, max);
+        GUILayout.EndHorizontal();
+        if (!Mathf.Approximately(next, current))
+            _status = DebugFloatingDamageLabEditing.SetFloat(settings, field, next);
+    }
+#endif
 
     void StyleRow(FloatingDamageSettings settings, PopupKind kind, string label)
     {

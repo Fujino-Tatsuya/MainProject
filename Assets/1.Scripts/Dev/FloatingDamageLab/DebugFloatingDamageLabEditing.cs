@@ -28,6 +28,27 @@ public static class DebugFloatingDamageLabEditing
         return $"{kind} 스타일이 설정에 없다.";
     }
 
+    /// <summary>설정 SO 의 float 칸(직렬화 이름) 값을 읽는다. 없으면 0.</summary>
+    public static float GetFloat(FloatingDamageSettings settings, string field)
+    {
+        SerializedProperty property = new SerializedObject(settings).FindProperty(field);
+        return property != null ? property.floatValue : 0f;
+    }
+
+    /// <summary>설정 SO 의 float 칸(직렬화 이름)을 바꾸고 저장한다(268 슬라이더). 다음 숫자부터 반영.</summary>
+    public static string SetFloat(FloatingDamageSettings settings, string field, float value)
+    {
+        var so = new SerializedObject(settings);
+        SerializedProperty property = so.FindProperty(field);
+        if (property == null)
+            return $"{field} 칸이 설정에 없다.";
+
+        property.floatValue = value;
+        so.ApplyModifiedProperties();
+        AssetDatabase.SaveAssetIfDirty(settings);
+        return $"{field} = {value:0.##} (저장됨: {AssetDatabase.GetAssetPath(settings)})";
+    }
+
     /// <summary>
     /// 씬 인스턴스 앵커의 localOffset·worldOffset 을 그 컴포넌트가 정의된 원본 프리팹(23호 = TwentyThree.prefab, 레이드 변형이 물려받음)에 쓴다.
     /// 본(anchorTransform) 지정은 바꾸지 않는다. 중간 변형 프리팹이 같은 칸을 덮어쓰고 있으면 경고한다.
