@@ -27,21 +27,11 @@ public sealed class BossVictoryPaletteTests
         BossVictoryPaletteSlot.Circle2Right, BossVictoryPaletteSlot.CrtGlow,
     };
 
-    // 처음(11-12 굽기 전) 공용 설정 값 — 서로 맞물린 기준 팔레트 한 벌(기준 #D6AB69 · 대비 파랑, 색조 차이 = DefaultContrastHueOffset). 관계 테스트용, 에셋과 무관.
-    static readonly Color OldBase = new Color32(0xD6, 0xAB, 0x69, 0xFF);
-
-    static BossVictoryPaletteCalc.Inputs RefInputs()
-    {
-        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
-        inputs.BaseColor = OldBase;
-        inputs.ContrastColor = BossVictoryPaletteCalc.DefaultContrastColor;
-        return inputs;
-    }
-
+    // 지금 공용 설정 에셋 값(팔라딘 기준 팔레트) — 에셋 없이 쓰는 기준.
     static Color[] Reference()
     {
         var c = new Color[BossVictoryPalette.Count];
-        c[(int)BossVictoryPaletteSlot.Amber] = OldBase;
+        c[(int)BossVictoryPaletteSlot.Amber] = BossVictoryPaletteCalc.DefaultBaseColor;
         c[(int)BossVictoryPaletteSlot.NoiseBright] = new Color32(0xFF, 0xF6, 0xEA, 0xFF);
         c[(int)BossVictoryPaletteSlot.NoiseDark] = new Color32(0x3A, 0x17, 0x12, 0xFF);
         c[(int)BossVictoryPaletteSlot.RectifyOutline] = Color.white;
@@ -74,7 +64,7 @@ public sealed class BossVictoryPaletteTests
 
     [Test]
     // 세 캐릭터 프로필 기준 색은 사용자가 튜닝한다(11-12) — 값은 고정하지 않고, '기준 색 = 공용 호박색이면 공용 색 그대로' 관계만 본다.
-    // 코드 기본값(처치자 없음·표에 없는 캐릭터 — 기본 프로필 에셋은 11-12 삭제)은 값 그대로 DefaultBaseColor(= 팔라딘 기준 색, 11-12 굽기) → 공용 색 그대로.
+    // 코드 기본값(처치자 없음·표에 없는 캐릭터 — 기본 프로필 에셋은 11-12 삭제)은 값 그대로 #D6AB69 → 공용 색 그대로.
     public void 기준_색이_공용_호박색이면_공용_색_그대로_에셋()
     {
         var s = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(SettingsPath);
@@ -82,7 +72,7 @@ public sealed class BossVictoryPaletteTests
         Color[] reference = BossVictoryPaletteCalc.ReferenceColors(s);
 
         BossVictoryProfile code = s.ProfileFor(TutorialCharacter.None);
-        AssertColor(BossVictoryPaletteCalc.DefaultBaseColor, code.baseColor, "코드 기본값 기준 색 = DefaultBaseColor");
+        AssertColor(BossVictoryPaletteCalc.DefaultBaseColor, code.baseColor, "코드 기본값 기준 색 = #D6AB69");
         AssertSameAsReference(reference, BossVictoryPaletteCalc.Compute(s, code), "코드 기본값", true);
 
         foreach (TutorialCharacter character in new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin })
@@ -118,7 +108,7 @@ public sealed class BossVictoryPaletteTests
     public void 코드_기본_입력이면_기준_팔레트_그대로()
     {
         Color[] reference = Reference();
-        BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, RefInputs());
+        BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, BossVictoryPaletteCalc.Inputs.Default);
         foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots) AssertColor(reference[(int)slot], palette[slot], slot.ToString());
         AssertColor(reference[(int)BossVictoryPaletteSlot.CrtGlow], palette.ContrastBase, "대비 기준 색");
     }
@@ -127,8 +117,8 @@ public sealed class BossVictoryPaletteTests
     public void 기준_색조를_돌리면_기조와_대비_그룹이_같이_돈다_무채색은_그대로()
     {
         Color[] reference = Reference();
-        BossVictoryPaletteCalc.Inputs inputs = RefInputs();
-        inputs.BaseColor = RotateHue(OldBase, 60f);   // 채도·밝기 같음 → 비율 1
+        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
+        inputs.BaseColor = RotateHue(BossVictoryPaletteCalc.DefaultBaseColor, 60f);   // 채도·밝기 같음 → 비율 1
         BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, inputs);
 
         AssertColor(inputs.BaseColor, palette[BossVictoryPaletteSlot.Amber], "호박색 = 기준 색");
@@ -149,8 +139,8 @@ public sealed class BossVictoryPaletteTests
     public void 기준_채도_밝기는_비율로_따라간다()
     {
         Color[] reference = Reference();
-        BossVictoryPaletteCalc.Inputs inputs = RefInputs();
-        Color.RGBToHSV(OldBase, out float h, out float s, out float v);
+        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
+        Color.RGBToHSV(BossVictoryPaletteCalc.DefaultBaseColor, out float h, out float s, out float v);
         inputs.BaseColor = Color.HSVToRGB(h, s * 0.5f, v * 0.5f);
         BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, inputs);
         Color orange = reference[(int)BossVictoryPaletteSlot.OrangeLeft];
@@ -174,8 +164,8 @@ public sealed class BossVictoryPaletteTests
         };
         foreach (float rotate in new[] { 0f, 90f, 200f })
         {
-            BossVictoryPaletteCalc.Inputs inputs = RefInputs();
-            inputs.BaseColor = RotateHue(OldBase, rotate);
+            BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
+            inputs.BaseColor = RotateHue(BossVictoryPaletteCalc.DefaultBaseColor, rotate);
             inputs.Overrides = overrides;
             BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, inputs);
             Assert.AreEqual(green, palette[BossVictoryPaletteSlot.OrangeLeft], $"회전 {rotate} — 직접 지정 그대로");
@@ -190,7 +180,7 @@ public sealed class BossVictoryPaletteTests
     public void 회색_기준이면_기조는_회색_대비는_하한_덕에_산다()
     {
         Color[] reference = Reference();
-        BossVictoryPaletteCalc.Inputs inputs = RefInputs();
+        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
         inputs.BaseColor = new Color(0.5f, 0.5f, 0.5f, 1f);
         BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, inputs);
 
@@ -210,7 +200,7 @@ public sealed class BossVictoryPaletteTests
     public void 대비_직접_지정이면_TV_꺼짐_발광은_그_색_원은_그_색에서_따라간다()
     {
         Color[] reference = Reference();
-        BossVictoryPaletteCalc.Inputs inputs = RefInputs();
+        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
         inputs.ContrastMode = BossVictoryContrastMode.Manual;
         inputs.ContrastColor = RotateHue(BossVictoryPaletteCalc.DefaultContrastColor, -90f);
         inputs.ContrastMinSaturation = 1f;   // 직접 지정엔 하한이 안 걸린다
