@@ -48,8 +48,8 @@ MonoBehaviour:
       bobPhase: 0
       bobDamping: 0
     amber:
-    - start: 0.3
-      length: 6.8999996
+    - start: 0.1
+      length: 7.1
       fadeIn: 0.15
       fadeOut: 0
       weight: 1
@@ -293,21 +293,8 @@ MonoBehaviour:
       bobDamping: 0
     crtOff: []
     cameraCut:
-    - start: 0.96
-      length: 4.61
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
-      keys: []
-      uvFrom: 0
-      uvTo: 0
-      uvEase: 0
-      bobAmplitude: 0
-      bobPeriod: 0
-      bobPhase: 0
-      bobDamping: 0
-    - start: 5.57
-      length: 1.6199999
+    - start: 0.77
+      length: 6.42
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -330,25 +317,6 @@ MonoBehaviour:
       smoothPath: 0
       hideWalls: 1
       blendSeconds: 0
-      blendCurve: 1
-      startPosition: {x: 0, y: 0, z: 0}
-      startRotation: {x: 0, y: 0, z: 0, w: 0}
-      startFov: 0
-      hasEnd: 0
-      endPosition: {x: 0, y: 0, z: 0}
-      endRotation: {x: 0, y: 0, z: 0, w: 0}
-      endFov: 0
-      ease: 0
-    - anchor: 0
-      keys:
-      - u: 0
-        position: {x: 0.7309832, y: 0.7548896, z: -5.6136727}
-        rotation: {x: -0.03416963, y: -0.028053746, z: -0.0010535398, w: 0.9990217}
-        fov: 60.000004
-        curve: 1
-      smoothPath: 0
-      hideWalls: 1
-      blendSeconds: 3.711
       blendCurve: 1
       startPosition: {x: 0, y: 0, z: 0}
       startRotation: {x: 0, y: 0, z: 0, w: 0}
