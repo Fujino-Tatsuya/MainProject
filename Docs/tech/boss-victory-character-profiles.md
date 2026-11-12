@@ -117,6 +117,15 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - 기본·거너·어쌔신: 끔(옛 흐름 — 평타 클립 0.2 → 백대쉬 0.2 → 스킬 0.65 에서 백대쉬 끊음).
 - 끊기·재생은 각 피어 표시만(서버 판정·새 RPC 없음). 이동은 오너 모터, 다른 피어는 위치 복제.
 
+## 4.10 팔라딘 검 번개·검 2배(269)
+
+프로필 칸 `swordLightning`(검에 번개)·`swordScale`(검 크기 배율) — 팔라딘 프로필만 켬·2, 기본·거너·어쌔신은 끔·1. 타임라인 창 '스킬 연출 시작' 노드 인스펙터에도 보인다.
+- 구간 = 연출 시작(`Begin`, 이펙트 소거 직후) ~ 정리(`Teardown` — 끝·취소·랩 원상복구·파괴). 노드가 아니라 칸인 이유: 구간이 연출 전체로 고정이라 시각이 없다.
+- 번개 = 팔라딘 R 칼날 전기 엔트리(`FX_Sword_Electric_Entry`)·소켓(검 메쉬 `SM_Wep_Sword_03`)을 `PaladinSkillView.swordElectric` 에서 읽어 **따로 든 루프 핸들**로 재생(`BeginVictorySword`/`EndVictorySword`). 같은 소켓 플레이어를 쓰면 처치 연출 R 의 `OnEnd` → `StopUltimateVfxLocal` 때 같이 꺼진다. 엔트리 파트 delay 0.45초만큼 늦게 보인다.
+- 검 크기 = 검 메쉬 `localScale` × 배율(피벗 기준), 끝나면 원래 값. 이펙트는 SetParent 를 안 써 검 배율을 안 타므로 같은 배율(소켓 배율 × 2)로 대출.
+- 처치자 이펙트 배율(느려짐 ×`killerAfterFinisherScale`)을 번개도 같이 받는다(처치자 자손을 따라가는 이펙트).
+- 프리팹 수정 없음(런타임). 다른 캐릭터는 `PaladinSkillView` 가 없어 칸을 켜도 무시. 새 RPC 없음 — 복제 처치 상태로 각 피어가 `Begin`(늦은 참가자 같음). 순수 판단 `BossVictoryGlitchPresentation.UsesKillerSword`(EditMode `BossVictoryProfileTests`).
+
 ## 5. 알려진 한계
 
 - 프로필은 회차 시작 때 고정 — 연출 중 처치자 캐릭터가 바뀌어도(랩 F1) 그 회차는 옛 프로필, 랩이 바로 처음부터 다시 튼다.

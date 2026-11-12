@@ -183,6 +183,60 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     {
         TraitSkillFx.Raised -= HandleTraitFx;
         StopTargetFloorLocal();
+        EndVictorySword();
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  보스 처치 연출 — 검 번개·검 크기(할 일 269)
+    // ═════════════════════════════════════════════════════════════════
+    //
+    // 처치자가 팔라딘이면 BossVictoryGlitchPresentation 이 시작(Begin) 때 켜고 정리(Teardown) 때 끈다 — 복제된 처치 상태로
+    // 각 피어가 연 연출이라 RPC 없이 모든 피어(늦은 참가자 포함) 같다. 켜고 끄는 값은 처치자 프로필 칸(swordLightning·swordScale).
+    //
+    // 번개 = R 칼날 전기와 같은 엔트리(swordElectric.Effect)·같은 소켓(검 메쉬)을 쓰되 <b>핸들은 따로</b> 든다 —
+    // 처치 연출 스킬(R 표시 전용)이 끝나며 OnEnd → StopUltimateVfxLocal 이 swordElectric 을 끄는데, 같은 소켓 플레이어를 쓰면 그때 같이 꺼진다.
+    // 검 크기 = 검 메쉬 localScale(원래 값 × 배율, 피벗 기준). 이펙트는 SetParent 를 안 써 검 배율을 안 타므로 같은 배율을 넘긴다.
+
+    private EffectHandle _victorySwordFx;
+    private Transform _victorySword;
+    private Vector3 _victorySwordBaseScale;
+
+    /// <summary>[이 피어] 보스 처치 연출 동안 검에 번개를 두르고(<paramref name="lightning"/>) 검을 <paramref name="scale"/> 배로 키운다. 이미 켜져 있으면 걷고 다시.</summary>
+    public void BeginVictorySword(bool lightning, float scale)
+    {
+        EndVictorySword();
+        if (!lightning && Mathf.Approximately(scale, 1f))
+            return;
+
+        Transform sword = swordElectric != null ? swordElectric.Socket : null;
+        if (sword == null)
+        {
+            Edit.LogWarning("[PaladinSkillView] 처치 연출 검 — swordElectric 소켓이 비어 검을 못 찾는다(번개·크기 건너뜀).", this);
+            return;
+        }
+
+        scale = Mathf.Max(0.01f, scale);
+        if (!Mathf.Approximately(scale, 1f))
+        {
+            _victorySword = sword;
+            _victorySwordBaseScale = sword.localScale;
+            sword.localScale = _victorySwordBaseScale * scale;
+        }
+
+        if (lightning && swordElectric.Effect != null && EffectManager.TryGet(out EffectManager effects, this))
+            _victorySwordFx = effects.PlayLooping(swordElectric.Effect, sword, Vector3.zero, swordElectric.Scale * scale);
+    }
+
+    /// <summary>[이 피어] 처치 연출 검을 원래대로(번개 걷기·원래 크기). 켜져 있지 않으면 no-op.</summary>
+    public void EndVictorySword()
+    {
+        if (_victorySwordFx.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.Release(_victorySwordFx);
+        _victorySwordFx = EffectHandle.None;
+
+        if (_victorySword != null)
+            _victorySword.localScale = _victorySwordBaseScale;
+        _victorySword = null;
     }
 
     /// <summary>

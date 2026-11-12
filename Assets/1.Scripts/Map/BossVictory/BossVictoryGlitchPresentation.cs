@@ -57,6 +57,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     Player _killer;
     GameObject _boss;
     PlayerSkillController _killerSkills;
+    PaladinSkillView _killerSword;   // 처치자 검 번개·검 크기를 켠 팔라딘(269 — 프로필 칸, 정리 때 끈다)
 
     // 처치자 순서(255 후속 4): 하던 동작 ×0.5 → (대기) → 백대쉬(등장 연출 밀림 재사용, ×1) → 처치 연출 스킬(×1) → 느려짐 ×0.1. 각 단계 시각 = 타임라인 노드.
     BossVictoryKillerSequence.Step _killerStep;
@@ -384,6 +385,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _circleCenter = _killer != null ? _killer.transform.position : v.HitPoint;   // 발밑 회색 원 — 처치자 발밑(높이 기준 + 마커 전 중심), 시작 순간 고정
 
         int cleared = ClearEffectsLocal();
+        BeginKillerSword();   // 소거 뒤 — 처치자 검 번개·크기(269, 팔라딘만)
 
         if (_killer != null) CollectAnimators(_killer.gameObject, Role.Killer);
         for (int i = 0; i < _others.Count; i++) CollectAnimators(_others[i], Role.Other);
@@ -402,6 +404,27 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         Edit.Log($"[BossVictory] 글리치 연출 시작 — 회차 {v.Sequence} · 막타 client {v.KillerClientId} · 팀원 {_others.Count} · " +
                  $"Animator {_animators.Count} · 이펙트 소거 {cleared} · 프로필 {_profile.name}({_killerCharacter})", this);
     }
+
+    // 처치자 검 번개·검 크기(269) — 프로필 칸이 켜져 있고 처치자가 검을 든 팔라딘(PaladinSkillView)일 때만. 시작 ~ 정리(끝·취소·파괴) 동안.
+    // 복제된 처치 상태로 각 피어가 Begin 하므로 새 RPC 없이 모든 피어·늦은 참가자 같다. 다른 캐릭터는 PaladinSkillView 가 없어 무시된다.
+    void BeginKillerSword()
+    {
+        _killerSword = null;
+        if (_killer == null || !UsesKillerSword(_profile)) return;
+        if (!_killer.TryGetComponent(out PaladinSkillView sword)) return;
+        _killerSword = sword;
+        sword.BeginVictorySword(_profile.swordLightning, _profile.swordScale);
+    }
+
+    void EndKillerSword()
+    {
+        if (_killerSword != null) _killerSword.EndVictorySword();
+        _killerSword = null;
+    }
+
+    /// <summary>프로필이 처치자 검 연출(번개 또는 크기 ≠ 1)을 쓰는가(순수 판단, EditMode).</summary>
+    public static bool UsesKillerSword(BossVictoryProfile profile) =>
+        profile != null && (profile.swordLightning || !Mathf.Approximately(profile.swordScale, 1f));
 
     // 처치 판정 즉시 이 피어 표시 소거(Q11). 서버 판정 장판·투사체는 디렉터가 서버에서 디스폰한다(TryStartVictoryServer).
     int ClearEffectsLocal()
@@ -1350,6 +1373,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _bossHitAnimators.Clear();
         _bossPlayedAnimators.Clear();
         EndDash();
+        EndKillerSword();
 
         if (_killerSkills != null)
         {
