@@ -35,6 +35,8 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Range(-180f, 180f)] public float backDashAngle;
     [Tooltip("백대쉬 후 대기(초) — 백대쉬 끝 ~ Idle 복귀. 기본 0.35 = 보스 등장 밀림 ReactionIdleDelay(등장 연출은 상수 그대로).")]
     [Min(0f)] public float backDashIdleDelay = 0.35f;
+    [Tooltip("스킬 연출 시작 때 백대쉬를 끊지 않고 같이 간다(267 후속) — 스킬 애니가 몸을 쥐고 백대쉬는 이동만(밀림 리액션 애니·끝 Idle 복귀 없음). 스킬 연출 시작이 백대쉬 시작보다 앞이어도 백대쉬는 자기 마커 시각에 시작. 하던 평타는 스킬 재생(0층 CrossFade 0.05초)이 끊는다. 표시만(각 피어), 판정·RPC 무관.")]
+    public bool finisherWithBackDash;
 
     [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 캐릭터를 골라 편집)")]
     [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]

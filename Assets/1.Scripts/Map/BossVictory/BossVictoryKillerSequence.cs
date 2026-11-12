@@ -36,6 +36,13 @@ public static class BossVictoryKillerSequence
     /// <summary>'느려짐 시작' 마커로 처치자·보스가 End 후 배율이 되는가 — 마커가 켜져 있고(&gt; 0) 시각이 지났다. 꺼짐이면 스킬 End 이벤트가 정한다.</summary>
     public static bool SlowByMarker(float slowStart, float t) => slowStart > 0f && t >= slowStart;
 
+    /// <summary>
+    /// 스킬과 백대쉬가 같이 가는 프로필(<c>finisherWithBackDash</c>, 267 후속)에서 지금 백대쉬를 (이동만으로) 시작해야 하나 —
+    /// 이미 스킬 단계이고, 이번 회차에 백대쉬를 아직 안 했고, 백대쉬 시작 시각이 지났다. 끈 프로필은 늘 false(옛 흐름: 스킬이 백대쉬를 끊거나 건너뜀).
+    /// </summary>
+    public static bool StartDashDuringFinisher(bool finisherWithBackDash, Step step, bool dashStarted, float backDashStart, float t) =>
+        finisherWithBackDash && step == Step.Finisher && !dashStarted && t >= backDashStart;
+
     /// <summary>스킬 연출 시작 기본 = 백대쉬 시작 + 백대쉬 시간 + 백대쉬 후 대기(255 후속 3 까지의 체감 — Idle 복귀 직후 스킬).</summary>
     public static float DefaultFinisherStart(float backDashStart, float backDashDuration, float backDashIdleDelay) =>
         backDashStart + backDashDuration + backDashIdleDelay;

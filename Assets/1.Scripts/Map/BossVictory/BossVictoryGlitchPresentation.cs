@@ -71,6 +71,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     float _dashDone;
     bool _dashReaction;
     bool _dashIdle;
+    bool _dashStarted;    // 이번 회차에 백대쉬를 시작했나(스킬과 같이 가는 프로필 — 스킬 뒤 늦게 시작할 때 한 번만)
+    bool _dashMotionOnly; // 백대쉬 이동만(스킬 애니가 몸을 쥠 — 밀림 리액션·끝 Idle 복귀 없음)
 
     // 처치 연출 스킬 끝 자르기(255 후속 7) — 자른 프레임에 닿으면 처치자 애니 배율 0(BossVictoryAnimTrim).
     int _finisherState;          // 처치 연출 스킬 상태 짧은 이름 해시(재생 시작 뒤에만 0 아님)
@@ -347,6 +349,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _finisherWarned = false;
         _killerStep = BossVictoryKillerSequence.Step.None;
         _dashRunning = false;
+        _dashStarted = false;
+        _dashMotionOnly = false;
         _finisherState = 0;
         _finisherEndEvent = -1f;
         _killerFrozen = false;
@@ -440,6 +444,12 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
                 SetKillerStep(BossVictoryKillerSequence.Step.Wait);
             BossVictoryKillerSequence.Step target = BossVictoryKillerSequence.Target(tl.KillerTimes(), _glitchTime);
             if (target > _killerStep) EnterKillerStep(target);
+            // 스킬과 같이 가는 프로필(267 후속) — 스킬이 먼저 시작했어도 백대쉬는 자기 마커 시각에 이동만으로 시작.
+            if (BossVictoryKillerSequence.StartDashDuringFinisher(_profile.finisherWithBackDash, _killerStep, _dashStarted, tl.backDashStartTime, _glitchTime))
+            {
+                ClockLog($"백대쉬 시작(스킬과 같이) {tl.backDashStartTime:0.000}s");
+                BeginBackDash(motionOnly: true);
+            }
             if (_killerStep == BossVictoryKillerSequence.Step.Finisher && !_killerFrozen) TickFinisherTrim();
         }
         if (_phase == Phase.Finisher && BossVictoryKillerSequence.SlowByMarker(tl.slowStartTime, _glitchTime))
@@ -462,6 +472,14 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
                 BeginBackDash();
                 break;
             case BossVictoryKillerSequence.Step.Finisher:
+                if (_profile.finisherWithBackDash)
+                {
+                    // 267 후속 — 백대쉬를 끊지 않고 이동만 이어 간다(스킬 애니가 몸을 쥠). 하던 평타는 스킬 재생 CrossFade 가 끊는다.
+                    if (_dashRunning) _dashMotionOnly = true;
+                    StartFinisher();
+                    Edit.Log($"[BossVictory] 스킬 연출 시작 — 백대쉬와 같이({(_dashRunning ? "이동 이어 감" : "백대쉬는 자기 마커에")}) (글리치 t {_glitchTime:0.00})", this);
+                    break;
+                }
                 if (from == BossVictoryKillerSequence.Step.BackDash && _dashRunning)
                     Edit.Log($"[BossVictory] 스킬 연출 시작 — 백대쉬를 끊는다 (글리치 t {_glitchTime:0.00})", this);
                 EndDash();
@@ -500,8 +518,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     // 백대쉬 = 보스 등장 연출 밀림 동작(BossEncounterDirector.StepSkid — 같은 리액션 상태) · 거리·시간·곡선·방향 보정 = 설정 SO 처치 연출 전용 값
     // (기본 = 등장 밀림 값 복사, 255 후속 3). 방향 = 보스 반대쪽을 보정 각만큼 돌림(BossVictoryBackDash.Direction).
-    void BeginBackDash()
+    void BeginBackDash(bool motionOnly = false)
     {
+        _dashStarted = true;
+        _dashMotionOnly = motionOnly;
         Vector3 killerPos = _killer.transform.position;
         _dashDir = BossVictoryBackDash.Direction(killerPos, _boss != null ? _boss.transform.position : killerPos, _killer.transform.forward, _profile.backDashAngle);
         _dashEase ??= u => BossVictoryCameraCuts.Evaluate(_profile.backDashEase, u);
@@ -525,7 +545,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         if (!_running || !_dashRunning || _killer == null) return;
         if (!BossEncounterDirector.StepSkid(_killer, _dashMotor, _dashDir, _profile.backDashDistance, _dashStartAt, _profile.backDashDuration,
-                                            Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle, _dashEase, _profile.backDashIdleDelay))
+                                            Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle, _dashEase, _profile.backDashIdleDelay,
+                                            animate: !_dashMotionOnly))
             return;
         EndDash();   // Idle 복귀까지 끝 — 스킬 연출 시작 마커까지 대기 자세
     }

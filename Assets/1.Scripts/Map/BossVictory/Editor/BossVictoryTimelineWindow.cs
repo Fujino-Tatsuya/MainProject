@@ -1668,7 +1668,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawProfileFields("백대쉬(처치 연출 전용 · 이 캐릭터 프로필)",
                     nameof(BossVictoryProfile.backDashDistance), nameof(BossVictoryProfile.backDashDuration),
                     nameof(BossVictoryProfile.backDashEase), nameof(BossVictoryProfile.backDashAngle),
-                    nameof(BossVictoryProfile.backDashIdleDelay));
+                    nameof(BossVictoryProfile.backDashIdleDelay), nameof(BossVictoryProfile.finisherWithBackDash));
                 EditorGUILayout.LabelField("방향 = 보스 반대쪽을 보정 각만큼 돌림(+ = 시계 방향). 후 대기 = 백대쉬 끝 ~ Idle 복귀. 리액션 애니는 보스 등장 밀림과 같다(등장 연출 값은 그대로). 기본값 = 보스 등장 밀림 값.", EditorStyles.wordWrappedMiniLabel);
                 if (GUILayout.Button("스킬 연출 시작 = 백대쉬 시작 + 시간 + 후 대기", GUILayout.Width(300f)))
                 {

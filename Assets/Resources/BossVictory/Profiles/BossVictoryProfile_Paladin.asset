@@ -22,6 +22,7 @@ MonoBehaviour:
   backDashEase: 3
   backDashAngle: -30
   backDashIdleDelay: 0.35
+  finisherWithBackDash: 1
   timeline:
     desaturate:
     - start: 0.105
@@ -357,20 +358,7 @@ MonoBehaviour:
       endRotation: {x: 0, y: 0, z: 0, w: 0}
       endFov: 0
       ease: 0
-    killerAction:
-    - start: 0
-      length: 0.2
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
-      keys: []
-      uvFrom: 0
-      uvTo: 0
-      uvEase: 0
-      bobAmplitude: 0
-      bobPeriod: 0
-      bobPhase: 0
-      bobDamping: 0
+    killerAction: []
     noiseScrollV:
     - start: 0.5
       length: 1.01
@@ -484,8 +472,8 @@ MonoBehaviour:
     focusKillerTime: 0.2
     hideOthersTime: 0.2
     lobbyTransitionTime: 7.19
-    backDashStartTime: 0.2
-    finisherStartTime: 0.65
+    backDashStartTime: 0
+    finisherStartTime: 0
     finisherTrimSeconds: 4.9333334
     slowStartTime: 1.85
     bossHitAnimTime: 0.2

@@ -87,6 +87,35 @@ public sealed class BossVictoryKillerSequenceTests
     }
 
     [Test]
+    public void 스킬과_같이_가는_프로필은_스킬_단계에서도_백대쉬를_한_번_시작()
+    {
+        // 267 후속 — 팔라딘: 백대쉬 시작 0 · 스킬 연출 시작 0 → 단계는 바로 스킬, 백대쉬는 같은 순간 이동만으로.
+        var tm = new BossVictoryKillerSequence.Times { HasActionClip = false, BackDashStart = 0f, FinisherStart = 0f };
+        Assert.AreEqual(Step.Finisher, BossVictoryKillerSequence.Target(tm, 0f), "같은 시각이면 스킬 단계(평타는 스킬 재생이 끊는다)");
+        Assert.IsTrue(BossVictoryKillerSequence.StartDashDuringFinisher(true, Step.Finisher, false, 0f, 0f));
+        Assert.IsFalse(BossVictoryKillerSequence.StartDashDuringFinisher(true, Step.Finisher, true, 0f, 0.1f), "한 회차에 한 번");
+        Assert.IsFalse(BossVictoryKillerSequence.StartDashDuringFinisher(true, Step.Finisher, false, 0.3f, 0.2f), "자기 마커 전");
+        Assert.IsTrue(BossVictoryKillerSequence.StartDashDuringFinisher(true, Step.Finisher, false, 0.3f, 0.3f), "스킬 뒤 늦은 백대쉬");
+        Assert.IsFalse(BossVictoryKillerSequence.StartDashDuringFinisher(true, Step.BackDash, false, 0f, 0.1f), "스킬 단계에서만");
+        Assert.IsFalse(BossVictoryKillerSequence.StartDashDuringFinisher(false, Step.Finisher, false, 0f, 0.1f), "끈 프로필 = 옛 흐름(건너뜀)");
+    }
+
+    [Test]
+    public void 팔라딘만_스킬과_백대쉬가_동시()
+    {
+        BossVictoryGlitchSettings s = Resources.Load<BossVictoryGlitchSettings>(BossVictoryGlitchSettings.ResourcePath);
+        Assert.IsNotNull(s, "설정 에셋");
+        BossVictoryProfile paladin = s.ProfileFor(TutorialCharacter.Paladin);
+        Assert.IsTrue(paladin.finisherWithBackDash, "팔라딘 = 같이 감");
+        Assert.AreEqual(0f, paladin.timeline.backDashStartTime, Tolerance);
+        Assert.AreEqual(0f, paladin.timeline.finisherStartTime, Tolerance);
+        Assert.IsFalse(paladin.timeline.KillerTimes().HasActionClip, "처치자 평타 클립 없음");
+        Assert.IsFalse(s.defaultProfile.finisherWithBackDash, "기본 = 옛 흐름");
+        Assert.IsFalse(s.ProfileFor(TutorialCharacter.Gunner).finisherWithBackDash, "거너 = 옛 흐름");
+        Assert.IsFalse(s.ProfileFor(TutorialCharacter.Assassin).finisherWithBackDash, "어쌔신 = 옛 흐름");
+    }
+
+    [Test]
     public void 새_타임라인_단계_시각()
     {
         var tl = new BossVictoryTimeline();

@@ -1047,13 +1047,14 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
     /// 처음 한 번 리액션 상태(<see cref="SkidReactionStates"/> 중 있는 것) → 시간 비율만큼 <paramref name="dir"/> 로 밀기(<paramref name="motor"/> 가 null 이면
     /// 애니만 — 오너가 아닌 피어) → 밀림 끝 + <paramref name="idleDelay"/>(기본 <see cref="ReactionIdleDelay"/> — 처치 연출은 설정 SO 백대쉬 후 대기) 에 Idle. 반환 = 끝났다(Idle 복귀까지).
     /// <paramref name="ease"/> = 진행 곡선(null = <see cref="BossIntroFormation.SkidEase"/> — 등장 연출. 처치 연출 백대쉬는 설정 SO 곡선).
+    /// <paramref name="animate"/> = false 면 이동만(리액션·Idle 애니 없음 — 처치 연출 스킬과 백대쉬가 같이 갈 때, 267 후속).
     /// </summary>
     public static bool StepSkid(Player player, PlayerMotor motor, Vector3 dir, float distance, double startAt, float duration, double now,
                                 ref float done, ref bool reactionPlayed, ref bool idleRestored, System.Func<float, float> ease = null,
-                                float idleDelay = ReactionIdleDelay)
+                                float idleDelay = ReactionIdleDelay, bool animate = true)
     {
         Animator animator = player != null ? player.CharacterAnimator : null;
-        if (!reactionPlayed)
+        if (!reactionPlayed && animate)
         {
             reactionPlayed = true;
             if (player != null) player.SetAnimatorMoving(false);
@@ -1067,7 +1068,7 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         if (step > 0f && motor != null) motor.AddGroundedDisplacement(dir * step);
 
         if (now < startAt + duration + idleDelay) return false;
-        if (!idleRestored)
+        if (!idleRestored && animate)
         {
             idleRestored = true;
             CrossFadeFirstExisting(animator, IdleStates);
