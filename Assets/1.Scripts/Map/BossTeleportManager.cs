@@ -212,7 +212,6 @@ public class BossTeleportManager : NetworkBehaviour
         if (_rigStarted && _rig != null) _rig.ResetToIdle();
         _rigStarted = false;
         _elevatorSeenStart = 0d;
-        AudioManager.Instance?.EndCinematicBgm(this);
 
         base.OnNetworkDespawn();
     }
@@ -1103,10 +1102,7 @@ public class BossTeleportManager : NetworkBehaviour
             _elevatorArrivedLocal = false;
             _elevatorSeenStart = start;
             RestoreSilhouettes();
-            // 엘리베이터 연출(문 앞 이동·탑승·상승·암전) = 인게임 곡 없음(경석 11-12 — 0.1초 아웃). 끝(도착 완료)엔 보스 단계가
-            // 이미 등장 연출(무음)로 넘어가 있어 그대로 무음이 이어지고, 도착 무효·재도전 리셋이면 인게임 곡이 2초 인으로 돌아온다.
-            if (start > 0d) AudioManager.Instance?.BeginCinematicBgm(this);
-            else AudioManager.Instance?.EndCinematicBgm(this);
+            // BGM 은 건드리지 않는다 — 엘리베이터 동안 스테이지 곡 유지, 보스방 등장 연출(Preparing)이 0.1초에 끈다(기획 11-12).
             // 다른 연출(또는 끝)로 바뀌었으면 보행 지시를 버린다. RPC 가 시작 시각 복제보다 먼저 와도 같은 연출이면 유지된다.
             if (_walk.Active && _walk.ElevatorStart != start) StopOwnerWalk();
         }

@@ -123,6 +123,17 @@ public class AudioManager : MonoBehaviour
         return PlayEntry(entry, entry.Is3D ? worldPos : (Vector3?)null, VolumeForSource(source));
     }
 
+    /// <summary>2D 엔트리를 <paramref name="fadeIn"/> 초에 걸쳐 키우며 재생한다(연출음 이어 붙이기 크로스페이드용). 3D 엔트리면 재생하지 않는다.</summary>
+    public IAudioPlayer PlayFadeIn(string key, float fadeIn)
+    {
+        if (!TryGetEntry(key, out SoundEntry entry) || entry.Is3D)
+        {
+            return null;
+        }
+
+        return PlayEntry(entry, null, 1f, null, fadeIn);
+    }
+
     /// <summary>3D 엔트리를 <paramref name="follow"/> 를 따라가며 재생한다(움직이는 발원). 2D 엔트리면 위치를 무시한다.</summary>
     public IAudioPlayer Play(string key, Transform follow)
     {
@@ -245,7 +256,7 @@ public class AudioManager : MonoBehaviour
         return _entryById.TryGetValue(id, out entry);
     }
 
-    private IAudioPlayer PlayEntry(SoundEntry entry, Vector3? worldPos, float volumeScale = 1f, Transform follow = null)
+    private IAudioPlayer PlayEntry(SoundEntry entry, Vector3? worldPos, float volumeScale = 1f, Transform follow = null, float fadeIn = 0f)
     {
         string key = entry.Key;
         if (!entry.Sound.IsValid())
@@ -267,7 +278,9 @@ public class AudioManager : MonoBehaviour
             ? BroAudio.Play(entry.Sound, follow)
             : worldPos.HasValue
                 ? BroAudio.Play(entry.Sound, worldPos.Value)
-                : BroAudio.Play(entry.Sound);
+                : fadeIn > 0f
+                    ? BroAudio.Play(entry.Sound, fadeIn)
+                    : BroAudio.Play(entry.Sound);
 
         if (player == null || !player.IsActive)
         {
@@ -481,7 +494,14 @@ public class AudioManager : MonoBehaviour
         // (늦은 합류는 23호 Dead 보정과 보스 단계 현재값 적용의 순서가 정해져 있지 않다.)
         if (_bossBgm == BossBgmState.Defeated) return;
         _bossBgm = state;
-        EvaluateBgm(state == BossBgmState.Defeated ? BgmBossDeathFadeOut : BgmSceneFadeOut);
+        // 보스 등장 연출 시작(Intro) = 스테이지 곡 "바로" 끔(0.1초, 기획 11-12 — 1초에 걸쳐 꺼지면 안 된다).
+        float fadeOut = state switch
+        {
+            BossBgmState.Defeated => BgmBossDeathFadeOut,
+            BossBgmState.Intro => BgmCinematicFadeOut,
+            _ => BgmSceneFadeOut,
+        };
+        EvaluateBgm(fadeOut);
     }
 
     private string TargetBgmKey => HasCinematic ? null : _bossBgm switch
@@ -535,7 +555,9 @@ public class AudioManager : MonoBehaviour
             return;
         }
 
-        BroAudio.Play(entry.Sound, BgmFadeIn).SetVolume(entry.VolumeMultiplier);
+        // 보스 곡 = 등장 연출이 끝나는 순간 원래 크기로 바로(페이드 인 없음, 기획 11-12). 나머지 곡은 2초 인.
+        float fadeIn = key == BossBgmKey ? 0f : BgmFadeIn;
+        BroAudio.Play(entry.Sound, fadeIn).SetVolume(entry.VolumeMultiplier);
         _bgmKey = key;
         _bgmId = entry.Sound;
     }
