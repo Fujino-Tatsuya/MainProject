@@ -21,6 +21,7 @@
 | 해상도 | 높이 맞춤 + 실제 px 하한 16(§4, 154) |
 | 간파 중 | 내 강 시도 ~ 성공 섬광 끝 동안 내 화면만 숨김(§5, 154) |
 | 데이터 | 서버가 피해마다 `ClientDamageDealtClientRpc` 로 실제 감소량 + 공격자(clientId·몬스터면 NetworkObjectId) + 공격 종류를 보냄(§6). 회복은 `ClientHealedClientRpc`(§13.4) |
+| 보스 처치 연출 중 | 새 숫자 없음 + 떠 있던 숫자 즉시 제거(§5, 11-12) |
 | 수치 원본 | SO 에셋. **xlsx(GameData) 미연결** |
 
 ## 2. 생성 위치 — 앵커 + 픽셀 오프셋
@@ -155,6 +156,7 @@ y = 투영y + spawnOffset + style.offset.y + scatter.y + rise/fall
   (11-04 할 일 211: 제압 간파 섬광 시퀀스 동안 숨김은 시퀀스가 Legacy 가 되며 삭제 — 제압 간파 = V3.) 숫자 생성·수명·누적은 그대로 돌아 끝나면 살아 있는 숫자가 보인다. 약 시도·대상 없음·팀원 화면의 일반 간파는 숨기지 않는다.
   스포너 `LateUpdate` 가 `InterruptProductionDirector.CombatUiHidden` 을 읽는다(디렉터는 스포너를 모름). 규칙 = `InterruptProductionRules.ShouldHideCombatUi`
   — 같은 값으로 머리 위 체력바(플레이어·몬스터·보스 — 179 후속 4, 화면 고정 보스 HP 바는 그대로)·오너 조준 표시도 숨는다. [interrupt-presentation.md §6.4](interrupt-presentation.md#64-스위치프로필-위치) A5.
+- **보스 처치 연출 중 제거(11-12)** — `BossVictoryGlitchPresentation.HidesDamageNumbers`(시작 ~ 끝·취소·파괴, 랩 F2/F7 리셋 포함) 동안 `FloatingDamageSpawner` 가 새 숫자(피해·힐)를 만들지 않고, 떠 있던 숫자(막타 포함)는 `LateUpdate` 에서 바로 회수한다(`ClearAll`). 캔버스 숨김(A5)과 달리 끝나도 되살아나지 않는다. 각 피어 로컬, 새 RPC 없음. 테스트 `BossVictoryDamageNumberHideTests`.
 
 ## 6. 보호막 숫자 · 데이터 경로
 

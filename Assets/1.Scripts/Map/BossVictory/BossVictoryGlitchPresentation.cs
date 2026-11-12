@@ -105,6 +105,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     /// <summary>[이 피어] 처치 연출 중인가 — 조준 표시 숨김 이유(267 후속). 복제된 처치 상태로 각 피어가 연 연출이라 늦은 참가자도 같다. 끝·취소(Teardown)·파괴면 false.</summary>
     public static bool HidesCombatAim => IsRunning;
 
+    /// <summary>[이 피어] 처치 연출 중인가 — 피해·힐 숫자 제거 이유(연출때 데미지 플로팅 제거). <see cref="FloatingDamageSpawner"/> 가 매 프레임 읽어 새 숫자를 막고 떠 있던 숫자를 지운다. 끝·취소(Teardown)·파괴면 false(누수 없음).</summary>
+    public static bool HidesDamageNumbers => IsRunning;
+
     /// <summary>[이 피어] 처치 연출 진행 중(시작 ~ 끝·취소·파괴). 표시 전용 연출이 언제 접을지 본다(어쌔신 처치 오라 — 267 후속).</summary>
     public static bool IsRunning => Instance != null && Instance._running;
 

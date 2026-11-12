@@ -184,6 +184,7 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
   - Q = 기존 `GunnerChargeLaserSkill.OnPresentationOnlyStart`(1.2초 충전 → 보스 쪽 발사). 차징 구체 크기만 프로필 `chargeScaleFrom → chargeScaleTo`(+ `chargeScaleCurve`) — `GunnerBeamView.SetPresentationChargeScale`, 정리 때 끈다. 발사 순간 = 목표 크기, 레이저 폭 그대로.
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
+## 4.14 연출 중 피해 숫자 제거(11-12)처치 연출 동안(`Begin` ~ 끝·취소·파괴, 디버그 랩 F2/F7 리셋 포함) 피해·힐 숫자를 띄우지 않고, 시작 순간 떠 있던 숫자(막타 포함)는 지운다 — `BossVictoryGlitchPresentation.HidesDamageNumbers` 를 `FloatingDamageSpawner` 가 매 프레임 읽는다(연출 상태에서 파생이라 해제 누수 없음, 각 피어 로컬, 새 RPC 없음). [floating-damage-design.md §5](floating-damage-design.md).
 
 ## 5. 알려진 한계
 
