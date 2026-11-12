@@ -761,8 +761,8 @@ MonoBehaviour:
     slowStartTime: 1.85
     bossHitAnimTime: 0.2
     bossHitTrimSeconds: 0
-    bossFreezeTime: 0
-    bossSlowTime: 0.2
+    bossFreezeTime: 0.19
+    bossSlowTime: 0.46
     chargeStartTime: -1
     killerActionEndTime: 0
   baseColor: {r: 0.8867924, g: 0.225881, b: 0.2298093, a: 1}
@@ -783,6 +783,6 @@ MonoBehaviour:
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0
   bossLook: 1
-  bossRimWidth: 0.35
-  bossRimSoftness: 0.1
+  bossRimWidth: 0.347
+  bossRimSoftness: 0
   bossRimInsideIntensity: 2
