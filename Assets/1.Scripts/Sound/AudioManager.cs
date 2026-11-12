@@ -123,6 +123,17 @@ public class AudioManager : MonoBehaviour
         return PlayEntry(entry, entry.Is3D ? worldPos : (Vector3?)null, VolumeForSource(source));
     }
 
+    /// <summary>3D 엔트리를 <paramref name="follow"/> 를 따라가며 재생한다(움직이는 발원). 2D 엔트리면 위치를 무시한다.</summary>
+    public IAudioPlayer Play(string key, Transform follow)
+    {
+        if (!TryGetEntry(key, out SoundEntry entry))
+        {
+            return null;
+        }
+
+        return entry.Is3D && follow != null ? PlayEntry(entry, follow.position, 1f, follow) : PlayEntry(entry, null);
+    }
+
     /// <summary>위치 무관(2D/전역) 사운드를 한 번 재생한다. 카탈로그에 있으면 시트 설정을 적용한다.</summary>
     public IAudioPlayer PlayOneShot(SoundID id)
     {
@@ -234,7 +245,7 @@ public class AudioManager : MonoBehaviour
         return _entryById.TryGetValue(id, out entry);
     }
 
-    private IAudioPlayer PlayEntry(SoundEntry entry, Vector3? worldPos, float volumeScale = 1f)
+    private IAudioPlayer PlayEntry(SoundEntry entry, Vector3? worldPos, float volumeScale = 1f, Transform follow = null)
     {
         string key = entry.Key;
         if (!entry.Sound.IsValid())
@@ -252,9 +263,11 @@ public class AudioManager : MonoBehaviour
             return null;
         }
 
-        IAudioPlayer player = worldPos.HasValue
-            ? BroAudio.Play(entry.Sound, worldPos.Value)
-            : BroAudio.Play(entry.Sound);
+        IAudioPlayer player = follow != null
+            ? BroAudio.Play(entry.Sound, follow)
+            : worldPos.HasValue
+                ? BroAudio.Play(entry.Sound, worldPos.Value)
+                : BroAudio.Play(entry.Sound);
 
         if (player == null || !player.IsActive)
         {
@@ -356,6 +369,8 @@ public class AudioManager : MonoBehaviour
     // · 같은 곡 반복 = 엔티티 Seamless 2초(끝 2초 전 같은 파일을 겹쳐 시작 — BroAudio 엔티티 TransitionTime 2).
     // · 곡이 바뀔 때 = 지금 곡을 페이드아웃 → **끝난 뒤** 새 곡 2초 페이드인. 서로 다른 곡은 겹치지 않는다(로딩 중 공백 허용).
     // · 씬 전환 시작 = 1초 아웃(BeginSceneTransition). 씬 로딩은 음악을 기다리지 않는다(여기는 소리만).
+    // · 11-12 경석: 로딩 씬 = 로비 곡(EnterLoadingBgm) · 연출(로비 포드 발사·맵 포드 착륙·존4 소개) 동안 BGM 없음 = 0.1초 아웃,
+    //   끝나면 그 씬 곡 2초 인(Begin/EndCinematicBgm) · 타이틀은 모니터 꺼짐 시작에 0.1초 아웃.
     // · 보스: 연출 시작(Preparing) = 스테이지 곡 1초 아웃 → 연출 중 무음 → 전투 시작 = 보스 곡 2초 인 →
     //   보스 사망 = 2초 아웃이 이긴다(그 뒤 오는 일반 아웃은 진행 중 아웃을 줄이지 못한다).
     // 판단은 이 한 곳 — "씬이 원하는 곡"과 "보스 상태"를 보고 지금 틀 곡을 고른다(EvaluateBgm). 요청은 멱등.
@@ -367,6 +382,9 @@ public class AudioManager : MonoBehaviour
     private const float BgmSceneFadeOut = 1f;
     private const float BgmBossDeathFadeOut = 2f;
     private const float BgmFadeIn = 2f;
+    private const float BgmCinematicFadeOut = 0.1f;   // "바로 꺼짐" — 뚝 끊으면 틱 잡음이 나서 0.1초(경석 11-12)
+    public const string LoadingBgmKey = "BGM_Lobby";  // 로딩 씬 = 로비 곡(경석 11-12)
+    private readonly HashSet<Object> _cinematicOwners = new HashSet<Object>();   // 지금 BGM 을 꺼 둔 연출들
 
     private string _sceneBgmKey;            // 이 씬이 원하는 곡(없으면 null)
     private BossBgmState _bossBgm;          // 같은 씬 안 보스 단계
@@ -374,6 +392,11 @@ public class AudioManager : MonoBehaviour
     private SoundID _bgmId = SoundID.Invalid;
     private bool _bgmStopping;
     private int _bgmGeneration;
+    private UnityEngine.SceneManagement.Scene _bossBgmScene;   // 보스 상태를 낸 씬(재합류 때 PlayBGM 이 지우지 않게)
+
+    // DontDestroyOnLoad 는 늘 떠 있으므로 "그 씬이 아직 있다"의 근거가 못 된다 — 예전처럼 지운다.
+    private bool IsBossBgmSceneLoaded =>
+        _bossBgmScene.IsValid() && _bossBgmScene.isLoaded && _bossBgmScene.name != "DontDestroyOnLoad";
 
     /// <summary>
     /// [이 피어] 이 씬의 BGM 을 정한다(Title·Lobby <c>Start</c>, Map <c>MainGameReady</c>). 지금 곡과 다르면 아웃 → 끝난 뒤 2초 인.
@@ -383,22 +406,76 @@ public class AudioManager : MonoBehaviour
     {
         _sceneBgmKey = key;
         // 씬 진입(Title·Lobby Start, Map MainGameReady)이다 — 이전 씬의 보스 상태는 남기지 않는다
-        // (보스전 중 ESC → 타이틀처럼 BeginSceneTransition 을 안 거친 이탈도 여기서 풀린다). 보스는 MainGameReady 뒤에 나온다.
-        _bossBgm = BossBgmState.None;
+        // (보스전 중 ESC → 타이틀처럼 BeginSceneTransition 을 안 거친 이탈도 여기서 풀린다).
+        // 🔴 단, 보스 상태를 낸 씬이 아직 떠 있으면 그대로 둔다 — 판 도중 재합류(C14)는 동기화 때 보스 단계·23호 사망을 먼저
+        //    적용하고 그 뒤에 MainGameReady(맵 곡)가 와서, 예전엔 여기서 지워져 보스전 중에 스테이지 곡이 났다(Codex 교차검증 11-12).
+        if (!IsBossBgmSceneLoaded) _bossBgm = BossBgmState.None;
         EvaluateBgm(BgmSceneFadeOut);
     }
 
-    /// <summary>[이 피어] 씬 전환이 시작됐다 — 지금 곡 1초 아웃(보스 사망 아웃 중이면 그대로 둔다). 새 씬이 PlayBGM 으로 다시 정한다.</summary>
-    public void BeginSceneTransition()
+    /// <summary>
+    /// [이 피어] 씬 전환이 시작됐다 — 지금 곡 아웃(기본 1초, 보스 사망 아웃 중이면 그대로 둔다). 새 씬이 PlayBGM 으로 다시 정한다.
+    /// 타이틀은 모니터가 꺼지기 시작하는 순간 0.1초로 부른다(경석 11-12).
+    /// </summary>
+    public void BeginSceneTransition(float fadeOut = BgmSceneFadeOut)
     {
         _sceneBgmKey = null;
         _bossBgm = BossBgmState.None;
+        _bossBgmScene = default;
+        _cinematicOwners.Clear();
+        EvaluateBgm(fadeOut);
+    }
+
+    /// <summary>
+    /// [이 피어] 로딩 씬이 떴다 — 로딩 동안은 로비 곡(경석 11-12: "로딩씬은 로비 BGM 을 이어서 쓴다").
+    /// 로비 끝 포드 발사 연출로 꺼 둔 로비 곡이 여기서 다시 2초 인으로 나오고, 맵 곡(재시작)이 울리고 있었으면 1초 아웃 뒤 바뀐다.
+    /// 로딩 흐름의 여러 지점(서버 시작·클라 상태 메시지·맵 로드 시작)에서 불려도 같은 곡이면 아무 일도 없다.
+    /// </summary>
+    public void EnterLoadingBgm()
+    {
+        _sceneBgmKey = LoadingBgmKey;
+        _bossBgm = BossBgmState.None;
+        _bossBgmScene = default;
+        _cinematicOwners.Clear();
         EvaluateBgm(BgmSceneFadeOut);
     }
 
-    /// <summary>[이 피어] 보스 단계(복제값을 각 피어가 본다). 사망 = 2초 아웃, 나머지 전환 = 1초 아웃.</summary>
-    public void SetBossBgmState(BossBgmState state)
+    /// <summary>
+    /// [이 피어] 연출이 시작됐다 — 연출 동안 BGM 없음(연출 사운드만). 지금 곡은 0.1초 아웃(경석 11-12 "바로 꺼짐").
+    /// 대상: 로비 끝 포드 발사 · 맵 포드 착륙 · 존4 소개 연출. 보스 등장·사망은 보스 단계(<see cref="SetBossBgmState"/>)가 따로 맡는다.
+    /// <paramref name="owner"/> 마다 한 번 — 같은 owner 로 여러 번 불러도 같다. 끝나면 <see cref="EndCinematicBgm"/>.
+    /// </summary>
+    public void BeginCinematicBgm(Object owner)
     {
+        if (owner == null || !_cinematicOwners.Add(owner)) return;
+        EvaluateBgm(BgmCinematicFadeOut);
+    }
+
+    /// <summary>[이 피어] 연출이 끝났다 — 남은 연출이 없으면 이 씬 곡(또는 보스 단계 곡)을 2초 인. 멱등.</summary>
+    public void EndCinematicBgm(Object owner)
+    {
+        if (owner == null || !_cinematicOwners.Remove(owner)) return;
+        EvaluateBgm(BgmSceneFadeOut);
+    }
+
+    // 파괴된 owner(EndCinematicBgm 없이 씬과 함께 사라진 연출)는 무음을 붙잡지 않는다.
+    private bool HasCinematic
+    {
+        get
+        {
+            if (_cinematicOwners.Count == 0) return false;
+            _cinematicOwners.RemoveWhere(o => o == null);
+            return _cinematicOwners.Count > 0;
+        }
+    }
+
+    /// <summary>
+    /// [이 피어] 보스 단계(복제값을 각 피어가 본다). 사망 = 2초 아웃, 나머지 전환 = 1초 아웃.
+    /// <paramref name="owner"/> = 상태를 낸 오브젝트 — 그 씬이 떠 있는 동안은 <see cref="PlayBGM(string)"/> 가 보스 상태를 지우지 않는다(재합류).
+    /// </summary>
+    public void SetBossBgmState(BossBgmState state, Component owner = null)
+    {
+        if (owner != null) _bossBgmScene = owner.gameObject.scene;
         if (_bossBgm == state) return;
         // 사망 뒤엔 보스 단계(Combat·Idle 등)가 늦게 와도 곡을 되살리지 않는다 — 씬 전환(BeginSceneTransition)만 푼다.
         // (늦은 합류는 23호 Dead 보정과 보스 단계 현재값 적용의 순서가 정해져 있지 않다.)
@@ -407,7 +484,7 @@ public class AudioManager : MonoBehaviour
         EvaluateBgm(state == BossBgmState.Defeated ? BgmBossDeathFadeOut : BgmSceneFadeOut);
     }
 
-    private string TargetBgmKey => _bossBgm switch
+    private string TargetBgmKey => HasCinematic ? null : _bossBgm switch
     {
         BossBgmState.Intro => null,
         BossBgmState.Combat => BossBgmKey,

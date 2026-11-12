@@ -120,6 +120,15 @@ public class BossTeleportManager : NetworkBehaviour
     private bool _rigStarted;            // 그 시작 시각으로 리그를 재생했나(존 스폰 전이면 다음 프레임에 다시)
     private bool _elevatorArrivedLocal;  // 이번 연출에서 보스룸 도착 RPC 를 받았나 — 암전 유지·칸 추적을 끝낸다
     private Transform _cameraFollow;     // 지금 카메라 임시 추적 대상(null = 플레이어)
+    // 엘리베이터 연출음(11-12, 3D). 리스너는 플레이어에 붙어 칸에 같이 타므로 칸 위치에 틀면 거리 0(너무 가깝다 — 기획 의견) →
+    // "리스너 + (칸 − 카메라)" 가상 자리 = 쿼터뷰 카메라가 칸을 보는 거리·방향에서 들린다. 매 프레임 옮겨 상승 중에도 거리가 유지된다.
+    private bool _elevatorStartSoundPlayed;
+    private bool _elevatorEndSoundPlayed;
+    private Ami.BroAudio.IAudioPlayer _elevatorStartSound;
+    private Ami.BroAudio.IAudioPlayer _elevatorEndSound;
+    private Transform _elevatorSoundAnchor;
+    private AudioListener _elevatorListener;
+    private Vector3 _elevatorSoundOffset;  // 리스너 → 가상 자리. 도착(보스룸 이동) 뒤엔 마지막 값을 유지한다
     // 이 피어에서 실루엣을 꺼 둔 참가자 — 연출이 끝나면(도착·취소·재도전·디스폰) 반드시 되켠다.
     private readonly List<PlayerSilhouetteTag> _suppressedSilhouettes = new List<PlayerSilhouetteTag>();
 
@@ -203,6 +212,7 @@ public class BossTeleportManager : NetworkBehaviour
         if (_rigStarted && _rig != null) _rig.ResetToIdle();
         _rigStarted = false;
         _elevatorSeenStart = 0d;
+        AudioManager.Instance?.EndCinematicBgm(this);
 
         base.OnNetworkDespawn();
     }
@@ -1086,11 +1096,17 @@ public class BossTeleportManager : NetworkBehaviour
         double start = _elevatorStartAt.Value;
         if (start != _elevatorSeenStart)
         {
+            // 연출음 — 도착(보스룸 이동)까지 갔으면 꼬리를 남기고, 그 전에 끝났으면(취소·재시작) 끊는다.
+            ResetElevatorSounds(stop: !_elevatorArrivedLocal);
             if (_rigStarted && _rig != null) _rig.ResetToIdle();
             _rigStarted = false;
             _elevatorArrivedLocal = false;
             _elevatorSeenStart = start;
             RestoreSilhouettes();
+            // 엘리베이터 연출(문 앞 이동·탑승·상승·암전) = 인게임 곡 없음(경석 11-12 — 0.1초 아웃). 끝(도착 완료)엔 보스 단계가
+            // 이미 등장 연출(무음)로 넘어가 있어 그대로 무음이 이어지고, 도착 무효·재도전 리셋이면 인게임 곡이 2초 인으로 돌아온다.
+            if (start > 0d) AudioManager.Instance?.BeginCinematicBgm(this);
+            else AudioManager.Instance?.EndCinematicBgm(this);
             // 다른 연출(또는 끝)로 바뀌었으면 보행 지시를 버린다. RPC 가 시작 시각 복제보다 먼저 와도 같은 연출이면 유지된다.
             if (_walk.Active && _walk.ElevatorStart != start) StopOwnerWalk();
         }
@@ -1117,9 +1133,81 @@ public class BossTeleportManager : NetworkBehaviour
 
         double elapsed = ServerNow - start;
         UpdateWalkerSilhouettes(elapsed);
+        UpdateElevatorSounds(elapsed);
 
         bool followCab = !_elevatorArrivedLocal && IsLocalElevatorParticipant() && _localTimeline.CameraFollowsCabAt(elapsed);
         SetCameraFollow(followCab ? _rig.CameraTarget : null);
+    }
+
+    /// <summary>
+    /// [전 피어] 엘리베이터 연출음(11-12). 시작음 = 파일 2.1초(둘째 소리)가 문 열림에 오게(하강 중 시작), 끝음 = 문 닫힘 시작(0~1.7초 닫힘·2.55초 상승).
+    /// 늦게 본 피어는 지난 만큼 건너뛴다. 가상 자리는 매 프레임 옮긴다(<see cref="_elevatorSoundOffset"/>).
+    /// </summary>
+    private void UpdateElevatorSounds(double elapsed)
+    {
+        UpdateElevatorSoundAnchor();
+        if (_elevatorSoundAnchor == null) return;
+
+        double startAt = _localTimeline.DoorOpenAt - GameSoundHooks.ElevatorStartFileDoorOpen;
+        if (!_elevatorStartSoundPlayed && elapsed >= startAt)
+        {
+            _elevatorStartSoundPlayed = true;
+            _elevatorStartSound = GameSoundHooks.PlayCinematicFollow(GameSoundHooks.DirectElevatorStart, _elevatorSoundAnchor,
+                elapsed - startAt, GameSoundHooks.ElevatorStartLength);
+            Debug.Log($"[Sound] 엘리베이터 시작음 — 가상 거리 {_elevatorSoundOffset.magnitude:0.#}m(카메라~칸)", this);
+        }
+
+        if (!_elevatorEndSoundPlayed && elapsed >= _localTimeline.DoorCloseAt)
+        {
+            _elevatorEndSoundPlayed = true;
+            _elevatorEndSound = GameSoundHooks.PlayCinematicFollow(GameSoundHooks.DirectElevatorEnd, _elevatorSoundAnchor,
+                elapsed - _localTimeline.DoorCloseAt, GameSoundHooks.ElevatorEndLength);
+        }
+    }
+
+    // 가상 자리 = 리스너 + (칸 − 카메라). 카메라·리스너가 없으면 칸 자리. 도착 뒤(카메라가 보스룸으로 옮김)엔 마지막 오프셋을 유지한다.
+    private void UpdateElevatorSoundAnchor()
+    {
+        Transform cab = _rig != null ? _rig.CameraTarget : null;
+        if (cab == null) return;
+
+        if (_elevatorSoundAnchor == null)
+        {
+            _elevatorSoundAnchor = new GameObject("ElevatorSoundAnchor").transform;
+            _elevatorSoundAnchor.SetParent(transform, false);
+        }
+
+        if (_elevatorListener == null || !_elevatorListener.isActiveAndEnabled)
+        {
+            _elevatorListener = null;
+            foreach (AudioListener listener in FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+            {
+                if (listener.isActiveAndEnabled) { _elevatorListener = listener; break; }
+            }
+        }
+
+        Camera cam = Camera.main;
+        if (_elevatorListener == null || cam == null)
+        {
+            _elevatorSoundAnchor.position = cab.position;
+            return;
+        }
+
+        if (!_elevatorArrivedLocal) _elevatorSoundOffset = cab.position - cam.transform.position;
+        _elevatorSoundAnchor.position = _elevatorListener.transform.position + _elevatorSoundOffset;
+    }
+
+    private void ResetElevatorSounds(bool stop)
+    {
+        if (stop)
+        {
+            GameSoundHooks.Stop(_elevatorStartSound);
+            GameSoundHooks.Stop(_elevatorEndSound);
+        }
+        _elevatorStartSound = null;
+        _elevatorEndSound = null;
+        _elevatorStartSoundPlayed = false;
+        _elevatorEndSoundPlayed = false;
     }
 
     /// <summary>걷기 시작한 슬롯의 플레이어 실루엣을 끈다 — 연출이 끝날 때까지(뒤이어 숨김). 늦게 합류해도 지난 슬롯을 한꺼번에 끈다.</summary>
