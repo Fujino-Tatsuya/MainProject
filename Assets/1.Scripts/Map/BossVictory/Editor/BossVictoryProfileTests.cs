@@ -167,7 +167,7 @@ public sealed class BossVictoryProfileTests
         Assert.IsNotNull(s, SettingsPath);
         BossVictoryProfile paladin = s.ProfileFor(TutorialCharacter.Paladin);
         Assert.IsTrue(paladin.handSwordLightning, "팔라딘 = 손 검 번개");
-        Assert.AreEqual(2f, paladin.fallingSwordScale, 1e-5f, "팔라딘 = 낙하 검 2배");
+        Assert.AreEqual(1.25f, paladin.fallingSwordScale, 1e-5f, "팔라딘 = 낙하 검 1.25배");
         Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(paladin));
         Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.defaultProfile), "기본 = 안 씀");
         Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.ProfileFor(TutorialCharacter.Gunner)), "거너 = 안 씀");

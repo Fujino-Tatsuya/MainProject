@@ -117,12 +117,12 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - 기본·거너·어쌔신: 끔(옛 흐름 — 평타 클립 0.2 → 백대쉬 0.2 → 스킬 0.65 에서 백대쉬 끊음).
 - 끊기·재생은 각 피어 표시만(서버 판정·새 RPC 없음). 이동은 오너 모터, 다른 피어는 위치 복제.
 
-## 4.10 팔라딘 손 검 번개·낙하 검 2배·느려짐 제외(269)
+## 4.10 팔라딘 손 검 번개·낙하 검 1.25배·느려짐 제외(269)
 
-프로필 칸 `handSwordLightning`(손 검 번개)·`fallingSwordScale`(낙하 검 배율) — 팔라딘 프로필만 켬·2, 기본·거너·어쌔신은 끔·1. 타임라인 창 '스킬 연출 시작' 노드 인스펙터에도 보인다. 노드가 아니라 칸인 이유: 손 검 번개 구간은 연출 전체로 고정이고, 낙하 검은 R 클립 Custom0 이 시각을 정한다.
+프로필 칸 `handSwordLightning`(손 검 번개)·`fallingSwordScale`(낙하 검 배율) — 팔라딘 프로필만 켬·1.25(처음 2 → 사용자 결정으로 1.25), 기본·거너·어쌔신은 끔·1. 타임라인 창 '스킬 연출 시작' 노드 인스펙터에도 보인다. 노드가 아니라 칸인 이유: 손 검 번개 구간은 연출 전체로 고정이고, 낙하 검은 R 클립 Custom0 이 시각을 정한다.
 - **손 검 번개**: 연출 시작(`Begin`, 이펙트 소거 직후) ~ 정리(`Teardown` — 끝·취소·랩 원상복구·파괴). 팔라딘 R 칼날 전기 엔트리(`FX_Sword_Electric_Entry`)·소켓(손 검 메쉬 `SM_Wep_Sword_03`)을 `PaladinSkillView.swordElectric` 에서 읽어 **따로 든 루프 핸들**로 재생(`BeginVictorySword`/`EndVictorySword`). 같은 소켓 플레이어를 쓰면 처치 연출 R 의 `OnEnd` → `StopUltimateVfxLocal` 때 같이 꺼진다. 엔트리 파트 delay 0.45초만큼 늦게 보인다. 손 검 크기는 그대로.
-- **낙하 검 2배**: 처치 연출 R(표시 전용)의 마무리 낙뢰 `FX_Lightening_Strike`(HolySword — 하늘 15m 에서 떨어지는 검)를 `PlayTargetStrikeAtLocal`(표시 전용 경로만 — 평소 R 은 배율 1) 에서 배율 × `fallingSwordScale` 로 재생.
-  - 🔴 매니저 배율은 인스턴스 루트 localScale 만 키우는데 칼 파트(HolySword·SwordGlow·SwordTwinkle)는 `scalingMode: Local` 이라 부모 배율을 무시한다 → 루트만 키우면 칼 크기는 그대로, 낙하 시작점만 30m 로 올라가 칼이 15m 공중에서 멈춘다. 그래서 루트 아래 Local 파트의 자기 localScale 도 같은 배율로 키우고(크기·낙하 거리 모두 2배 → 바닥에 닿음), 이펙트가 풀로 돌아가면(원샷 수명 2.2초 끝·걷힘·플레이어 비활성) `PaladinSkillView.Update` 가 원래 값으로 되돌린다.
+- **낙하 검 배율(팔라딘 1.25)**: 처치 연출 R(표시 전용)의 마무리 낙뢰 `FX_Lightening_Strike`(HolySword — 하늘 15m 에서 떨어지는 검)를 `PlayTargetStrikeAtLocal`(표시 전용 경로만 — 평소 R 은 배율 1) 에서 배율 × `fallingSwordScale` 로 재생.
+  - 🔴 매니저 배율은 인스턴스 루트 localScale 만 키우는데 칼 파트(HolySword·SwordGlow·SwordTwinkle)는 `scalingMode: Local` 이라 부모 배율을 무시한다 → 루트만 키우면 칼 크기는 그대로, 낙하 시작점만 30m 로 올라가 칼이 15m 공중에서 멈춘다. 그래서 루트 아래 Local 파트의 자기 localScale 도 같은 배율로 키우고(크기·낙하 거리 모두 같은 배율 → 바닥에 닿음), 이펙트가 풀로 돌아가면(원샷 수명 2.2초 끝·걷힘·플레이어 비활성) `PaladinSkillView.Update` 가 원래 값으로 되돌린다.
   - 낙하 검은 원래대로 수명 2.2초(Custom0 부터) 뒤 사라진다 — 연출 끝까지 남기지 않는다(그 위에 번개를 붙이지 않으므로 남길 이유 없음).
 - **느려짐 제외**(사용자 결정): 손 검 번개와 어쌔신 처치 오라(267 후속)는 '느려짐 시작' 뒤에도 원래 속도. `BossVictoryGlitchPresentation.KeepRealtime(handle)` 로 등록 → 처치자 이펙트 배율을 걸 때마다(`SetEffectRate`) 등록 핸들은 `EffectManager.SetPlayRate(handle, 1)`. 회차 시작·정리 때 비운다. (손 검 번개는 손 검을 따라가 원래도 `SetPlayRateForTarget(처치자 루트)` 에 안 걸리지만 같은 규칙으로 등록.)
   - 낙하 검은 월드 고정 원샷이라 처치자 배율에 원래 안 걸린다 — 느려짐 뒤에도 원래 속도로 떨어진다(맞추지 않음: 공중에서 거의 멈춘 칼이 되고, 마무리 낙뢰 타이밍이 클립 Custom0 과 어긋난다).

@@ -24,7 +24,7 @@ MonoBehaviour:
   backDashIdleDelay: 0.35
   finisherWithBackDash: 1
   handSwordLightning: 1
-  fallingSwordScale: 2
+  fallingSwordScale: 1.25
   timeline:
     desaturate:
     - start: 0.105
