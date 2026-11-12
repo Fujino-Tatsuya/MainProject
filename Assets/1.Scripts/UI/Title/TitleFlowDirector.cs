@@ -295,6 +295,8 @@ public sealed class TitleFlowDirector : MonoBehaviour
     // 🔴 로비 전환은 TitleSceneManager.StartGame 하나로 — 그게 검정 페이드 완료 후 로비로 간다(로비는 진입 시 페이드 인).
     private IEnumerator PowerOffThenLobby()
     {
+        // 타이틀 곡은 Press·접근 동안 남고, 모니터가 꺼지기 시작하는 순간 끈다(경석 11-12 — 0.1초 아웃). StartGame 의 1초 아웃은 이후 무해.
+        AudioManager.Instance?.BeginSceneTransition(0.1f);
         yield return _monitorDisplay.PowerOff(_powerOffDuration);
         _sceneManager.StartGame();
     }

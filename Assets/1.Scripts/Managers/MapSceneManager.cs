@@ -49,6 +49,10 @@ public class MapSceneManager : NemoSceneManager
     {
         if (AudioManager.Instance != null)
         {
+            // 로딩이 걷히면 곧 포드 착륙 연출이다 — 연출 무음을 맵 곡보다 먼저 건다. 반대 순서면 로비 곡이 0.1초가 아니라
+            // 맵 곡 전환용 1초 아웃으로 꺼진다(진행 중 아웃은 줄지 않는다). 맵 곡은 착륙이 끝나면 2초 인(경석 11-12).
+            if (!MapPodArrival.IsArrivalDoneLocal)
+                AudioManager.Instance.BeginCinematicBgm(MapPodArrival.Active);
             AudioManager.Instance.PlayBGM("BGM_InGame");
         }
     }

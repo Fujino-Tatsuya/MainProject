@@ -118,3 +118,54 @@
 11. 호스트·클라 각각 1~6 의 소리·이펙트가 한 번씩만(중복 0).
 
 **11-12 경석 Play(솔로) 결과:** 1~5·7 확인 — 취약 Q 가 벽까지 연속 밀림(로그 `취약 넉백` 최대 4회 → 외곽 벽 충돌), 바람 잔존 0, BGM 흐름 정상(로딩씬 진입 약 1초 뒤 아웃 · 보스 연출 무음 → 전투 보스 곡 · 사망 2초 아웃 → 로비). 남은 것: 8~11 MPPM 재합류, **로딩씬 BGM 유무(기획 문의 중)**, 연출 구간 효과음(보스 등장·사망 연출). ⚠️ 이 PC 에디터 PlayerPrefs 음악 볼륨이 0으로 저장돼 BGM 이 안 들렸던 적 있음 — 연결 문제로 오인하지 말 것(`Settings.Audio.Volume.1`).
+
+## 11-12 BGM 흐름 규칙 변경 (경석 지시) — 미커밋
+**연출 동안은 연출 사운드만(BGM 없음), 로딩씬은 로비 곡.** `AudioManager` 에 두 가지를 더했다.
+- `EnterLoadingBgm()` — 로딩 씬 = `BGM_Lobby`(`LoadingBgmKey`). `NetworkLoadingFlowController` 의 예전 `BeginSceneTransition` 4곳(서버 로딩 시작·재시작, 클라 LoadingScene 상태, 맵 로드 시작)을 이걸로 바꿨다. 같은 곡이면 아무 일도 없다.
+- `BeginCinematicBgm(owner)` / `EndCinematicBgm(owner)` — 연출 owner 가 하나라도 있으면 목표 곡 없음, 지금 곡 **0.1초 아웃**(뚝 끊으면 틱 잡음). 끝나면 그 씬 곡(보스 단계면 보스 곡) 2초 인. 파괴된 owner 는 자동으로 빠진다. `BeginSceneTransition`·`EnterLoadingBgm` 이 전부 지운다.
+
+| 구간 | 지금 동작 | 거는 곳 |
+|---|---|---|
+| 타이틀 | Press·접근 동안 타이틀 곡 → **모니터 꺼짐 시작에 0.1초 아웃** | `TitleFlowDirector.PowerOffThenLobby` → `BeginSceneTransition(0.1f)` |
+| 로비 끝 포드 발사 | 시작 순간 로비 곡 0.1초 아웃(연출 사운드만) | `LobbyPodLaunch.Update` 시작 시각 처음 본 순간 1번 · 끝/취소 = `ClearLocal` |
+| 로딩씬 | 로비 곡 2초 인 | `EnterLoadingBgm` |
+| 맵 포드 착륙 | 로딩이 걷히는 순간 로비 곡 0.1초 아웃 → 착륙 끝나면 **인게임 곡 2초 인** | `MapSceneManager.PlayInGameBgm`(맵 곡보다 먼저 무음) · `MapPodArrival.LateUpdate`(시작 본 순간 1번, 끝·중단 = `ClearLocal`/미무장) |
+| 존4 소개 연출 | **BGM 안 끊김**(인게임 곡 그대로 — 경석 11-12 정정, 무음 처리 되돌림) | — |
+| 보스 엘리베이터(문 앞 이동·탑승·상승·암전) | 시작 순간 인게임 곡 0.1초 아웃 → 도착 후 보스 등장 연출 무음으로 이어짐. 도착 무효·재도전 리셋이면 인게임 곡 2초 인 | `BossTeleportManager.UpdateElevatorLocal`(복제 시작 시각, 0 = 끝) |
+| 보스 등장·사망 | 그대로(등장 무음 → 전투 보스 곡 / 사망 2초 아웃) | 보스 단계 |
+| 맵→로비(결과·전멸) | 그대로 1초 아웃 → 로비 곡 | `PerformGoToResult` |
+| 재접속 대기 씬 | 1초 아웃 | `CleanupAfterDrop` |
+
+### Play 체크리스트 (BGM 흐름)
+1. 타이틀: Press 문구·카메라 접근 동안 타이틀 곡 유지 → 모니터가 꺼지기 시작하는 순간 곡이 바로 꺼짐.
+2. 로비: 로비 곡 → 출격 집결 확정 후 **포드 발사가 시작되는 순간** 곡이 바로 꺼지고 발사 효과음만.
+3. 로딩씬이 뜨면 로비 곡이 2초에 걸쳐 다시 나옴(처음부터).
+4. 맵: 로딩 화면이 걷히고 포드 착륙이 시작되는 순간 로비 곡이 바로 꺼짐 → 착륙 연출(효과음만) → 연출이 끝나 UI 가 돌아오는 순간 인게임 곡 2초 인. (예전처럼 로딩 진입 1초 뒤에 꺼지지 않아야 한다.)
+5. 존4 진입 소개 연출: 인게임 곡이 **끊기지 않고** 그대로 이어진다.
+5-1. 보스 엘리베이터: 집결 확정 후 연출(암전→문 앞→탑승→상승)이 시작되는 순간 인게임 곡이 바로 꺼지고, 보스방 도착·등장 연출 내내 무음 → 전투 시작에 보스 곡. (11-12 Play 지적: 예전엔 등장 연출 시작까지 인게임 곡이 남았다)
+6. 보스 연출 무음 → 전투 보스 곡 → 사망 2초 아웃 → 로비 곡(변화 없음 확인).
+7. 포드 발사가 취소되는 경우(가능하면)엔 로비 곡이 다시 나온다.
+8. MPPM: 클라도 같은 순간에 꺼지고 켜진다(로딩씬 = 로비 곡, 착륙 끝 = 인게임 곡).
+
+
+## 11-12 연출 사운드 5종 (SVN r670 `Sound_2/SFX/Direct`) — 미커밋
+키 = xlsx `Sound` 시트 entries[66~70](라이브러리 `Sound1Library`, 엔티티 = 키). 각 피어가 자기 화면 시각에 맞춰 로컬 재생(새 RPC 없음), 늦게 본 피어는 지난 만큼 앞을 건너뛰고 다 지났으면 안 튼다(`GameSoundHooks.PlayCinematic`).
+
+| 키 | 파일(길이) | 언제 | 기준(측정 50ms RMS) | 2D/3D | 거는 곳 |
+|---|---|---|---|---|---|
+| `Direct_Pod_Start` | Pod_Start(8.3s) | 로비 **해치 열림 − 0.75초**(`PodStartLeadSeconds`, 청취 3회째, 해치 클립 이벤트로 미리 계산 · 11-12 Play 정정 2회 — 발사 시작 기준이면 끝 2초가 로딩씬에 샘, 해치 기준이면 문 열림 소리 0.5초 늦음) | 2.0s = 발사(+3.83) · 5.3~6s = 가속·하강(+7.4~7.6) · 끝 = 로딩(+10.13) | 2D | `LobbyPodLaunch.UpdateLauncher` · 취소·재시작만 끊음 |
+| `Direct_Pod_End` | Pod_End(5.03s) | 맵 착지 시각에 파일 0.85초 충돌음 | 착지 = 시작 + √(2·5/9.81) ≈ 1.01s(앞 구간 건너뛰기) | 2D | `MapPodArrival.LateUpdate`(`TouchdownAt`) |
+| `Direct_Elevator_Start` | Elevator_Start(5.9s) | 파일 2.1초(둘째 소리) = 문 열림(`DoorOpenAt` 2.9s) → 0.8s 에 시작 | 앞 0.15~1.6s = 하강 | **3D** | `BossTeleportManager.UpdateElevatorSounds` |
+| `Direct_Elevator_End` | Elevator_End(4.47s) | 문 닫힘 시작(`DoorCloseAt`) | 0~1.7s 닫힘(클립 1.68s) · 2.55s 상승 | **3D** | 같은 곳 · 도착 전 취소면 끊음 |
+| `Direct_Boss_Start` | Boss_Start(7.6s) | 등장 시네마틱 Preparing 시작 | 2.75~3s 최대 ≈ 착지 충격 2.8s(워크인 1.6 + 강하 1.2) | 2D | `BossEncounterDirector.HandlePhaseSound` · 스킵·중단이면 0.3초 아웃 |
+
+**엘리베이터 3D 거리감(기획 "너무 가깝다")**: 리스너는 플레이어에 붙어 칸에 같이 타므로 칸 위치에 틀면 거리 0 이다. 그래서 발원을 **리스너 + (칸 − 카메라)** 가상 자리(`ElevatorSoundAnchor`, 매 프레임 이동)에 둔다 = 쿼터뷰 카메라가 칸을 보는 거리·방향에서 들린다. 감쇠는 시트 `minDistance 8 / maxDistance 60` — 시작음 재생 때 `[Sound] 엘리베이터 시작음 — 가상 거리 Nm` 로그가 찍히니 그 값을 보고 시트에서 조정한다(멀게 = min 을 줄인다). `AudioManager.Play(key, Transform follow)` 를 새로 둠(BroAudio followTarget).
+
+### Play 체크리스트 (연출 사운드)
+0. Unity `Tools/Data/사운드 동기화` → 엔티티 5개 생성(동기화 창에서 '동기화').
+1. 로비 출격: 발사 시작에 출발음 → 가장 큰 구간이 포드가 빨라질 때, 페이드 무렵 잦아드는지.
+2. 맵 착륙: 충돌음이 포드가 땅에 닿는 순간인지(어긋나면 `PodEndFileImpact`).
+3. 엘리베이터: 하강음 → 문 열릴 때 둘째 소리 / 문 닫힘 → 상승음. 거리감(로그의 가상 거리)·좌우가 이상하지 않은지.
+4. 보스 등장: 착지 충격과 최대 음량이 맞는지 · 스킵 시 0.3초에 꺼지는지.
+5. 존4 소개 연출: 인게임 곡이 끊기지 않는지.
+6. MPPM: 클라도 같은 순간 1번씩(중복 없음).

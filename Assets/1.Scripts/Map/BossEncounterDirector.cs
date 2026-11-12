@@ -293,6 +293,7 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
     private bool _skidSent;              // [서버] 이번 Impact 에 밀림·흔들림을 보냈다
     private bool _commandSent;           // [서버] 이번 Dialogue 에 웰즈 지시를 보냈다
     private readonly BossIntroSkipVotes _skipVotes = new BossIntroSkipVotes();
+    private Ami.BroAudio.IAudioPlayer _bossStartSound;   // [전 피어] 등장 연출음 — 스킵·중단 때만 끊는다
     private bool _defeatHandled;
     private double _resultTransitionAt;
 
@@ -315,6 +316,8 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         // 보스 BGM(PLAN-sound-mix 3단계) — 복제 단계를 모든 피어가 보고 각자 튼다. 늦게 들어와도 지금 단계로 맞춘다.
         phase.OnValueChanged += HandlePhaseBgm;
         HandlePhaseBgm(BossEncounterPhase.Idle, phase.Value);
+        // 등장 연출음 — 바뀌는 순간만(늦게 합류한 피어는 지난 연출음을 틀지 않는다).
+        phase.OnValueChanged += HandlePhaseSound;
 
         if (!IsServer)
             return;
@@ -368,9 +371,32 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// [전 피어] 보스 등장 연출음(Boss_Start 7.6초, 11-12) = 시네마틱 Preparing 시작. 파일이 2.75~3초에 최대가 되는데
+    /// 기본값 워크인 0.25 + 3.5/2.6 ≈ 1.6초 + 강하 1.2초 = 착지 충격 ≈ 2.8초라 그대로 맞는다(워크인·강하 칸을 바꾸면 어긋난다).
+    /// 스킵(Dialogue 를 거치지 않고 Combat)·중단(Idle·FailedSafe)이면 0.3초에 끊는다 — 정상 흐름은 끝까지 둔다.
+    /// </summary>
+    private void HandlePhaseSound(BossEncounterPhase previous, BossEncounterPhase next)
+    {
+        if (next == BossEncounterPhase.Preparing && previous != BossEncounterPhase.Preparing && introEnabled)
+        {
+            _bossStartSound = GameSoundHooks.PlayCinematic(GameSoundHooks.DirectBossStart, 0d, GameSoundHooks.BossStartLength);
+            return;
+        }
+
+        bool skipped = next == BossEncounterPhase.Combat && previous != BossEncounterPhase.Dialogue;
+        bool aborted = next == BossEncounterPhase.Idle || next == BossEncounterPhase.FailedSafe;
+        if (skipped || aborted)
+        {
+            GameSoundHooks.Stop(_bossStartSound, 0.3f);
+            _bossStartSound = null;
+        }
+    }
+
     public override void OnNetworkDespawn()
     {
         phase.OnValueChanged -= HandlePhaseBgm;
+        phase.OnValueChanged -= HandlePhaseSound;
 
         // 씬 전환 중 콜백이 남으면 사라진 오브젝트를 만지게 된다 — 반드시 대칭 해제.
         if (_teleportManager != null)

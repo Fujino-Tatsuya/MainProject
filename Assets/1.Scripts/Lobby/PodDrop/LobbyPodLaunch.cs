@@ -135,6 +135,10 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private PodAnimatorDriver _launcherDriver;
     private bool _hatchHeldOnBoard;
     private int _launchFastStage; // 지금 발사 클립 가속 단계(0 = 1배속, 1·2 = 가속 단계)
+    private bool _podStartSoundPlayed;                 // 이번 연출(시작 시각)에 출발음을 틀었다
+    private bool _hatchCueRead;                        // 해치 클립 이벤트 위치를 읽었다(없으면 +∞ → 서버 복제 시각만 쓴다)
+    private float _hatchClipEventSeconds = float.PositiveInfinity;
+    private Ami.BroAudio.IAudioPlayer _podStartSound;  // 연출 취소·재시작 때만 끈다 — 로비가 내려갈 때는 끝까지 둔다(로딩 전에 끝난다)
 
     // 발사 클립 이벤트 위치(클립 초, 할 일 198) — 컨트롤러 클립에서 한 번 읽는다. 없는 이벤트 = +∞.
     private bool _launchCuesRead;
@@ -507,6 +511,12 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         {
             ClearLocal();
             _seenStart = start;
+            GameSoundHooks.Stop(_podStartSound);   // 취소·재시작이면 끊는다
+            _podStartSound = null;
+            _podStartSoundPlayed = false;
+            // 포드 발사 연출 = BGM 없음(경석 11-12 — 로비 곡 0.1초 아웃). 한 번만 — 로딩 씬이 로비 곡을 다시 켜는데(EnterLoadingBgm)
+            // 로비가 아직 떠 있어 매 프레임 걸면 그걸 다시 끈다. 연출이 취소되면 ClearLocal 이 로비 곡을 되돌린다.
+            if (start > 0d) AudioManager.Instance?.BeginCinematicBgm(this);
         }
 
         if (start <= 0d)
@@ -520,6 +530,22 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             _timeline = settings.CreateLobbyTimeline(ReplicatedWalkSeconds());
 
         double elapsed = ServerNow - start;
+        // 출발음(Pod_Start 8.3초) = 해치 열림(복제 시각)부터. 파일이 연출에 맞춰 만들어져 있다 — 2.0초 첫 큰 소리 = 다 앉아 발사 시작,
+        // 5.3~6초 최대 = 가속·하강, 끝 = 맵 로딩 시작(11-12 Play 로그 해치 +1.92·발사 +3.83·하강 +7.63·로딩 +10.13). 발사 시작 기준이면 끝 2초가 로딩씬에 샜다(경석 11-12).
+        // 해치 열림 신호(서버 복제)는 이벤트가 난 뒤에 오므로, 해치 클립 이벤트 위치로 미리 계산한 시각(둘 중 이른 쪽)에서 PodStartLeadSeconds 앞에 시작한다
+        // (11-12 Play — 문 열리는 소리가 화면보다 약 0.5초 늦었다).
+        if (!_hatchCueRead && launcher != null)
+        {
+            _hatchCueRead = true;
+            _hatchClipEventSeconds = PodAnimatorDriver.ClipEventSeconds(launcher, settings.Lobby.hatchState, PodAnimEventRelay.KindStage);
+        }
+        double hatchOpened = Math.Min(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start), _timeline.HatchAt + (double)_hatchClipEventSeconds);
+        double podSoundAt = hatchOpened - GameSoundHooks.PodStartLeadSeconds;
+        if (!_podStartSoundPlayed && !double.IsInfinity(hatchOpened) && elapsed >= podSoundAt)
+        {
+            _podStartSoundPlayed = true;
+            _podStartSound = GameSoundHooks.PlayCinematic(GameSoundHooks.DirectPodStart, elapsed - podSoundAt, GameSoundHooks.PodStartLength);
+        }
         // 연출 내내(출격 확정 ~ 로딩) 모든 플레이어의 벽 뒤 실루엣을 끈다 — 로컬 시각 값. 발사대 벽 뒤로 걸어 들어갈 때 윤곽선이 컷을 깨지 않게.
         _silhouettes.SuppressAll();
         UpdateLauncher(elapsed, _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start)),
@@ -613,6 +639,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     {
         StopOwnerWalk();
         _timeline = null;
+        AudioManager.Instance?.EndCinematicBgm(this);
 
         if (_overlay != null) _overlay.Clear();
         _silhouettes.RestoreAll();

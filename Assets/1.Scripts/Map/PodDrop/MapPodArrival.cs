@@ -96,6 +96,8 @@ public sealed class MapPodArrival : NetworkBehaviour
     private PodDropMapTimeline _timeline;
     private bool _localActive;
     private bool _localFinished;
+    private bool _cinematicBgmBegun;         // 착륙 연출 BGM 무음을 걸었다(한 번만 — 끝에서 ClearLocal 이 푼다)
+    private bool _podEndSoundPlayed;         // 도착음(Pod_End)을 틀었다(한 번만)
     private PodDropScreenOverlay _overlay;
     private CameraTargetSwitcher _heldCamera;
     private GameObject _pod;
@@ -398,6 +400,8 @@ public sealed class MapPodArrival : NetworkBehaviour
         if (!_armed.Value || settings == null)
         {
             if (_localActive) ClearLocal();
+            // 연출이 꺼졌거나 중단됐다(AbortServer) — 맵 곡을 붙잡지 않는다(MapSceneManager 가 MainGameReady 에 건 무음 포함). 멱등.
+            AudioManager.Instance?.EndCinematicBgm(this);
             return;
         }
 
@@ -418,6 +422,24 @@ public sealed class MapPodArrival : NetworkBehaviour
             _localFinished = true;
             Debug.Log($"[SceneFlow] {Tag} 도착 연출 끝 — UI·튜토리얼 시작");
             return;
+        }
+
+        // 착륙 연출 = BGM 없음(경석 11-12 — 로딩 동안 이어진 로비 곡 0.1초 아웃 → 끝나면 맵 곡 2초 인). 시작을 본 순간 한 번 — 끝난 뒤 합류한 피어는 위에서 이미 빠져 걸지 않는다.
+        if (started && !_cinematicBgmBegun)
+        {
+            _cinematicBgmBegun = true;
+            AudioManager.Instance?.BeginCinematicBgm(this);
+        }
+
+        // 도착음(Pod_End 5.03초, 11-12) — 파일 0.85초 충돌음 = 착지 시각(앞 구간 건너뛰기면 시작 + √(2h/g) ≈ 1.01초). 착지 시각을 알게 된 순간 한 번.
+        if (started && !_podEndSoundPlayed)
+        {
+            double touchdown = timeline.TouchdownAt(deployed);
+            if (!double.IsInfinity(touchdown))
+            {
+                _podEndSoundPlayed = true;
+                GameSoundHooks.PlayCinematic(GameSoundHooks.DirectPodEnd, elapsed - (touchdown - GameSoundHooks.PodEndFileImpact), GameSoundHooks.PodEndLength);
+            }
         }
 
         // 디졸브 끝 = 서버가 잠금을 푸는 순간(조작 복귀) — 같은 순간 카메라를 플레이어로 넘긴다. 실루엣은 연출 끝(ClearLocal)까지 꺼 둔다(할 일 230).
@@ -608,6 +630,7 @@ public sealed class MapPodArrival : NetworkBehaviour
     private void ClearLocal()
     {
         _localActive = false;
+        AudioManager.Instance?.EndCinematicBgm(this);
         if (_overlay != null) _overlay.Clear();
         _silhouettes.RestoreAll();
         ReleaseCameraFollow();

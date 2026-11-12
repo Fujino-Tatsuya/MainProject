@@ -46,6 +46,48 @@ public static class GameSoundHooks
     public const string No23Drone = "S1_23_Drone_Explode";
     public const string InterruptWall = "S1_Interrupt_Wall";
 
+    // ── 연출(Sound_2/SFX/Direct, 11-12) — 각 피어가 자기 화면 시각에 맞춰 로컬 재생(새 RPC 없음) ──
+    public const string DirectPodStart = "Direct_Pod_Start";
+    public const string DirectPodEnd = "Direct_Pod_End";
+    public const string DirectElevatorStart = "Direct_Elevator_Start";
+    public const string DirectElevatorEnd = "Direct_Elevator_End";
+    public const string DirectBossStart = "Direct_Boss_Start";
+
+    // 파일 길이·기준점(11-12 측정, 50ms RMS). 늦게 본 피어는 지난 만큼 앞을 건너뛰고, 다 지났으면 안 튼다.
+    public const float PodStartLength = 8.3f;
+    /// <summary>Pod_Start 를 해치 열림(클립 이벤트)보다 몇 초 앞에 시작하는가 — 11-12 Play 청취 2회(0 → 0.5초 늦음, 0.5 → 0.2~0.3초 늦음).</summary>
+    public const float PodStartLeadSeconds = 1.125f;
+    /// <summary>Pod_End.wav(5.03초) 안의 착지 충돌음(초) — 0.85초가 가장 크다. 착지 시각에 맞춘다.</summary>
+    public const float PodEndFileImpact = 0.85f;
+    public const float PodEndLength = 5.03f;
+    /// <summary>Elevator_Start.wav(5.9초) 안의 문 열림 시작(초) — 앞 0.15~1.6초 = 하강, 2.1초부터 둘째 소리. 문 열림 시각에 맞춘다.</summary>
+    public const float ElevatorStartFileDoorOpen = 2.1f;
+    public const float ElevatorStartLength = 5.9f;
+    /// <summary>Elevator_End.wav(4.47초) — 0~1.7초 문 닫힘(클립 1.68초), 2.55초부터 상승. 문 닫힘 시작에 튼다.</summary>
+    public const float ElevatorEndLength = 4.47f;
+    public const float BossStartLength = 7.6f;
+
+    /// <summary>
+    /// 시작 시각이 <paramref name="secondsSinceStart"/> 초 지난 연출음을 튼다 — 0 이하면 지금(또는 그만큼 뒤), 양수면 앞을 건너뛴다.
+    /// 이미 끝났을 길이면 안 튼다(늦게 합류한 피어). 연출음은 2D 라 위치는 쓰지 않는다.
+    /// </summary>
+    public static IAudioPlayer PlayCinematic(string key, double secondsSinceStart, float length)
+    {
+        if (secondsSinceStart >= length - 0.1) return null;
+        IAudioPlayer player = Play(key, Vector3.zero);
+        if (player == null) return null;
+        return secondsSinceStart > 0d ? player.SetStartOffset((float)secondsSinceStart) : secondsSinceStart < 0d ? player.SetDelay((float)-secondsSinceStart) : player;
+    }
+
+    /// <summary>3D 연출음을 <paramref name="follow"/> 위치를 따라가며 튼다(움직이는 칸). <see cref="PlayCinematic"/> 과 같은 건너뛰기 규칙.</summary>
+    public static IAudioPlayer PlayCinematicFollow(string key, Transform follow, double secondsSinceStart, float length)
+    {
+        if (secondsSinceStart >= length - 0.1 || follow == null) return null;
+        IAudioPlayer player = AudioManager.Instance?.Play(key, follow);
+        if (player == null) return null;
+        return secondsSinceStart > 0d ? player.SetStartOffset((float)secondsSinceStart) : player;
+    }
+
     /// <summary>팔라딘 평타 0기반 타수 → 키. 범위 밖이면 마지막 타.</summary>
     public static string PaladinAttackKey(int attackIndex) => PaladinAttack[Mathf.Clamp(attackIndex, 0, PaladinAttack.Length - 1)];
 
