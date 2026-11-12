@@ -468,3 +468,10 @@ MonoBehaviour:
     bossFreezeTime: 0
     bossSlowTime: 0.2
     killerActionEndTime: 0
+  baseColor: {r: 0.8392157, g: 0.67058825, b: 0.4117647, a: 1}
+  contrastMode: 0
+  contrastHueOffset: 174.0697
+  contrastColor: {r: 0.25, g: 0.62, b: 1, a: 1}
+  contrastMinSaturation: 0.45
+  contrastMinValue: 0.6
+  paletteOverrides: []

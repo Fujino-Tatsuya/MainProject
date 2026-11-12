@@ -48,6 +48,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     BossEncounterDirector _director;
     BossVictoryGlitchSettings _settings;
     BossVictoryProfile _profile;   // 처치자 캐릭터 프로필(267 — 타임라인·백대쉬·시간 배율·처치 연출 스킬 칸). 회차 시작 때 고정
+    BossVictoryPalette _palette;   // 처치자 프로필 기준 계산 팔레트(271 — 기준 색 → 화면 효과 색). 프로필과 같이 회차 시작 때 고정
     TutorialCharacter _killerCharacter;
     int _sequence = -1;
     bool _running;
@@ -95,6 +96,17 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     /// <summary>[이 피어] 이번 회차가 쓰는 프로필(연출 중이 아니면 null).</summary>
     public BossVictoryProfile Profile => _running ? _profile : null;
+
+    /// <summary>[이 피어] 이번 회차 팔레트(271, 연출 중이 아니면 null).</summary>
+    public BossVictoryPalette Palette => _running ? _palette : null;
+
+    /// <summary>창에서 기준 색·직접 지정·공용 색을 바꿨을 때 — 지금 회차 팔레트를 다시 계산해 화면에 넣는다(에디터 미리보기, 표시만). TV 꺼짐은 다음 꺼짐부터.</summary>
+    public void RefreshLook()
+    {
+        if (!_running || _profile == null) return;
+        _palette = BossVictoryPaletteCalc.Compute(_settings, _profile);
+        if (_renderOn) BossVictoryGlitchRender.ApplyLook(_settings, _palette);
+    }
 
     // ── 시계 진단(디버그 씬 — 랩 timelineClockLog) · 클립 노드 실측 표본(에디터 — 창이 클립 시간을 타임라인 초로 그린다) ──
     /// <summary>[디버그] 켜면 노드·키가 발화할 때마다 "타임라인 t / 실제 경과" 한 줄(디버그 랩이 켠다 — 랩 인스펙터 timelineClockLog).</summary>
@@ -378,6 +390,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         // 처치자를 못 찾으면(나감 등) 기본 프로필(267).
         _killerCharacter = _killer != null ? TutorialLocalPlayerInfo.ResolveCharacter(_killer) : TutorialCharacter.None;
         _profile = _settings.ProfileFor(_killerCharacter);
+        _palette = BossVictoryPaletteCalc.Compute(_settings, _profile);   // 271 — 새 복제 없음(같은 KillerClientId → 같은 프로필 → 같은 색)
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         // 디버그 랩(244) 표시용 팀원 복제본 — Player 가 아니라 위에서 안 잡힌다. 비어 있으면 실게임과 같다.
         foreach (GameObject mate in BossEncounterDirector.DevVictoryExtraTeammates)
@@ -769,7 +782,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _noiseOffset = Vector2.zero;
         _noiseCamValid = false;
         _cutJumped = false;
-        _renderOn = BossVictoryGlitchRender.Enable(_settings);
+        _renderOn = BossVictoryGlitchRender.Enable(_settings, _palette);
         if (!_renderOn)
         {
             Edit.LogWarning($"[BossVictory] 셰이더({BossVictoryGlitchRender.MaskShaderName}·{BossVictoryGlitchRender.CompositeShaderName})가 없어 글리치 없이 돈다.", this);
@@ -1040,7 +1053,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         Shader shader = _settings.crtOffShader != null ? _settings.crtOffShader : Shader.Find(BossVictoryCrtOff.ShaderName);
         if (shader == null)
             Edit.LogWarning($"[BossVictory] 셰이더 {BossVictoryCrtOff.ShaderName} 가 없어 CRT 꺼짐 대신 검정 페이드.", this);
-        _crt = new BossVictoryCrtOff("BossVictory", shader, _settings.crtOffGlowColor);
+        _crt = new BossVictoryCrtOff("BossVictory", shader, _palette != null ? _palette[BossVictoryPaletteSlot.CrtGlow] : _settings.crtOffGlowColor);
     }
 
     // ── 카메라 컷(4단계) ───────────────────────────────────────────────────

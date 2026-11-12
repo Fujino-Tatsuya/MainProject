@@ -1,9 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
 /// <summary>
 /// 보스 처치 연출 캐릭터별 프로필(할 일 267 — A안: 캐릭터별 값을 에셋 통째로). 타임라인 전체(카메라 컷·처치자 평타·마커·끝 자르기·느려짐·보스 노드·화면 효과 세기 클립) +
-/// 백대쉬 + 대상별 시간 배율 + 처치 연출 스킬 칸. 화면 효과 모양(글리치 색·노이즈·찢김·CRT·셰이더·벽 숨김 기준)은 공용 <see cref="BossVictoryGlitchSettings"/>.
+/// 백대쉬 + 대상별 시간 배율 + 처치 연출 스킬 칸 + 팔레트 기준 색(271). 화면 효과 모양(노이즈·찢김·CRT·셰이더·벽 숨김 기준)과 기준(팔라딘) 색은 공용 <see cref="BossVictoryGlitchSettings"/> — 실제 색 = <see cref="BossVictoryPaletteCalc"/>.
 /// 고르는 곳 = 공용 설정의 '캐릭터 → 프로필' 표(<see cref="BossVictoryGlitchSettings.characterProfiles"/>), 없거나 비면 기본 프로필(<see cref="BossVictoryGlitchSettings.defaultProfile"/>).
 /// 정본 에셋 = <c>Resources/BossVictory/Profiles/</c>(저작 메뉴 <c>Tools/Boss Victory/캐릭터별 프로필 만들기 (267)</c>).
 /// </summary>
@@ -47,6 +48,22 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 캐릭터를 골라 편집)")]
     [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
     public BossVictoryTimeline timeline = BossVictoryTimeline.CreateDefault();
+
+    [Header("팔레트(271 — 기준 색 하나로 화면 효과 색 자동, 계산 = BossVictoryPaletteCalc)")]
+    [Tooltip("이 캐릭터 기준 색. 공용 설정 색들은 '공용 amberColor 기준' 관계로 해석해 이 색을 따라간다(색조 회전 + 채도·밝기 비율). 공용 amberColor 와 같으면 공용 색 그대로.")]
+    public Color baseColor = BossVictoryPaletteCalc.DefaultBaseColor;
+    [Tooltip("대비 그룹(① 마젠타·② 블루 원 좌우·TV 꺼짐 발광) 기준 색 — 자동 = 기준 색 색조 + 색조 차이 / 직접 지정 = 아래 대비 색.")]
+    public BossVictoryContrastMode contrastMode = BossVictoryContrastMode.Auto;
+    [Tooltip("자동일 때 대비 기준 색 색조 = 기준 색 색조 + 이 값(도). 기본 = 공용 TV 꺼짐 파랑 − 공용 amberColor 에서 역산(팔라딘 결과 그대로).")]
+    [Range(-180f, 180f)] public float contrastHueOffset = BossVictoryPaletteCalc.DefaultContrastHueOffset;
+    [Tooltip("직접 지정일 때 대비 기준 색(TV 꺼짐 발광 색이 그대로 이 색).")]
+    public Color contrastColor = BossVictoryPaletteCalc.DefaultContrastColor;
+    [Tooltip("자동일 때 대비 기준 색 채도 하한 — 기준 색이 회색에 가까워도 대비색이 죽지 않게.")]
+    [Range(0f, 1f)] public float contrastMinSaturation = BossVictoryPaletteCalc.DefaultContrastMinSaturation;
+    [Tooltip("자동일 때 대비 기준 색 밝기 하한 — 기준 색이 어두워도 대비색이 보이게.")]
+    [Range(0f, 1f)] public float contrastMinValue = BossVictoryPaletteCalc.DefaultContrastMinValue;
+    [Tooltip("칸별 직접 지정(기본 = 비어 있음 = 전부 자동). manual 켬 = 그 칸은 이 색 그대로.")]
+    public List<BossVictoryPaletteOverride> paletteOverrides = new List<BossVictoryPaletteOverride>();
 
     void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 

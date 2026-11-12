@@ -56,6 +56,7 @@ internal static class CombatEditModeTestRunner
         "^BossVictoryKeys", // BossVictoryKeysTests — 처치 연출 타임라인 키·옛 페이드/2점 컷 이관(PLAN-boss-victory-glitch 255 후속 6)
         "^BossVictoryAnimTrim", // BossVictoryAnimTrimTests — 처치 연출 스킬 클립 끝 자르기 프레임·멈춤·느려짐 판정(PLAN-boss-victory-glitch 255 후속 7)
         "^BossVictoryProfile", // BossVictoryProfileTests — 캐릭터별 처치 연출 프로필 표 고르기·폴백·에셋 연결(할 일 267)
+        "^BossVictoryPalette", // BossVictoryPaletteTests — 기준 색 → 팔레트 자동·직접 지정·대비 하한(할 일 271)
         "^BossVictoryRectify", // BossVictoryRectifyTests — 배경 글자 RECTIFY 배치·기본 클립·폰트 아틀라스(할 일 267 후속)
         "^BossVictoryTimeline" // BossVictoryTimelineTests — 처치 연출 타임라인 클립 평가·기본값 = 옛 곡선(PLAN-boss-victory-glitch 타임라인 창)
     };

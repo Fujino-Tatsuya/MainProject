@@ -43,7 +43,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
 
 
     [Header("글리치 색·모양")]
-    [Tooltip("배경 호박색(sRGB).")]
+    [Tooltip("배경 호박색(sRGB) = 팔레트 기준 색의 기준(271). 이 SO 의 색들은 이 색 기준 관계로 해석돼 처치자 프로필 baseColor 를 따라간다(TV 꺼짐 발광 = 대비 기준 색의 기준). 실제 색 = BossVictoryPaletteCalc.")]
     public Color amberColor = new Color32(0xD2, 0xA6, 0x4E, 0xFF);
     [Min(1f)] public float scanlineCount = 360f;
     [Tooltip("CRT 주사선을 바닥에서 뺀다(267 후속) — 깊이로 복원한 표면 법선의 위쪽 성분(normal.y)이 이 값 이하 = 벽(주사선 그대로).")]
