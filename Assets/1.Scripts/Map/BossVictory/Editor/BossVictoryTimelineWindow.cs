@@ -46,6 +46,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         if (_settings == null) _settings = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(DefaultAssetPath);
         Undo.undoRedoPerformed += OnUndoRedo;
+        SceneView.duringSceneGui += OnSceneGUI;   // 순간이동 Q 두 점 핸들(272)
         wantsMouseMove = false;
         _inspectorHeight = EditorPrefs.GetFloat(InspectorHeightPref, DefaultInspectorHeight);
     }
@@ -96,6 +97,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void OnDisable()
     {
         Undo.undoRedoPerformed -= OnUndoRedo;
+        SceneView.duringSceneGui -= OnSceneGUI;
     }
 
     // ── 캐릭터별 프로필(267) — 도구 막대 드롭다운(팔라딘·거너·어쌔신 — 기본 프로필 에셋은 11-12 삭제, 표에 없는 캐릭터 = 코드 기본값). Play 중 연출이 돌면 실제 처치자 캐릭터를 따라간다. ──
@@ -1401,7 +1403,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryMarker.FocusKiller => "처치자가 아닌 피어의 카메라가 이 시각에 처치자로 즉시 넘어간다(처치자 화면 그대로).",
         BossVictoryMarker.HideOthers => "이 시각에 처치자 외 플레이어 캐릭터를 모든 화면에서 숨긴다.",
         BossVictoryMarker.BackDashStart =>
-            "이 시각에 처치자가 백대쉬한다 — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다. " +
+            "이 시각에 처치자가 백대쉬한다(처치자 이동 = 순간이동이면 순간이동, 후퇴 차징이면 가까울 때만 E + 백대쉬 — 272) — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다(순간이동은 스킬 직전에 한다). " +
             "처치자 순서 노드는 각 피어가 자기 화면 시계로 앞으로만 판정 — 스크럽으로 되돌아가지 않는다(다시 보려면 ⏮).",
         BossVictoryMarker.FinisherStart =>
             "클립 시작 = 처치 연출 스킬을 표시용으로 바로 트는 시각 — 백대쉬가 덜 끝났으면 끊고, 처치 순간 쓰던 스킬이 남아 있어도 기다리지 않는다. " +
@@ -1416,6 +1418,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             "이 시각에 보스를 그 자세로 멈춘다(배율 0). 0 = 끔. 뒤에 슬로우가 오면 슬로우 배율로 다시 움직인다(시각이 가장 늦은 노드가 이김).",
         BossVictoryMarker.BossSlow =>
             "이 시각부터 보스 ×End 후 배율(아래 칸). 0 = 끔 — '느려짐 시작'(그것도 끔이면 처치 연출 스킬 End) 순간을 따른다. 뒤에 정지가 오면 정지.",
+        BossVictoryMarker.ChargeStart =>
+            "거너(처치자 이동 = 후퇴 차징)만 — 처치 순간 보스와 가까워 E·백대쉬를 했을 때 이 시각에 Q 차징을 시작한다(멀면 백대쉬 시작 시각에 바로 차징 — 이 마커 무시). " +
+            "기본 = 백대쉬 시작 + 0.2초(끌면 그 시각에 고정). 다른 이동 방식에선 쓰지 않는다.",
         _ => "",
     };
 
@@ -1557,6 +1562,77 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // ── 'Scene 뷰로' — 지금 보고 있는 Scene 뷰 화면을 컷 화면으로(255 후속 2) ──
     // 저장 = 기준 좌표계(기준점 + 처치자→보스 축). 그 기준이 되는 처치자·보스 위치:
     // Play 중 연출이 돌면 지금 컷이 잡은 위치(컷 전이면 지금 위치) · 아니면 이 에디터 세션에서 마지막으로 본 회차 위치(SessionState). 없으면 버튼을 막는다.
+
+    // ── 순간이동 Q 두 점(272) — 이 창이 열려 있고 프로필 이동이 '순간이동'이면 Scene 뷰에 순간이동 지점·도착 지점·경로 + 끌기 핸들 ──
+    // 기준 보스 = 재생 중 보스 → 이 세션 마지막 회차 보스(SessionState) → 열린 씬의 23호. 저장 = 보스 기준 오프셋(BossVictoryKillerMoves.BossLocalOffset, 높이 0).
+
+    const string BossPoseKey = "BossVictoryTimeline.LastBossPose";
+    static readonly Color TeleportColor = new Color(0.75f, 0.45f, 1f);
+    static readonly Color ArrivalColor = new Color(1f, 0.55f, 0.85f);
+
+    static bool TryGetBossPose(out Vector3 position, out Quaternion rotation, out string source)
+    {
+        GameObject boss = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null ? BossVictoryGlitchPresentation.Instance.BossObject : null;
+        if (boss != null)
+        {
+            position = boss.transform.position;
+            rotation = boss.transform.rotation;
+            SessionState.SetBool(BossPoseKey, true);
+            SessionState.SetVector3(BossPoseKey + ".Pos", position);
+            SessionState.SetVector3(BossPoseKey + ".Euler", rotation.eulerAngles);
+            source = $"재생 중 보스 {boss.name}";
+            return true;
+        }
+        if (SessionState.GetBool(BossPoseKey, false))
+        {
+            position = SessionState.GetVector3(BossPoseKey + ".Pos", Vector3.zero);
+            rotation = Quaternion.Euler(SessionState.GetVector3(BossPoseKey + ".Euler", Vector3.zero));
+            source = "마지막 회차 보스";
+            return true;
+        }
+        TwentyThreeBoss scene = Object.FindFirstObjectByType<TwentyThreeBoss>();
+        position = scene != null ? scene.transform.position : default;
+        rotation = scene != null ? scene.transform.rotation : Quaternion.identity;
+        source = scene != null ? $"씬의 {scene.name}" : "";
+        return scene != null;
+    }
+
+    void OnSceneGUI(SceneView view)
+    {
+        if (_profile == null || _profile.killerMove != BossVictoryKillerMove.TeleportDash) return;
+        if (!TryGetBossPose(out Vector3 bossPos, out Quaternion bossRot, out string source)) return;
+        Vector3 a = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, _profile.teleportOffset);
+        Vector3 b = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, _profile.arrivalOffset);
+
+        Handles.color = new Color(1f, 1f, 1f, 0.6f);
+        Handles.DrawWireDisc(bossPos, Vector3.up, 0.6f);
+        Handles.DrawAAPolyLine(2f, bossPos, bossPos + BossVictoryKillerMoves.Yaw(bossRot) * Vector3.forward * 1.5f);   // 보스 정면(+Z)
+        Handles.color = ArrivalColor;
+        Handles.DrawAAPolyLine(5f, a, b);
+        Vector3 path = b - a;
+        if (path.sqrMagnitude > 0.01f) Handles.ConeHandleCap(0, b - path.normalized * 0.3f, Quaternion.LookRotation(path), 0.35f, EventType.Repaint);
+        Handles.color = TeleportColor;
+        Handles.DrawWireDisc(a, Vector3.up, 0.4f);
+        Handles.color = ArrivalColor;
+        Handles.DrawWireDisc(b, Vector3.up, 0.4f);
+        Handles.Label(a + Vector3.up * 0.6f, "순간이동 지점");
+        Handles.Label(b + Vector3.up * 0.6f, "도착 지점");
+        Handles.Label(bossPos + Vector3.up * 0.8f, $"기준: {source}");
+
+        EditorGUI.BeginChangeCheck();
+        Vector3 na = Handles.PositionHandle(a, Quaternion.identity);
+        Vector3 nb = Handles.PositionHandle(b, Quaternion.identity);
+        if (!EditorGUI.EndChangeCheck()) return;
+        Undo.RecordObject(_profile, "처치 연출 순간이동 지점");
+        Vector3 ta = BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, na);
+        Vector3 tb = BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, nb);
+        ta.y = tb.y = 0f;   // 높이는 런타임이 처치자 발 높이로 맞춘다
+        _profile.teleportOffset = ta;
+        _profile.arrivalOffset = tb;
+        EditorUtility.SetDirty(_profile);
+        _profileSo?.Update();
+        Repaint();
+    }
 
     const string SubjectsKey = "BossVictoryTimeline.LastSubjects";
 
@@ -1776,6 +1852,39 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         switch (marker)
         {
             case BossVictoryMarker.BackDashStart:
+                DrawProfileFields("처치자 이동(272 · 이 캐릭터 프로필)", nameof(BossVictoryProfile.killerMove));
+                if (_profile.killerMove == BossVictoryKillerMove.TeleportDash)
+                {
+                    DrawProfileFields("순간이동 Q(이 마커 = 순간이동 · 스킬 연출 시작 = Q, 정지 프레임 = 처치 연출 스킬 클립 끝 자르기)",
+                        nameof(BossVictoryProfile.teleportOffset), nameof(BossVictoryProfile.arrivalOffset),
+                        nameof(BossVictoryProfile.teleportMoveState), nameof(BossVictoryProfile.teleportMoveInterval),
+                        nameof(BossVictoryProfile.teleportMoveEase));
+                    EditorGUILayout.LabelField("두 점 = 보스 기준 오프셋(+Z = 보스 정면). 이 창이 열려 있으면 Scene 뷰에 두 점·경로가 보이고 핸들로 끈다(기준 보스 = 재생 중 보스 → 마지막 회차 → 씬의 23호).", EditorStyles.wordWrappedMiniLabel);
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button($"스킬 연출 시작 = 이 마커({Timeline.backDashStartTime:0.00}s)", GUILayout.Width(240f)))
+                        {
+                            Record("처치 연출 타임라인 순간이동 Q 시작 맞추기");
+                            Timeline.SetMarkerTime(BossVictoryMarker.FinisherStart, Timeline.backDashStartTime);
+                            Save();
+                        }
+                        if (GUILayout.Button($"정지 프레임 = {BossVictoryKillerMoves.DefaultFreezeFrame}f", GUILayout.Width(140f)))
+                        {
+                            Record("처치 연출 타임라인 순간이동 Q 정지 프레임");
+                            FinisherFull(out AnimationClip clip, out _);
+                            float fps = clip != null ? clip.frameRate : 60f;
+                            Timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(
+                                BossVictoryKillerMoves.FreezeSeconds(BossVictoryKillerMoves.DefaultFreezeFrame, fps), clip != null ? clip.length : 0f, fps);
+                            Save();
+                        }
+                    }
+                    break;
+                }
+                if (_profile.killerMove == BossVictoryKillerMove.RetreatCharge)
+                {
+                    DrawProfileFields("후퇴 차징(가까우면 이 마커에 후퇴 스킬 + 백대쉬 → 'Q 차징 시작' / 멀면 이 마커에 바로 Q)",
+                        nameof(BossVictoryProfile.retreatDistance), nameof(BossVictoryProfile.retreatSkillSlot));
+                }
                 DrawProfileFields("백대쉬(처치 연출 전용 · 이 캐릭터 프로필)",
                     nameof(BossVictoryProfile.backDashDistance), nameof(BossVictoryProfile.backDashDuration),
                     nameof(BossVictoryProfile.backDashEase), nameof(BossVictoryProfile.backDashAngle),
@@ -1804,6 +1913,18 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryMarker.BossSlow:
                 DrawProfileFields("보스 End 후 배율", nameof(BossVictoryProfile.bossAfterFinisherScale));
+                break;
+            case BossVictoryMarker.ChargeStart:
+                DrawProfileFields("거너 Q 차징 구체(272 · 이 캐릭터 프로필 — 최대 충전 = 목표 크기로 발사, 레이저 폭 그대로)",
+                    nameof(BossVictoryProfile.chargeScaleFrom), nameof(BossVictoryProfile.chargeScaleTo), nameof(BossVictoryProfile.chargeScaleCurve));
+                if (Timeline.chargeStartTime >= 0f && GUILayout.Button($"자동으로(백대쉬 시작 + {BossVictoryTimeline.DefaultChargeDelay:0.0}초)", GUILayout.Width(220f)))
+                {
+                    Record("처치 연출 타임라인 Q 차징 시작 자동");
+                    Timeline.chargeStartTime = -1f;
+                    Save();
+                }
+                if (_profile.killerMove != BossVictoryKillerMove.RetreatCharge)
+                    EditorGUILayout.HelpBox("이 프로필은 처치자 이동이 '후퇴 차징'이 아니라 이 마커를 쓰지 않는다.", MessageType.Info);
                 break;
             case BossVictoryMarker.FocusKiller:
             {
@@ -2140,10 +2261,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     AnimationClip FinisherClipOf(GameObject character)
     {
         if (character == null) return null;
+        Animator animator = character.GetComponentInChildren<Animator>(true);
+        // 순간이동 Q(272) — 처치 연출 스킬 대신 프로필 애니 상태(Combo_Attack_03_04). 끝 자르기 = 정지 프레임.
+        if (_profile != null && _profile.killerMove == BossVictoryKillerMove.TeleportDash)
+            return animator != null && animator.runtimeAnimatorController != null
+                ? AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, _profile.teleportMoveState) : null;
         PlayerSkillSlot slot = _profile != null ? _profile.finisherSlot : PlayerSkillSlot.Ultimate;   // 지금 프로필 칸(267)
         PlayerSkillController controller = character.GetComponentInChildren<PlayerSkillController>(true);
         PlayerSkillBase skill = controller != null ? controller.GetSkill(slot) : null;
-        Animator animator = character.GetComponentInChildren<Animator>(true);
         if (skill == null || skill.Data == null || animator == null || animator.runtimeAnimatorController == null) return null;
         return AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.Data.AnimatorStateName);
     }
@@ -2265,6 +2390,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     const string BossHitControllerPath = "Assets/4.Animations/Wells&No.23/No.23/Controller/No23Controller.controller";
     Object _finisherClipKey;
     AnimationClip _finisherClipCache;
+    string _finisherMoveStateCache;
     string _finisherWhoCache;
     Object _bossHitClipKey;
     string _bossHitStateCache;
@@ -2300,9 +2426,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         GameObject killer = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null ? BossVictoryGlitchPresentation.Instance.KillerObject : null;
         Object key = killer != null ? killer : AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath(_character));
-        if (key != _finisherClipKey)
+        string moveState = _profile.killerMove == BossVictoryKillerMove.TeleportDash ? _profile.teleportMoveState : null;   // 순간이동 Q 상태가 바뀌면 다시(272)
+        if (key != _finisherClipKey || moveState != _finisherMoveStateCache)
         {
             _finisherClipKey = key;
+            _finisherMoveStateCache = moveState;
             _finisherClipCache = FinisherClipOf(key as GameObject);
             _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : _character == TutorialCharacter.None ? "코드 기본값(팔라딘 몸)" : CharacterLabel(_character);
         }

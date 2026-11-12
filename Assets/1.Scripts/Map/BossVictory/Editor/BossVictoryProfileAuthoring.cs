@@ -55,6 +55,49 @@ public static class BossVictoryProfileAuthoring
         return profile;
     }
 
+    const string AssassinPrefabPath = "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab";
+
+    /// <summary>
+    /// 할 일 272 처치자 이동을 정본 프로필에 넣는다 — 어쌔신 = 순간이동 Q(스킬 연출 시작 = 백대쉬 시작 마커, 끝 자르기 = 정지 프레임 71f) · 거너 = 후퇴 차징.
+    /// 지정한 칸만 바꾸고 Unity 직렬화로 저장한다(다른 칸 — 사용자 튜닝 값 — 은 그대로). 팔라딘은 기본(백대쉬) 그대로.
+    /// </summary>
+    [MenuItem("Tools/Boss Victory/처치자 이동 프로필 적용 (272)")]
+    public static void ApplyKillerMoves()
+    {
+        var assassin = AssetDatabase.LoadAssetAtPath<BossVictoryProfile>(ProfilePath(TutorialCharacter.Assassin));
+        if (assassin != null)
+        {
+            Undo.RecordObject(assassin, "처치자 이동 프로필 적용 (272)");
+            assassin.killerMove = BossVictoryKillerMove.TeleportDash;
+            assassin.timeline.finisherStartTime = assassin.timeline.backDashStartTime;
+            AnimationClip clip = TeleportMoveClip(assassin.teleportMoveState);
+            float fps = clip != null ? clip.frameRate : 60f;
+            assassin.timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(
+                BossVictoryKillerMoves.FreezeSeconds(BossVictoryKillerMoves.DefaultFreezeFrame, fps), clip != null ? clip.length : 0f, fps);
+            EditorUtility.SetDirty(assassin);
+            AssetDatabase.SaveAssetIfDirty(assassin);
+            Debug.Log($"[BossVictory] 어쌔신 프로필 — 순간이동 Q · 스킬 연출 시작 {assassin.timeline.finisherStartTime:0.###}s · 정지 {assassin.timeline.finisherTrimSeconds:0.####}s({clip?.name})", assassin);
+        }
+        var gunner = AssetDatabase.LoadAssetAtPath<BossVictoryProfile>(ProfilePath(TutorialCharacter.Gunner));
+        if (gunner != null)
+        {
+            Undo.RecordObject(gunner, "처치자 이동 프로필 적용 (272)");
+            gunner.killerMove = BossVictoryKillerMove.RetreatCharge;
+            EditorUtility.SetDirty(gunner);
+            AssetDatabase.SaveAssetIfDirty(gunner);
+            Debug.Log("[BossVictory] 거너 프로필 — 후퇴 차징", gunner);
+        }
+    }
+
+    /// <summary>어쌔신 Variant Animator 의 순간이동 Q 상태 클립(없으면 null).</summary>
+    public static AnimationClip TeleportMoveClip(string state)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssassinPrefabPath);
+        Animator animator = prefab != null ? prefab.GetComponentInChildren<Animator>(true) : null;
+        return animator != null && animator.runtimeAnimatorController != null
+            ? AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, state) : null;
+    }
+
     static BossVictoryProfile CreateAsset(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
