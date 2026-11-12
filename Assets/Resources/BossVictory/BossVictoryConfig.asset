@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 689f5cd2f942a3244a47270e85510619, type: 3}
   m_Name: BossVictoryConfig
   m_EditorClassIdentifier: Assembly-CSharp::BossVictoryConfig
-  finalPitch: 24
-  endPitch: 32
-  fov: 34
+  finalPitch: 6.029367
+  endPitch: 17.826128
+  fov: 48.664097
   referenceAspect: 1.7777778
-  minDistance: 4
-  maxDistance: 22
-  distanceStep: 0.5
+  minDistance: 11.125343
+  maxDistance: 38.486088
+  distanceStep: 5
   endDistanceScale: 1.25
   characterHeight: 1.8
   bossRadiusFallback: 1.5
@@ -43,6 +43,10 @@ MonoBehaviour:
   characterExposure: 1.75
   characterGamma: 1.1
   effectDetectGain: 6
+  groundCircleRadius: 3.8
+  groundCircleGrowSeconds: 0.2
+  groundCircleSoftness: 5
+  groundCircleBrightness: 2.3
   slowMotionScale: 0.1
   wallFacingThreshold: 0.3
   wallSearchRadius: 40

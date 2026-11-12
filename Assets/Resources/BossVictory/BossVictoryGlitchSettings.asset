@@ -1,0 +1,119 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4746dfe25f278299b295f57c9881699, type: 3}
+  m_Name: BossVictoryGlitchSettings
+  m_EditorClassIdentifier: Assembly-CSharp::BossVictoryGlitchSettings
+  defaultProfile: {fileID: 11400000, guid: 3cd2425b4ee2c595e772d8d5d21e0dff, type: 2}
+  characterProfiles:
+  - character: 1
+    profile: {fileID: 11400000, guid: 1fd77fcfa89fedfa1e26ef33d7101c6b, type: 2}
+  - character: 2
+    profile: {fileID: 11400000, guid: 27a607adf96eb8c3ae0de497f0774aa5, type: 2}
+  - character: 3
+    profile: {fileID: 11400000, guid: 3851280abdc7ec06cb7604a8da0a12e9, type: 2}
+  bossHitStateName: getowned
+  bossHitFadeSeconds: 0.05
+  focusKillerBlendSeconds: 0
+  hideOthersTarget: 0
+  amberColor: {r: 0.83921576, g: 0.67058825, b: 0.41176474, a: 1}
+  scanlineCount: 360
+  scanlineFloorNormalMin: 0.55
+  scanlineFloorNormalMax: 0.8
+  scanlineFloorKeep: 0
+  skyAmberMinLuma: 0.6
+  amberLumaLift: 0.45
+  scanlineDarkness: 0.15
+  victoryVolume: 1
+  victoryVignetteIntensity: 0
+  victoryOverrideExposure: 0
+  victoryPostExposure: 0.25
+  tearLinePixels: 1
+  tearLineMaxMultiplier: 1.75
+  tearMaxShift: 0.1851
+  tearDensity: 0.9
+  tearRefreshRate: 30
+  tearStreakLength: 0.025
+  bossNoiseTexture: {fileID: 2800000, guid: 465bf8b24a9102e0f904bee0aebfbe89, type: 3}
+  bossNoiseSpace: 0
+  bossNoiseTiling: {x: 0.2, y: 1}
+  bossNoiseCameraScale: {x: 0.1, y: 0.1}
+  bossNoiseBrightColor: {r: 1, g: 0.9647059, b: 0.91764706, a: 1}
+  bossNoiseBrightIntensity: 1.6
+  bossNoiseDarkColor: {r: 0.22745098, g: 0.09019608, b: 0.07058824, a: 1}
+  groundCircleRadius: 5.73
+  groundCircleSoftness: 19.05
+  groundCircleBrightness: 1.8
+  rectifyFont: {fileID: 12800000, guid: ec558e14f18f3e04183bac06c64ac696, type: 3}
+  rectifyText: RECTIFY
+  rectifyWidth: 1.06
+  rectifyCenterY: 0.58
+  rectifyOutline: 0.005
+  rectifyColor: {r: 1, g: 1, b: 1, a: 1}
+  rectifyCircles:
+  - start: 0
+    startRadius: 0.15
+    fade: 0.15
+    expand: 0.5
+    center: {x: 0.46, y: 0.5}
+    leftColor: {r: 1, g: 0.1764706, b: 0.7058824, a: 1}
+    rightColor: {r: 0.627451, g: 0.2509804, b: 1, a: 1}
+  - start: 0.1
+    startRadius: 0.15
+    fade: 0.15
+    expand: 0.5
+    center: {x: 0.46, y: 0.5}
+    leftColor: {r: 0.3529412, g: 0.78431374, b: 1, a: 1}
+    rightColor: {r: 0.14117648, g: 0.21960784, b: 0.65882355, a: 1}
+  - start: 0.25
+    startRadius: 0.15
+    fade: 0.15
+    expand: 0.1
+    center: {x: 0.46, y: 0.5}
+    leftColor: {r: 1, g: 1, b: 1, a: 1}
+    rightColor: {r: 1, g: 0.9647059, b: 0.8784314, a: 1}
+  rectifyCircleGrayColor: {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
+  rectifyCircleGrayToWhite: 0.1
+  rectifyFillSoftness: 0.01
+  rectifyFillCoversOutline: 1
+  rectifyCirclesVersion: 1
+  rectifyFillColors: []
+  rectifyFillCenter: {x: 0.46, y: 0.5}
+  rectifyFillStartRadius: 0.15
+  rectifyFillDelay: 0.1
+  rectifyFillFade: 0.15
+  rectifyFillExpand: 0.5
+  rectifyWhiteColor: {r: 1, g: 1, b: 1, a: 1}
+  rectifyWhiteStart: 0.3
+  rectifyWhiteCenter: {x: 0.46, y: 0.5}
+  rectifyWhiteStartRadius: 0.15
+  rectifyWhiteFade: 0.15
+  rectifyWhiteExpand: 0.1
+  rectifyOrangeHold: 0.05
+  rectifyOrangeWipe: 0.1
+  rectifyOrangeRightToLeft: 1
+  rectifyOrangeJitter: 0.2
+  rectifyOrangeRowPixels: 4
+  rectifyOrangeLeft: {r: 1, g: 0.64705884, b: 0.22745098, a: 1}
+  rectifyOrangeRight: {r: 0.972549, g: 0.9098039, b: 0.38431373, a: 1}
+  rectifyOrangeGradient: 1
+  rectifyScanlineSpacing: 0.003
+  rectifyScanlineDark: 0
+  rectifyGlowIntensity: 1
+  rectifyGlowRadius: 24
+  rectifyGlowColor: {r: 1, g: 1, b: 1, a: 1}
+  rectifyGlowTarget: 2
+  wallFacingThreshold: 0.3
+  wallSearchRadius: 40
+  crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}
+  maskShader: {fileID: 4800000, guid: 3efaf0437d7bf628e1397fc495a613e1, type: 3}
+  compositeShader: {fileID: 4800000, guid: 979774beff724b5e1fd017b192707160, type: 3}
+  crtOffShader: {fileID: 4800000, guid: 9c24c9581dab14646ac4ddcb56d7141b, type: 3}

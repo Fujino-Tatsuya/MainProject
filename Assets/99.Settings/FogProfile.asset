@@ -25,23 +25,23 @@ MonoBehaviour:
   useMainLightDirection: 1
   sunDirection: {x: 0.5, y: -0.7, z: 0.3}
   sunColor: {r: 0.6037736, g: 0.5810269, b: 0.51453656, a: 1}
-  sunIntensity: 0.66
+  sunIntensity: 0.1
   sunPower: 24.9
   noiseEnabled: 1
   noiseTexture: {fileID: 0}
   noiseScale: 0.05
   noiseStrength: 0.553
   noiseScroll: {x: 0.3, y: 0.15}
-  dimRangeUp: 0
-  dimRangeDown: 0
-  dimFadeUp: 3
-  dimFadeDown: 3
+  dimRangeUp: 10000
+  dimRangeDown: 972.3
+  dimFadeUp: 9.34
+  dimFadeDown: 9.23
   dimSaturation: 1
-  dimBrightness: 0.497
+  dimBrightness: 0
   dimAffectSky: 0.714
-  viewRange: 18
-  viewFade: 4
-  losDarken: 0.814
+  viewRange: 947.5
+  viewFade: 76.14
+  losDarken: 0
   losDistanceBias: 0
   losEdgeFade: 5.71
   losBrightness: 0.201

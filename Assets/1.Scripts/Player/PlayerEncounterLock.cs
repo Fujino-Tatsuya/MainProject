@@ -175,7 +175,9 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
     /// 서버 전용·멱등. 보스 엘리베이터 입력 잠금을 켜고 끈다(<see cref="BossTeleportManager"/> — 연출 시작(카운트다운 끝) ~ 보스방 도착 뒤 보스 등장 잠금으로 넘김).
     /// 보이는 채로 오너 입력만 막고 무적을 건다. 켤 때 진행 중인 스킬·공격을 정상 경로로 끊는다. 숨김·보스 등장 잠금과는 독립이다.
     /// </summary>
-    public bool SetCinematicInputLockServer(bool locked)
+    /// <param name="cancelCurrentAction">켤 때 실행 중 스킬·평타를 취소한다(기본). 보스 처치 연출의 처치자는 false — 하던 동작을 0.5배속으로 끝까지 보여 준다
+    /// (판정은 무적·보스 사망으로 이미 막혀 있다, PLAN-boss-victory-glitch).</param>
+    public bool SetCinematicInputLockServer(bool locked, bool cancelCurrentAction = true)
     {
         if (!IsServerAuthority())
             return false;
@@ -183,7 +185,7 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
         if (IsCinematicInputLocked == locked)
             return true;
 
-        if (locked)
+        if (locked && cancelCurrentAction)
         {
             skillController?.EndActiveSkillServer(SkillEndReason.Cancelled);
             defaultAttack?.CancelCurrentAttack();

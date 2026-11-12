@@ -48,6 +48,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     private readonly FinalStrikeVfxSchedule finalStrike = new FinalStrikeVfxSchedule();
     // 완료 판정 1회의 적중 대상(1명). Player.ServerAttackLanded 통지용 버퍼.
     private readonly System.Collections.Generic.List<Unit> landedUnits = new System.Collections.Generic.List<Unit>(1);
+    // [이 피어] 표시 전용 재생(보스 처치 연출)의 대상. 있으면 Custom0 마무리 낙뢰(하늘에서 칼)를 서버 RPC 대신 이 피어가 직접 떨어뜨린다.
+    private Transform presentationTarget;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Ultimate;
 
@@ -170,9 +172,20 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         base.OnAnimationEvent(eventType);
     }
 
+    // [이 피어] 표시 전용(보스 처치 연출) — 서버 OnServerStart·OnAnimationEvent 가 안 돌아 마무리 낙뢰가 빠지던 것.
+    // 대상만 받아 두고 Custom0 에서 같은 엔트리·같은 자리 규칙(대상 아래 바닥)·같은 배율로 이 피어가 떨어뜨린다. 판정·표식·슈퍼아머 없음.
+    public override void OnPresentationOnlyStart(Transform target)
+    {
+        presentationTarget = target;
+        finalStrike.Reset();
+    }
+
     // 전 피어. Hit 뒤 남은 구간을 각 피어가 자기 애니메이터에서 빠르게 돌린다(RPC 없음) — End 도 같이 당겨진다.
     public override void OnLocalAnimationEvent(SkillAnimationEventType eventType)
     {
+        if (eventType == SkillAnimationEventType.Custom0 && presentationTarget != null && finalStrike.TryFire())
+            skillView?.PlayTargetStrikeAtLocal(presentationTarget, VfxPlayRate);
+
         if (eventType == SkillAnimationEventType.Hit && animator != null)
             animator.SetFloat(UltimateSpeedHash, AnimationSpeed * AfterHitSpeedMultiplier);
     }
@@ -205,6 +218,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     {
         base.OnEnd(reason);
         lockedTarget = null;
+        presentationTarget = null;
 
         // 🔴 여기는 RPC 가 필요 없다 — OnEnd 는 전 피어에서 돈다(서버는 EndActiveSkillServer,
         //    클라는 EndSkillClientRpc). 각 피어가 자기 몫을 걷으면 끝이다.

@@ -4,7 +4,7 @@ using Unity.Netcode;
 using UnityEngine;
 
 // 보스 B 승리 연출(PLAN-boss-victory-cinematic) — 디렉터 몫은 **복제 상태 + 서버 진행**뿐이다(Codex C7).
-// 표시(모든 피어)는 BossVictoryPresentation. 디렉터가 씬 상주 NetworkObject 라 복제 값을 여기(partial)에 둔다
+// 표시(모든 피어)는 ZZZ 글리치 연출(PLAN-boss-victory-glitch — 교체 중, 옛 BossVictoryPresentation 은 Legacy). 디렉터가 씬 상주 NetworkObject 라 복제 값을 여기(partial)에 둔다
 // — 런타임에 붙인 컴포넌트는 NetworkVariable 을 가질 수 없다(4구역 소개 연출과 같은 제약). RPC 없음: 늦은 합류도 같은 경로.
 public sealed partial class BossEncounterDirector
 {
@@ -67,19 +67,18 @@ public sealed partial class BossEncounterDirector
 
     // [서버]
     private bool _spawnedVictoryVariant;    // 이번에 스폰한 보스가 B(raidBossPrefab) — 전역 선택값이 아니라 실제 인스턴스 기준(C13)
-    private bool _victoryLockApplied;       // 2.00초에 정식 잠금(스킬 취소·무적)을 걸었다(Q1)
-    private double _victoryMinResultAt;     // 결과 화면 전환 하한 = 시작 + 3.20초(C6)
+    private bool _victoryResultReady;       // 서버(호스트) 화면의 처치 연출이 끝났다(타임라인 로비 전환 마커) — 그 전엔 결과 전환을 붙잡는다
 
     /// <summary>
-    /// [서버] 이 보스의 사망 표현이 지금 흐르는 배율 — 승리 연출 대상이 아니면 1. 추가 연출 구간 = 0(사망 애니는 그 뒤 — 할 일 200 G),
-    /// 슬로모션 구간 = <see cref="BossVictoryConfig.slowMotionScale"/>. 사망 연출 대기(<c>MonsterBase.DeathPresentationTimeScale</c>)가 읽는다.
+    /// [서버] 이 보스의 사망 표현이 지금 흐르는 배율 — 승리 연출 대상이 아니면 1. 사망 연출 대기(<c>MonsterBase.DeathPresentationTimeScale</c>)가 읽는다.
+    /// 값 = 서버(호스트) 피어의 표시가 정한 보스 배율(처치 연출 스킬 End 전 0 · 뒤 0.1 — <see cref="BossVictoryGlitchPresentation.BossTimeScale"/>).
+    /// 각 피어가 자기 화면 애니 이벤트로 판단하므로(Q12) 서버도 자기 화면 기준이다.
     /// </summary>
     public float VictoryDeathTimeScaleFor(NetworkBehaviour boss)
     {
-        if (!IsSpawned || boss == null) return 1f;
-        VictoryState v = _victory.Value;
-        if (!v.Active || v.BossNetworkObjectId != boss.NetworkObjectId) return 1f;
-        return BossVictoryRules.DeathTimeScale(v.StageTime(NetworkManager.ServerTime.Time), BossVictoryConfig.Load().slowMotionScale);
+        if (!IsVictoryBoss(boss)) return 1f;
+        BossVictoryGlitchPresentation presentation = BossVictoryGlitchPresentation.Instance;
+        return presentation != null ? presentation.BossTimeScale : 1f;
     }
 
     /// <summary>[서버] 이 보스가 승리 연출(보스 B) 대상인가 — 디졸브·디스폰 없이 사망 자세로 남는다(할 일 200 G).</summary>
@@ -102,10 +101,9 @@ public sealed partial class BossEncounterDirector
         TwentyThreeBoss boss = _bossUnit as TwentyThreeBoss;
         if (boss == null) return;
 
-        BossVictoryConfig cfg = BossVictoryConfig.Load();
         Vector3 bossPos = boss.transform.position;
 
-        // 참가자 — clientId 순(같은 입력 = 같은 구도).
+        // 참가자 — clientId 순.
         var players = new List<Player>();
         foreach (KeyValuePair<ulong, NetworkClient> pair in NetworkManager.ConnectedClients)
         {
@@ -139,25 +137,6 @@ public sealed partial class BossEncounterDirector
             return;
         }
 
-        var teammates = new List<Vector3>();
-        for (int i = 0; i < players.Count; i++)
-            if (players[i] != killer && IsAliveForVictory(players[i]))   // D7: 사망 팀원은 구도 계산에서 뺀다
-                teammates.Add(players[i].transform.position);
-
-        Bounds bossBounds = BossBounds(boss, cfg);
-        var subjects = new BossVictoryRules.Subjects
-        {
-            Killer = killer.transform.position,
-            KillerForward = killer.transform.forward,
-            HitPoint = hitPoint,
-            Boss = bossPos,
-            BossRadius = Mathf.Max(bossBounds.extents.x, bossBounds.extents.z),
-            BossHeight = bossBounds.size.y,
-            Teammates = teammates,
-        };
-        BossVictoryRules.Composition comp = BossVictoryRules.Compose(subjects, cfg.ToFraming());
-
-        float prelude = Mathf.Max(0f, cfg.preludeSeconds);   // 추가 연출 구간(할 일 200) — 이 뒤로 모든 단계가 밀린다
         double now = NetworkManager.ServerTime.Time;
         _victory.Value = new VictoryState
         {
@@ -167,60 +146,67 @@ public sealed partial class BossEncounterDirector
             BossNetworkObjectId = boss.NetworkObjectId,
             KillerClientId = killer.OwnerClientId,
             HitPoint = hitPoint,
-            FinalPosition = comp.Final.Position,
-            FinalRotation = comp.Final.Rotation,
-            EndPosition = comp.EndPose.Position,
-            EndRotation = comp.EndPose.Rotation,
-            Fov = cfg.fov,
-            PreludeSeconds = prelude,
         };
 
-        // 처치 순간: 피해 무시(D3) · 전역 슬로모션 강제 해제(C11). 입력은 각 오너가 상태를 보고 막는다(Q1 — 공격 동작은 살려 둔다).
+        // 처치 순간: 피해 무시(D3) · 전역 슬로모션 강제 해제(C11) · 전원 연출 잠금(입력 차단 + 처치자 외 실행 중 스킬·평타 취소 — 처치자는
+        // 하던 동작을 끝까지, 처치 연출 스킬은 각 피어가 표시로만 새로 튼다) · 서버 판정 장판·투사체 디스폰(Q11 — 표시 소거는 각 피어 BossVictoryGlitchPresentation).
         for (int i = 0; i < players.Count; i++)
+        {
             players[i].GetComponent<PlayerInvulnerability>()?.AddServerToken(InvulnerabilityCause.BossVictory, 0.0);
+            // 처치자는 하던 동작(평타·스킬)을 끊지 않는다 — 각 피어가 0.5배속으로 그 클립 끝까지 보여 준 뒤 백대쉬 → 처치 연출 스킬.
+            players[i].GetComponent<PlayerEncounterLock>()?.SetCinematicInputLockServer(true, cancelCurrentAction: players[i] != killer);
+        }
         GlobalTimeScale.Instance?.ServerForceReset();
+        int despawned = DespawnCombatObjectsServer();
 
-        // 결과 화면: 하한 = 추가 연출 구간 + 단계 끝(3.20초), 안전망은 추가 연출 구간 + 슬로모션 구간만큼 미룬다(C6 · 할 일 200).
-        _victoryLockApplied = false;
-        _victoryMinResultAt = now + prelude + BossVictoryRules.End;
-        if (_resultTransitionAt > 0d) _resultTransitionAt += BossVictoryRules.ResultSafetyDelay(prelude);
+        _victoryResultReady = false;
 
-        Edit.Log($"[BossVictory] 시작 — 막타 client {killer.OwnerClientId}(기록 {(killer.OwnerClientId == hitClientId ? "있음" : "없음 → 대체")}) · " +
-                 $"팀원 {teammates.Count}명 · 구도 방위 {comp.Yaw:0}° 거리 {comp.Distance:0.0}m 점수 {comp.Score:0.00} · 추가 연출 구간 {prelude:0.00}초", this);
+        Edit.Log($"[BossVictory] 시작 — 막타 client {killer.OwnerClientId}(기록 {(killer.OwnerClientId == hitClientId ? "있음" : "없음 → 대체")}) · 장판·투사체 디스폰 {despawned}", this);
     }
 
-    // [서버] Update — 단계 2.00초(추가 연출 구간 뒤)에 정식 잠금(Q1: 정지가 풀리며 스킬 취소·전투 입력 차단).
+    // [서버] 처치 판정 즉시 서버 판정 장판(AreaZone)·몬스터 투사체를 전부 디스폰한다(Q11 1차 범위 — 빠진 종류는 Play 에서 보이면 더한다).
+    private static int DespawnCombatObjectsServer()
+    {
+        int count = 0;
+        foreach (AreaZone zone in FindObjectsByType<AreaZone>(FindObjectsSortMode.None))
+        {
+            if (zone == null || zone.NetworkObject == null || !zone.NetworkObject.IsSpawned) continue;
+            zone.Despawn();
+            count++;
+        }
+        foreach (MonsterProjectile projectile in FindObjectsByType<MonsterProjectile>(FindObjectsSortMode.None))
+        {
+            if (projectile == null || projectile.NetworkObject == null || !projectile.NetworkObject.IsSpawned) continue;
+            projectile.NetworkObject.Despawn();
+            count++;
+        }
+        return count;
+    }
+
+    // [서버] Update — 서버(호스트) 피어의 처치 연출이 끝나는 순간(타임라인 로비 전환 마커 — TV 꺼짐 클립이 있으면 보통 그 끝·화면 검정, 없으면 검정 없이) 결과 전환을 지금으로 당긴다(PLAN-boss-victory-glitch 6단계).
+    // 연출 시계는 처치 판정부터 게임 시간으로 흘러 처치 연출 스킬 End 와 무관하게 반드시 끝난다(스킬 End 가 빠져도 붙잡히지 않는다).
     private void TickVictoryServer()
     {
         VictoryState v = _victory.Value;
-        if (!v.Active || _victoryLockApplied) return;
-        if (v.StageTime(NetworkManager.ServerTime.Time) < BossVictoryRules.FreezeEnd) return;
-
-        _victoryLockApplied = true;
-        foreach (KeyValuePair<ulong, NetworkClient> pair in NetworkManager.ConnectedClients)
-        {
-            NetworkObject po = pair.Value != null ? pair.Value.PlayerObject : null;   // ?. 는 파괴된 Unity 객체를 못 거른다
-            PlayerEncounterLock encounterLock = po != null ? po.GetComponent<PlayerEncounterLock>() : null;
-            if (encounterLock != null) encounterLock.SetCinematicInputLockServer(true);
-        }
-        Edit.Log("[BossVictory] 단계 2.00초 — 슬로모션 해제 · 전원 연출 잠금(스킬 취소)", this);
+        if (!v.Active || _victoryResultReady) return;
+        BossVictoryGlitchPresentation presentation = BossVictoryGlitchPresentation.Instance;
+        if (presentation == null || presentation.Sequence != v.Sequence || !presentation.Finished) return;
+        _victoryResultReady = true;
+        _resultTransitionAt = NetworkManager.ServerTime.Time;
+        Edit.Log("[BossVictory] 호스트 화면 연출 끝 — 로비(결과 패널)로 전환", this);
     }
 
-    // 결과 화면 전환을 지금 막아야 하는가(추가 연출 구간 + 단계 3.20초 전).
+    // 디버그 랩(244, DebugBossVictory 씬) 진입점 — 구현은 BossEncounterDirector.Dev.cs(UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS).
+    // 구현이 없으면 C# 이 호출째 지운다 → 릴리스 동작 불변.
+    partial void DevBlockResultTransition(ref bool block);
+
+    // 결과 화면 전환을 지금 막아야 하는가 — 승리 연출 중이고 호스트 화면 연출이 아직 안 끝났다(표시가 없으면 붙잡지 않는다).
     private bool HoldsResultForVictory() =>
-        _victoryMinResultAt > 0d && NetworkManager.ServerTime.Time < _victoryMinResultAt;
+        _victory.Value.Active && !_victoryResultReady && BossVictoryGlitchPresentation.Instance != null;
 
     private static bool IsAliveForVictory(Player p)
     {
         PlayerLifeCycleController life = p != null ? p.GetComponent<PlayerLifeCycleController>() : null;
         return p != null && (life == null || life.State == PlayerLifeState.Alive);
-    }
-
-    private static Bounds BossBounds(TwentyThreeBoss boss, BossVictoryConfig cfg)
-    {
-        Collider col = boss.GetComponent<Collider>();
-        if (col != null && col.bounds.size.sqrMagnitude > 0.01f) return col.bounds;
-        return new Bounds(boss.transform.position + Vector3.up * cfg.bossHeightFallback * 0.5f,
-            new Vector3(cfg.bossRadiusFallback * 2f, cfg.bossHeightFallback, cfg.bossRadiusFallback * 2f));
     }
 }

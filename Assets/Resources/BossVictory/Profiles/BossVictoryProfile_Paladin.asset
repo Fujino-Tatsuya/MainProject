@@ -1,0 +1,736 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aca0e2726a4a76d24415043ca9f5a9d1, type: 3}
+  m_Name: BossVictoryProfile_Paladin
+  m_EditorClassIdentifier: Assembly-CSharp::BossVictoryProfile
+  killerCurrentActionScale: 0.5
+  killerAfterFinisherScale: 0.07
+  otherPlayersScale: 0.05
+  bossAfterFinisherScale: 0.1
+  finisherSlot: 3
+  backDashDistance: 4
+  backDashDuration: 0.5
+  backDashEase: 3
+  backDashAngle: -30
+  backDashIdleDelay: 0.35
+  finisherWithBackDash: 1
+  timeline:
+    desaturate:
+    - start: 0.105
+      length: 7.095
+      fadeIn: 0.09
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.016378526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    amber:
+    - start: 0.24
+      length: 2.15
+      fadeIn: 0.15
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.028301883
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 3.75
+      length: 0.8699999
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.1
+        value: 1
+        curve: 0
+      - u: 0.9
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 2.4
+      length: 1.3499999
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.1
+        value: 1
+        curve: 0
+      - u: 0.9
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 0.13
+      length: 0.050000012
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.1
+        value: 1
+        curve: 0
+      - u: 0.9
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    scanline:
+    - start: 0.105
+      length: 6.195
+      fadeIn: 0.09
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.016378526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    bossNoise:
+    - start: 0.12
+      length: 6.1800003
+      fadeIn: 0.05
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.009124088
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    tear:
+    - start: 0.09
+      length: 0.22999999
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.65625
+        value: 1
+        curve: 0
+      - u: 0.6875
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 0.32
+      length: 0.09
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.111111104
+        value: 1
+        curve: 0
+      - u: 0.111111164
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 0.96
+      length: 0.2
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 2.16
+      length: 0.28999996
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 3.64
+      length: 0.2
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 4.35
+      length: 1.9500003
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.21379302
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    smear:
+    - start: 0.09
+      length: 0.16
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.65625
+        value: 1
+        curve: 0
+      - u: 0.6875
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 0.32
+      length: 0.09
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.111111104
+        value: 1
+        curve: 0
+      - u: 0.111111164
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    hudHide:
+    - start: 0.08
+      length: 6.2200003
+      fadeIn: 0.04
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.0072463765
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    crtOff: []
+    cameraCut:
+    - start: 0.77
+      length: 1.3600001
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 2.13
+      length: 0.19999981
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 2.33
+      length: 1.4200001
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 3.75
+      length: 0.1
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 3.78
+      length: 2.2700002
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 6.05
+      length: 0.1
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    cameraCutShots:
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 1.6458317, y: 0.7546348, z: -5.37314}
+        rotation: {x: -0.027950438, y: -0.12646225, z: -0.0036580502, w: 0.9915709}
+        fov: 60.000004
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 0
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 1.5627736, y: 0.75465053, z: -5.394676}
+        rotation: {x: 0.028008, y: 0.10978682, z: 0.0031879651, w: -0.9935553}
+        fov: 70.96
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 1.36
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 6.8400083, y: 7.381151, z: 3.7115176}
+        rotation: {x: 0.2237205, y: -0.7349215, z: 0.28719103, w: 0.57215464}
+        fov: 60.000004
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 0.0997
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: 6.9469085, y: 7.381233, z: 3.2819831}
+        rotation: {x: 0.2483488, y: -0.68413746, z: 0.26922905, w: 0.63070965}
+        fov: 58
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 2.91
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: -6.126869, y: 11.723041, z: -5.828121}
+        rotation: {x: -0.38096625, y: -0.35024187, z: 0.15868644, w: -0.84084123}
+        fov: 60.000004
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 0
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
+    - anchor: 0
+      keys:
+      - u: 0
+        position: {x: -6.885368, y: 12.315742, z: -5.6391063}
+        rotation: {x: 0.38482556, y: 0.37416255, z: -0.17441894, w: 0.82552385}
+        fov: 90
+        curve: 1
+      smoothPath: 0
+      hideWalls: 1
+      blendSeconds: 2.27
+      blendCurve: 1
+      startPosition: {x: 0, y: 0, z: 0}
+      startRotation: {x: 0, y: 0, z: 0, w: 0}
+      startFov: 0
+      hasEnd: 0
+      endPosition: {x: 0, y: 0, z: 0}
+      endRotation: {x: 0, y: 0, z: 0, w: 0}
+      endFov: 0
+      ease: 0
+    killerAction: []
+    noiseScrollV:
+    - start: 0.5
+      length: 1.01
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 1
+      uvTo: 0
+      uvEase: 1
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    cameraBob:
+    - start: 1.23
+      length: 5.36
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.037735853
+        value: 1
+        curve: 0
+      - u: 0.9433962
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0.3
+      bobPeriod: 1
+      bobPhase: 0.25
+      bobDamping: 0
+    rectify:
+    - start: 0.81
+      length: 5.4900002
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.023809526
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    rectifySeeded: 1
+    rectifyFill:
+    - start: 0.72
+      length: 5.58
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    rectifyFillSeeded: 1
+    cameraBobSeeded: 1
+    groundCircle:
+    - start: 0.3
+      length: 3.49
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.11320756
+        value: 1
+        curve: 0
+      - u: 1
+        value: 1
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    groundCircleSeeded: 1
+    focusKillerTime: 0.2
+    hideOthersTime: 0.2
+    lobbyTransitionTime: 5.28
+    backDashStartTime: 0
+    finisherStartTime: 0
+    finisherTrimSeconds: 3.5666666
+    slowStartTime: 1.06
+    bossHitAnimTime: 0.2
+    bossHitTrimSeconds: 0
+    bossFreezeTime: 0
+    bossSlowTime: 0.2
+    killerActionEndTime: 0
