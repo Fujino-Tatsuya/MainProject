@@ -62,6 +62,9 @@ public static class BossVictoryGlitchRender
     static readonly int IdNoiseST = Shader.PropertyToID("_NoiseST");          // xy 타일링, zw UV 오프셋(카메라 이동 누적)
     static readonly int IdNoiseBright = Shader.PropertyToID("_NoiseBright");
     static readonly int IdNoiseDark = Shader.PropertyToID("_NoiseDark");
+    static readonly int IdBossRim = Shader.PropertyToID("_BossRim");       // x 림라이트(1)/노이즈(0), y 프레넬 문턱, z 부드러움
+    static readonly int IdRimInside = Shader.PropertyToID("_RimInside");
+    static readonly int IdRimEdge = Shader.PropertyToID("_RimEdge");
     static readonly int IdRectifyTex = Shader.PropertyToID("_RectifyTex");
     static readonly int IdRectifyScreen = Shader.PropertyToID("_RectifyScreen");   // 글자마다 xy 최소 · zw 최대(뷰포트)
     static readonly int IdRectifyUV = Shader.PropertyToID("_RectifyUV");           // 글자마다 아틀라스 xy 시작 · zw 크기
@@ -99,11 +102,11 @@ public static class BossVictoryGlitchRender
 
     /// <summary>켠다(멱등 — 이미 켜져 있으면 색·모양만 다시 넣는다). 셰이더가 없으면 false(호출측이 진단을 남긴다).
     /// <paramref name="palette"/> = 처치자 프로필 기준 계산 팔레트(271), null = 공용 설정 색 그대로. <paramref name="orange"/> = 처치자 프로필 RECTIFY 주황 채움 값(11-12).</summary>
-    public static bool Enable(BossVictoryGlitchSettings settings, BossVictoryPalette palette, BossVictoryOrangeLook orange)
+    public static bool Enable(BossVictoryGlitchSettings settings, BossVictoryPalette palette, BossVictoryOrangeLook orange, BossVictoryBossLook bossLook)
     {
         if (_hooked)
         {
-            ApplyLook(settings, palette, orange);
+            ApplyLook(settings, palette, orange, bossLook);
             return true;
         }
         Shader mask = settings != null && settings.maskShader != null ? settings.maskShader : Shader.Find(MaskShaderName);
@@ -113,7 +116,7 @@ public static class BossVictoryGlitchRender
         _maskPlayer = NewMask(mask, new Color(1f, 0f, 0f, 1f));
         _maskBoss = NewMask(mask, new Color(0f, 0f, 1f, 1f));
         _composite = CoreUtils.CreateEngineMaterial(comp);
-        ApplyLook(settings, palette, orange);
+        ApplyLook(settings, palette, orange, bossLook);
         _anyEffect = false;
 
         _maskPass = new MaskPass(_maskPlayer, _maskBoss)
@@ -156,7 +159,7 @@ public static class BossVictoryGlitchRender
     }
 
     /// <summary>색·노이즈·모양 칸(설정 SO) — 켤 때 + 창에서 값을 바꿨을 때. 색 = <paramref name="palette"/>(271 — null 이면 공용 설정 색 그대로 = 기준 팔레트).</summary>
-    public static void ApplyLook(BossVictoryGlitchSettings s, BossVictoryPalette palette, BossVictoryOrangeLook orange)
+    public static void ApplyLook(BossVictoryGlitchSettings s, BossVictoryPalette palette, BossVictoryOrangeLook orange, BossVictoryBossLook bossLook)
     {
         if (_composite == null || s == null) return;
         palette ??= BossVictoryPaletteCalc.Compute(s, null);
@@ -165,6 +168,10 @@ public static class BossVictoryGlitchRender
         _noiseTiling = s.bossNoiseTiling;
         _composite.SetColor(IdNoiseBright, palette[BossVictoryPaletteSlot.NoiseBright].linear * Mathf.Max(0f, s.bossNoiseBrightIntensity));
         _composite.SetColor(IdNoiseDark, palette[BossVictoryPaletteSlot.NoiseDark].linear);
+        // 보스 표현(11-12) — 림라이트면 노이즈 대신 안쪽 밝게(× 세기)·프레넬 테두리 어둡게. 프레넬 = 마스크 G(보스만).
+        _composite.SetVector(IdBossRim, new Vector4(bossLook.IsRim ? 1f : 0f, bossLook.RimThreshold, bossLook.RimSoftness, 0f));
+        _composite.SetColor(IdRimInside, palette[BossVictoryPaletteSlot.RimInside].linear * bossLook.InsideIntensity);
+        _composite.SetColor(IdRimEdge, palette[BossVictoryPaletteSlot.RimEdge].linear);
         _composite.SetVector(IdLook, new Vector4(Mathf.Max(1f, s.scanlineCount), Mathf.Max(1f, s.tearLinePixels),
             Mathf.Max(1f, s.tearLineMaxMultiplier), Mathf.Max(1f, s.tearRefreshRate)));
         _composite.SetVector(IdTear, new Vector4(Mathf.Max(0f, s.tearMaxShift), Mathf.Clamp01(s.tearDensity), Mathf.Max(0f, s.tearStreakLength), 0f));

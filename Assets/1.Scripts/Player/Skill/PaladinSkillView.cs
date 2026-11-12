@@ -209,6 +209,9 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     private float _victoryFallingLife;         // 처치 연출 낙하 검 수명(초, 0 = 엔트리 수명)
     private Transform _victoryStrikeTarget;    // 처치 연출 낙하 검 기준(보스) — 오프셋을 끌면 떨어진 검을 옮길 때
     private EffectHandle _victoryStrikeHandle; // 배율을 바꾼 낙하 검(수명이 끝나면 Update 가 Local 파트 배율을 되돌린다)
+    private VictoryStrikeHold _victoryHold;     // 낙하 검 수명 — 꽂힌 채 멈췄다 풀기(VictoryStrikeHold 설명)
+    private EffectHandle _victoryHoldHandle;
+    private float _victoryHoldRate = 1f;
     private readonly List<Transform> _scaledStrikeParts = new List<Transform>();
     private readonly List<Vector3> _scaledStrikeBase = new List<Vector3>();
     private static readonly List<GameObject> s_strikeInstances = new List<GameObject>();
@@ -237,12 +240,17 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         BossVictoryGlitchPresentation.KeepRealtime(_victorySwordFx);
     }
 
-    /// <summary>[이 피어] 처치 연출 끝·취소 — 손 검 번개 걷기, 낙하 검 배율 1(이미 떨어진 검은 수명대로 두고 끝나면 파트 배율 복구). 켜져 있지 않으면 no-op.</summary>
+    /// <summary>[이 피어] 처치 연출 끝·취소 — 손 검 번개 걷기, 낙하 검 배율 1(이미 떨어진 검은 수명대로 두고 끝나면 파트 배율 복구),
+    /// 수명(fallingSwordLife)으로 남겨 둔 낙하 검은 걷는다. 켜져 있지 않으면 no-op.</summary>
     public void EndVictorySword()
     {
         if (_victorySwordFx.IsSet && EffectManager.Instance != null)
             EffectManager.Instance.Release(_victorySwordFx);
         _victorySwordFx = EffectHandle.None;
+        if (_victoryHoldHandle.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.ReleaseImmediate(_victoryHoldHandle);   // 이미 반납됐으면(세대 바뀜) no-op
+        _victoryHold = default;
+        _victoryHoldHandle = EffectHandle.None;
         _victoryFallingScale = 1f;
         _victoryFallingOffset = Vector3.zero;
         _victoryFallingLife = 0f;
@@ -251,9 +259,29 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     private void Update()
     {
+        TickVictoryHold();
         // 배율을 바꾼 낙하 검이 풀로 돌아갔으면(원샷 수명 끝·걷힘) Local 파트 배율을 되돌린다 — 다음 R 에 남지 않게.
         if (_scaledStrikeParts.Count > 0 && (EffectManager.Instance == null || EffectManager.Instance.GetInstances(_victoryStrikeHandle, s_strikeInstances) == 0))
             RestoreStrikeParts();
+    }
+
+    // 낙하 검 수명 — 꽂힌 순간 재생 배율 0(파티클·매니저 수명 함께 멈춤) → 수명 초 뒤 원래 배율로 풀어 원래 끝 연출로 사라짐.
+    private void TickVictoryHold()
+    {
+        if (_victoryHold.State == VictoryStrikeHold.Phase.Off)
+            return;
+        EffectManager effects = EffectManager.Instance;
+        if (effects == null || effects.GetInstances(_victoryHoldHandle, s_strikeInstances) == 0)
+        {
+            _victoryHold = default;   // 걷혔다(정리·새 시전)
+            _victoryHoldHandle = EffectHandle.None;
+            return;
+        }
+        switch (_victoryHold.Step(Time.deltaTime * _victoryHoldRate, Time.unscaledDeltaTime))
+        {
+            case VictoryStrikeHold.Action.Freeze: effects.SetPlayRate(_victoryHoldHandle, 0f); break;
+            case VictoryStrikeHold.Action.Resume: effects.SetPlayRate(_victoryHoldHandle, _victoryHoldRate); break;
+        }
     }
 
     /// <summary>
@@ -480,11 +508,15 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         _victoryStrikeTarget = target;
         Vector3 point = target != null ? BossVictoryKillerMoves.BossPoint(target.position, target.rotation, _victoryFallingOffset) : transform.position;
         LockTargetPosition(null, point);
-        PlayTargetStrikeLocal(playRate, _victoryFallingScale, _victoryFallingLife);   // 처치 연출 낙하 검 배율(269)·수명 — 평소 R 경로는 1·엔트리 수명
+        PlayTargetStrikeLocal(playRate, _victoryFallingScale);   // 처치 연출 낙하 검 배율(269) — 평소 R 경로는 1
         ScaleStrikeLocalParts(_victoryFallingScale);
+        // 수명 = 꽂힌 채 멈춰 두는 시간(반납만 늦추던 durationOverride 는 그림을 못 남겼다 — VictoryStrikeHold). 0 = 엔트리 그대로.
+        _victoryHold = VictoryStrikeHold.Create(targetStrike != null ? targetStrike.ResolvedDuration : 0f, _victoryFallingLife);
+        _victoryHoldHandle = _victoryHold.State != VictoryStrikeHold.Phase.Off ? _targetStrikeHandle : EffectHandle.None;
+        _victoryHoldRate = playRate > 0f ? playRate : 1f;
     }
 
-    private void PlayTargetStrikeLocal(float playRate, float scaleMultiplier = 1f, float lifeOverride = 0f)
+    private void PlayTargetStrikeLocal(float playRate, float scaleMultiplier = 1f)
     {
         if (targetStrike == null || EffectManager.Instance == null) return;
 
@@ -492,7 +524,7 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         // 둘이 어긋나면 "표식 옆에 칼이 꽂히는" 그림이 된다.
         // 원샷이라 엔트리 수명 뒤에 매니저가 알아서 반납한다. 핸들은 도중에 걷을 때만 쓴다.
         _targetStrikeHandle = EffectManager.Instance.PlayRecallable(targetStrike, _targetPosition, Quaternion.identity,
-            targetStrikeScale * scaleMultiplier, lifeOverride, playRate);
+            targetStrikeScale * scaleMultiplier, 0f, playRate);
     }
 
     /// <summary>

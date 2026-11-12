@@ -125,7 +125,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         if (!_running || _profile == null) return;
         _palette = BossVictoryPaletteCalc.Compute(_settings, _profile);
-        if (_renderOn) BossVictoryGlitchRender.ApplyLook(_settings, _palette, BossVictoryOrangeLook.From(_profile));
+        if (_renderOn) BossVictoryGlitchRender.ApplyLook(_settings, _palette, BossVictoryOrangeLook.From(_profile), BossVictoryBossLook.From(_profile));
     }
 
     // ── 시계 진단(디버그 씬 — 랩 timelineClockLog) · 클립 노드 실측 표본(에디터 — 창이 클립 시간을 타임라인 초로 그린다) ──
@@ -1029,7 +1029,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _noiseOffset = Vector2.zero;
         _noiseCamValid = false;
         _cutJumped = false;
-        _renderOn = BossVictoryGlitchRender.Enable(_settings, _palette, BossVictoryOrangeLook.From(_profile));   // 주황 채움 = 처치자 프로필(11-12)
+        _renderOn = BossVictoryGlitchRender.Enable(_settings, _palette, BossVictoryOrangeLook.From(_profile), BossVictoryBossLook.From(_profile));   // 주황 채움 = 처치자 프로필(11-12)
         if (!_renderOn)
         {
             Edit.LogWarning($"[BossVictory] 셰이더({BossVictoryGlitchRender.MaskShaderName}·{BossVictoryGlitchRender.CompositeShaderName})가 없어 글리치 없이 돈다.", this);
@@ -1356,6 +1356,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             _cutJumped = !fromBlend;   // 블렌드 끝에서 이어지면 텔레포트가 아니다
             if (index >= 0) _cutSubjects = fromBlend ? _lastBlendSubjects : CutSubjects();
         }
+        // 기준 '처치자 무기' 컷만 매 프레임 따라간다(처치자·보스·무기 위치 — 무기는 컷의 부드러움으로). 나머지는 위에서 잡은 그대로.
+        if (index >= 0) FollowWeaponAnchor(ref _cutSubjects, tl.CameraCutShot(index));
+        if (incoming >= 0) FollowWeaponAnchor(ref _blendSubjects, tl.CameraCutShot(incoming));
         _lastBlendIndex = _blendIndex;
         _lastBlendSubjects = _blendSubjects;
 
@@ -1407,6 +1410,15 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     public bool TryGetCutSubjects(out BossVictoryCameraCuts.Subjects subjects)
     {
         subjects = _cutIndex >= 0 ? _cutSubjects : CutSubjects();
+        // 무기 = 지금 컷이 '처치자 무기' 면 그 컷이 따라간 값(화면과 같음), 아니면 지금 무기 위치 — 다른 컷을 고치는 'Scene 뷰로' 도 실제 무기 기준.
+        bool weaponCut = _cutIndex >= 0 && _profile != null && _profile.timeline != null &&
+                         BossVictoryCameraCuts.FollowsEveryFrame(_profile.timeline.CameraCutShot(_cutIndex).anchor);
+        if (!weaponCut && _running)
+        {
+            Transform weapon = KillerWeapon();
+            subjects.HasWeapon = weapon != null;
+            subjects.Weapon = weapon != null ? weapon.position : default;
+        }
         return _running;
     }
 
@@ -1415,7 +1427,38 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         var s = new BossVictoryCameraCuts.Subjects();
         s.Killer = _killer != null ? _killer.transform.position : _state.HitPoint;
         s.BossBase = _boss != null ? _boss.transform.position : _state.HitPoint;
+        Transform weapon = KillerWeapon();
+        s.HasWeapon = weapon != null;
+        s.Weapon = weapon != null ? weapon.position : default;
         return s;
+    }
+
+    // 처치자 무기(BossVictoryWeaponMarker.Find) — 처치자가 바뀔 때만 다시 찾는다.
+    Transform _killerWeapon;
+    Player _killerWeaponOf;
+    bool _killerWeaponWarned;
+
+    Transform KillerWeapon()
+    {
+        if (_killerWeaponOf != _killer)
+        {
+            _killerWeaponOf = _killer;
+            _killerWeapon = _killer != null ? BossVictoryWeaponMarker.Find(_killer.transform) : null;
+            _killerWeaponWarned = false;
+        }
+        return _killerWeapon;
+    }
+
+    void FollowWeaponAnchor(ref BossVictoryCameraCuts.Subjects subjects, in BossVictoryCameraCuts.Cut cut)
+    {
+        if (!BossVictoryCameraCuts.FollowsEveryFrame(cut.anchor)) return;
+        BossVictoryCameraCuts.Subjects live = CutSubjects();
+        if (!live.HasWeapon && !_killerWeaponWarned)
+        {
+            _killerWeaponWarned = true;
+            Edit.LogWarning($"[BossVictory] 카메라 컷 기준 '처치자 무기' — {(_killer != null ? _killer.name : "처치자 없음")} 에 BossVictoryWeaponMarker·WeaponTransformRelay 무기가 없어 처치자 발밑으로.", this);
+        }
+        subjects = BossVictoryCameraCuts.FollowWeapon(subjects, live, cut.weaponFollowSmoothing, Time.unscaledDeltaTime);
     }
 
     // 컷 카메라에 들어갈 때 한 번 — 머리 위 UI·윤곽선·잔여 흔들림이 컷을 깬다(옛 연출과 같은 목록). 벽 가림은 컷과 무관하게 Begin~Teardown.

@@ -5768,7 +5768,10 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8342937058224501313, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
       insertIndex: -1
       addedObject: {fileID: 9102685625585565318}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5765402001003216653, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7734229503225389154}
   m_SourcePrefab: {fileID: 100100000, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
 --- !u!114 &3988724667065146670 stripped
 MonoBehaviour:
@@ -5801,6 +5804,23 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6577791197332317623, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
   m_PrefabInstance: {fileID: 4164306706429407243}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &7622417617245900550 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5765402001003216653, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
+  m_PrefabInstance: {fileID: 4164306706429407243}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7734229503225389154
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7622417617245900550}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c5659030edfb51468941da4db5d75e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossVictoryWeaponMarker
 --- !u!4 &8113218494813838305 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5286495743266417642, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
