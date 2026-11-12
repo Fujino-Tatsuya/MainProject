@@ -345,7 +345,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         Color fill = _baseColor;
         fill.a = alpha;
         Color outline = _digitSet.OutlineColor;
-        outline.a *= alpha;
+        // 외곽선 알파(268) — alpha 에 팀원 최대 알파·페이드가 이미 들어 있다.
+        outline.a = FloatingDamageOutlinePolicy.Alpha(outline.a, _settings.OutlineAlpha, alpha);
         _view.SetColors(fill, outline);
     }
 

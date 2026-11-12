@@ -88,6 +88,17 @@ public static class FloatingDamageMinPixelPolicy
     }
 }
 
+/// <summary>
+/// 외곽선 알파(할 일 268) = DigitSet 외곽선 색 알파 × Settings 외곽선 알파 × 지금 숫자 알파(팀원 최대 알파·페이드 포함).
+/// </summary>
+public static class FloatingDamageOutlinePolicy
+{
+    public static float Alpha(float digitSetOutlineAlpha, float outlineAlpha, float currentAlpha)
+    {
+        return Mathf.Clamp01(digitSetOutlineAlpha) * Mathf.Clamp01(outlineAlpha) * Mathf.Clamp01(currentAlpha);
+    }
+}
+
 [Serializable]
 public struct FloatingPopupRequest
 {
@@ -209,6 +220,10 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Tooltip("AllWithOwnEmphasis에서 팀원 데미지 숫자의 최대 알파. 페이드 전체에 곱한다.")]
     [SerializeField, Range(0f, 1f), DataTableIgnore] float teammateAlpha = 200f / 255f;
 
+    [Header("외곽선")]
+    [Tooltip("숫자 외곽선 알파(268). DigitSet 외곽선 색 알파 × 이 값 × 숫자 알파(팀원 최대 알파·페이드)로 곱한다.")]
+    [SerializeField, Range(0f, 1f), DataTableIgnore] float outlineAlpha = 0.8f;
+
     [Header("화면")]
     [SerializeField] Vector2 referenceResolution = new Vector2(1920f, 1080f);
     [SerializeField] int canvasSortingOrder = 50;
@@ -284,6 +299,7 @@ public sealed class FloatingDamageSettings : ScriptableObject
     public FloatingDamageDisplayFilter DisplayFilter => GameplayConfig.DamageNumbers(displayFilter);
     public float TeammateScaleMultiplier => teammateScaleMultiplier;
     public float TeammateAlpha => teammateAlpha;
+    public float OutlineAlpha => outlineAlpha;
     public Vector2 ReferenceResolution => referenceResolution;
     public int CanvasSortingOrder => canvasSortingOrder;
     public Vector2 ScreenEdgePadding => screenEdgePadding;

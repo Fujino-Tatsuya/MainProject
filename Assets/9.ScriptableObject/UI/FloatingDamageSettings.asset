@@ -15,6 +15,7 @@ MonoBehaviour:
   displayFilter: 2
   teammateScaleMultiplier: 0.75
   teammateAlpha: 0.78431374
+  outlineAlpha: 0.8
   referenceResolution: {x: 1920, y: 1080}
   canvasSortingOrder: 50
   screenEdgePadding: {x: 60, y: 30}
