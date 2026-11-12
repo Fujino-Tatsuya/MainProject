@@ -24,7 +24,7 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
         #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
-            // ── 공용 선언·함수(267 후속 — 패스가 늘어도 같이 쓴다) ──
+            // ── 공용 선언·함수(합성 패스 + RECTIFY 글로우 패스 1~4가 같이 쓴다, 267 후속) ──
             TEXTURE2D_X(_GlitchIdTex);
             TEXTURE2D(_NoiseTex);
             SAMPLER(sampler_NoiseTex);
@@ -200,6 +200,22 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 return half4(orangeCol, covered);
             }
 
+            // 흰 원(링 3 — 마지막 링이라 덮인 만큼 그대로 보인다) 마스크 0~1. 글로우 소스용.
+            half RectifyWhiteMask(float2 uv)
+            {
+                float4 ring = _RectifyFillRings[3];
+                if (ring.y <= 0.0) return 0.0h;
+                float2 size = max(_RectifyFillRect.zw - _RectifyFillRect.xy, 1e-5);
+                float2 wuv = (uv - _RectifyFillRect.xy) / size;
+                float d = length((wuv - ring.zw) * float2(_RectifyFillParams.z, 1.0));
+                float soft = max(_RectifyFillParams.y, 1e-4);
+                return (half)(ring.y * (1.0 - smoothstep(ring.x - soft, ring.x + soft, d)));
+            }
+
+            // ── RECTIFY 전용 글로우(267 후속 — 맵 블룸과 무관) ──
+            float4 _RectifyGlowParams;   // x 흰 원 고름(0/1), y 주황 채움 고름(0/1), z (미사용), w 세기
+            float4 _RectifyGlowStep;     // xy 블러 한 칸 간격(글로우 텍스처 UV — C# 이 반경 ÷ 4탭으로 계산)
+            float4 _RectifyGlowColor;    // rgb 틴트(곱하기)
             float4 _GlitchGrade;         // x 배경 호박 명도 리프트, y CRT 주사선 어둡기
         ENDHLSL
 
@@ -320,6 +336,113 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 }
 
                 return half4(graded, 1.0h);
+            }
+            ENDHLSL
+        }
+
+        // ── RECTIFY 전용 글로우(267 후속) — 1 소스(절반 해상도) → 2 가로 블러 → 3 세로 블러 → 4 더하기(전체 해상도). ──
+        // 소스 = 고른 채움(흰 원·주황) × 글자 마스크(외곽선 바깥 경계까지) × 채움 불투명도 × 글자 알파 × (1 − 플레이어·보스).
+        // 찢김 UV·등장 가로줄은 따르지 않는다(블러로 뭉개지는 빛이라).
+        Pass
+        {
+            Name "RectifyGlowSource"
+            ZWrite Off ZTest Always Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment FragGlowSource
+
+            half4 FragGlowSource(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+                float2 uv = input.texcoord;
+                if (_RectifyParams.x <= 0.0001 || _RectifyFillParams.x <= 0.0001) return 0.0h;
+                half4 id = MaskAt(uv);
+                half visible = (half)_RectifyParams.x * (1.0h - id.r) * (1.0h - id.b);
+                half glyph = RectifyAt(uv).z;
+                half4 orange = RectifyOrangeAt(uv, uv.y * _ScreenParams.y);
+                half white = RectifyWhiteMask(uv) * (1.0h - orange.a);
+                half3 src = (half)_RectifyGlowParams.x * white * _RectifyFillColors[3].rgb
+                          + (half)_RectifyGlowParams.y * orange.a * orange.rgb;
+                return half4(src * glyph * visible * (half)_RectifyFillParams.x, 1.0h);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "RectifyGlowBlurH"
+            ZWrite Off ZTest Always Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment FragBlurH
+
+            // 9탭 가우스(시그마 ≈ 2탭). 간격 = _RectifyGlowStep(UV).
+            half3 Blur9(float2 uv, float2 stepUV)
+            {
+                const half w[5] = { 0.2270h, 0.1946h, 0.1216h, 0.0541h, 0.0162h };
+                half3 c = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv).rgb * w[0];
+                [unroll] for (int i = 1; i < 5; i++)
+                {
+                    c += SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv + stepUV * i).rgb * w[i];
+                    c += SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv - stepUV * i).rgb * w[i];
+                }
+                return c;
+            }
+
+            half4 FragBlurH(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+                return half4(Blur9(input.texcoord, float2(_RectifyGlowStep.x, 0.0)), 1.0h);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "RectifyGlowBlurV"
+            ZWrite Off ZTest Always Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment FragBlurV
+
+            half3 Blur9(float2 uv, float2 stepUV)
+            {
+                const half w[5] = { 0.2270h, 0.1946h, 0.1216h, 0.0541h, 0.0162h };
+                half3 c = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv).rgb * w[0];
+                [unroll] for (int i = 1; i < 5; i++)
+                {
+                    c += SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv + stepUV * i).rgb * w[i];
+                    c += SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv - stepUV * i).rgb * w[i];
+                }
+                return c;
+            }
+
+            half4 FragBlurV(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+                return half4(Blur9(input.texcoord, float2(0.0, _RectifyGlowStep.y)), 1.0h);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "RectifyGlowAdd"
+            ZWrite Off ZTest Always Cull Off
+            Blend One One
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment FragGlowAdd
+
+            half4 FragGlowAdd(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+                half3 g = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, input.texcoord).rgb;
+                return half4(g * _RectifyGlowColor.rgb * (half)_RectifyGlowParams.w, 0.0h);
             }
             ENDHLSL
         }

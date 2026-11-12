@@ -86,6 +86,10 @@ MonoBehaviour:
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0
+  rectifyGlowIntensity: 1
+  rectifyGlowRadius: 24
+  rectifyGlowColor: {r: 1, g: 1, b: 1, a: 1}
+  rectifyGlowTarget: 2
   wallFacingThreshold: 0.3
   wallSearchRadius: 40
   crtOffGlowColor: {r: 0.25, g: 0.62, b: 1, a: 1}

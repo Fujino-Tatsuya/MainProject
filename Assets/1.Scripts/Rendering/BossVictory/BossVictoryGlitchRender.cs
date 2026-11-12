@@ -12,6 +12,7 @@ using UnityEngine.Rendering.Universal;
 /// <list type="number">
 /// <item>마스크(투명 렌더 직전): 플레이어(흑백 대상)·보스(노이즈 대상) 렌더러를 렌더링 레이어 비트로 골라 ID 텍스처(R 플레이어 · B 보스).</item>
 /// <item>합성(투명 렌더 직후, 후처리 전): 흑백·호박색·주사선·물결·계단·늘어남·블록·스미어·슬라이스·RGB 분리·섬광 + 보스 노이즈 UV.</item>
+/// <item>RECTIFY 글로우(267 후속, 합성 직후 · 채움이 보이는 프레임만): 절반 해상도 소스 → 9탭 가로·세로 블러 → 합성 결과에 더하기.</item>
 /// 처치 연출 전용 볼륨(비네트·노출 덮기)도 켤 때 만들고 끌 때 지운다.
 /// </list>
 /// 세기는 표시(<see cref="BossVictoryGlitchPresentation"/>)가 설정 SO 타임라인 곡선으로 매 프레임 넣는다. 마스터 세기 0 이면 두 패스 다 건너뛴다.
@@ -79,7 +80,12 @@ public static class BossVictoryGlitchRender
     static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
     static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 찢김 줄 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
     static readonly int IdGrade = Shader.PropertyToID("_GlitchGrade");          // x 배경 호박 명도 리프트, y CRT 주사선 어둡기(267 후속)
+    static readonly int IdGlowParams = Shader.PropertyToID("_RectifyGlowParams"); // x 흰 원 고름, y 주황 고름, w 세기(267 후속 RECTIFY 글로우)
+    static readonly int IdGlowStep = Shader.PropertyToID("_RectifyGlowStep");     // xy 블러 한 칸(글로우 텍스처 UV)
+    static readonly int IdGlowColor = Shader.PropertyToID("_RectifyGlowColor");
 
+    // 합성 셰이더 패스 번호 — 0 합성 · 1 글로우 소스 · 2 가로 블러 · 3 세로 블러 · 4 더하기.
+    const int PassGlowSource = 1, PassGlowBlurH = 2, PassGlowBlurV = 3, PassGlowAdd = 4;
 
     static Material _maskPlayer, _maskBoss, _composite;
     static MaskPass _maskPass;
@@ -132,6 +138,7 @@ public static class BossVictoryGlitchRender
         CoreUtils.Destroy(_composite);
         _maskPlayer = _maskBoss = _composite = null;
         DestroyVolume();
+        _glowOn = false;
         BossVictoryRectifyText.Destroy(_rectifyAsset);
         _rectifyAsset = null;
         _rectifyFont = null;
@@ -256,6 +263,9 @@ public static class BossVictoryGlitchRender
     static float _orangeHold, _orangeWipe = 0.1f, _orangeJitter, _orangeRowPx = 4f, _orangeGradient;
     static bool _orangeRightToLeft = true;
     static bool _fillCoversOutline = true;
+    // RECTIFY 전용 글로우(267 후속) — 설정 사본. 켜짐 판단은 매 프레임(SetFillFrame).
+    static float _glowIntensity, _glowRadius = 24f, _glowWhite, _glowOrange;
+    static bool _glowOn;
 
     static void ApplyFillLook(BossVictoryGlitchSettings s)
     {
@@ -286,6 +296,11 @@ public static class BossVictoryGlitchRender
         _composite.SetColor(IdOrangeLeft, s.rectifyOrangeLeft.linear);
         Color right = s.rectifyOrangeRight.linear;
         _composite.SetVector(IdOrangeRight, new Vector4(right.r, right.g, right.b, _orangeGradient));
+        _glowIntensity = Mathf.Max(0f, s.rectifyGlowIntensity);
+        _glowRadius = Mathf.Max(1f, s.rectifyGlowRadius);
+        _glowWhite = s.rectifyGlowTarget != BossVictoryGlitchSettings.RectifyGlowTarget.Orange ? 1f : 0f;
+        _glowOrange = s.rectifyGlowTarget != BossVictoryGlitchSettings.RectifyGlowTarget.WhiteCircle ? 1f : 0f;
+        _composite.SetColor(IdGlowColor, s.rectifyGlowColor.linear);
     }
 
     // 링 3개 — 단어 사각형 UV(종횡비 보정, 단위 = 단어 높이). Rmax = 중심에서 네 모서리까지.
@@ -321,6 +336,11 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdFillRect, word);
         _composite.SetVector(IdFillParams, new Vector4(opacity, Mathf.Max(0f, _fillSoft), wordAspect, Mathf.Max(1f, _scanSpacing * Screen.height)));
         _composite.SetVector(IdFillLook, new Vector4(_scanDark, _fillCoversOutline ? 1f : 0f, 0f, 0f));
+        // 글로우 — 채움이 보이고(글자 알파·채움 불투명도 > 0) 세기 > 0 이고 하나라도 고른 프레임만. 한 칸 간격 = 반경 ÷ 4탭(화면 px → UV).
+        _glowOn = _glowIntensity > 0f && opacity > 0f && _rectifyCount > 0 && f.Rectify > 0.0001f && (_glowWhite + _glowOrange) > 0f;
+        float sw = Mathf.Max(1, Screen.width), sh = Mathf.Max(1, Screen.height);
+        _composite.SetVector(IdGlowParams, new Vector4(_glowWhite, _glowOrange, 0f, _glowIntensity));
+        _composite.SetVector(IdGlowStep, new Vector4(_glowRadius / (4f * sw), _glowRadius / (4f * sh), 0f, 0f));
     }
 
     static float _noiseSpace;
@@ -480,6 +500,7 @@ public static class BossVictoryGlitchRender
             public Material material;
             public TextureHandle source;
             public TextureHandle idTex;
+            public int pass;
         }
 
         public CompositePass(Material composite)
@@ -522,7 +543,42 @@ public static class BossVictoryGlitchRender
                     Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, d.material, 0);
                 });
             }
+            if (_glowOn) RecordGlow(renderGraph, desc, dest, shared.idTex);
             resourceData.cameraColor = dest;
+        }
+
+        // RECTIFY 전용 글로우(267 후속) — 절반 해상도 텍스처 2장(렌더 그래프 임시 — 연출 프레임에만 잡히고 풀로 돌아간다):
+        // 소스(전체 → 절반) → 가로 블러 → 세로 블러 → 합성 결과에 더하기(전체). 맵 블룸과 무관.
+        void RecordGlow(RenderGraph renderGraph, RenderTextureDescriptor desc, TextureHandle dest, TextureHandle idTex)
+        {
+            RenderTextureDescriptor half = desc;
+            half.width = Mathf.Max(1, desc.width / 2);
+            half.height = Mathf.Max(1, desc.height / 2);
+            TextureHandle a = UniversalRenderer.CreateRenderGraphTexture(renderGraph, half, "_BossVictoryRectifyGlowA", true, FilterMode.Bilinear);
+            TextureHandle b = UniversalRenderer.CreateRenderGraphTexture(renderGraph, half, "_BossVictoryRectifyGlowB", true, FilterMode.Bilinear);
+            GlowPass(renderGraph, "BossVictoryRectifyGlowSource", dest, a, idTex, PassGlowSource, false);
+            GlowPass(renderGraph, "BossVictoryRectifyGlowBlurH", a, b, TextureHandle.nullHandle, PassGlowBlurH, false);
+            GlowPass(renderGraph, "BossVictoryRectifyGlowBlurV", b, a, TextureHandle.nullHandle, PassGlowBlurV, false);
+            GlowPass(renderGraph, "BossVictoryRectifyGlowAdd", a, dest, TextureHandle.nullHandle, PassGlowAdd, true);
+        }
+
+        void GlowPass(RenderGraph renderGraph, string name, TextureHandle source, TextureHandle target, TextureHandle idTex, int pass, bool additive)
+        {
+            using (var builder = renderGraph.AddRasterRenderPass<BlitData>(name, out BlitData data))
+            {
+                data.material = _composite;
+                data.source = source;
+                data.idTex = idTex;
+                data.pass = pass;
+                builder.UseTexture(source, AccessFlags.Read);
+                if (idTex.IsValid()) builder.UseTexture(idTex, AccessFlags.Read);
+                builder.SetRenderAttachment(target, 0, additive ? AccessFlags.ReadWrite : AccessFlags.Write);
+                builder.SetRenderFunc(static (BlitData d, RasterGraphContext ctx) =>
+                {
+                    if (d.idTex.IsValid()) d.material.SetTexture(IdIdTex, d.idTex);
+                    Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, d.material, d.pass);
+                });
+            }
         }
     }
 }

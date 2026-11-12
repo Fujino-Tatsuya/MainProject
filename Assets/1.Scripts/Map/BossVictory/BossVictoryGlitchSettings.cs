@@ -181,6 +181,18 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("안쪽 주사선 어둡기(0 = 없음 — 기본, 267 후속 사용자 요청으로 RECTIFY 위 주사선을 뺐다. 다시 켜려면 0.25 근처).")]
     [Range(0f, 1f)] public float rectifyScanlineDark = 0f;
 
+    public enum RectifyGlowTarget { WhiteCircle, Orange, Both }
+
+    [Header("RECTIFY 전용 글로우(267 후속 — 맵 블룸과 무관, 글자 채움만 빛남)")]
+    [Tooltip("빛 세기(더하기 배율). 0 = 끔(글로우 패스를 아예 건너뛴다).")]
+    [Min(0f)] public float rectifyGlowIntensity = 1f;
+    [Tooltip("빛 퍼짐 반경(실제 화면 픽셀). 절반 해상도 텍스처에서 9탭 가로·세로 블러 — 한 칸 간격 = 반경 ÷ 4.")]
+    [Range(1f, 96f)] public float rectifyGlowRadius = 24f;
+    [Tooltip("빛 색(채움 색에 곱하기). 흰색 = 채움 색 그대로.")]
+    public Color rectifyGlowColor = Color.white;
+    [Tooltip("어느 채움이 빛날지 — 흰 원 / 주황 채움 / 둘 다.")]
+    public RectifyGlowTarget rectifyGlowTarget = RectifyGlowTarget.Both;
+
     // 카메라 컷 목록은 타임라인 '카메라 컷' 트랙(timeline.cameraCut·cameraCutShots — 255, 옛 cuts 배열 삭제). 예: 와이드(0.33·거리 16·각 22·방위 50) → 보스 클로즈업(1.67·7·6·−160) → 와이드(2.6).
     [Header("카메라 컷 벽 숨김(컷·컷별 켜기/끄기 = 타임라인 '카메라 컷' 트랙)")]
     [Tooltip("연출 카메라에서 앞면이 확실히 카메라를 향하지 않는 벽을 끈다 — 법선·시선 내적 문턱(옛 연출과 같은 기준).")]

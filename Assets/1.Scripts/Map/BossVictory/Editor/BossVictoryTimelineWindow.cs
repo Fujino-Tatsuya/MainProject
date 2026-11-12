@@ -1768,6 +1768,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     nameof(BossVictoryGlitchSettings.rectifyFillExpand), nameof(BossVictoryGlitchSettings.rectifyFillSoftness),
                     nameof(BossVictoryGlitchSettings.rectifyFillGradient), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline), nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing),
                     nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
+                DrawSettingsFields("RECTIFY 전용 글로우(맵 블룸과 무관)", nameof(BossVictoryGlitchSettings.rectifyGlowIntensity), nameof(BossVictoryGlitchSettings.rectifyGlowRadius),
+                    nameof(BossVictoryGlitchSettings.rectifyGlowColor), nameof(BossVictoryGlitchSettings.rectifyGlowTarget));
                 DrawSettingsFields("흰 원(4번째, 링과 따로)", nameof(BossVictoryGlitchSettings.rectifyWhiteColor), nameof(BossVictoryGlitchSettings.rectifyWhiteStart),
                     nameof(BossVictoryGlitchSettings.rectifyWhiteCenter), nameof(BossVictoryGlitchSettings.rectifyWhiteStartRadius),
                     nameof(BossVictoryGlitchSettings.rectifyWhiteFade), nameof(BossVictoryGlitchSettings.rectifyWhiteExpand),
