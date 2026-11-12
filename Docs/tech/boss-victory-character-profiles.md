@@ -10,28 +10,30 @@
 | 백대쉬(거리·시간·곡선·보정 각·후 대기) | `BossVictoryProfile.backDash*` | ✅ |
 | 대상별 시간 배율 4개(하던 동작·처치자 End 후·팀원·보스 End 후) | `BossVictoryProfile.*Scale` | ✅ |
 | 처치 연출 스킬 칸 | `BossVictoryProfile.finisherSlot` | ✅ |
+| 팔레트 기준 색·대비 설정·칸별 직접 지정(271, §4.11) | `BossVictoryProfile.baseColor`·`contrast*`·`paletteOverrides` | ✅ (공용 색 = 기준 팔레트) |
+| **RECTIFY 주황 채움 = 캐릭터별(11-12, §4.12)** — 머무름·와이프·방향·들쭉날쭉·줄 굵기·좌우 색·보간 세기·안쪽 주사선 간격·어둡기 | `BossVictoryProfile.rectifyOrange*`·`rectifyScanline*` | ✅
 | 화면 효과 모양(호박색·주사선·찢김·보스 노이즈·CRT 색·셰이더)·벽 숨김 기준·보스 피격 애니 상태·마커 옵션(포커스 블렌드·숨김 대상) | `BossVictoryGlitchSettings` | ❌ 공용 |
 
-- 에셋: 공용 `Assets/Resources/BossVictory/BossVictoryGlitchSettings.asset` · 프로필 `Assets/Resources/BossVictory/Profiles/BossVictoryProfile_{Default,Paladin,Gunner,Assassin}.asset`.
-- **고르기**: 공용 설정의 `characterProfiles` 표(캐릭터 → 프로필). 캐릭터 = 기존 캐릭터 판별 `TutorialCharacter`(로스터 칸, `TutorialLocalPlayerInfo.ResolveCharacter`). 같은 캐릭터 두 줄이면 앞 줄. **표에 없거나 프로필이 비면 `defaultProfile`**, 그것도 비면 코드 기본값(경고 1회). 순수 함수 `BossVictoryProfileSelect.Select`.
-- 처음 내용: 267 이전 설정 에셋 값을 그대로 복제(4개 모두 같은 내용). 기본 프로필 = 이전 연출.
+- 에셋: 공용 `Assets/Resources/BossVictory/BossVictoryGlitchSettings.asset` · 프로필 `Assets/Resources/BossVictory/Profiles/BossVictoryProfile_{Paladin,Gunner,Assassin}.asset`. 기본 프로필 에셋 `BossVictoryProfile_Default` 는 **11-12 삭제**(사용자 지시) — 공용 `defaultProfile` 칸은 비어 있다.
+- **고르기**: 공용 설정의 `characterProfiles` 표(캐릭터 → 프로필). 캐릭터 = 기존 캐릭터 판별 `TutorialCharacter`(로스터 칸, `TutorialLocalPlayerInfo.ResolveCharacter`). 같은 캐릭터 두 줄이면 앞 줄. **표에 없거나 프로필이 비면 `defaultProfile`, 그것도 비면(정본) 코드 기본값** `BossVictoryProfile.CreateDefault()`(저장 안 되는 인스턴스 하나, 처음 쓸 때 로그 1회). 순수 함수 `BossVictoryProfileSelect.Select`.
+- 처음 내용: 267 이전 설정 에셋 값을 그대로 복제(기본·세 캐릭터 같은 내용) → 그 뒤 캐릭터별 튜닝. 기본 프로필 에셋은 11-12 삭제 — 지금은 표에 없는 캐릭터·처치자를 못 찾은 회차만 코드 기본값(코드 초기값 타임라인 = 옛 기본 곡선, 처치자 검·백대쉬 동시 끔, 기준 색 #D6AB69)을 쓴다.
 - 프리팹 수정 없음. `PlayerVictoryFinisher`(어느 프리팹에도 안 붙어 있던 Variant 스킬 칸 컴포넌트)는 삭제 — 스킬 칸은 프로필.
 
 ## 2. 네트워크
 
-새 RPC·NetworkVariable 없음. 각 피어가 `BossVictoryGlitchPresentation.Begin` 에서 복제된 `VictoryState.KillerClientId` 로 처치자 `Player` 를 찾고 → 그 캐릭터 → 프로필을 회차 시작 때 고정한다(늦은 참가자도 같은 길). 호스트의 로비 전환(타임라인 '로비 전환' 마커 → `PresentationFinished`)도 같은 프로필 시계. 처치자를 못 찾으면(나감 등) 기본 프로필.
+새 RPC·NetworkVariable 없음. 각 피어가 `BossVictoryGlitchPresentation.Begin` 에서 복제된 `VictoryState.KillerClientId` 로 처치자 `Player` 를 찾고 → 그 캐릭터 → 프로필을 회차 시작 때 고정한다(늦은 참가자도 같은 길). 호스트의 로비 전환(타임라인 '로비 전환' 마커 → `PresentationFinished`)도 같은 프로필 시계. 처치자를 못 찾으면(나감 등) 기본 프로필 — 칸이 비어 코드 기본값(모든 피어 같은 코드 값이라 결과 같음).
 
 ## 3. 편집법 — 타임라인 창 `Tools/Boss Victory/처치 연출 타임라인`
 
-- **도구 막대 캐릭터 드롭다운**(기본·팔라딘·거너·어쌔신) = 그 프로필을 편집. 옛 '미리보기 캐릭터'(스킬 클립 길이 표시)와 통합 — 기본은 팔라딘 몸으로 보여 준다.
-- Play 중 연출이 돌면 **실제 처치자 캐릭터를 따라간다**(드롭다운 잠김, '실제 처치자').
-- 표에 프로필이 없는 캐릭터를 고르면 기본 프로필이 보이고(고치면 기본이 바뀐다고 안내) '이 캐릭터 프로필 만들기(기본 복제)' 버튼.
+- **도구 막대 캐릭터 드롭다운**(팔라딘·거너·어쌔신) = 그 프로필을 편집. 옛 '미리보기 캐릭터'(스킬 클립 길이 표시)와 통합. ('기본' 줄은 기본 프로필 에셋 삭제와 함께 뺐다, 11-12.)
+- Play 중 연출이 돌면 **실제 처치자 캐릭터를 따라간다**(드롭다운 잠김, '실제 처치자'). 처치자를 못 찾은 회차면 '코드 기본값'으로 보이고 고쳐도 저장되지 않는다.
+- 표에 프로필이 없는 캐릭터를 고르면 코드 기본값이 보이고(고쳐도 저장 안 됨 안내) '이 캐릭터 프로필 만들기(코드 기본값)' 버튼. 메뉴 `Tools/Boss Victory/캐릭터별 프로필 만들기 (267)` 도 같은 길 — **기본 프로필 에셋은 다시 만들지 않는다**. 새 프로필 원본을 다른 캐릭터 복제가 아니라 코드 기본값으로 둔 이유: 팔라딘 등을 복제하면 그 캐릭터 전용 칸(손 검 번개·낙하 검 배율·백대쉬 동시)까지 딸려 온다. 비슷하게 시작하려면 노드 복사로 옮긴다.
 - **노드 복사**: 클립·마커 우클릭 → '다른 캐릭터에 복사…' → 캐릭터 체크 → 복사. Ctrl/⌘+클릭으로 여러 노드를 골라 한 번에. 같은 시각으로:
   - 마커(백대쉬 시작·스킬 연출 시작·느려짐·보스 노드·로비 전환 등 하나뿐인 것) = **덮어쓰기**. 애니 클립 노드(스킬 연출 시작·보스 피격 애니)는 끝 자르기도 같이.
   - 클립(카메라 컷·화면 효과 구간·HUD 숨김) = **새로 추가**(카메라 컷 값·키 포함). 1개뿐인 트랙(TV 꺼짐·처치자 평타)은 덮어쓰기.
   - Undo 한 번(Ctrl+Z)에 전부 되돌림. 순수 함수 `BossVictoryTimeline.CopyMarkerFrom`·`CopyClipFrom`.
 - 노드 인스펙터의 백대쉬·배율·스킬 칸은 지금 프로필 칸, 트랙 모양 값(색·노이즈 등)은 공용 설정 칸.
-- 메뉴 `Tools/Boss Victory/캐릭터별 프로필 만들기 (267)` — 없는 프로필만 기본 복제로 만들어 표에 넣는다(덮어쓰지 않음).
+- 메뉴 `Tools/Boss Victory/캐릭터별 프로필 만들기 (267)` — 없는 캐릭터 프로필(팔라딘·거너·어쌔신)만 코드 기본값으로 만들어 표에 넣는다(덮어쓰지 않음, 기본 프로필 에셋은 안 만듦).
 - **스크롤**(11-12): 위 시간 눈금 = 세로 고정·가로(시간 스크롤) 따라감, 왼쪽 트랙 이름 열 = 세로 따라감·가로 고정. 트랙이 넘치면 세로 막대(맨 밑에 트랙 1칸 여유), 확대해서 시간이 넘치면 맨 아래 가로 막대. 휠(트랙·눈금 위) = 줌, 휠(이름 열 위) = 세로 스크롤, 가운데 끌기 = 시간 이동. 아래 노드 인스펙터는 따로 세로 스크롤.
 - **카메라 컷 → Scene 뷰**(11-12): 컷 인스펙터 '이 카메라 뷰로 Scene 카메라 세팅하기'(컷 시작) · '재생 헤드 N초 화면으로'(이동 컷 그 순간, 재생 헤드가 컷 구간 안일 때만). 자세 = 런타임과 같은 `BossVictoryCameraCuts.Pose`, 기준 = 'Scene 뷰로' 와 같은 처치자·보스 위치(Play 중 지금 회차 / 아니면 이 에디터 세션 마지막 회차). 기준이 없거나 Scene 뷰가 없으면 비활성 + 이유. 앞 컷과 섞는 블렌드 구간은 반영하지 않는다(이 컷 자신의 화면).
 
@@ -62,7 +64,7 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - 칸: 진폭(%)·주기(초)·시작 위상(0~1)·감쇠(1/초). 새 노드 기본 = 레퍼런스 측정값 0.22%·1.6초·위상 0.25·감쇠 0(분석: `_lane-artifacts/Work2/camera-bob/`).
 - 적용 = 카메라 투영 행렬 세로 이동(`ApplyCameraBob`) — 카메라 위치·회전·컷·추적은 안 건드려 누적 없음, 끝나면 원래 투영. 시각 t 로 정해져 스크럽·모든 피어 같음(새 RPC 없음). 복사 = 클립 추가.
 - 시차(원근 이동) 없음 — 화면 전체가 같이 오르내린다.
-- 4개 프로필 기본 클립 = 0.3~5.6초, 들어올 때 0.2초·나갈 때 0.3초, 0.22%·1.6초·위상 0.25. 옛 에셋은 읽을 때 한 번 넣는다(`SeedCameraBob`, 숨은 표시 `cameraBobSeeded` — 지우면 다시 안 넣음).
+- 프로필 기본 클립(267 당시 4개 프로필) = 0.3~5.6초, 들어올 때 0.2초·나갈 때 0.3초, 0.22%·1.6초·위상 0.25. 옛 에셋은 읽을 때 한 번 넣는다(`SeedCameraBob`, 숨은 표시 `cameraBobSeeded` — 지우면 다시 안 넣음).
 
 ## 4.4 배경 글자 RECTIFY(267 후속)
 
@@ -80,10 +82,10 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - 원 안 색 = 단어 UV x 기준 왼쪽 색 → 오른쪽 색(옛 방사형 그라데이션은 없앰). 코드 기본값: ① #FF2DB4 → #A040FF · ② #5AC8FF(하늘) → #2438A8(남색) · ③ #FFFFFF → #FFF6E0. 생성 0 / 4/60 / 0.2초, 반지름 0.15, 페이드 0.15, 확장 0.6, 중심 (0.46, 0.5).
 - 좌표 = 단어 사각형(글자 사각형 합집합) UV, 거리 단위 = 단어 높이(가로에 단어 종횡비 보정). Rmax = 원 중심에서 네 모서리까지(+경계, 다 덮음). 경계 0.01(`rectifyFillSoftness`, 픽셀보다 작으면 fwidth AA).
 - **옛 값 자동 이전**(`MigrateRectifyCircles`, `OnEnable` 1회 — `rectifyCirclesVersion` 1): ① = 옛 링 0(생성 0·옛 반지름·페이드·확장·중심, 왼쪽 = 옛 링 0 색) · ② = 옛 링 1(생성 = 옛 간격 `rectifyFillDelay`, 색 = 새 블루 그라데이션) · ③ = 옛 흰 원(생성·반지름·페이드·확장·중심, 왼쪽 = 옛 흰색) · 회색 = 옛 링 2 색(있으면). 옛 칸(`rectifyFillColors`·`rectifyFillCenter/StartRadius/Delay/Fade/Expand`·`rectifyWhite*`)은 숨김, 그라데이션 칸은 삭제. 에셋(`BossVictoryGlitchSettings.asset`)은 11-12 튜닝값(링 색 2개·간격 0.1·확장 0.5·흰 원 0.3초/확장 0.1·그라데이션 0)을 이 규칙으로 옮겨 저장했다 — ② 옛 #3A6BFF 는 하늘 → 남색으로 바뀜.
-- **주황 채움**(`rectifyOrange*`): 마지막(흰) 원이 다 퍼진 뒤(생성 + 페이드 + 회색→흰 + 확장) `rectifyOrangeHold`(0.05초) 머물고, 레퍼런스(raw 12~23 프레임)처럼 가로줄(4px)마다 들쭉날쭉한 경계가 오른쪽 → 왼쪽으로 지나가며(0.1초, 들쭉날쭉 단어 폭 0.2) 흰색을 불투명한 주황으로 바꾼다. 색 = 왼쪽 #FFA53A → 오른쪽 #F8E862 보간(세기 `rectifyOrangeGradient`).
+- **주황 채움**(`rectifyOrange*` — 11-12부터 캐릭터별 프로필, §4.12): 마지막(흰) 원이 다 퍼진 뒤(생성 + 페이드 + 회색→흰 + 확장) `rectifyOrangeHold`(0.05초) 머물고, 레퍼런스(raw 12~23 프레임)처럼 가로줄(4px)마다 들쭉날쭉한 경계가 한쪽에서(`rectifyOrangeRightToLeft`) 지나가며(0.1초, 들쭉날쭉 단어 폭 0.2) 흰색을 불투명한 주황으로 바꾼다. 색 = 왼쪽 → 오른쪽 보간(세기 `rectifyOrangeGradient`, 옮길 때 값: 왼쪽→오른쪽 방향·#FF4500 근처 → 분홍 #FF0074 근처 — 사용자 튜닝).
 - 블룸: 글리치 합성은 `AfterRenderingTransparents`(후처리 전)라 RECTIFY 도 볼륨 블룸을 받지만, 값이 0~1(LDR)이라 맵 볼륨 threshold(0.9~1.25)를 거의 못 넘어 번짐이 없다 — 대신 전용 글로우(§4.8).
 - 순수 함수 `BossVictoryRectifyFill`(원 상태 `Circle`·원 색·주황 시작/진행·와이프·색·단어 사각형·Rmax) → 셰이더가 글자 SDF 마스크에 그린다 — `rectifyFillCoversOutline`(기본 켬, 11-12 사용자 요청)이면 마스크를 외곽선 바깥 경계(sd = −외곽선 반두께, 바깥 AA 유지)까지 넓혀 색이 지나간 자리는 외곽선도 같은 색, 흰 외곽선은 색이 아직 닿지 않은 만큼(1 − 덮인 정도)만 남는다(첫 원 전 = 흰 외곽선만). 끄면 예전처럼 안쪽만·외곽선 흰색. 안쪽 가는 가로 주사선 칸(간격 화면 높이 0.3%, `rectifyScanlineDark`) — 11-12 사용자 요청으로 기본 0(끔), 칸은 다시 켤 여지로 남김. 덮기 끔일 때만 흰 외곽선이 그 위.
-- 모양 값은 공용 설정 `rectifyCircles`·`rectifyCircleGray*`·`rectifyFillSoftness/CoversOutline`·`rectifyScanline*`. 시각 t 로 결정 — 스크럽·피어 동일, 새 RPC 없음. 복사 = 클립 추가.
+- 모양 값은 공용 설정 `rectifyCircles`·`rectifyCircleGray*`·`rectifyFillSoftness/CoversOutline`(주황 채움·`rectifyScanline*` 는 캐릭터별 프로필, §4.12). 시각 t 로 결정 — 스크럽·피어 동일, 새 RPC 없음. 복사 = 클립 추가.
 
 ## 4.6 CRT 주사선 = 벽·하늘에만(267 후속)
 
@@ -128,9 +130,67 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
   - 낙하 검은 월드 고정 원샷이라 처치자 배율에 원래 안 걸린다 — 느려짐 뒤에도 원래 속도로 떨어진다(맞추지 않음: 공중에서 거의 멈춘 칼이 되고, 마무리 낙뢰 타이밍이 클립 Custom0 과 어긋난다).
 - 프리팹 수정 없음(런타임). 다른 캐릭터는 `PaladinSkillView` 가 없어 칸을 켜도 무시. 새 RPC 없음 — 복제 처치 상태로 각 피어가 `Begin`(늦은 참가자 같음). 순수 판단 `BossVictoryGlitchPresentation.UsesKillerSword`(EditMode `BossVictoryProfileTests`).
 
+## 4.11 기준 색 → 팔레트 자동(271)
+
+프로필 칸 하나(`baseColor`, 기준 색)로 처치 연출 화면 효과 색 15칸을 계산한다. 순수 함수 `BossVictoryPaletteCalc`(`Map/BossVictory/BossVictoryPalette.cs`), EditMode `BossVictoryPaletteTests`.
+
+- **기준 팔레트 = 공용 설정 색 그대로**: `BossVictoryGlitchSettings` 의 amberColor·bossNoiseBright/Dark·rectifyColor·rectifyCircles[0..2] 좌우·rectifyCircleGrayColor·rectifyGlowColor·crtOffGlowColor(+ 처치자 프로필 rectifyOrangeLeft/Right, 11-12 §4.12)는 이제 '팔라딘 기준 팔레트'다. 기준 색의 기준 = 공용 `amberColor`, 대비 기준 색의 기준 = 공용 `crtOffGlowColor`. (`rectifyWhiteColor` 는 옛 이관 전용 숨은 칸이라 빠진다.)
+- **칸** = `BossVictoryPaletteSlot`(호박색·노이즈 밝음/어두움·RECTIFY 외곽선·①②③ 원 좌우·③ 회색·주황 좌우·글로우·TV 꺼짐). 직렬화 값이라 순서를 바꾸지 않는다.
+- **기조 그룹 규칙**(HSV, sRGB 값): 색 = 공용 색에서 색조 += (새 기준 색조 − 공용 호박색 색조), 채도·밝기 ×= (새 기준 ÷ 공용 호박색). 호박색 칸 = 기준 색 자체. 1 이하(LDR) 색은 밝기 1 에서 자르고, 1 넘는 HDR 색은 세기를 비율 그대로 유지(노이즈 밝은 색 배율 `bossNoiseBrightIntensity` 는 색 계산 뒤 그대로 곱한다).
+- **무채색 그대로**: 채도 < 0.02(흰 외곽선·③ 흰·③ 회색·글로우 흰색)는 색조가 없어 기준 색을 바꿔도 그대로.
+- **대비 그룹**(①·② 원 좌우 4색 + TV 꺼짐 발광): 대비 기준 색을 따라간다(그룹 안 색 = 공용 TV 꺼짐 파랑 → 대비 기준 색 관계, 위와 같은 규칙). TV 꺼짐 발광 = 대비 기준 색 자체.
+  - `contrastMode = Auto`(기본): 색조 = 기준 색 색조 + `contrastHueOffset`(기본 174.0697° = 공용 TV 꺼짐 파랑 − 공용 호박색, 팔라딘 결과 그대로 — 창 '색조 차이 = 공용에서 역산' 버튼). 채도·밝기 = 공용 TV 꺼짐 × 기조와 같은 비율 → **하한** `contrastMinSaturation`(0.45)·`contrastMinValue`(0.6).
+  - **하한을 둔 이유**: 비율 규칙만 쓰면 기준 색이 회색(채도 0)일 때 대비 기준 채도도 0 → ①·② 원·TV 꺼짐까지 회색이 돼 RECTIFY 안쪽 색 연출의 '색이 터지는' 단계가 사라진다. 어두운 기준 색도 같은 이유로 밝기 하한. 기조 그룹은 하한 없이 회색·어둡게 따라간다(회색 캐릭터 = 회색 화면이 자연스러움). 팔라딘 값(채도 0.75·밝기 1)은 하한 위라 영향 없음.
+  - `contrastMode = Manual`: `contrastColor` 를 그대로 대비 기준 색으로(하한 안 걸림).
+- **칸별 직접 지정**: 프로필 `paletteOverrides`(칸·manual·색). manual 켬 = 그 칸은 그 색 그대로(HDR 가능), 끄면 자동(색은 다시 켤 때를 위해 남김). 같은 칸 두 줄이면 앞 줄. 기본 = 비어 있음(전부 자동).
+- **처음 값**: 세 프로필(팔라딘·거너·어쌔신)과 코드 기본값 모두 기준 색 #D6AB69(= 공용 호박색) → 지금 색과 같다. 테스트는 값이 아니라 관계를 고정한다(기준 색 = 공용 호박색이면 공용 색 그대로, 오차 1e-3 — 세 프로필 기준 색은 사용자 튜닝 값, 코드 기본값만 #D6AB69 고정). 기본 프로필 에셋은 11-12 삭제.
+- **런타임**: `BossVictoryGlitchPresentation.Begin` 이 처치자 프로필을 고르는 순간 `_palette` 를 계산해 `BossVictoryGlitchRender.Enable(settings, palette, orange)`·TV 꺼짐 `BossVictoryCrtOff` 에 넘긴다. 새 RPC 없음 — 복제된 `KillerClientId` → 처치자 캐릭터 → 프로필 → 같은 팔레트(늦은 참가자도). 렌더러 `Enable` 은 이미 켜져 있으면 색만 다시 넣는다.
+- **편집**: 타임라인 창 인스펙터 위 **'팔레트'** 버튼(또는 노란 틴트·보스 노이즈·TV 꺼짐·RECTIFY 트랙 칸의 '팔레트') — 기준 색·대비 모드/색조 차이/하한(또는 대비 색), 계산된 대비 기준 색, 15칸 견본(자동/직접 표시·체크 = 직접 지정·직접이면 색 편집). Play 중 연출이 돌면 바꾼 값이 바로 화면에(`RefreshLook`, TV 꺼짐은 다음 꺼짐부터). 트랙 칸의 공용 색을 고치면 기준 팔레트가 바뀌어 모든 캐릭터에 같은 관계로 퍼진다.
+
+## 4.12 RECTIFY 주황 채움 = 캐릭터별(11-12)
+
+공용 설정의 'RECTIFY 주황 채움' 10칸(`rectifyOrangeHold/Wipe/RightToLeft/Jitter/RowPixels/Left/Right/Gradient`·`rectifyScanlineSpacing/Dark`)을 `BossVictoryProfile`(인스펙터 'RECTIFY 주황 채움(캐릭터별)')로 옮기고 공용에서는 지웠다.
+- **이전**: 세 프로필에 옮기기 전 공용 값(사용자 튜닝 포함 — 왼쪽→오른쪽·좌 (1, 0.27, 0)·우 (1, 0, 0.455))을 Unity 에서 그대로 복사 → 화면은 옮기기 전과 같다. `CreateDefault()`(표에 없는 캐릭터) 기본값도 같은 값(`BossVictoryOrangeLook.Default*`).
+- **런타임**: 처치자 프로필 → `BossVictoryOrangeLook.From(profile)`(하한·0~1 자르기) → `BossVictoryGlitchRender.Enable/ApplyLook(settings, palette, orange)`. 처치자 = 복제된 `KillerClientId`(새 RPC·복제 값 없음).
+- **팔레트(271)**: 칸 `OrangeLeft/Right` 는 그대로, 기준(원본) 색만 처치자 프로필 `rectifyOrangeLeft/Right`(`ReferenceColors(settings, profile)`). 기준 색 따라가기·칸별 직접 지정 규칙은 같고 팔레트 견본도 프로필 값을 따른다.
+- **편집**: 타임라인 창 RECTIFY 안쪽 색 트랙 칸 — '주황 채움' 칸이 지금 고른 캐릭터 프로필 값. 테스트 `BossVictoryOrangeProfileTests`(세 프로필 값 = 옛 공용 값 · 렌더 값 = 처치자 프로필).
+
+## 4.13 처치자 이동 = 캐릭터별(272)
+
+프로필 칸 `killerMove`(`BossVictoryKillerMove`)가 처치자 움직임을 고른다 — 캐릭터 분기 대신 데이터. 순수 함수 `BossVictoryKillerMoves`(`Map/BossVictory/BossVictoryKillerMove.cs`), EditMode `BossVictoryKillerMoveTests`. 정본 값 넣기 = 메뉴 `Tools/Boss Victory/처치자 이동 프로필 적용 (272)`(지정 칸만 바꾸고 Unity 직렬화 — 다른 칸 그대로).
+
+| 이동 | 프로필 | '백대쉬 시작' 단계 | '처치 연출 스킬' 단계 |
+|---|---|---|---|
+| `BackDash`(기본) | 팔라딘 | 백대쉬(지금 그대로) | 스킬 연출 시작 마커에 처치 연출 스킬 |
+| `TeleportDash` | 어쌔신 | 없음 | 트랙 '어쌔신 순간이동·Q 이동' 클립마다 순간이동 → Q 이동(첫 클립 시작부터) |
+| `RetreatCharge` | 거너 | 가까울 때만: 후퇴 스킬(E) 표시 + 백대쉬(이동만) | 가까움 = 'Q 차징 시작' 마커 / 멂 = 백대쉬 시작 시각에 바로 Q |
+
+- **공통**: 이동은 처치자 **오너만 실제로**(PlayerMotor), 다른 피어는 복제 위치. 애니·이펙트는 각 피어 로컬. **새 RPC·복제 값 없음**. 처치 연출에 특성 연출 없음(어쌔신 일섬 `DashTint` 안 씀, 거너 Q 는 기존 `BeginPresentationCharge` 기본 색).
+- **어쌔신 순간이동 Q — 타임라인 트랙 '어쌔신 순간이동·Q 이동'(272 후속, `BossVictoryTrack.AssassinDash` · 목록 `timeline.assassinDash`)**:
+  - **클립 하나 = 한 번**: 클립 시작에 그 클립의 **시작 지점**으로 순간이동 → 클립 길이 동안 **도착 지점**까지 Q 이동(곡선 `teleportMoveEase`) → 끝에 일섬 1번.
+  - **여러 개 = 시작 순서대로 #1 → #2 …**(시작이 같으면 목록 순). 겹치면 앞 클립은 다음 클립 시작에서 끝난다(그 자리까지만 가고 일섬 끝점도 거기). 순수 함수 `BossVictoryAssassinDash`(`Order`·`Number`·`SegmentEnd`·`Current`·`AllDone`·`Progress`).
+  - 두 점 = 클립마다 보스 기준 오프셋 `dashFrom`·`dashTo`(보스 위치 + 보스 **수평** 회전 × 오프셋, +Z = 보스 정면, 높이 = 처치자 발). 보스가 없으면 처치자 기준. 창에서 클립을 고르면 아래 칸에 숫자로 고친다.
+  - 순간이동 = `LobbyPodLaunch.TeleportOwner` 순서(백대쉬·대시 끊기 → 넉백 지움 → `TeleportAuthoritative` → 방향 = 도착 지점 쪽 → `NetworkTransform.Teleport`). 이동 = 오너가 FixedUpdate 에 진행 차이만큼 `AddGroundedDisplacement`(유닛 통과, 벽이면 멈춤). 진행 = 글리치 시각 기준(클립 길이 = 실제 초).
+  - 애니 = Q 대신 `teleportMoveState`(기본 `Assassin_Q_DashStrike_Transformed` = Combo_Attack_03_04, 60fps 1.917초, 상태 속도 1.5, Custom0 0.15·End 0.425). 첫 클립에 `PlayerSkillController.PlayPresentationStateOnly` 로 스킬 없이 0층을 쥐고(클립 이벤트는 어느 스킬에도 안 감 — **End 는 '스킬 끝'이 아니다**), **클립마다 Custom0 프레임부터 다시** 튼다. 이동 중 처치자 애니 배율 = `MoveAnimScale` = (End − Custom0) ÷ 클립 길이 ÷ 상태 속도 — 도착하는 순간 End 자세(기본 0.275초 클립 = 배율 0.667). 클립 사이 빈 시간은 제자리에서 애니가 그대로 이어진다.
+  - 일섬 = 일반 Q 그대로 — 클립 시작에 `AssassinSkillView.BeginPierce(시작 지점, 방향)`, 이동 끝에 `EndPresentationPierce(진행 점)`(PierceLine + PierceBurst, 특성 색 없음). 끝점은 계산값이라 모든 피어 같다.
+  - **마지막 클립 뒤** 애니가 정지 프레임까지 가서 로비 전환까지 멈춘다 — 기존 '처치 연출 스킬' 클립 끝 자르기(255 후속 7) `finisherTrimSeconds` 재사용(기본 71/60 = 1.1833초, 트랙 이름 누르면 '정지 프레임 = 71f' 버튼). 정지는 `AllDone` 뒤에만 본다.
+  - 단계 시각: '백대쉬 시작' 단계 없음(무한대), '처치 연출 스킬' 단계 = 첫 클립 시작(클립 없으면 안 함). **'백대쉬 시작' 마커·'스킬 연출 시작' 마커는 이 이동에서 안 쓴다.** 옛 칸 `teleportOffset`·`arrivalOffset`·`teleportMoveInterval`(이동 구간 A/B)은 지웠다.
+  - 이관: 메뉴 '처치자 이동 프로필 적용 (272)' 가 트랙이 비었을 때만 클립 1개를 만든다(옛 값 = 시작 0.2·길이 0.275·옛 두 점은 11-12 이관 끝, 이후엔 기본 두 점). 이미 있으면 그대로.
+  - 원래 처치 연출(R 변신)을 대신한다 — `finisherSlot` 은 이 이동에서 안 쓴다(칸은 남김).
+  - Scene 뷰: 타임라인 창이 열려 있고 이동이 순간이동이면 **모든 클립**의 두 점·경로를 `#n 시작`·`#n 도착` 라벨로 그리고, 고른 클립만 밝게 + 위치 핸들(높이 0 으로 저장). 기준 보스 = 재생 중 보스 → 이 세션 마지막 회차 보스 → 열린 씬의 23호. 트랙 클립에도 `#n` 이 보인다.
+- **거너 후퇴 차징**(제자리 — 순간이동 없음):
+  - 처치 순간 보스와 수평 거리 < `retreatDistance`(기본 5m)면 '백대쉬 시작'에 `retreatSkillSlot`(E 냉각 백스텝) 표시 전용 재생(냉기·궤적 — 그 스킬 이동은 안 돎) + 백대쉬(기존 백대쉬 칸, 보스 반대쪽, 이동만). 'Q 차징 시작' 마커(`chargeStartTime`, 기본 -1 = 백대쉬 시작 + 0.2초 — 끌면 고정)에 E 표시를 접고 처치 연출 스킬(Q) — 백대쉬는 끊지 않고 이어 감.
+  - 멀면 E·백대쉬 없이 '백대쉬 시작' 시각에 바로 Q.
+  - Q = 기존 `GunnerChargeLaserSkill.OnPresentationOnlyStart`(1.2초 충전 → 보스 쪽 발사). 차징 구체 크기만 프로필 `chargeScaleFrom → chargeScaleTo`(+ `chargeScaleCurve`) — `GunnerBeamView.SetPresentationChargeScale`, 정리 때 끈다. 발사 순간 = 목표 크기, 레이저 폭 그대로.
+  - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
+  - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
+
 ## 5. 알려진 한계
 
+- (272) 거너 가까움 판정은 처치 순간 각 피어 화면의 처치자 위치로 한다(새 복제 값 없음) — 문턱 근처면 피어마다 E·백대쉬 유무가 갈릴 수 있다(이동은 오너 기준이라 위치는 결국 같다).
+- (272) 어쌔신 순간이동은 오너가 옮기고 다른 피어는 복제로 받아, 그 피어에선 클립마다 Q 애니가 순간이동 위치 도착보다 반 RTT 먼저 시작될 수 있다. 일섬 끝점은 계산값이라 벽에 막혀 덜 갔으면 실제 위치보다 길다. 이동 중 애니 배율은 클립 길이에 맞춰 바뀌어(짧으면 빠르게) 원래 Q 속도와 다를 수 있다. 느려짐 단계 중에 클립이 있으면 이동 배율이 느려짐 배율보다 먼저다.
+
 - 프로필은 회차 시작 때 고정 — 연출 중 처치자 캐릭터가 바뀌어도(랩 F1) 그 회차는 옛 프로필, 랩이 바로 처음부터 다시 튼다.
-- 끝 자르기 값은 클립 시간(초) 하나 — 기본 프로필을 여러 캐릭터가 쓰면 캐릭터마다 클립 길이가 달라 같은 값이 다른 프레임이다(캐릭터 프로필을 만들면 따로).
+- 끝 자르기 값은 클립 시간(초) 하나 — 기본 프로필(지금은 코드 기본값)을 여러 캐릭터가 쓰면 캐릭터마다 클립 길이가 달라 같은 값이 다른 프레임이다(캐릭터 프로필을 만들면 따로).
 - 클립 노드 실측 표본(`BossVictoryClipTiming`)은 클립 이름 기준이라 프로필과 무관(같은 클립이면 공유).
 - 클립 복사는 같은 자리에 이미 같은 클립이 있어도 하나 더 생긴다(중복 확인 안 함 — Undo 로 되돌림).

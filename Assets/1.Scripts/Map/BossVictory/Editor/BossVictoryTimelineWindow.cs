@@ -46,6 +46,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         if (_settings == null) _settings = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(DefaultAssetPath);
         Undo.undoRedoPerformed += OnUndoRedo;
+        SceneView.duringSceneGui += OnSceneGUI;   // 순간이동 Q 두 점 핸들(272)
         wantsMouseMove = false;
         _inspectorHeight = EditorPrefs.GetFloat(InspectorHeightPref, DefaultInspectorHeight);
     }
@@ -96,15 +97,20 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void OnDisable()
     {
         Undo.undoRedoPerformed -= OnUndoRedo;
+        SceneView.duringSceneGui -= OnSceneGUI;
     }
 
-    // ── 캐릭터별 프로필(267) — 도구 막대 드롭다운(기본·팔라딘·거너·어쌔신). Play 중 연출이 돌면 실제 처치자 캐릭터를 따라간다. ──
-    static readonly TutorialCharacter[] Characters = { TutorialCharacter.None, TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin };
-    static readonly string[] CharacterLabels = { "기본", "팔라딘", "거너", "어쌔신" };
+    // ── 캐릭터별 프로필(267) — 도구 막대 드롭다운(팔라딘·거너·어쌔신 — 기본 프로필 에셋은 11-12 삭제, 표에 없는 캐릭터 = 코드 기본값). Play 중 연출이 돌면 실제 처치자 캐릭터를 따라간다. ──
+    static readonly TutorialCharacter[] Characters = { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin };
+    static readonly string[] CharacterLabels = { "팔라딘", "거너", "어쌔신" };
     [SerializeField] TutorialCharacter _character;
     BossVictoryProfile _profile;
 
-    static string CharacterLabel(TutorialCharacter c) => CharacterLabels[Mathf.Max(0, System.Array.IndexOf(Characters, c))];
+    static string CharacterLabel(TutorialCharacter c)
+    {
+        int i = System.Array.IndexOf(Characters, c);
+        return i >= 0 ? CharacterLabels[i] : "코드 기본값";   // None = 처치자를 못 찾은 회차(실제 처치자 따라갈 때만)
+    }
 
     // 실제 처치자(랩 재생 중) — 없으면 false.
     static bool TryLiveKiller(out TutorialCharacter character, out BossVictoryProfile profile)
@@ -115,7 +121,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return profile != null;
     }
 
-    // 지금 편집할 프로필 — 실제 처치자 → 드롭다운 캐릭터 프로필(표에 없으면 기본 프로필).
+    // 지금 편집할 프로필 — 실제 처치자 → 드롭다운 캐릭터 프로필(표에 없으면 코드 기본값 — 저장 안 됨, 배너 안내).
     void ResolveProfile()
     {
         BossVictoryProfile before = _profile;
@@ -124,7 +130,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             _character = live;
             _profile = liveProfile;
         }
-        else _profile = _settings != null ? _settings.ProfileFor(_character) : null;
+        else
+        {
+            if (System.Array.IndexOf(Characters, _character) < 0) _character = TutorialCharacter.Paladin;   // 옛 '기본' 선택·처치자 없던 회차 뒤 → 팔라딘
+            _profile = _settings != null ? _settings.ProfileFor(_character) : null;
+        }
         if (_profile == before) return;
         _finisherClipKey = _bossHitClipKey = null;
         _finisherEstimate = null;
@@ -378,6 +388,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (BossVictoryTimeline.IsBob(track))
             GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
                 $"±{clip.bobAmplitude:0.##}% · {clip.bobPeriod:0.##}s", EditorStyles.miniLabel);
+        if (BossVictoryTimeline.IsAssassinDash(track))
+            GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
+                $"#{BossVictoryAssassinDash.Number(Timeline.assassinDash, index)}", EditorStyles.miniBoldLabel);
         if (track == BossVictoryTrack.CameraCut)
         {
             EditorGUI.DrawRect(new Rect(r.x, r.y, 2f, r.height), Color.white);   // 컷 = 시작 순간
@@ -597,6 +610,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     bool HasClipSelection => _selTrack >= 0 && _selIndex >= 0 && _selIndex < Timeline.Clips((BossVictoryTrack)_selTrack).Count;
 
     bool _selFinisher;   // '처치 연출 스킬 End' 줄 노드(시간 배율 칸)
+    bool _selPalette;    // 팔레트(271 — 기준 색·대비·12색 견본) 칸
 
     void Select(int track, int index, int marker)
     {
@@ -605,6 +619,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _selMarker = marker;
         _selKey = -1;
         _selFinisher = false;
+        _selPalette = false;
         _multi.Clear();
         GUI.FocusControl(null);
     }
@@ -1275,12 +1290,36 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         List<BossVictoryClip> clips = Timeline.Clips(track);
         BossVictoryClip added = NewClip(track, start);
         if (BossVictoryTimeline.HasFades(track)) added.MigrateFadesToKeys();   // 효과 세기 = 키(255 후속 6)
+        if (BossVictoryTimeline.IsAssassinDash(track)) InitAssassinDash(clips, ref added);
         clips.Add(added);
         if (track == BossVictoryTrack.CameraCut) Timeline.cameraCutShots.Add(BossVictoryCameraCuts.Cut.Default);
         Select((int)track, clips.Count - 1, -1);
         Save();
         Repaint();
     }
+
+    // 새 어쌔신 순간이동·Q 이동 클립(272 후속) — 길이 = Custom0 → End 구간, 두 점 = 앞 클립(시작 순 마지막) 값, 없으면 기본.
+    static void InitAssassinDash(List<BossVictoryClip> clips, ref BossVictoryClip added)
+    {
+        added.length = BossVictoryAssassinDash.DefaultLength;
+        added.fadeIn = added.fadeOut = 0f;
+        added.weight = 1f;
+        var order = new List<int>(clips.Count);
+        BossVictoryAssassinDash.Order(clips, order);
+        if (order.Count > 0)
+        {
+            BossVictoryClip last = clips[order[order.Count - 1]];
+            added.dashFrom = last.dashFrom;
+            added.dashTo = last.dashTo;
+        }
+        else
+        {
+            added.dashFrom = BossVictoryAssassinDash.DefaultFrom;
+            added.dashTo = BossVictoryAssassinDash.DefaultTo;
+        }
+    }
+
+    static Vector3 FlatOffset(Vector3 v) => new Vector3(v.x, 0f, v.z);   // 높이는 런타임이 처치자 발 높이로 맞춘다
 
     void MoveMarker(BossVictoryMarker marker, float t)
     {
@@ -1391,7 +1430,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryMarker.FocusKiller => "처치자가 아닌 피어의 카메라가 이 시각에 처치자로 즉시 넘어간다(처치자 화면 그대로).",
         BossVictoryMarker.HideOthers => "이 시각에 처치자 외 플레이어 캐릭터를 모든 화면에서 숨긴다.",
         BossVictoryMarker.BackDashStart =>
-            "이 시각에 처치자가 백대쉬한다 — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다. " +
+            "이 시각에 처치자가 백대쉬한다(처치자 이동 = 순간이동이면 이 마커는 안 씀 — 어쌔신 순간이동·Q 이동 트랙, 후퇴 차징이면 가까울 때만 E + 백대쉬 — 272) — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다. " +
             "처치자 순서 노드는 각 피어가 자기 화면 시계로 앞으로만 판정 — 스크럽으로 되돌아가지 않는다(다시 보려면 ⏮).",
         BossVictoryMarker.FinisherStart =>
             "클립 시작 = 처치 연출 스킬을 표시용으로 바로 트는 시각 — 백대쉬가 덜 끝났으면 끊고, 처치 순간 쓰던 스킬이 남아 있어도 기다리지 않는다. " +
@@ -1406,6 +1445,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             "이 시각에 보스를 그 자세로 멈춘다(배율 0). 0 = 끔. 뒤에 슬로우가 오면 슬로우 배율로 다시 움직인다(시각이 가장 늦은 노드가 이김).",
         BossVictoryMarker.BossSlow =>
             "이 시각부터 보스 ×End 후 배율(아래 칸). 0 = 끔 — '느려짐 시작'(그것도 끔이면 처치 연출 스킬 End) 순간을 따른다. 뒤에 정지가 오면 정지.",
+        BossVictoryMarker.ChargeStart =>
+            "거너(처치자 이동 = 후퇴 차징)만 — 처치 순간 보스와 가까워 E·백대쉬를 했을 때 이 시각에 Q 차징을 시작한다(멀면 백대쉬 시작 시각에 바로 차징 — 이 마커 무시). " +
+            "기본 = 백대쉬 시작 + 0.2초(끌면 그 시각에 고정). 다른 이동 방식에선 쓰지 않는다.",
         _ => "",
     };
 
@@ -1452,6 +1494,11 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             DrawTimeScales();
             return;
         }
+        if (_selPalette)
+        {
+            DrawPalette();
+            return;
+        }
         if (_selTrack >= 0 && !HasClipSelection)
         {
             var only = (BossVictoryTrack)_selTrack;
@@ -1490,6 +1537,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             c.uvFrom = EditorGUILayout.FloatField(new GUIContent("시작 오프셋(UV)", "노이즈 텍스처 V 오프셋 — 1 = 한 장. 텍스처가 Repeat 라 넘어가면 감긴다."), c.uvFrom);
             c.uvTo = EditorGUILayout.FloatField(new GUIContent("끝 오프셋(UV)", "클립 끝 이후에도 이 값 유지 — 다음 클립은 여기에 더해진다."), c.uvTo);
             c.uvEase = (BossVictoryKeyCurve)EditorGUILayout.Popup("이징", (int)c.uvEase, KeyCurveLabels);
+        }
+        if (BossVictoryTimeline.IsAssassinDash(track))
+        {
+            EditorGUILayout.LabelField("실행 순서", $"#{BossVictoryAssassinDash.Number(Timeline.assassinDash, _selIndex)}(시작 순 — 겹치면 앞 클립은 다음 클립 시작에서 끝)");
+            c.dashFrom = FlatOffset(EditorGUILayout.Vector3Field(new GUIContent("시작 지점(보스 기준)", "클립 시작에 이 점으로 순간이동. +Z = 보스 정면, 높이는 무시(처치자 발 높이)."), c.dashFrom));
+            c.dashTo = FlatOffset(EditorGUILayout.Vector3Field(new GUIContent("도착 지점(보스 기준)", "클립 길이 동안 여기까지 Q 이동(곡선 = 프로필 teleportMoveEase). 끝에 일섬."), c.dashTo));
         }
         if (BossVictoryTimeline.IsBob(track))
         {
@@ -1542,6 +1595,91 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // ── 'Scene 뷰로' — 지금 보고 있는 Scene 뷰 화면을 컷 화면으로(255 후속 2) ──
     // 저장 = 기준 좌표계(기준점 + 처치자→보스 축). 그 기준이 되는 처치자·보스 위치:
     // Play 중 연출이 돌면 지금 컷이 잡은 위치(컷 전이면 지금 위치) · 아니면 이 에디터 세션에서 마지막으로 본 회차 위치(SessionState). 없으면 버튼을 막는다.
+
+    // ── 순간이동 Q 두 점(272 후속) — 이 창이 열려 있고 프로필 이동이 '순간이동'이면 Scene 뷰에 클립마다 시작·도착 지점·경로(#n) + 선택 클립 끌기 핸들 ──
+    // 기준 보스 = 재생 중 보스 → 이 세션 마지막 회차 보스(SessionState) → 열린 씬의 23호. 저장 = 보스 기준 오프셋(BossVictoryKillerMoves.BossLocalOffset, 높이 0).
+
+    const string BossPoseKey = "BossVictoryTimeline.LastBossPose";
+    static readonly Color TeleportColor = new Color(0.75f, 0.45f, 1f);
+    static readonly Color ArrivalColor = new Color(1f, 0.55f, 0.85f);
+
+    static bool TryGetBossPose(out Vector3 position, out Quaternion rotation, out string source)
+    {
+        GameObject boss = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null ? BossVictoryGlitchPresentation.Instance.BossObject : null;
+        if (boss != null)
+        {
+            position = boss.transform.position;
+            rotation = boss.transform.rotation;
+            SessionState.SetBool(BossPoseKey, true);
+            SessionState.SetVector3(BossPoseKey + ".Pos", position);
+            SessionState.SetVector3(BossPoseKey + ".Euler", rotation.eulerAngles);
+            source = $"재생 중 보스 {boss.name}";
+            return true;
+        }
+        if (SessionState.GetBool(BossPoseKey, false))
+        {
+            position = SessionState.GetVector3(BossPoseKey + ".Pos", Vector3.zero);
+            rotation = Quaternion.Euler(SessionState.GetVector3(BossPoseKey + ".Euler", Vector3.zero));
+            source = "마지막 회차 보스";
+            return true;
+        }
+        TwentyThreeBoss scene = Object.FindFirstObjectByType<TwentyThreeBoss>();
+        position = scene != null ? scene.transform.position : default;
+        rotation = scene != null ? scene.transform.rotation : Quaternion.identity;
+        source = scene != null ? $"씬의 {scene.name}" : "";
+        return scene != null;
+    }
+
+    // 어쌔신 순간이동·Q 이동 클립(272 후속) — 모든 클립 두 점·경로 + '#n' 표시, 선택한 클립만 밝게 + 핸들.
+    void OnSceneGUI(SceneView view)
+    {
+        if (_profile == null || _profile.killerMove != BossVictoryKillerMove.TeleportDash) return;
+        if (!TryGetBossPose(out Vector3 bossPos, out Quaternion bossRot, out string source)) return;
+        List<BossVictoryClip> clips = Timeline.assassinDash;
+
+        Handles.color = new Color(1f, 1f, 1f, 0.6f);
+        Handles.DrawWireDisc(bossPos, Vector3.up, 0.6f);
+        Handles.DrawAAPolyLine(2f, bossPos, bossPos + BossVictoryKillerMoves.Yaw(bossRot) * Vector3.forward * 1.5f);   // 보스 정면(+Z)
+        Handles.Label(bossPos + Vector3.up * 0.8f, $"기준: {source}");
+        if (clips == null || clips.Count == 0) return;
+
+        int selected = _selTrack == (int)BossVictoryTrack.AssassinDash && HasClipSelection ? _selIndex : -1;
+        var order = new List<int>(clips.Count);
+        BossVictoryAssassinDash.Order(clips, order);
+        for (int k = 0; k < order.Count; k++)
+        {
+            int i = order[k];
+            bool on = i == selected;
+            float alpha = selected < 0 || on ? 1f : 0.35f;
+            Vector3 a = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, clips[i].dashFrom);
+            Vector3 b = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, clips[i].dashTo);
+            Handles.color = WithAlpha(ArrivalColor, alpha);
+            Handles.DrawAAPolyLine(on ? 6f : 3f, a, b);
+            Vector3 path = b - a;
+            if (path.sqrMagnitude > 0.01f) Handles.ConeHandleCap(0, b - path.normalized * 0.3f, Quaternion.LookRotation(path), 0.35f, EventType.Repaint);
+            Handles.color = WithAlpha(TeleportColor, alpha);
+            Handles.DrawWireDisc(a, Vector3.up, on ? 0.5f : 0.4f);
+            Handles.color = WithAlpha(ArrivalColor, alpha);
+            Handles.DrawWireDisc(b, Vector3.up, on ? 0.5f : 0.4f);
+            Handles.Label(a + Vector3.up * 0.6f, $"#{k + 1} 시작");
+            Handles.Label(b + Vector3.up * 0.6f, $"#{k + 1} 도착");
+        }
+        if (selected < 0) return;
+
+        BossVictoryClip c = clips[selected];
+        EditorGUI.BeginChangeCheck();
+        Vector3 na = Handles.PositionHandle(BossVictoryKillerMoves.BossPoint(bossPos, bossRot, c.dashFrom), Quaternion.identity);
+        Vector3 nb = Handles.PositionHandle(BossVictoryKillerMoves.BossPoint(bossPos, bossRot, c.dashTo), Quaternion.identity);
+        if (!EditorGUI.EndChangeCheck()) return;
+        RecordField("처치 연출 순간이동 지점");
+        c.dashFrom = FlatOffset(BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, na));
+        c.dashTo = FlatOffset(BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, nb));
+        clips[selected] = c;
+        Save();
+        Repaint();
+    }
+
+    static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, c.a * a);
 
     const string SubjectsKey = "BossVictoryTimeline.LastSubjects";
 
@@ -1702,7 +1840,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     void ApplySettings(SerializedObject so)
     {
-        if (so.ApplyModifiedProperties()) Save();
+        if (so.ApplyModifiedProperties()) SavePalette();   // 공용 색이 바뀌었을 수 있다 — Play 중 팔레트도 다시(271)
     }
 
     SerializedObject _profileSo;
@@ -1712,14 +1850,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         if (_profileSo == null || _profileSo.targetObject != _profile) _profileSo = new SerializedObject(_profile);
         _profileSo.Update();
-        EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
+        if (title != null) EditorGUILayout.Space(4f);
+        if (title != null) EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
         foreach (string n in names)
         {
             SerializedProperty p = _profileSo.FindProperty(n);
             if (p != null) EditorGUILayout.PropertyField(p, true);
         }
-        if (_profileSo.ApplyModifiedProperties()) Save();
+        if (_profileSo.ApplyModifiedProperties()) SavePalette();   // 기준 색 칸 등 — Play 중 팔레트도 다시(271)
     }
 
     void DrawSettingsFields(string title, params string[] names)
@@ -1761,6 +1899,17 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         switch (marker)
         {
             case BossVictoryMarker.BackDashStart:
+                DrawProfileFields("처치자 이동(272 · 이 캐릭터 프로필)", nameof(BossVictoryProfile.killerMove));
+                if (_profile.killerMove == BossVictoryKillerMove.TeleportDash)
+                {
+                    EditorGUILayout.HelpBox("순간이동(272 후속) — 이 마커는 쓰지 않는다. 순간이동·Q 이동은 '어쌔신 순간이동·Q 이동' 트랙 클립이 낸다(트랙 이름을 누르면 애니 상태·곡선·정지 프레임).", MessageType.Info);
+                    break;
+                }
+                if (_profile.killerMove == BossVictoryKillerMove.RetreatCharge)
+                {
+                    DrawProfileFields("후퇴 차징(가까우면 이 마커에 후퇴 스킬 + 백대쉬 → 'Q 차징 시작' / 멀면 이 마커에 바로 Q)",
+                        nameof(BossVictoryProfile.retreatDistance), nameof(BossVictoryProfile.retreatSkillSlot));
+                }
                 DrawProfileFields("백대쉬(처치 연출 전용 · 이 캐릭터 프로필)",
                     nameof(BossVictoryProfile.backDashDistance), nameof(BossVictoryProfile.backDashDuration),
                     nameof(BossVictoryProfile.backDashEase), nameof(BossVictoryProfile.backDashAngle),
@@ -1790,6 +1939,18 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             case BossVictoryMarker.BossSlow:
                 DrawProfileFields("보스 End 후 배율", nameof(BossVictoryProfile.bossAfterFinisherScale));
                 break;
+            case BossVictoryMarker.ChargeStart:
+                DrawProfileFields("거너 Q 차징 구체(272 · 이 캐릭터 프로필 — 최대 충전 = 목표 크기로 발사, 레이저 폭 그대로)",
+                    nameof(BossVictoryProfile.chargeScaleFrom), nameof(BossVictoryProfile.chargeScaleTo), nameof(BossVictoryProfile.chargeScaleCurve));
+                if (Timeline.chargeStartTime >= 0f && GUILayout.Button($"자동으로(백대쉬 시작 + {BossVictoryTimeline.DefaultChargeDelay:0.0}초)", GUILayout.Width(220f)))
+                {
+                    Record("처치 연출 타임라인 Q 차징 시작 자동");
+                    Timeline.chargeStartTime = -1f;
+                    Save();
+                }
+                if (_profile.killerMove != BossVictoryKillerMove.RetreatCharge)
+                    EditorGUILayout.HelpBox("이 프로필은 처치자 이동이 '후퇴 차징'이 아니라 이 마커를 쓰지 않는다.", MessageType.Info);
+                break;
             case BossVictoryMarker.FocusKiller:
             {
                 SerializedObject so = SettingsObject();
@@ -1814,7 +1975,26 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         switch (track)
         {
+            case BossVictoryTrack.AssassinDash:
+                if (_profile.killerMove != BossVictoryKillerMove.TeleportDash)
+                    EditorGUILayout.HelpBox("이 캐릭터 처치자 이동이 순간이동이 아니라 이 트랙은 쓰지 않는다(백대쉬 시작 마커의 '처치자 이동').", MessageType.Info);
+                EditorGUILayout.LabelField("클립 = 시작에 그 클립 시작 지점으로 순간이동 → 길이 동안 도착 지점까지 Q 이동 → 끝에 일섬. 여러 개 = 시작 순 #1 #2 …, 겹치면 앞 클립은 다음 클립 시작에서 끝. " +
+                    "클립마다 애니를 Custom0 프레임부터 다시 틀고 Custom0→End 가 클립 길이에 맞게 속도를 맞춘다. 클립 사이엔 제자리에서 애니가 이어지고, 마지막 뒤엔 정지 프레임까지 가서 로비 전환까지 멈춘다. " +
+                    "두 점 = 보스 기준(+Z = 보스 정면) — 클립을 고르면 Scene 뷰 핸들로 끈다.", EditorStyles.wordWrappedMiniLabel);
+                DrawProfileFields("순간이동 Q(이 캐릭터 프로필)", nameof(BossVictoryProfile.teleportMoveState), nameof(BossVictoryProfile.teleportMoveEase));
+                if (GUILayout.Button($"정지 프레임 = {BossVictoryKillerMoves.DefaultFreezeFrame}f", GUILayout.Width(140f)))
+                {
+                    Record("처치 연출 타임라인 순간이동 Q 정지 프레임");
+                    FinisherFull(out AnimationClip clip, out _);
+                    float fps = clip != null ? clip.frameRate : 60f;
+                    Timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(
+                        BossVictoryKillerMoves.FreezeSeconds(BossVictoryKillerMoves.DefaultFreezeFrame, fps), clip != null ? clip.length : 0f, fps);
+                    Save();
+                }
+                EditorGUILayout.LabelField($"정지 = {Timeline.finisherTrimSeconds:0.###}초(클립 시간 · '처치 연출 스킬' 클립 끝 자르기와 같은 칸)", EditorStyles.miniLabel);
+                break;
             case BossVictoryTrack.Amber:
+                DrawPaletteHint();
                 DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor), nameof(BossVictoryGlitchSettings.amberLumaLift),
                     nameof(BossVictoryGlitchSettings.skyAmberMinLuma));
                 DrawSettingsFields("처치 연출 전용 볼륨", nameof(BossVictoryGlitchSettings.victoryVolume), nameof(BossVictoryGlitchSettings.victoryVignetteIntensity),
@@ -1827,6 +2007,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     nameof(BossVictoryGlitchSettings.scanlineFloorKeep));
                 break;
             case BossVictoryTrack.BossNoise:
+                DrawPaletteHint();
                 DrawSettingsFields("보스 노이즈 모양",
                     nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseSpace),
                     nameof(BossVictoryGlitchSettings.bossNoiseTiling), nameof(BossVictoryGlitchSettings.bossNoiseCameraScale),
@@ -1847,6 +2028,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawProfileFields("하던 동작 배율", nameof(BossVictoryProfile.killerCurrentActionScale));
                 break;
             case BossVictoryTrack.CrtOff:
+                DrawPaletteHint();
                 DrawSettingsFields("TV 꺼짐 모양", nameof(BossVictoryGlitchSettings.crtOffGlowColor));
                 break;
             case BossVictoryTrack.NoiseScrollV:
@@ -1854,23 +2036,26 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawSettingsFields("보스 노이즈 모양", nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseTiling));
                 break;
             case BossVictoryTrack.Rectify:
+                DrawPaletteHint();
                 EditorGUILayout.LabelField("배경 글자 — 외곽선만, 플레이어·보스 뒤·벽/바닥 앞, 찢긴 화면과 같이 찢긴다. 세기 = 알파: 들어오는 동안 가로줄이 그 비율만큼 무작위로 켜져 찢기듯 등장. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
                 DrawSettingsFields("배경 글자 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFont), nameof(BossVictoryGlitchSettings.rectifyText),
                     nameof(BossVictoryGlitchSettings.rectifyWidth), nameof(BossVictoryGlitchSettings.rectifyCenterY),
                     nameof(BossVictoryGlitchSettings.rectifyOutline), nameof(BossVictoryGlitchSettings.rectifyColor));
                 break;
             case BossVictoryTrack.RectifyFill:
-                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원 3개 — ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각(클립 시작 기준)에 자기 중심에서 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. ③은 회색으로 페이드 → 회색에서 흰색으로 바뀐 순간부터 확장. 원 안 색 = 왼쪽 색 → 오른쪽 색. 나중 원이 위, 마지막 원으로 고정. 첫 원 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
+                DrawPaletteHint();
+                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원 3개 — ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각(클립 시작 기준)에 자기 중심에서 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. ③은 회색으로 페이드 → 회색에서 흰색으로 바뀐 순간부터 확장. 원 안 색 = 왼쪽 색 → 오른쪽 색. 나중 원이 위, 마지막 원으로 고정. 첫 원 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용(주황 채움·안쪽 주사선은 캐릭터별 프로필).", EditorStyles.wordWrappedMiniLabel);
                 DrawRectifyCircleFields();
                 DrawSettingsFields("안쪽 색 공용", nameof(BossVictoryGlitchSettings.rectifyCircleGrayColor), nameof(BossVictoryGlitchSettings.rectifyCircleGrayToWhite),
-                    nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline),
-                    nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing), nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
+                    nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline));
                 DrawSettingsFields("RECTIFY 전용 글로우(맵 블룸과 무관)", nameof(BossVictoryGlitchSettings.rectifyGlowIntensity), nameof(BossVictoryGlitchSettings.rectifyGlowRadius),
                     nameof(BossVictoryGlitchSettings.rectifyGlowColor), nameof(BossVictoryGlitchSettings.rectifyGlowTarget));
-                DrawSettingsFields("주황 채움(흰 원 뒤)", nameof(BossVictoryGlitchSettings.rectifyOrangeHold), nameof(BossVictoryGlitchSettings.rectifyOrangeWipe),
-                    nameof(BossVictoryGlitchSettings.rectifyOrangeRightToLeft), nameof(BossVictoryGlitchSettings.rectifyOrangeJitter),
-                    nameof(BossVictoryGlitchSettings.rectifyOrangeRowPixels), nameof(BossVictoryGlitchSettings.rectifyOrangeLeft),
-                    nameof(BossVictoryGlitchSettings.rectifyOrangeRight), nameof(BossVictoryGlitchSettings.rectifyOrangeGradient));
+                if (_profile != null)
+                    DrawProfileFields("RECTIFY 주황 채움(캐릭터별 — 이 캐릭터 프로필, 11-12)", nameof(BossVictoryProfile.rectifyOrangeHold), nameof(BossVictoryProfile.rectifyOrangeWipe),
+                        nameof(BossVictoryProfile.rectifyOrangeRightToLeft), nameof(BossVictoryProfile.rectifyOrangeJitter),
+                        nameof(BossVictoryProfile.rectifyOrangeRowPixels), nameof(BossVictoryProfile.rectifyOrangeLeft),
+                        nameof(BossVictoryProfile.rectifyOrangeRight), nameof(BossVictoryProfile.rectifyOrangeGradient),
+                        nameof(BossVictoryProfile.rectifyScanlineSpacing), nameof(BossVictoryProfile.rectifyScanlineDark));
                 break;
             case BossVictoryTrack.CameraBob:
                 EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);
@@ -1886,6 +2071,142 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             default:
                 EditorGUILayout.LabelField("이 트랙은 세기(클립)만 — 따로 모양 값 없음.", EditorStyles.miniLabel);
                 break;
+        }
+    }
+
+    // ── 팔레트(271) — 프로필 기준 색·대비 설정 + 계산된 색 견본(칸마다 자동/직접 지정) ──────────
+
+    static readonly Dictionary<BossVictoryPaletteSlot, string> PaletteLabels = new Dictionary<BossVictoryPaletteSlot, string>
+    {
+        { BossVictoryPaletteSlot.Amber, "배경 호박색(= 기준 색)" },
+        { BossVictoryPaletteSlot.NoiseBright, "보스 노이즈 밝은 색" },
+        { BossVictoryPaletteSlot.NoiseDark, "보스 노이즈 어두운 색" },
+        { BossVictoryPaletteSlot.RectifyOutline, "RECTIFY 외곽선" },
+        { BossVictoryPaletteSlot.Circle1Left, "① 원 왼쪽(대비)" },
+        { BossVictoryPaletteSlot.Circle1Right, "① 원 오른쪽(대비)" },
+        { BossVictoryPaletteSlot.Circle2Left, "② 원 왼쪽(대비)" },
+        { BossVictoryPaletteSlot.Circle2Right, "② 원 오른쪽(대비)" },
+        { BossVictoryPaletteSlot.Circle3Left, "③ 흰 원 왼쪽" },
+        { BossVictoryPaletteSlot.Circle3Right, "③ 흰 원 오른쪽" },
+        { BossVictoryPaletteSlot.CircleGray, "③ 회색 단계" },
+        { BossVictoryPaletteSlot.OrangeLeft, "주황 채움 왼쪽" },
+        { BossVictoryPaletteSlot.OrangeRight, "주황 채움 오른쪽" },
+        { BossVictoryPaletteSlot.Glow, "RECTIFY 글로우" },
+        { BossVictoryPaletteSlot.CrtGlow, "TV 꺼짐 발광(= 대비 기준 색)" },
+    };
+
+    void DrawPalette()
+    {
+        EditorGUILayout.LabelField("팔레트(271 — 이 캐릭터 프로필)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("공용 설정 색 = 기준(팔라딘) 팔레트. 각 색은 공용 '배경 호박색'과의 관계(색조 차이 · 채도·밝기 비율)를 유지한 채 이 프로필 기준 색을 따라간다. 흰·회색(채도 0)은 그대로. " +
+                                   "대비 그룹(①·② 원·TV 꺼짐)은 대비 기준 색을 따라간다 — 자동 = 기준 색 색조 + 색조 차이(채도·밝기 하한 있음) / 직접 지정. 칸마다 '직접'을 켜면 그 색 그대로.", EditorStyles.wordWrappedMiniLabel);
+        DrawProfileFields("기준 색·대비", nameof(BossVictoryProfile.baseColor), nameof(BossVictoryProfile.contrastMode));
+        DrawProfileFields(null, _profile.contrastMode == BossVictoryContrastMode.Auto
+            ? new[] { nameof(BossVictoryProfile.contrastHueOffset), nameof(BossVictoryProfile.contrastMinSaturation), nameof(BossVictoryProfile.contrastMinValue) }
+            : new[] { nameof(BossVictoryProfile.contrastColor) });
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button(new GUIContent("기준 색 = 공용 호박색", "프로필 기준 색을 공용 설정 amberColor 로 — 결과 = 공용 색 그대로(직접 지정 칸 제외)."), GUILayout.Width(140f)))
+            {
+                Undo.RecordObject(_profile, "처치 연출 팔레트 기준 색");
+                _profile.baseColor = _settings.amberColor;
+                SavePalette();
+            }
+            if (GUILayout.Button(new GUIContent("색조 차이 = 공용에서 역산", "공용 TV 꺼짐 파랑 − 공용 호박색 색조 — 기준 색이 공용과 같을 때 대비 그룹이 공용 색 그대로."), GUILayout.Width(160f)))
+            {
+                Undo.RecordObject(_profile, "처치 연출 팔레트 색조 차이");
+                _profile.contrastHueOffset = BossVictoryPaletteCalc.ReferenceContrastHueOffset(_settings);
+                SavePalette();
+            }
+        }
+
+        BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(_settings, _profile);
+        EditorGUILayout.Space(4f);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("대비 기준 색(계산)", EditorStyles.miniBoldLabel, GUILayout.Width(160f));
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.ColorField(GUIContent.none, palette.ContrastBase, false, false, true, GUILayout.Width(80f));
+        }
+        EditorGUILayout.LabelField("계산된 색(견본 · 직접 = 그 칸만 고정)", EditorStyles.miniBoldLabel);
+        foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                bool manual = palette.IsManual(slot);
+                EditorGUILayout.LabelField(PaletteLabels.TryGetValue(slot, out string label) ? label : slot.ToString(), GUILayout.Width(170f));
+                GUILayout.Label(manual ? "직접" : "자동", manual ? EditorStyles.miniBoldLabel : EditorStyles.miniLabel, GUILayout.Width(28f));
+                bool newManual = GUILayout.Toggle(manual, new GUIContent("", "켬 = 직접 지정(기준 색을 바꿔도 안 따라감) · 끔 = 자동"), GUILayout.Width(18f));
+                if (newManual != manual) SetPaletteManual(slot, newManual, palette[slot]);
+                using (new EditorGUI.DisabledScope(!manual))
+                {
+                    EditorGUI.BeginChangeCheck();
+                    Color c = EditorGUILayout.ColorField(GUIContent.none, palette[slot], true, true, true, GUILayout.Width(120f));
+                    if (EditorGUI.EndChangeCheck() && manual) SetPaletteColor(slot, c);
+                }
+            }
+        }
+    }
+
+    int PaletteOverrideIndex(BossVictoryPaletteSlot slot)
+    {
+        List<BossVictoryPaletteOverride> list = _profile.paletteOverrides;
+        if (list == null) return -1;
+        for (int i = 0; i < list.Count; i++)
+            if (list[i].slot == slot) return i;
+        return -1;
+    }
+
+    // 직접 지정 켬 = 지금 보이는(자동 계산) 색에서 시작 — 이미 줄이 있으면 남겨 둔 색을 다시 쓴다. 끔 = 줄은 남기고 manual 만 끔.
+    void SetPaletteManual(BossVictoryPaletteSlot slot, bool manual, Color current)
+    {
+        Undo.RecordObject(_profile, "처치 연출 팔레트 직접 지정");
+        _profile.paletteOverrides ??= new List<BossVictoryPaletteOverride>();
+        int i = PaletteOverrideIndex(slot);
+        if (i < 0) _profile.paletteOverrides.Add(new BossVictoryPaletteOverride { slot = slot, manual = manual, color = current });
+        else
+        {
+            BossVictoryPaletteOverride o = _profile.paletteOverrides[i];
+            o.manual = manual;
+            _profile.paletteOverrides[i] = o;
+        }
+        SavePalette();
+    }
+
+    void SetPaletteColor(BossVictoryPaletteSlot slot, Color color)
+    {
+        int i = PaletteOverrideIndex(slot);
+        if (i < 0) return;
+        Undo.RecordObject(_profile, "처치 연출 팔레트 색");
+        BossVictoryPaletteOverride o = _profile.paletteOverrides[i];
+        o.color = color;
+        _profile.paletteOverrides[i] = o;
+        SavePalette();
+    }
+
+    void SavePalette()
+    {
+        Save();
+        RefreshLivePalette();
+    }
+
+    // Play 중 연출이 돌면 바뀐 팔레트를 바로 화면에(표시만).
+    static void RefreshLivePalette()
+    {
+        if (EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null) BossVictoryGlitchPresentation.Instance.RefreshLook();
+    }
+
+    // 트랙 모양 칸의 색 = 기준(팔라딘) 팔레트라는 안내 + 팔레트 칸 열기.
+    void DrawPaletteHint()
+    {
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("아래 색 = 공용 기준(팔라딘) 색 — 실제 색은 캐릭터 기준 색에서 계산(271).", EditorStyles.wordWrappedMiniLabel);
+            if (GUILayout.Button("팔레트", EditorStyles.miniButton, GUILayout.Width(52f)))
+            {
+                Select(-1, -1, -1);
+                _selPalette = true;
+            }
         }
     }
 
@@ -1916,6 +2237,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 Select(-1, -1, -1);
                 _selFinisher = on;
             }
+            if (GUILayout.Toggle(_selPalette, "팔레트", EditorStyles.miniButton, GUILayout.Width(52f)) != _selPalette)
+            {
+                bool on = !_selPalette;
+                Select(-1, -1, -1);
+                _selPalette = on;
+            }
             if (p != null && p.GlitchTime >= 0f)
             {
                 float at = p.FinisherEndedAt;
@@ -1928,7 +2255,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
     }
 
-    // 캐릭터 → Variant(클립 미리보기). 기본 프로필은 팔라딘 몸으로 보여 준다.
+    // 캐릭터 → Variant(클립 미리보기). 코드 기본값(처치자 없음)은 팔라딘 몸으로 보여 준다.
     static string VariantPath(TutorialCharacter c) => c switch
     {
         TutorialCharacter.Gunner => "Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab",
@@ -1941,7 +2268,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         float dash = Timeline.finisherStartTime;
         var parts = new List<string>();
-        // 지금 프로필의 스킬 칸으로 — 기본 프로필이면 세 캐릭터 몸, 캐릭터 프로필이면 그 캐릭터 몸만(267).
+        // 지금 프로필의 스킬 칸으로 — 코드 기본값(처치자 없음)이면 세 캐릭터 몸, 캐릭터 프로필이면 그 캐릭터 몸만(267).
         TutorialCharacter[] bodies = _character == TutorialCharacter.None
             ? new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin }
             : new[] { _character };
@@ -1977,10 +2304,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     AnimationClip FinisherClipOf(GameObject character)
     {
         if (character == null) return null;
+        Animator animator = character.GetComponentInChildren<Animator>(true);
+        // 순간이동 Q(272) — 처치 연출 스킬 대신 프로필 애니 상태(Combo_Attack_03_04). 끝 자르기 = 정지 프레임.
+        if (_profile != null && _profile.killerMove == BossVictoryKillerMove.TeleportDash)
+            return animator != null && animator.runtimeAnimatorController != null
+                ? AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, _profile.teleportMoveState) : null;
         PlayerSkillSlot slot = _profile != null ? _profile.finisherSlot : PlayerSkillSlot.Ultimate;   // 지금 프로필 칸(267)
         PlayerSkillController controller = character.GetComponentInChildren<PlayerSkillController>(true);
         PlayerSkillBase skill = controller != null ? controller.GetSkill(slot) : null;
-        Animator animator = character.GetComponentInChildren<Animator>(true);
         if (skill == null || skill.Data == null || animator == null || animator.runtimeAnimatorController == null) return null;
         return AnimationEventRequirements.FindStateClip(animator.runtimeAnimatorController, skill.Data.AnimatorStateName);
     }
@@ -2102,6 +2433,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     const string BossHitControllerPath = "Assets/4.Animations/Wells&No.23/No.23/Controller/No23Controller.controller";
     Object _finisherClipKey;
     AnimationClip _finisherClipCache;
+    string _finisherMoveStateCache;
     string _finisherWhoCache;
     Object _bossHitClipKey;
     string _bossHitStateCache;
@@ -2137,11 +2469,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         GameObject killer = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null ? BossVictoryGlitchPresentation.Instance.KillerObject : null;
         Object key = killer != null ? killer : AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath(_character));
-        if (key != _finisherClipKey)
+        string moveState = _profile.killerMove == BossVictoryKillerMove.TeleportDash ? _profile.teleportMoveState : null;   // 순간이동 Q 상태가 바뀌면 다시(272)
+        if (key != _finisherClipKey || moveState != _finisherMoveStateCache)
         {
             _finisherClipKey = key;
+            _finisherMoveStateCache = moveState;
             _finisherClipCache = FinisherClipOf(key as GameObject);
-            _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : _character == TutorialCharacter.None ? "기본(팔라딘 몸)" : CharacterLabel(_character);
+            _finisherWhoCache = killer != null ? $"실제 처치자 {killer.name}" : _character == TutorialCharacter.None ? "코드 기본값(팔라딘 몸)" : CharacterLabel(_character);
         }
         clip = _finisherClipCache;
         who = _finisherWhoCache;
@@ -2358,21 +2692,22 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (live) GUILayout.Label("실제 처치자", EditorStyles.miniLabel, GUILayout.Width(56f));
     }
 
-    // 지금 편집 중인 프로필 한 줄 — 표에 없는 캐릭터는 기본 프로필을 쓴다(고치면 기본이 바뀐다) · 만들기 버튼.
+    // 지금 편집 중인 프로필 한 줄 — 표에 없는 캐릭터는 코드 기본값(저장 안 됨)을 쓴다 · 만들기 버튼(코드 기본값으로 새 에셋).
     void DrawProfileBanner()
     {
-        bool own = _character == TutorialCharacter.None || _settings.HasOwnProfile(_character);
+        bool own = _character != TutorialCharacter.None && _settings.HasOwnProfile(_character);
         using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
         {
-            string who = _character == TutorialCharacter.None ? "기본 프로필" : $"{CharacterLabel(_character)} 프로필";
-            string text = !ProfileIsAsset
-                ? "기본 프로필 에셋이 비어 코드 기본값으로 보인다 — 고쳐도 저장되지 않는다. 'Tools/Boss Victory/캐릭터별 프로필 만들기 (267)'."
-                : own
-                    ? $"편집 중: {who} — {_profile.name}{(_character == TutorialCharacter.None ? " (표에 없는 캐릭터가 쓴다)" : "")}"
-                    : $"{CharacterLabel(_character)} 은(는) 표에 프로필이 없어 기본 프로필({_profile.name})을 쓴다 — 여기서 고치면 기본이 바뀐다.";
+            string text = own
+                ? $"편집 중: {CharacterLabel(_character)} 프로필 — {_profile.name}"
+                : _character == TutorialCharacter.None
+                    ? "이번 회차는 처치자를 못 찾아 코드 기본값 프로필로 돈다 — 고쳐도 저장되지 않는다."
+                    : !ProfileIsAsset
+                        ? $"{CharacterLabel(_character)} 은(는) 표에 프로필이 없어 코드 기본값으로 돈다 — 고쳐도 저장되지 않는다. 오른쪽 버튼으로 프로필을 만든다."
+                        : $"{CharacterLabel(_character)} 은(는) 표에 프로필이 없어 공용 '기본 프로필' 칸의 {_profile.name} 을 쓴다 — 여기서 고치면 그 에셋이 바뀐다.";
             GUILayout.Label(text, EditorStyles.wordWrappedMiniLabel);
             if (ProfileIsAsset && GUILayout.Button("선택", EditorStyles.miniButton, GUILayout.Width(40f))) EditorGUIUtility.PingObject(_profile);
-            if (!own && _settings.defaultProfile != null && GUILayout.Button("이 캐릭터 프로필 만들기(기본 복제)", EditorStyles.miniButton, GUILayout.Width(190f)))
+            if (!own && _character != TutorialCharacter.None && GUILayout.Button("이 캐릭터 프로필 만들기(코드 기본값)", EditorStyles.miniButton, GUILayout.Width(200f)))
             {
                 BossVictoryProfileAuthoring.CreateCharacterProfile(_settings, _character);
                 ResolveProfile();
@@ -2443,6 +2778,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _selMarker = node.IsMarker ? node.MarkerId : -1;
         _selKey = -1;
         _selFinisher = false;
+        _selPalette = false;
         GUI.FocusControl(null);
     }
 
@@ -2471,13 +2807,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         PopupWindow.Show(new Rect(_pendingCopyAt, Vector2.one), new CopyToCharactersPopup(this, nodes));
     }
 
-    // 복사 대상 후보 — 기본 + 세 캐릭터 중 지금 프로필이 아닌 것. 표에 프로필이 없는 캐릭터는 고를 수 없다(null).
+    // 복사 대상 후보 — 세 캐릭터 중 지금 프로필이 아닌 것. 표에 프로필이 없는 캐릭터는 고를 수 없다(null).
     List<(string label, BossVictoryProfile profile)> CopyTargets()
     {
         var list = new List<(string, BossVictoryProfile)>();
         foreach (TutorialCharacter c in Characters)
         {
-            BossVictoryProfile p = c == TutorialCharacter.None ? _settings.defaultProfile : _settings.HasOwnProfile(c) ? _settings.ProfileFor(c) : null;
+            BossVictoryProfile p = _settings.HasOwnProfile(c) ? _settings.ProfileFor(c) : null;
             if (p != null && p == _profile) continue;
             list.Add((CharacterLabel(c), p));
         }

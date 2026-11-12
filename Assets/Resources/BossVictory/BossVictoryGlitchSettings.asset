@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4746dfe25f278299b295f57c9881699, type: 3}
   m_Name: BossVictoryGlitchSettings
   m_EditorClassIdentifier: Assembly-CSharp::BossVictoryGlitchSettings
-  defaultProfile: {fileID: 11400000, guid: 3cd2425b4ee2c595e772d8d5d21e0dff, type: 2}
+  defaultProfile: {fileID: 0}
   characterProfiles:
   - character: 1
     profile: {fileID: 11400000, guid: 1fd77fcfa89fedfa1e26ef33d7101c6b, type: 2}
@@ -97,16 +97,6 @@ MonoBehaviour:
   rectifyWhiteStartRadius: 0.15
   rectifyWhiteFade: 0.15
   rectifyWhiteExpand: 0.1
-  rectifyOrangeHold: 0.05
-  rectifyOrangeWipe: 0.1
-  rectifyOrangeRightToLeft: 1
-  rectifyOrangeJitter: 0.2
-  rectifyOrangeRowPixels: 4
-  rectifyOrangeLeft: {r: 1, g: 0.64705884, b: 0.22745098, a: 1}
-  rectifyOrangeRight: {r: 0.972549, g: 0.9098039, b: 0.38431373, a: 1}
-  rectifyOrangeGradient: 1
-  rectifyScanlineSpacing: 0.003
-  rectifyScanlineDark: 0
   rectifyGlowIntensity: 1
   rectifyGlowRadius: 24
   rectifyGlowColor: {r: 1, g: 1, b: 1, a: 1}

@@ -110,7 +110,7 @@ public sealed class BossVictoryKillerSequenceTests
         Assert.AreEqual(0f, paladin.timeline.backDashStartTime, Tolerance);
         Assert.AreEqual(0f, paladin.timeline.finisherStartTime, Tolerance);
         Assert.IsFalse(paladin.timeline.KillerTimes().HasActionClip, "처치자 평타 클립 없음");
-        Assert.IsFalse(s.defaultProfile.finisherWithBackDash, "기본 = 옛 흐름");
+        Assert.IsFalse(s.ProfileFor(TutorialCharacter.None).finisherWithBackDash, "코드 기본값 = 옛 흐름");
         Assert.IsFalse(s.ProfileFor(TutorialCharacter.Gunner).finisherWithBackDash, "거너 = 옛 흐름");
         Assert.IsFalse(s.ProfileFor(TutorialCharacter.Assassin).finisherWithBackDash, "어쌔신 = 옛 흐름");
     }

@@ -147,16 +147,38 @@ public sealed class BossVictoryProfileTests
     }
 
     [Test]
-    public void 정본_설정은_기본과_세_캐릭터_프로필을_가진다()
+    public void 정본_설정은_세_캐릭터_프로필만_있고_기본은_코드_기본값()
     {
         var s = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(SettingsPath);
         Assert.IsNotNull(s, SettingsPath);
-        Assert.IsNotNull(s.defaultProfile, "기본 프로필");
+        // 기본 프로필 에셋은 11-12 삭제 — 칸이 비어 표에 없는 캐릭터·처치자 없음은 코드 기본값(저장 안 되는 인스턴스).
+        Assert.IsNull(s.defaultProfile, "기본 프로필 칸 = 비어 있음");
+        Assert.IsNull(AssetDatabase.LoadAssetAtPath<BossVictoryProfile>(BossVictoryProfileAuthoring.Folder + "/BossVictoryProfile_Default.asset"), "기본 프로필 에셋 없음");
+        BossVictoryProfile code = s.ProfileFor(TutorialCharacter.None);
+        Assert.IsNotNull(code, "처치자 없음 = 코드 기본값");
+        Assert.IsFalse(EditorUtility.IsPersistent(code), "코드 기본값 = 에셋 아님");
+        Assert.IsNotNull(code.timeline);
+        Assert.IsFalse(s.HasOwnProfile(TutorialCharacter.None));
         foreach (TutorialCharacter c in new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin })
         {
             Assert.IsTrue(s.HasOwnProfile(c), $"{c} 프로필 줄");
-            Assert.AreNotSame(s.defaultProfile, s.ProfileFor(c), $"{c} 는 기본과 다른 에셋");
+            Assert.IsTrue(EditorUtility.IsPersistent(s.ProfileFor(c)), $"{c} = 에셋");
+            Assert.AreNotSame(code, s.ProfileFor(c), $"{c} 는 코드 기본값과 다른 에셋");
         }
+    }
+
+    [Test]
+    public void 표가_비고_기본_칸도_비면_모든_캐릭터가_코드_기본값()
+    {
+        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        try
+        {
+            BossVictoryProfile none = s.ProfileFor(TutorialCharacter.None);
+            Assert.IsNotNull(none);
+            foreach (TutorialCharacter c in new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin })
+                Assert.AreSame(none, s.ProfileFor(c), $"{c} = 같은 코드 기본값");
+        }
+        finally { Object.DestroyImmediate(s); }
     }
 
     // 처치자 손 검 번개·낙하 검 2배(269) — 팔라딘 프로필만 켬, 나머지는 안 씀.
@@ -169,7 +191,7 @@ public sealed class BossVictoryProfileTests
         Assert.IsTrue(paladin.handSwordLightning, "팔라딘 = 손 검 번개");
         Assert.AreEqual(1.25f, paladin.fallingSwordScale, 1e-5f, "팔라딘 = 낙하 검 1.25배");
         Assert.IsTrue(BossVictoryGlitchPresentation.UsesKillerSword(paladin));
-        Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.defaultProfile), "기본 = 안 씀");
+        Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.ProfileFor(TutorialCharacter.None)), "코드 기본값 = 안 씀");
         Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.ProfileFor(TutorialCharacter.Gunner)), "거너 = 안 씀");
         Assert.IsFalse(BossVictoryGlitchPresentation.UsesKillerSword(s.ProfileFor(TutorialCharacter.Assassin)), "어쌔신 = 안 씀");
     }

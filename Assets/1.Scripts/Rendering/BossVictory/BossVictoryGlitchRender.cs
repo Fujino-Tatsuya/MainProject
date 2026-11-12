@@ -97,10 +97,15 @@ public static class BossVictoryGlitchRender
 
     public static bool Active => _hooked;
 
-    /// <summary>켠다(멱등). 셰이더가 없으면 false(호출측이 진단을 남긴다).</summary>
-    public static bool Enable(BossVictoryGlitchSettings settings)
+    /// <summary>켠다(멱등 — 이미 켜져 있으면 색·모양만 다시 넣는다). 셰이더가 없으면 false(호출측이 진단을 남긴다).
+    /// <paramref name="palette"/> = 처치자 프로필 기준 계산 팔레트(271), null = 공용 설정 색 그대로. <paramref name="orange"/> = 처치자 프로필 RECTIFY 주황 채움 값(11-12).</summary>
+    public static bool Enable(BossVictoryGlitchSettings settings, BossVictoryPalette palette, BossVictoryOrangeLook orange)
     {
-        if (_hooked) return true;
+        if (_hooked)
+        {
+            ApplyLook(settings, palette, orange);
+            return true;
+        }
         Shader mask = settings != null && settings.maskShader != null ? settings.maskShader : Shader.Find(MaskShaderName);
         Shader comp = settings != null && settings.compositeShader != null ? settings.compositeShader : Shader.Find(CompositeShaderName);
         if (mask == null || comp == null) return false;
@@ -108,7 +113,7 @@ public static class BossVictoryGlitchRender
         _maskPlayer = NewMask(mask, new Color(1f, 0f, 0f, 1f));
         _maskBoss = NewMask(mask, new Color(0f, 0f, 1f, 1f));
         _composite = CoreUtils.CreateEngineMaterial(comp);
-        ApplyLook(settings);
+        ApplyLook(settings, palette, orange);
         _anyEffect = false;
 
         _maskPass = new MaskPass(_maskPlayer, _maskBoss)
@@ -150,15 +155,16 @@ public static class BossVictoryGlitchRender
         _anyEffect = false;
     }
 
-    /// <summary>색·노이즈·모양 칸(설정 SO) — 켤 때 + 랩에서 값을 바꿨을 때.</summary>
-    public static void ApplyLook(BossVictoryGlitchSettings s)
+    /// <summary>색·노이즈·모양 칸(설정 SO) — 켤 때 + 창에서 값을 바꿨을 때. 색 = <paramref name="palette"/>(271 — null 이면 공용 설정 색 그대로 = 기준 팔레트).</summary>
+    public static void ApplyLook(BossVictoryGlitchSettings s, BossVictoryPalette palette, BossVictoryOrangeLook orange)
     {
         if (_composite == null || s == null) return;
-        _composite.SetColor(IdAmberColor, s.amberColor.linear);
+        palette ??= BossVictoryPaletteCalc.Compute(s, null);
+        _composite.SetColor(IdAmberColor, palette[BossVictoryPaletteSlot.Amber].linear);
         _composite.SetTexture(IdNoiseTex, s.bossNoiseTexture != null ? s.bossNoiseTexture : Texture2D.grayTexture);
         _noiseTiling = s.bossNoiseTiling;
-        _composite.SetColor(IdNoiseBright, s.bossNoiseBrightColor.linear * Mathf.Max(0f, s.bossNoiseBrightIntensity));
-        _composite.SetColor(IdNoiseDark, s.bossNoiseDarkColor.linear);
+        _composite.SetColor(IdNoiseBright, palette[BossVictoryPaletteSlot.NoiseBright].linear * Mathf.Max(0f, s.bossNoiseBrightIntensity));
+        _composite.SetColor(IdNoiseDark, palette[BossVictoryPaletteSlot.NoiseDark].linear);
         _composite.SetVector(IdLook, new Vector4(Mathf.Max(1f, s.scanlineCount), Mathf.Max(1f, s.tearLinePixels),
             Mathf.Max(1f, s.tearLineMaxMultiplier), Mathf.Max(1f, s.tearRefreshRate)));
         _composite.SetVector(IdTear, new Vector4(Mathf.Max(0f, s.tearMaxShift), Mathf.Clamp01(s.tearDensity), Mathf.Max(0f, s.tearStreakLength), 0f));
@@ -168,8 +174,8 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdCircleLook, new Vector4(Mathf.Max(0f, s.groundCircleSoftness), Mathf.Max(0f, s.groundCircleBrightness), 0f, 0f));
         _composite.SetVector(IdGrade, new Vector4(Mathf.Clamp01(s.amberLumaLift), Mathf.Clamp01(s.scanlineDarkness), 0f, 0f));
         ApplyVolume(s);
-        ApplyRectify(s);
-        ApplyFillLook(s);
+        ApplyRectify(s, palette);
+        ApplyFillLook(s, palette, orange);
     }
 
     // 처치 연출 전용 볼륨(267 후속) — 켤 때 만들고(전역·우선순위 높음) 끌 때 지운다. 각 피어 로컬, 네트워크 없음.
@@ -224,7 +230,7 @@ public static class BossVictoryGlitchRender
     static Font _rectifyFont;
     static string _rectifyText;
 
-    static void ApplyRectify(BossVictoryGlitchSettings s)
+    static void ApplyRectify(BossVictoryGlitchSettings s, BossVictoryPalette palette)
     {
         if (_rectifyFont != s.rectifyFont || _rectifyText != s.rectifyText)
         {
@@ -238,7 +244,7 @@ public static class BossVictoryGlitchRender
         _rectifyCenterY = s.rectifyCenterY;
         _rectifyHalf = BossVictoryRectifyText.OutlineHalfWidthSdf(_rectifyCap, s.rectifyOutline, BossVictoryRectifyText.AtlasPadding);
         _rectifyAspect = -1f;   // 다음 프레임에 다시 배치
-        _composite.SetColor(IdRectifyColor, s.rectifyColor.linear);
+        _composite.SetColor(IdRectifyColor, palette[BossVictoryPaletteSlot.RectifyOutline].linear);
         _composite.SetTexture(IdRectifyTex, _rectifyAsset != null ? _rectifyAsset.atlasTexture : Texture2D.blackTexture);
     }
 
@@ -268,38 +274,39 @@ public static class BossVictoryGlitchRender
     static float _glowIntensity, _glowRadius = 24f, _glowWhite, _glowOrange;
     static bool _glowOn;
 
-    static void ApplyFillLook(BossVictoryGlitchSettings s)
+    static void ApplyFillLook(BossVictoryGlitchSettings s, BossVictoryPalette palette, BossVictoryOrangeLook orange)
     {
         BossVictoryGlitchSettings.RectifyCircle[] src = s.rectifyCircles ?? new BossVictoryGlitchSettings.RectifyCircle[0];
         _circleCount = Mathf.Min(src.Length, BossVictoryRectifyFill.CircleCount);
         for (int i = 0; i < _circleCount; i++)
         {
             _circles[i] = src[i];
-            Color l = src[i].leftColor.linear, r = src[i].rightColor.linear;
+            // 좌우 색 = 팔레트(271) — 원 i 왼쪽 = Circle1Left + 2i, 오른쪽 = 그다음 칸.
+            Color l = palette[BossVictoryPaletteSlot.Circle1Left + 2 * i].linear, r = palette[BossVictoryPaletteSlot.Circle1Right + 2 * i].linear;
             _fillColorsL[i] = new Vector4(l.r, l.g, l.b, 1f);
             _fillColorsR[i] = new Vector4(r.r, r.g, r.b, 1f);
         }
         for (int i = _circleCount; i < BossVictoryRectifyFill.CircleCount; i++) _fillColorsL[i] = _fillColorsR[i] = Vector4.zero;
-        _circleGray = s.rectifyCircleGrayColor.linear;
+        _circleGray = palette[BossVictoryPaletteSlot.CircleGray].linear;
         _grayToWhite = Mathf.Max(0f, s.rectifyCircleGrayToWhite);
         _fillSoft = s.rectifyFillSoftness;
         _fillCoversOutline = s.rectifyFillCoversOutline;
-        _scanSpacing = s.rectifyScanlineSpacing;
-        _scanDark = Mathf.Clamp01(s.rectifyScanlineDark);
-        _orangeHold = s.rectifyOrangeHold;
-        _orangeWipe = s.rectifyOrangeWipe;
-        _orangeRightToLeft = s.rectifyOrangeRightToLeft;
-        _orangeJitter = Mathf.Clamp01(s.rectifyOrangeJitter);
-        _orangeRowPx = Mathf.Max(1f, s.rectifyOrangeRowPixels);
-        _orangeGradient = Mathf.Clamp01(s.rectifyOrangeGradient);
-        _composite.SetColor(IdOrangeLeft, s.rectifyOrangeLeft.linear);
-        Color right = s.rectifyOrangeRight.linear;
+        _scanSpacing = orange.ScanlineSpacing;
+        _scanDark = orange.ScanlineDark;
+        _orangeHold = orange.Hold;
+        _orangeWipe = orange.Wipe;
+        _orangeRightToLeft = orange.RightToLeft;
+        _orangeJitter = orange.Jitter;
+        _orangeRowPx = orange.RowPixels;
+        _orangeGradient = orange.Gradient;
+        _composite.SetColor(IdOrangeLeft, palette[BossVictoryPaletteSlot.OrangeLeft].linear);
+        Color right = palette[BossVictoryPaletteSlot.OrangeRight].linear;
         _composite.SetVector(IdOrangeRight, new Vector4(right.r, right.g, right.b, _orangeGradient));
         _glowIntensity = Mathf.Max(0f, s.rectifyGlowIntensity);
         _glowRadius = Mathf.Max(1f, s.rectifyGlowRadius);
         _glowWhite = s.rectifyGlowTarget != BossVictoryGlitchSettings.RectifyGlowTarget.Orange ? 1f : 0f;
         _glowOrange = s.rectifyGlowTarget != BossVictoryGlitchSettings.RectifyGlowTarget.WhiteCircle ? 1f : 0f;
-        _composite.SetColor(IdGlowColor, s.rectifyGlowColor.linear);
+        _composite.SetColor(IdGlowColor, palette[BossVictoryPaletteSlot.Glow].linear);
     }
 
     // 원 3개 — 단어 사각형 UV(종횡비 보정, 단위 = 단어 높이). Rmax = 원 중심에서 네 모서리까지. 마지막 원 = 흰 원(회색 → 흰 뒤 확장).

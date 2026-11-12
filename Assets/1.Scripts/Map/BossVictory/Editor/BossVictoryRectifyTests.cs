@@ -272,12 +272,12 @@ public class BossVictoryRectifyTests
         Assert.AreEqual(r, BossVictoryRectifyFill.OrangeColor(1f, l, r, 1f));
         Assert.AreEqual(0.75f, BossVictoryRectifyFill.OrangeColor(0.5f, l, r, 1f).g, 1e-5f);
         Assert.AreEqual(l, BossVictoryRectifyFill.OrangeColor(1f, l, r, 0f));
-        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        var p = BossVictoryProfile.CreateDefault();   // 주황 채움 = 캐릭터별 프로필(11-12)
         try
         {
-            Assert.IsTrue(s.rectifyOrangeRightToLeft);
-            Assert.AreEqual(1f, s.rectifyOrangeGradient, 1e-5f);
+            Assert.IsFalse(p.rectifyOrangeRightToLeft);
+            Assert.AreEqual(1f, p.rectifyOrangeGradient, 1e-5f);
         }
-        finally { Object.DestroyImmediate(s); }
+        finally { Object.DestroyImmediate(p); }
     }
 }

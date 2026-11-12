@@ -5,8 +5,8 @@ using UnityEngine;
 /// <summary>
 /// 보스 처치 연출 — ZZZ 글리치(PLAN-boss-victory-glitch) 공용 수치. 정본 에셋: <c>Resources/BossVictory/BossVictoryGlitchSettings.asset</c>
 /// (없으면 코드 기본값). 화면 효과 모양(글리치 색·노이즈·찢김·CRT·셰이더·벽 숨김 기준)·보스 피격 애니·마커 옵션은 여기(공용).
-/// <b>캐릭터별 값</b>(타임라인 전체·백대쉬·시간 배율·처치 연출 스킬 칸)은 <see cref="BossVictoryProfile"/> — '캐릭터 → 프로필' 표(<see cref="characterProfiles"/>)로 고르고,
-/// 없거나 비면 기본 프로필(<see cref="defaultProfile"/>). 할 일 267(Docs/tech/boss-victory-character-profiles.md).
+/// <b>캐릭터별 값</b>(타임라인 전체·백대쉬·시간 배율·처치 연출 스킬 칸·팔레트·RECTIFY 주황 채움)은 <see cref="BossVictoryProfile"/> — '캐릭터 → 프로필' 표(<see cref="characterProfiles"/>)로 고르고,
+/// 없거나 비면 기본 프로필(<see cref="defaultProfile"/>, 정본은 비어 있어 코드 기본값 — 11-12). 할 일 267(Docs/tech/boss-victory-character-profiles.md).
 /// </summary>
 [CreateAssetMenu(menuName = "MainProject/Boss Victory Glitch Settings", fileName = "BossVictoryGlitchSettings")]
 public sealed class BossVictoryGlitchSettings : ScriptableObject
@@ -22,9 +22,9 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     }
 
     [Header("캐릭터별 프로필(267 — 처치자 캐릭터로 고름, 네트워크 추가 없음)")]
-    [Tooltip("표에 없거나 프로필이 빈 캐릭터가 쓰는 프로필(처음 = 267 이전 연출 그대로).")]
+    [Tooltip("표에 없거나 프로필이 빈 캐릭터(처치자를 못 찾음 포함)가 쓰는 프로필. 비우면 코드 기본값 프로필(BossVictoryProfile.CreateDefault) — 정본은 비워 둔다(11-12, 기본 프로필 에셋 삭제).")]
     public BossVictoryProfile defaultProfile;
-    [Tooltip("캐릭터 → 프로필. 같은 캐릭터가 두 줄이면 앞 줄. 줄을 비우면 그 캐릭터는 기본 프로필.")]
+    [Tooltip("캐릭터 → 프로필. 같은 캐릭터가 두 줄이면 앞 줄. 줄을 비우면 그 캐릭터는 기본 프로필(비었으면 코드 기본값).")]
     public List<CharacterProfile> characterProfiles = new List<CharacterProfile>();
 
     [Header("보스 피격 애니(처치 연출 — 타임라인 '보스 피격 애니 시작' 마커, 255 후속 5)")]
@@ -43,7 +43,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
 
 
     [Header("글리치 색·모양")]
-    [Tooltip("배경 호박색(sRGB).")]
+    [Tooltip("배경 호박색(sRGB) = 팔레트 기준 색의 기준(271). 이 SO 의 색들은 이 색 기준 관계로 해석돼 처치자 프로필 baseColor 를 따라간다(TV 꺼짐 발광 = 대비 기준 색의 기준). 실제 색 = BossVictoryPaletteCalc.")]
     public Color amberColor = new Color32(0xD2, 0xA6, 0x4E, 0xFF);
     [Min(1f)] public float scanlineCount = 360f;
     [Tooltip("CRT 주사선을 바닥에서 뺀다(267 후속) — 깊이로 복원한 표면 법선의 위쪽 성분(normal.y)이 이 값 이하 = 벽(주사선 그대로).")]
@@ -199,28 +199,6 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
         return true;
     }
 
-    [Header("RECTIFY 주황 채움 — 흰 원이 다 퍼진 뒤(267 후속)")]
-    [Tooltip("흰 원이 다 퍼진 뒤 흰색으로 머무는 시간(초).")]
-    [Min(0f)] public float rectifyOrangeHold = 0.05f;
-    [Tooltip("흰 → 주황 와이프 시간(초) — 레퍼런스: 가로줄마다 들쭉날쭉한 경계가 한쪽에서 지나감(약 6프레임).")]
-    [Min(0f)] public float rectifyOrangeWipe = 0.1f;
-    [Tooltip("와이프 방향 — 켬 = 오른쪽에서 왼쪽(레퍼런스).")]
-    public bool rectifyOrangeRightToLeft = true;
-    [Tooltip("와이프 경계 줄마다 어긋남(단어 폭 비율).")]
-    [Range(0f, 1f)] public float rectifyOrangeJitter = 0.2f;
-    [Tooltip("와이프 줄 굵기(px).")]
-    [Min(1f)] public float rectifyOrangeRowPixels = 4f;
-    [Tooltip("주황 채움 왼쪽 색(W 쪽).")]
-    public Color rectifyOrangeLeft = new Color32(0xFF, 0xA5, 0x3A, 0xFF);
-    [Tooltip("주황 채움 오른쪽 색(T 쪽).")]
-    public Color rectifyOrangeRight = new Color32(0xF8, 0xE8, 0x62, 0xFF);
-    [Tooltip("좌→우 색 보간 세기(0 = 왼쪽 색만).")]
-    [Range(0f, 1f)] public float rectifyOrangeGradient = 1f;
-    [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
-    [Min(0.0005f)] public float rectifyScanlineSpacing = 0.003f;
-    [Tooltip("안쪽 주사선 어둡기(0 = 없음 — 기본, 267 후속 사용자 요청으로 RECTIFY 위 주사선을 뺐다. 다시 켜려면 0.25 근처).")]
-    [Range(0f, 1f)] public float rectifyScanlineDark = 0f;
-
     public enum RectifyGlowTarget { WhiteCircle, Orange, Both }
 
     [Header("RECTIFY 전용 글로우(267 후속 — 맵 블룸과 무관, 글자 채움만 빛남)")]
@@ -253,14 +231,14 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     static BossVictoryGlitchSettings _cached;
     static BossVictoryProfile _codeDefaultProfile;
 
-    /// <summary>이 캐릭터의 프로필 — 표 → 기본 프로필 → 코드 기본값(에셋이 비었을 때, 경고 1회). null 아님.</summary>
+    /// <summary>이 캐릭터의 프로필 — 표 → 기본 프로필 → 코드 기본값(기본 프로필이 비었을 때 — 정본은 비어 있다, 11-12). null 아님.</summary>
     public BossVictoryProfile ProfileFor(TutorialCharacter character)
     {
         BossVictoryProfile p = BossVictoryProfileSelect.Select(characterProfiles, character, defaultProfile);
         if (p != null) return p;
         if (_codeDefaultProfile == null)
         {
-            Debug.LogWarning($"[BossVictory] {name} 기본 프로필이 비어 코드 기본값 프로필로 돈다 — Tools/Boss Victory/캐릭터별 프로필 만들기 (267).");
+            Debug.Log($"[BossVictory] {name} — 표에 없는 캐릭터({character})는 코드 기본값 프로필로 돈다(기본 프로필 칸 비어 있음).");
             _codeDefaultProfile = BossVictoryProfile.CreateDefault();
         }
         return _codeDefaultProfile;
