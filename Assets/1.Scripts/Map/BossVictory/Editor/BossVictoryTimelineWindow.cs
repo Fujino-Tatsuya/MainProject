@@ -469,7 +469,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             ? $"{BossVictoryTimeline.MarkerLabel(marker)} ({OffText(marker)})"
             : $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
 
-    static readonly string[] AnchorLabels = { "가운데", "처치자", "보스" };
+    static readonly string[] AnchorLabels = { "가운데", "처치자", "보스", "처치자 무기(매 프레임)" };
 
     static string AnchorLabel(BossVictoryCameraCuts.Anchor anchor) =>
         (int)anchor >= 0 && (int)anchor < AnchorLabels.Length ? AnchorLabels[(int)anchor] : anchor.ToString();
@@ -1577,6 +1577,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         shot.anchor = (BossVictoryCameraCuts.Anchor)EditorGUILayout.Popup(new GUIContent("기준",
                 "화면을 이 점 + 처치자→보스 수평 축 좌표계로 저장 — 어디서 죽든 같은 구도. 바꾸면 저장된 화면은 새 기준으로 다시 읽힌다(Scene 뷰로 다시 찍기 권장)."),
             (int)shot.anchor, AnchorLabels);
+        if (BossVictoryCameraCuts.FollowsEveryFrame(shot.anchor))
+        {
+            shot.weaponFollowSmoothing = Mathf.Max(0f, EditorGUILayout.FloatField(new GUIContent("무기 따라가기 부드러움(초)",
+                "기준 '처치자 무기' — 원점 = 무기 위치(매 프레임), 축 = 처치자→보스 수평(+X = 오른쪽). 키 = 이 좌표계라 '총 오른쪽 얼마나'. " +
+                "이 값 = 무기 위치를 따라가는 지수 감쇠 시간(초), 0 = 딱 붙음. 무기 = BossVictoryWeaponMarker → WeaponTransformRelay 첫 무기, 없으면 처치자 발밑."),
+                shot.weaponFollowSmoothing));
+        }
         shot.smoothPath = EditorGUILayout.Toggle(new GUIContent("부드러운 경로",
             "키 3개 이상이면 위치를 Catmull-Rom 곡선으로 잇는다(키를 지나며 꺾이지 않음). 끄면 키 사이 직선."), shot.smoothPath);
         shot.hideWalls = EditorGUILayout.Toggle(new GUIContent("벽 숨김",
@@ -1724,6 +1731,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (!SessionState.GetBool(SubjectsKey, false)) return false;
         s.Killer = SessionState.GetVector3(SubjectsKey + ".Killer", Vector3.zero);
         s.BossBase = SessionState.GetVector3(SubjectsKey + ".Boss", Vector3.forward);
+        s.HasWeapon = SessionState.GetBool(SubjectsKey + ".HasWeapon", false);
+        s.Weapon = SessionState.GetVector3(SubjectsKey + ".Weapon", Vector3.zero);
         source = "마지막 회차";
         return true;
     }
@@ -1736,6 +1745,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         SessionState.SetBool(SubjectsKey, true);
         SessionState.SetVector3(SubjectsKey + ".Killer", s.Killer);
         SessionState.SetVector3(SubjectsKey + ".Boss", s.BossBase);
+        SessionState.SetBool(SubjectsKey + ".HasWeapon", s.HasWeapon);
+        SessionState.SetVector3(SubjectsKey + ".Weapon", s.Weapon);
     }
 
     static bool TryGetSceneView(out Vector3 position, out Quaternion rotation, out float fov)
@@ -1766,7 +1777,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             if (GUILayout.Button($"지금 Scene 뷰로 이 키 (#{key + 1})")) CaptureSceneView(s, key);
             if (GUILayout.Button("지금 Scene 뷰로 끝 화면")) CaptureSceneView(s, -1);
         }
-        EditorGUILayout.LabelField(reason ?? $"기준 = {source} 처치자·보스 위치 · 컷 기준 '{AnchorLabel(shot.anchor)}'", EditorStyles.wordWrappedMiniLabel);
+        string weaponNote = BossVictoryCameraCuts.FollowsEveryFrame(shot.anchor) ? (s.HasWeapon ? " · 무기 위치 있음" : " · 무기 못 찾음 → 처치자 발밑") : "";
+        EditorGUILayout.LabelField(reason ?? $"기준 = {source} 처치자·보스 위치 · 컷 기준 '{AnchorLabel(shot.anchor)}'{weaponNote}", EditorStyles.wordWrappedMiniLabel);
     }
 
     // ── 컷 → Scene 뷰(267 후속) — 'Scene 뷰로' 의 반대. 자세 = 런타임 재생과 같은 BossVictoryCameraCuts.Pose(컷, 기준, 진행) ──

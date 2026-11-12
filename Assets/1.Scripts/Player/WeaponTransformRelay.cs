@@ -76,6 +76,18 @@ public sealed class WeaponTransformRelay : MonoBehaviour
         }
     }
 
+    /// <summary>첫 줄의 무기(비어 있지 않은 첫 것) — 처치 연출 카메라 기준 '처치자 무기' 폴백(<see cref="BossVictoryWeaponMarker.Find"/>). 없으면 null.</summary>
+    public Transform FirstWeapon
+    {
+        get
+        {
+            if (follows == null) return null;
+            for (int i = 0; i < follows.Length; i++)
+                if (follows[i].weapon != null) return follows[i].weapon;
+            return null;
+        }
+    }
+
     /// <summary>보조 고정이 설정된 첫 줄(무기·손잡이2·보조 대상·블렌드). 없으면 false.</summary>
     public bool TryGetSecondary(out Transform weapon, out Transform handle, out Transform secondaryTarget, out float blend)
     {
