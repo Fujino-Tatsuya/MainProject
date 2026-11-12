@@ -136,6 +136,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private bool _hatchHeldOnBoard;
     private int _launchFastStage; // 지금 발사 클립 가속 단계(0 = 1배속, 1·2 = 가속 단계)
     private bool _podStartSoundPlayed;                 // 이번 연출(시작 시각)에 출발음을 틀었다
+    private bool _podLaunchSoundPlayed;                // 출발음 뒷부분(발사 시작 맞춤)을 처리했다
+    private double _podStartSoundAt;                   // 출발음 앞부분을 시작한 경과 시각(파일 0초)
     private bool _hatchCueRead;                        // 해치 클립 이벤트 위치를 읽었다(없으면 +∞ → 서버 복제 시각만 쓴다)
     private float _hatchClipEventSeconds = float.PositiveInfinity;
     private Ami.BroAudio.IAudioPlayer _podStartSound;  // 연출 취소·재시작 때만 끈다 — 로비가 내려갈 때는 끝까지 둔다(로딩 전에 끝난다)
@@ -514,9 +516,8 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
             GameSoundHooks.Stop(_podStartSound);   // 취소·재시작이면 끊는다
             _podStartSound = null;
             _podStartSoundPlayed = false;
-            // 포드 발사 연출 = BGM 없음(경석 11-12 — 로비 곡 0.1초 아웃). 한 번만 — 로딩 씬이 로비 곡을 다시 켜는데(EnterLoadingBgm)
-            // 로비가 아직 떠 있어 매 프레임 걸면 그걸 다시 끈다. 연출이 취소되면 ClearLocal 이 로비 곡을 되돌린다.
-            if (start > 0d) AudioManager.Instance?.BeginCinematicBgm(this);
+            _podLaunchSoundPlayed = false;
+            // BGM 은 건드리지 않는다 — 로비 곡이 발사 연출·로딩 끝까지 이어진다(기획 11-12).
         }
 
         if (start <= 0d)
@@ -544,8 +545,10 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         if (!_podStartSoundPlayed && !double.IsInfinity(hatchOpened) && elapsed >= podSoundAt)
         {
             _podStartSoundPlayed = true;
+            _podStartSoundAt = podSoundAt;
             _podStartSound = GameSoundHooks.PlayCinematic(GameSoundHooks.DirectPodStart, elapsed - podSoundAt, GameSoundHooks.PodStartLength);
         }
+        UpdatePodLaunchSound(elapsed, start);
         // 연출 내내(출격 확정 ~ 로딩) 모든 플레이어의 벽 뒤 실루엣을 끈다 — 로컬 시각 값. 발사대 벽 뒤로 걸어 들어갈 때 윤곽선이 컷을 깨지 않게.
         _silhouettes.SuppressAll();
         UpdateLauncher(elapsed, _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start)),
@@ -560,6 +563,62 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         double board = _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start));
         double descentAt = DescentElapsed(_timeline, start, board);
         _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed, descentAt), true);
+    }
+
+    /// <summary>
+    /// [전 피어] 출발음 뒷부분(11-12). 파일은 3인 타이밍 통짜라 발사(다 앉기) 시각이 인원마다 다르다 —
+    /// 파일 <see cref="GameSoundHooks.PodStartDescentFile"/> 초(하강 "슈우웅")가 실제 하강 시작에 오도록
+    /// <see cref="GameSoundHooks.PodStartBackSplit"/> 초부터 다시 틀고 앞부분과 <see cref="GameSoundHooks.PodStartCrossfade"/> 초 크로스페이드한다.
+    /// 앞부분이 이미 그 타이밍이면(차이 0.1초 안) 그대로 둔다. 하강이 늦으면(인원 많음) 앞부분을 이어 붙일 자리에서 페이드 아웃하고 기다린다.
+    /// 하강 시각 = 발사 시작 + 발사 클립 하강 이벤트 위치(가속 1단계 전은 1배속으로 예측 — 각 피어 같은 값).
+    /// </summary>
+    private void UpdatePodLaunchSound(double elapsed, double start)
+    {
+        if (!_podStartSoundPlayed || _podLaunchSoundPlayed) return;
+
+        double board = _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start));
+        double descentAt = PredictDescentElapsed(start, board);
+        float fade = GameSoundHooks.PodStartCrossfade;
+        double backStartAt = descentAt - (GameSoundHooks.PodStartDescentFile - GameSoundHooks.PodStartBackSplit);
+        double frontPos = elapsed - _podStartSoundAt;   // 앞부분 파일 위치
+
+        if (!double.IsInfinity(descentAt) && elapsed >= backStartAt)
+        {
+            _podLaunchSoundPlayed = true;
+            double backPos = GameSoundHooks.PodStartBackSplit + (elapsed - backStartAt);
+            if (_podStartSound != null && _podStartSound.IsActive && Math.Abs(frontPos - backPos) <= 0.1)
+                return;   // 앞부분이 이미 하강에 맞는 위치 — 이어 붙이지 않는다
+            GameSoundHooks.Stop(_podStartSound, fade);
+            // 앞부분이 꺼지는 동안 같은 키가 2개 — 시트 Direct_Pod_Start maxSimultaneous 가 2 이상이어야 한다(1 이면 뒷부분이 조용히 거부됐다, 11-12).
+            _podStartSound = GameSoundHooks.PlayCinematicFadeIn(GameSoundHooks.DirectPodStart, backPos, GameSoundHooks.PodStartLength, fade);
+            if (_podStartSound == null && backPos < GameSoundHooks.PodStartLength - 0.1)
+                Debug.LogWarning($"{Tag} 출발음 뒷부분 재생 거부 — 시트 Sound '{GameSoundHooks.DirectPodStart}' maxSimultaneous 가 2 이상인지 확인", this);
+            return;
+        }
+
+        // 하강이 파일보다 늦다(인원 많음) — 앞부분이 이어 붙일 자리에 닿으면 페이드 아웃하고 뒷부분을 기다린다(4.0초 발사음을 미리 내지 않게).
+        bool backFar = double.IsInfinity(descentAt) || backStartAt - elapsed > 0.1;
+        if (backFar && _podStartSound != null && frontPos >= GameSoundHooks.PodStartBackSplit)
+        {
+            GameSoundHooks.Stop(_podStartSound, fade);
+            _podStartSound = null;
+        }
+    }
+
+    /// <summary>[전 피어] 하강 시작 경과 시각 예측 — 가속 1단계 복제 전이면 그 이벤트까지 1배속으로 본다. 발사 전·이벤트 없음 = +∞(복제된 실제 하강이 있으면 그 값).</summary>
+    private double PredictDescentElapsed(double start, double board)
+    {
+        double actual = DescentElapsed(_timeline, start, board);   // 클립 이벤트 위치도 여기서 읽는다
+        if (!double.IsInfinity(actual) || float.IsPositiveInfinity(_descentClipSeconds) || float.IsPositiveInfinity(_fastClipSeconds))
+            return actual;
+
+        double launchAt = _timeline.LaunchAt(board);
+        if (double.IsInfinity(launchAt)) return PodDropTimeline.NotYet;
+        PodDropLobbyTimings lobby = settings.Lobby;
+        double fastAt = PodDropTimeline.EventElapsed(_launchFastAt.Value, start);
+        if (double.IsInfinity(fastAt)) fastAt = launchAt + _fastClipSeconds;
+        return PodDropLobbyTimeline.LaunchElapsedAtClipSeconds(_descentClipSeconds, launchAt, fastAt, lobby.launchFastSpeed, _fastClipSeconds,
+            PodDropTimeline.EventElapsed(_launchFast2At.Value, start), lobby.launchFastSpeed2, _fast2ClipSeconds);
     }
 
     // Base Layer(0) 에 전신 클립을 이어 재생한다 — 해치 클립을 마스크 레이어(Hatches)에 두면 그 자세가 발사 클립의 해치 닫힘을 덮는다.
@@ -639,7 +698,6 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     {
         StopOwnerWalk();
         _timeline = null;
-        AudioManager.Instance?.EndCinematicBgm(this);
 
         if (_overlay != null) _overlay.Clear();
         _silhouettes.RestoreAll();

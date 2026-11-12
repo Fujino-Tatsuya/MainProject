@@ -57,6 +57,24 @@ public static class GameSoundHooks
     public const float PodStartLength = 8.3f;
     /// <summary>Pod_Start 를 해치 열림(클립 이벤트)보다 몇 초 앞에 시작하는가 — 11-12 Play 청취 2회(0 → 0.5초 늦음, 0.5 → 0.2~0.3초 늦음).</summary>
     public const float PodStartLeadSeconds = 1.125f;
+    // Pod_Start 는 3인 타이밍으로 뽑은 통짜 — 인원에 따라 발사(마지막 사람 착석)·하강 시각이 1초 안팎 달라진다(기획 11-12). 앞부분 = 해치 기준, 뒷부분 = 하강 기준.
+    /// <summary>
+    /// ⚠️ 11-12 Play 정정: 뒷부분을 발사(4.0초)에 맞추니 하강 "슈우웅"이 실제 하강보다 이르고, 0.05초 끊김이 어색했다 →
+    /// 뒷부분 기준 = 파일 <see cref="PodStartDescentFile"/>(7.10초 — 밝은 바람 소리 상승 스윕 시작, 7.75초까지)가 실제 하강 시작에 오게.
+    /// 이어 붙이는 곳 = <see cref="PodStartBackSplit"/>(3.45~3.95초 조용한 바닥음 안)·<see cref="PodStartCrossfade"/> 초 크로스페이드.
+    /// </summary>
+    public const float PodStartDescentFile = 7.10f;
+    public const float PodStartBackSplit = 3.7f;
+    public const float PodStartCrossfade = 0.3f;
+
+    /// <summary><see cref="PlayCinematic"/> 과 같되 <paramref name="fadeIn"/> 초에 걸쳐 키운다(이어 붙이기용).</summary>
+    public static IAudioPlayer PlayCinematicFadeIn(string key, double secondsSinceStart, float length, float fadeIn)
+    {
+        if (secondsSinceStart >= length - 0.1) return null;
+        IAudioPlayer player = AudioManager.Instance?.PlayFadeIn(key, fadeIn);
+        if (player == null) return null;
+        return secondsSinceStart > 0d ? player.SetStartOffset((float)secondsSinceStart) : player;
+    }
     /// <summary>Pod_End.wav(5.03초) 안의 착지 충돌음(초) — 0.85초가 가장 크다. 착지 시각에 맞춘다.</summary>
     public const float PodEndFileImpact = 0.85f;
     public const float PodEndLength = 5.03f;
