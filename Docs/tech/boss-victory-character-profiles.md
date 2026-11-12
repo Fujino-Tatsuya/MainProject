@@ -155,7 +155,37 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - **팔레트(271)**: 칸 `OrangeLeft/Right` 는 그대로, 기준(원본) 색만 처치자 프로필 `rectifyOrangeLeft/Right`(`ReferenceColors(settings, profile)`). 기준 색 따라가기·칸별 직접 지정 규칙은 같고 팔레트 견본도 프로필 값을 따른다.
 - **편집**: 타임라인 창 RECTIFY 안쪽 색 트랙 칸 — '주황 채움' 칸이 지금 고른 캐릭터 프로필 값. 테스트 `BossVictoryOrangeProfileTests`(세 프로필 값 = 옛 공용 값 · 렌더 값 = 처치자 프로필).
 
+## 4.13 처치자 이동 = 캐릭터별(272)
+
+프로필 칸 `killerMove`(`BossVictoryKillerMove`)가 처치자 움직임을 고른다 — 캐릭터 분기 대신 데이터. 순수 함수 `BossVictoryKillerMoves`(`Map/BossVictory/BossVictoryKillerMove.cs`), EditMode `BossVictoryKillerMoveTests`. 정본 값 넣기 = 메뉴 `Tools/Boss Victory/처치자 이동 프로필 적용 (272)`(지정 칸만 바꾸고 Unity 직렬화 — 다른 칸 그대로).
+
+| 이동 | 프로필 | '백대쉬 시작' 단계 | '처치 연출 스킬' 단계 |
+|---|---|---|---|
+| `BackDash`(기본) | 팔라딘 | 백대쉬(지금 그대로) | 스킬 연출 시작 마커에 처치 연출 스킬 |
+| `TeleportDash` | 어쌔신 | 순간이동(보스 기준 순간이동 지점) | 순간이동 Q — 스킬 연출 시작이 더 앞이어도 순간이동 먼저 |
+| `RetreatCharge` | 거너 | 가까울 때만: 후퇴 스킬(E) 표시 + 백대쉬(이동만) | 가까움 = 'Q 차징 시작' 마커 / 멂 = 백대쉬 시작 시각에 바로 Q |
+
+- **공통**: 이동은 처치자 **오너만 실제로**(PlayerMotor), 다른 피어는 복제 위치. 애니·이펙트는 각 피어 로컬. **새 RPC·복제 값 없음**. 처치 연출에 특성 연출 없음(어쌔신 일섬 `DashTint` 안 씀, 거너 Q 는 기존 `BeginPresentationCharge` 기본 색).
+- **어쌔신 순간이동 Q**:
+  - 두 점 = 보스 기준 오프셋 `teleportOffset`·`arrivalOffset`(보스 위치 + 보스 **수평** 회전 × 오프셋, +Z = 보스 정면, 높이 = 처치자 발). 보스가 없으면 처치자 기준.
+  - '백대쉬 시작' 마커(0 = 처치 순간)에 순간이동 — `LobbyPodLaunch.TeleportOwner` 순서(백대쉬·대시 끊기 → 넉백 지움 → `TeleportAuthoritative` → 방향 = 도착 지점 쪽 → `NetworkTransform.Teleport`).
+  - 바로 Q 대신 `teleportMoveState`(기본 `Assassin_Q_DashStrike_Transformed` = Combo_Attack_03_04, 60fps 1.917초, Custom0 0.15·End 0.425·Hit 0.767)를 `PlayerSkillController.PlayPresentationStateOnly` 로 — 스킬 없이 0층을 쥐어 그 클립 이벤트는 어느 스킬에도 안 간다. **End 는 '스킬 끝'(`PresentationSkillEnded`)이 아니고 이동만 끝낸다.** 그래서 느려짐은 '느려짐 시작' 마커, 꺼져 있으면 정지 프레임(End 이벤트가 없는 것처럼).
+  - 이동 구간 = 클립 시간으로(공속·상태 속도 1.5 와 무관) `teleportMoveInterval`: A `Custom0ToEnd`(0.275초, 결정) / B `Custom0ToFreeze`. 곡선 `teleportMoveEase`. 오너가 FixedUpdate 에 진행 차이만큼 `AddGroundedDisplacement`(유닛 통과, 벽이면 멈춤).
+  - 일섬 = 일반 Q 그대로 — 이동 시작에 `AssassinSkillView.BeginPierce(순간이동 지점, 방향)`, 끝에 `EndPresentationPierce(도착 지점)`(PierceLine + PierceBurst, 특성 색 없음). 끝점은 계산값이라 모든 피어 같다.
+  - **정지 프레임 = 기존 '처치 연출 스킬' 클립 끝 자르기(255 후속 7) 재사용** — `finisherTrimSeconds` = 71/60 = 1.1833초(창 BackDashStart 칸 '정지 프레임 = 71f' 버튼). 닿으면 처치자 배율 0 이 느려짐보다 먼저라 로비 전환까지 그 자세. 창의 클립 노드도 순간이동 Q 클립을 보여 준다.
+  - 원래 처치 연출(R 변신)을 대신한다 — `finisherSlot` 은 이 이동에서 안 쓴다(칸은 남김).
+  - Scene 뷰: 타임라인 창이 열려 있고 이동이 순간이동이면 두 점·경로·보스 정면을 그리고 위치 핸들로 끈다(높이 0 으로 저장). 기준 보스 = 재생 중 보스 → 이 세션 마지막 회차 보스 → 열린 씬의 23호.
+- **거너 후퇴 차징**(제자리 — 순간이동 없음):
+  - 처치 순간 보스와 수평 거리 < `retreatDistance`(기본 5m)면 '백대쉬 시작'에 `retreatSkillSlot`(E 냉각 백스텝) 표시 전용 재생(냉기·궤적 — 그 스킬 이동은 안 돎) + 백대쉬(기존 백대쉬 칸, 보스 반대쪽, 이동만). 'Q 차징 시작' 마커(`chargeStartTime`, 기본 -1 = 백대쉬 시작 + 0.2초 — 끌면 고정)에 E 표시를 접고 처치 연출 스킬(Q) — 백대쉬는 끊지 않고 이어 감.
+  - 멀면 E·백대쉬 없이 '백대쉬 시작' 시각에 바로 Q.
+  - Q = 기존 `GunnerChargeLaserSkill.OnPresentationOnlyStart`(1.2초 충전 → 보스 쪽 발사). 차징 구체 크기만 프로필 `chargeScaleFrom → chargeScaleTo`(+ `chargeScaleCurve`) — `GunnerBeamView.SetPresentationChargeScale`, 정리 때 끈다. 발사 순간 = 목표 크기, 레이저 폭 그대로.
+  - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
+  - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
+
 ## 5. 알려진 한계
+
+- (272) 거너 가까움 판정은 처치 순간 각 피어 화면의 처치자 위치로 한다(새 복제 값 없음) — 문턱 근처면 피어마다 E·백대쉬 유무가 갈릴 수 있다(이동은 오너 기준이라 위치는 결국 같다).
+- (272) 어쌔신 순간이동은 오너가 옮기고 다른 피어는 복제로 받아, 그 피어에선 Q 애니가 순간이동 위치 도착보다 반 RTT 먼저 시작될 수 있다. 일섬 끝점은 계산값이라 벽에 막혀 덜 갔으면 실제 위치보다 길다.
 
 - 프로필은 회차 시작 때 고정 — 연출 중 처치자 캐릭터가 바뀌어도(랩 F1) 그 회차는 옛 프로필, 랩이 바로 처음부터 다시 튼다.
 - 끝 자르기 값은 클립 시간(초) 하나 — 기본 프로필(지금은 코드 기본값)을 여러 캐릭터가 쓰면 캐릭터마다 클립 길이가 달라 같은 값이 다른 프레임이다(캐릭터 프로필을 만들면 따로).
