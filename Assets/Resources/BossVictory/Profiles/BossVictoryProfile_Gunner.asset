@@ -28,7 +28,7 @@ MonoBehaviour:
   timeline:
     desaturate:
     - start: 0.105
-      length: 5.495
+      length: 7.095
       fadeIn: 0.09
       fadeOut: 0
       weight: 1
@@ -50,8 +50,8 @@ MonoBehaviour:
       bobPhase: 0
       bobDamping: 0
     amber:
-    - start: 0.3
-      length: 5.3
+    - start: 0.24
+      length: 2.15
       fadeIn: 0.15
       fadeOut: 0
       weight: 1
@@ -72,9 +72,84 @@ MonoBehaviour:
       bobPeriod: 0
       bobPhase: 0
       bobDamping: 0
+    - start: 3.75
+      length: 0.8699999
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.1
+        value: 1
+        curve: 0
+      - u: 0.9
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 2.4
+      length: 1.3499999
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.1
+        value: 1
+        curve: 0
+      - u: 0.9
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 0.13
+      length: 0.050000012
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.1
+        value: 1
+        curve: 0
+      - u: 0.9
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
     scanline:
     - start: 0.105
-      length: 5.495
+      length: 6.195
       fadeIn: 0.09
       fadeOut: 0
       weight: 1
@@ -97,7 +172,7 @@ MonoBehaviour:
       bobDamping: 0
     bossNoise:
     - start: 0.12
-      length: 5.48
+      length: 6.1800003
       fadeIn: 0.05
       fadeOut: 0
       weight: 1
@@ -120,7 +195,7 @@ MonoBehaviour:
       bobDamping: 0
     tear:
     - start: 0.09
-      length: 0.16
+      length: 0.22999999
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -169,7 +244,7 @@ MonoBehaviour:
       bobPeriod: 0
       bobPhase: 0
       bobDamping: 0
-    - start: 1.33
+    - start: 0.96
       length: 0.2
       fadeIn: 0
       fadeOut: 0
@@ -182,6 +257,81 @@ MonoBehaviour:
         value: 1
         curve: 0
       - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 2.16
+      length: 0.28999996
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 3.64
+      length: 0.2
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+    - start: 4.35
+      length: 1.9500003
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.21379302
+        value: 1
+        curve: 0
+      - u: 1
         value: 1
         curve: 1
       - u: 1
@@ -247,7 +397,7 @@ MonoBehaviour:
       bobDamping: 0
     hudHide:
     - start: 0.08
-      length: 5.52
+      length: 6.2200003
       fadeIn: 0.04
       fadeOut: 0
       weight: 1
@@ -365,7 +515,7 @@ MonoBehaviour:
       bobDamping: 0
     cameraBob:
     - start: 1.23
-      length: 4.3700004
+      length: 5.36
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -390,8 +540,8 @@ MonoBehaviour:
       bobPhase: 0.25
       bobDamping: 0
     rectify:
-    - start: 1.42
-      length: 4.18
+    - start: 0.81
+      length: 5.4900002
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -414,8 +564,8 @@ MonoBehaviour:
       bobDamping: 0
     rectifySeeded: 1
     rectifyFill:
-    - start: 0.4
-      length: 4.1
+    - start: 0.72
+      length: 5.58
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -437,7 +587,7 @@ MonoBehaviour:
     cameraBobSeeded: 1
     groundCircle:
     - start: 0.3
-      length: 5.2999997
+      length: 3.49
       fadeIn: 0
       fadeOut: 0
       weight: 1
