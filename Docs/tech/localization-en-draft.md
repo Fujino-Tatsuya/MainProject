@@ -213,7 +213,7 @@
 |---|---|---|
 | ko 가 영어인 문구 | `UI.Loading.Preparing`·`Loading`·`WaitingForPlayers`·`Activating`·`StandBy` · `UI.Loading.Ready1~3` · `UI.Result.Cleared`·`Failed`·`Aborted` · `UI.SkillTooltip.PassiveBadge` · `UI.Options.Language` | ko 칸을 한국어로 할지(en 은 지금 글자 그대로) |
 | 상태이상 이름 | `UI.StatusEffect.*` 14개 | ✅ CC 6종 + `Grabbed` 는 확정(2026-10-16, 할 일 50 — 아래 표). 남은 8개(슈퍼아머·스탯 배율·패시브 충전·정신 집중): ko 를 한국어로 할지 · en 을 띄어 쓸지(`Super Armor`·`Move Speed`·`Max HP` 등) |
-| 로딩 장난 팁 | `UI.Loading.Tip1~3` | 문구 교체 후보 — 실제 팁으로 바꿀지 |
+| 로딩 장난 팁 | ~~`UI.Loading.Tip1~3`~~ | ✅ 275(11-12) 삭제 — 시트 행 정리만 남음 |
 | 스킬 툴팁 `TODO` 문구 | `*/tooltip.description` 전부 | ko 확정 뒤 en 재번역 |
 | 문구에 박힌 수치 | `AssassinTransformSkillData/tooltip.description`(`2초`) · `AssassinCircleStrikeSkillData/tooltip.description`(`5번`) | 자리표시자로 뺄지(빼면 ko·en 같이) |
 | 조작 키 이름 | `UI.SkillTooltip.ShiftHint` · `UI.AssassinHUD.TransformReleasable` · `UI.AssassinHUD.EnhancedReady` · `AssassinStateData/tooltip.description`(`R`) · 부제 `우클릭` | `{key:액션}` 토큰 적용 시점 |

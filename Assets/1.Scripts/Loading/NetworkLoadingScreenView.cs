@@ -257,7 +257,15 @@ public class NetworkLoadingScreenView : MonoBehaviour
 
     private void ApplyImage()
     {
-        if (centerImage == null || imageTable == null || imageTable.Length == 0)
+        if (centerImage == null)
+        {
+            return;
+        }
+
+        // 표가 비면 가운데 이미지를 끈다 — sprite 없는 Image 는 흰 사각형으로 그려져 전체 화면 배경(275)을 가린다.
+        bool hasImage = imageTable != null && imageTable.Length > 0;
+        centerImage.enabled = hasImage;
+        if (!hasImage)
         {
             return;
         }

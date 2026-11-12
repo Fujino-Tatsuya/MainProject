@@ -341,7 +341,8 @@ Export 가 ErrorCodes 시트에 없는 코드를 **ko = 지금 문구, `#분류`
 | 키 | ko(폴백) | 자리표시자 | 쓰는 곳 |
 |---|---|---|---|
 | `UI.Loading.Preparing` · `Loading` · `WaitingForPlayers` · `Activating` · `StandBy` | Preparing... · Loading... · Waiting for players... · Starting... · Stand by... | | `NetworkLoadingScreenView.PhaseText` |
-| `UI.Loading.Tip1`~`Tip3` | 으아ㅏㅏㅏㅏ · 커피ㅣㅣㅣㅣ · 밥 뭐 먹지.... | | `2.LoadingScene` `tooltipTable[0~2]` — 행이 없으면 씬 값 |
+| ~~`UI.Loading.Tip1`~`Tip3`~~ | (275, 11-12 삭제 — 임시 장난 팁. 옛 키 재사용 금지) | | 시트 Strings 행 78~80 삭제 대기 |
+| `UI.Loading.TipDashInterrupt` | Tip. 간파는 준비 동작이 있습니다... 대쉬와 간파를 동시에 쓴다면....? | | `2.LoadingScene` `tooltipTable[0]` — 행이 없으면 씬 값. 표가 비면 팁 글자 숨김 |
 | `UI.Loading.Ready1`~`Ready3` | Enter... · All players are ready. · Starting... | | `readyMessages[0~2]` — 〃 |
 | `UI.SkillTooltip.ShiftHint` | 자세한 정보를 보려면 [Shift] 키를 누르세요 | | `SkillTooltipView` |
 | `UI.SkillTooltip.Error` | [오류: {error}] | `{error}` = 포매터 오류(개발용, 번역 안 함) | 〃 `ErrorText` |
