@@ -54,6 +54,20 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Range(0f, 1f)] public float scanlineFloorKeep = 0f;
     [Tooltip("하늘(먼 평면 깊이) 호박색 밝기 하한(267 후속) — 호박색 = 흑백 명도 × 색이라 검은 하늘은 칙칙한 겨자색이 된다. 하늘만 명도를 이 값 이상으로 올린다(0 = 예전대로).")]
     [Range(0f, 1f)] public float skyAmberMinLuma = 0.6f;
+    [Tooltip("배경 호박색 명도 리프트(267 후속 — 하이키) — 호박색 명도 = 리프트 + (1 − 리프트) × 원래 명도. 어두운 벽도 밝은 호박색이 된다. 0 = 예전(곱하기 그대로). 하늘 하한은 그 위에.")]
+    [Range(0f, 1f)] public float amberLumaLift = 0.45f;
+    [Tooltip("CRT 주사선 어둡기(267 후속) — 어두운 줄 밝기 = 1 − 이 값(예전 고정 0.28). 벽·하늘·플레이어·보스 위 주사선 전부.")]
+    [Range(0f, 1f)] public float scanlineDarkness = 0.15f;
+
+    [Header("처치 연출 전용 볼륨(267 후속 — 연출 동안만, 각 피어 로컬)")]
+    [Tooltip("연출 동안 맵 볼륨 위에 덮는 전역 볼륨을 켠다(글리치 시작 ~ 연출 끝·취소). 끄면 맵 볼륨 그대로.")]
+    public bool victoryVolume = true;
+    [Tooltip("연출 동안 비네트 세기(맵 볼륨 0.22 를 덮는다). 0 = 비네트 없음.")]
+    [Range(0f, 1f)] public float victoryVignetteIntensity = 0f;
+    [Tooltip("연출 동안 노출(Post Exposure)도 덮을지. 끄면 맵 볼륨 값(0.25) 그대로.")]
+    public bool victoryOverrideExposure;
+    [Tooltip("덮을 노출(EV). 맵 볼륨은 0.25.")]
+    public float victoryPostExposure = 0.25f;
 
     [Header("가로줄 찢김 모양")]
     [Tooltip("찢김 줄 기본 굵기(px, 화면 해상도 기준).")]
@@ -92,7 +106,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("원 가장자리 부드러움(m) — 반경 안쪽으로 이만큼에 걸쳐 흑백 → 호박색.")]
     [Min(0f)] public float groundCircleSoftness = 1f;
     [Tooltip("원 안 흑백 밝기 배율(원래 명도 × 이 값).")]
-    [Min(0f)] public float groundCircleBrightness = 1f;
+    [Min(0f)] public float groundCircleBrightness = 1.8f;
 
     [Header("배경 글자 RECTIFY(267 후속 — 켜는 시각·알파 = 타임라인 '배경 글자 RECTIFY' 클립)")]
     [Tooltip("폰트(SVN Assets/50.Art/UI/Fonts/JalnanGothicTTF). 비면 글자 없음.")]

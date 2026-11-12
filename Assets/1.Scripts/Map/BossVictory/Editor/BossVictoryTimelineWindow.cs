@@ -1717,11 +1717,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         switch (track)
         {
             case BossVictoryTrack.Amber:
-                DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor));
+                DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor), nameof(BossVictoryGlitchSettings.amberLumaLift),
+                    nameof(BossVictoryGlitchSettings.skyAmberMinLuma));
+                DrawSettingsFields("처치 연출 전용 볼륨", nameof(BossVictoryGlitchSettings.victoryVolume), nameof(BossVictoryGlitchSettings.victoryVignetteIntensity),
+                    nameof(BossVictoryGlitchSettings.victoryOverrideExposure), nameof(BossVictoryGlitchSettings.victoryPostExposure));
                 break;
             case BossVictoryTrack.Scanline:
                 EditorGUILayout.LabelField("주사선은 벽·하늘에만 — 바닥(표면 법선이 위를 향함)은 뺀다. 플레이어·보스 위는 늘 주사선, RECTIFY 글자 위는 뺀다.", EditorStyles.wordWrappedMiniLabel);
-                DrawSettingsFields("주사선 모양", nameof(BossVictoryGlitchSettings.scanlineCount),
+                DrawSettingsFields("주사선 모양", nameof(BossVictoryGlitchSettings.scanlineCount), nameof(BossVictoryGlitchSettings.scanlineDarkness),
                     nameof(BossVictoryGlitchSettings.scanlineFloorNormalMin), nameof(BossVictoryGlitchSettings.scanlineFloorNormalMax),
                     nameof(BossVictoryGlitchSettings.scanlineFloorKeep));
                 break;

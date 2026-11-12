@@ -12,6 +12,7 @@ using UnityEngine.Rendering.Universal;
 /// <list type="number">
 /// <item>마스크(투명 렌더 직전): 플레이어(흑백 대상)·보스(노이즈 대상) 렌더러를 렌더링 레이어 비트로 골라 ID 텍스처(R 플레이어 · B 보스).</item>
 /// <item>합성(투명 렌더 직후, 후처리 전): 흑백·호박색·주사선·물결·계단·늘어남·블록·스미어·슬라이스·RGB 분리·섬광 + 보스 노이즈 UV.</item>
+/// 처치 연출 전용 볼륨(비네트·노출 덮기)도 켤 때 만들고 끌 때 지운다.
 /// </list>
 /// 세기는 표시(<see cref="BossVictoryGlitchPresentation"/>)가 설정 SO 타임라인 곡선으로 매 프레임 넣는다. 마스터 세기 0 이면 두 패스 다 건너뛴다.
 /// </summary>
@@ -77,6 +78,8 @@ public static class BossVictoryGlitchRender
     static readonly int IdScanFloor = Shader.PropertyToID("_ScanFloor");          // x 벽 normal.y, y 바닥 normal.y, z 바닥 남김, w 하늘 호박 명도 하한(267 후속)
     static readonly int IdCircleLook = Shader.PropertyToID("_GroundCircleLook");  // x 가장자리 부드러움(m), y 흑백 밝기
     static readonly int IdLook = Shader.PropertyToID("_GlitchLook");          // x 주사선 줄 수, y 찢김 줄 굵기(px), z 굵기 최대 배수, w 찢김 갱신(초당)
+    static readonly int IdGrade = Shader.PropertyToID("_GlitchGrade");          // x 배경 호박 명도 리프트, y CRT 주사선 어둡기(267 후속)
+
 
     static Material _maskPlayer, _maskBoss, _composite;
     static MaskPass _maskPass;
@@ -128,6 +131,7 @@ public static class BossVictoryGlitchRender
         CoreUtils.Destroy(_maskBoss);
         CoreUtils.Destroy(_composite);
         _maskPlayer = _maskBoss = _composite = null;
+        DestroyVolume();
         BossVictoryRectifyText.Destroy(_rectifyAsset);
         _rectifyAsset = null;
         _rectifyFont = null;
@@ -153,8 +157,52 @@ public static class BossVictoryGlitchRender
         float floorMin = Mathf.Clamp01(s.scanlineFloorNormalMin);
         _composite.SetVector(IdScanFloor, new Vector4(floorMin, Mathf.Max(floorMin + 0.001f, Mathf.Clamp01(s.scanlineFloorNormalMax)), Mathf.Clamp01(s.scanlineFloorKeep), Mathf.Clamp01(s.skyAmberMinLuma)));
         _composite.SetVector(IdCircleLook, new Vector4(Mathf.Max(0f, s.groundCircleSoftness), Mathf.Max(0f, s.groundCircleBrightness), 0f, 0f));
+        _composite.SetVector(IdGrade, new Vector4(Mathf.Clamp01(s.amberLumaLift), Mathf.Clamp01(s.scanlineDarkness), 0f, 0f));
+        ApplyVolume(s);
         ApplyRectify(s);
         ApplyFillLook(s);
+    }
+
+    // 처치 연출 전용 볼륨(267 후속) — 켤 때 만들고(전역·우선순위 높음) 끌 때 지운다. 각 피어 로컬, 네트워크 없음.
+    // 맵 볼륨(VP_CombatLevel_Toon)의 비네트·노출만 덮는다 — 게임 중 화면은 안 건드린다.
+    const float VictoryVolumePriority = 120f;   // CinematicOverlay(110) 위
+    static GameObject _volumeGo;
+    static VolumeProfile _volumeProfile;
+    static Vignette _volumeVignette;
+    static ColorAdjustments _volumeColor;
+
+    static void ApplyVolume(BossVictoryGlitchSettings s)
+    {
+        if (!s.victoryVolume) { DestroyVolume(); return; }
+        if (_volumeGo == null)
+        {
+            _volumeGo = new GameObject("BossVictoryVolume") { hideFlags = HideFlags.DontSave };
+            Camera cam = Camera.main;
+            if (cam != null) _volumeGo.layer = cam.gameObject.layer;   // 카메라 볼륨 레이어 마스크 안(CinematicOverlay 와 같은 방식)
+            Volume volume = _volumeGo.AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = VictoryVolumePriority;
+            volume.weight = 1f;
+            _volumeProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+            _volumeProfile.name = "BossVictory Runtime Volume";
+            _volumeProfile.hideFlags = HideFlags.DontSave;
+            volume.profile = _volumeProfile;
+            _volumeVignette = _volumeProfile.Add<Vignette>();
+            _volumeColor = _volumeProfile.Add<ColorAdjustments>();
+        }
+        _volumeVignette.intensity.Override(Mathf.Clamp01(s.victoryVignetteIntensity));
+        _volumeColor.postExposure.overrideState = s.victoryOverrideExposure;
+        _volumeColor.postExposure.value = s.victoryPostExposure;
+    }
+
+    static void DestroyVolume()
+    {
+        if (_volumeGo != null) CoreUtils.Destroy(_volumeGo);
+        if (_volumeProfile != null) CoreUtils.Destroy(_volumeProfile);
+        _volumeGo = null;
+        _volumeProfile = null;
+        _volumeVignette = null;
+        _volumeColor = null;
     }
 
     // 배경 글자(267 후속) — 켤 때 아틀라스 1회, 배치는 화면 비율이 바뀔 때만.

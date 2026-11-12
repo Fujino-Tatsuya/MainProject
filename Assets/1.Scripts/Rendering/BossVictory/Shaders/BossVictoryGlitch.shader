@@ -23,19 +23,8 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
-        ENDHLSL
 
-        Pass
-        {
-            Name "BossVictoryGlitch"
-            ZWrite Off
-            ZTest Always
-            Cull Off
-
-            HLSLPROGRAM
-            #pragma vertex Vert
-            #pragma fragment Frag
-
+            // ── 공용 선언·함수(267 후속 — 패스가 늘어도 같이 쓴다) ──
             TEXTURE2D_X(_GlitchIdTex);
             TEXTURE2D(_NoiseTex);
             SAMPLER(sampler_NoiseTex);
@@ -196,6 +185,35 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
 
             half Luma(half3 c) { return dot(c, half3(0.2126h, 0.7152h, 0.0722h)); }
 
+            // 주황 채움(흰 원 뒤 줄 단위 들쭉날쭉 와이프, 레퍼런스) — rgb = 색(왼쪽 주황 → 오른쪽 노랑), a = 덮였나(0/1). 진행 0 = 0.
+            half4 RectifyOrangeAt(float2 uv, float ypx)
+            {
+                if (_RectifyOrange.x <= 0.0001) return 0.0h;
+                float wx = (uv.x - _RectifyFillRect.x) / max(_RectifyFillRect.z - _RectifyFillRect.x, 1e-5);
+                float oRow = floor(ypx / _RectifyOrange.w);
+                float oOff = Hash(float2(oRow, floor(_RectifyOrange.x * 6.0) + 91.0)) - 0.5;
+                float sx = _RectifyOrange.z > 0.5 ? 1.0 - wx : wx;
+                float edge = lerp(-_RectifyOrange.y, 1.0 + _RectifyOrange.y, saturate(_RectifyOrange.x));
+                half covered = (half)step(sx + oOff * _RectifyOrange.y, edge);
+                half3 lr = lerp(_RectifyOrangeLeft.rgb, _RectifyOrangeRight.rgb, saturate(wx));
+                half3 orangeCol = lerp(_RectifyOrangeLeft.rgb, lr, (half)_RectifyOrangeRight.a);
+                return half4(orangeCol, covered);
+            }
+
+            float4 _GlitchGrade;         // x 배경 호박 명도 리프트, y CRT 주사선 어둡기
+        ENDHLSL
+
+        Pass
+        {
+            Name "BossVictoryGlitch"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+
             half4 Frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -243,7 +261,9 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half lum = Luma(col);
                 half3 gray = lerp(col, lum.xxx, (half)_GlitchA.z);
                 // 하늘(먼 평면)은 명도 하한 — 곱하기 틴트라 검은 하늘이 칙칙한 겨자색이 되던 것(267 후속). 벽·바닥 톤의 밝은 노랑으로.
-                half lumAmber = lerp(lum, max(lum, (half)_ScanFloor.w), SkyMask(uv));
+                // 배경 명도 리프트(267 후속) — 하이키: 어두운 벽도 밝은 호박색으로(lift + (1 − lift) × 명도). 하늘 하한은 그 위에.
+                half lumLift = (half)_GlitchGrade.x + (1.0h - (half)_GlitchGrade.x) * lum;
+                half lumAmber = lerp(lumLift, max(lumLift, (half)_ScanFloor.w), SkyMask(uv));
                 half3 amber = lumAmber * _AmberColor.rgb * 1.6h;
                 half3 graded = lerp(gray, amber, (half)_GlitchA.w);
                 graded = lerp(graded, lerp(col, lum.xxx, (half)max(_GlitchA.z, _GlitchA.w)), player);
@@ -266,18 +286,8 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                     {
                         half4 fill = RectifyFillAt(uv);
                         // 주황 채움 — 흰 원 뒤 줄 단위 들쭉날쭉 와이프(레퍼런스), 색 = 왼쪽 주황 → 오른쪽 노랑. 다 덮으면 불투명.
-                        if (_RectifyOrange.x > 0.0001)
-                        {
-                            float wx = (uv.x - _RectifyFillRect.x) / max(_RectifyFillRect.z - _RectifyFillRect.x, 1e-5);
-                            float oRow = floor(ypx / _RectifyOrange.w);
-                            float oOff = Hash(float2(oRow, floor(_RectifyOrange.x * 6.0) + 91.0)) - 0.5;
-                            float sx = _RectifyOrange.z > 0.5 ? 1.0 - wx : wx;
-                            float edge = lerp(-_RectifyOrange.y, 1.0 + _RectifyOrange.y, saturate(_RectifyOrange.x));
-                            half covered = (half)step(sx + oOff * _RectifyOrange.y, edge);
-                            half3 lr = lerp(_RectifyOrangeLeft.rgb, _RectifyOrangeRight.rgb, saturate(wx));
-                            half3 orangeCol = lerp(_RectifyOrangeLeft.rgb, lr, (half)_RectifyOrangeRight.a);
-                            fill = half4(lerp(fill.rgb, orangeCol, covered), lerp(fill.a, 1.0h, covered));
-                        }
+                        half4 orange = RectifyOrangeAt(uv, ypx);
+                        fill = half4(lerp(fill.rgb, orange.rgb, orange.a), lerp(fill.a, 1.0h, orange.a));
                         half scanOn = (half)step(0.5, frac(ypx / _RectifyFillParams.w));
                         half3 fillCol = fill.rgb * (1.0h - (half)_RectifyFillLook.x * scanOn);
                         half coverOutline = (half)step(0.5, _RectifyFillLook.y);
@@ -305,7 +315,8 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                     half surf = ScanSurfaceWeight(uv);
                     half keep = max(surf, max(player, boss)) * (1.0h - rectMask);
                     half scan = 0.5h + 0.5h * sin(uv0.y * _GlitchLook.x * 6.28318h);
-                    graded *= lerp(1.0h, 0.72h + 0.28h * scan, (half)_GlitchB.x * keep);
+                    half dark = (half)_GlitchGrade.y;   // 어두운 줄 = 1 − 어둡기(예전 고정 0.28)
+                    graded *= lerp(1.0h, (1.0h - dark) + dark * scan, (half)_GlitchB.x * keep);
                 }
 
                 return half4(graded, 1.0h);

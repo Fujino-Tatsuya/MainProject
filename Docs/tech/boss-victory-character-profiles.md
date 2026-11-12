@@ -35,7 +35,7 @@
 
 ## 4. 디버그 랩 (DebugBossVictory)
 
-**F1 = 처치자(내 플레이어) 캐릭터 순환** 팔라딘 → 어쌔신 → 거너 — 간파·특성 랩의 `DebugCharacterCycle` 재사용. 이 씬은 빌드 목록에 있어(디버그 컴포넌트 격리 테스트 `DebugInterruptLabIsolationTests`) 씬에 두지 않고 랩이 실행 중에 붙인다(로스터 = NetworkManager 의 `NetworkLoadingFlowController`). 내 플레이어가 바뀌면 랩이 처음부터 다시 — 새 캐릭터 프로필로 재생.
+**F1 = 처치자(내 플레이어) 캐릭터 순환** 팔라딘 → 어쌔신 → 거너 — 간파·특성 랩의 `DebugCharacterCycle` 재사용. 이 씬은 빌드 목록에 넣지 않는다(사용자 결정 — `BossVictoryLabRulesTests` 가 확인). 단 툴바 Dev Boot 로 ▶하면 `DevBootLauncher` 가 Play 동안만 빌드 목록에 임시로 넣고 Play 가 끝나면 되돌린다 — Play 중 커밋하거나 Play 중 에디터가 비정상 종료되면 `ProjectSettings/EditorBuildSettings.asset` 에 남으니 커밋하지 말고 `Dev/Dev Boot/빌드 목록 강제 정리`. 캐릭터 순환 컴포넌트는 씬에 두지 않고 랩이 실행 중에 붙인다(로스터 = NetworkManager 의 `NetworkLoadingFlowController`). 내 플레이어가 바뀌면 랩이 처음부터 다시 — 새 캐릭터 프로필로 재생.
 
 ## 4.1 노이즈 UV 수직 이동 노드(267 후속)
 
@@ -87,6 +87,15 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 글리치 합성의 CRT 주사선(트랙 '주사선')을 바닥에서 뺀다. 픽셀마다 깊이(`_CameraDepthTexture`, 찢긴 UV 그대로)로 월드 위치와 이웃 4픽셀(깊이 차 작은 쪽)로 표면 법선을 복원 → 위쪽 성분 normal.y 가 `scanlineFloorNormalMin`(0.55) 이하 = 벽(주사선 그대로), `scanlineFloorNormalMax`(0.8) 이상 = 바닥(`scanlineFloorKeep` 0 = 없음), 사이는 smoothstep. 하늘 = 먼 평면 깊이 → 주사선. 플레이어·보스 마스크 위는 전부 주사선. **RECTIFY 글자 마스크(외곽선 포함 — SDF 안쪽 ∪ 외곽선 띠, 보이는 만큼) 위는 주사선을 뺀다**(11-12 사용자 요청, 이전엔 일부러 남겼던 부분). 깊이만 쓰므로 새 RPC 없이 피어마다 같다. RECTIFY 안쪽 주사선(§4.5)은 별개.
 - 하늘 호박색: 호박색 = 흑백 명도 × 색(곱하기)이라 검은 하늘은 칙칙한 겨자색이 됐다. 하늘(먼 평면 깊이)만 명도를 `skyAmberMinLuma`(0.6) 이상으로 올려 벽·바닥 톤의 밝은 노랑으로. 플레이어·보스·RECTIFY 는 그대로(그 뒤에 덮음). 하늘이 깊이를 쓰는 메시(돔)면 하늘로 안 잡힌다.
 - 한계: 바닥 위 소품의 윗면(위를 향함)은 바닥으로, 옆면은 벽으로 본다. 깊이를 쓰지 않는(ZWrite 꺼진) 반투명 물체는 뒤 표면 기준.
+
+## 4.7 화면 밝기 — 하이키(267 후속, 11-12)
+
+레퍼런스(배경 노랑이 밝고 쨍함·바닥 밝은 회색)보다 어두침침하던 것. 원인 1순위 = 호박색 = 씬 명도 × 색(곱하기)이라 어두운 벽이 어두운 겨자색으로 남음.
+- `amberLumaLift`(0.45): 호박색 명도 = 리프트 + (1 − 리프트) × 원래 명도. 벽 명도 0.1~0.3 → 후처리 뒤 약 (194,162,91)~(205,174,101) ≈ 레퍼런스 벽 (200,161,97). 하늘 하한(`skyAmberMinLuma`)은 그 위.
+- `scanlineDarkness`(0.15): CRT 주사선 어두운 줄 = 1 − 값(예전 코드 고정 0.28).
+- `groundCircleBrightness` 1 → 1.8: 발밑 회색 원(바닥) 밝기.
+- 처치 연출 전용 볼륨(`victoryVolume`·`victoryVignetteIntensity` 0·`victoryOverrideExposure`/`victoryPostExposure`): `BossVictoryGlitchRender.Enable` 때 런타임 전역 볼륨(우선순위 120, 카메라 레이어)을 만들고 `Disable`(연출 끝·취소·Teardown) 때 지운다. 맵 볼륨 `VP_CombatLevel_Toon` 의 비네트 0.22·노출 0.25 만 덮는다. 각 피어 로컬, 새 RPC 없음.
+- 참고(바꾸지 않음): 맵 볼륨 Neutral 톤매핑은 흰 1.0 → sRGB 224 로 깎는다. 디버그 씬과 맵은 같은 볼륨·방향광(0.75)·환경광.
 
 ## 5. 알려진 한계
 

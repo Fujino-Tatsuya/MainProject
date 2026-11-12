@@ -30,6 +30,12 @@ MonoBehaviour:
   scanlineFloorNormalMax: 0.8
   scanlineFloorKeep: 0
   skyAmberMinLuma: 0.6
+  amberLumaLift: 0.45
+  scanlineDarkness: 0.15
+  victoryVolume: 1
+  victoryVignetteIntensity: 0
+  victoryOverrideExposure: 0
+  victoryPostExposure: 0.25
   tearLinePixels: 1.75
   tearLineMaxMultiplier: 1.75
   tearMaxShift: 0.04
@@ -45,7 +51,7 @@ MonoBehaviour:
   bossNoiseDarkColor: {r: 0.22745098, g: 0.09019608, b: 0.07058824, a: 1}
   groundCircleRadius: 5.73
   groundCircleSoftness: 19.05
-  groundCircleBrightness: 1
+  groundCircleBrightness: 1.8
   rectifyFont: {fileID: 12800000, guid: ec558e14f18f3e04183bac06c64ac696, type: 3}
   rectifyText: RECTIFY
   rectifyWidth: 1.06
