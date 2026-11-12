@@ -8,7 +8,8 @@ using UnityEngine;
 /// target은 스켈레톤 안(예: R_/L_WeaponSocket 본)에 있어야 애니메이션으로 같이 움직인다.
 ///
 /// 보조 고정점(손잡이2, 팔라딘 방패): 지정한 Animator 상태(0층 지금/다음 상태)를 재생하는 동안만
-/// weapon 을 손잡이1(= target 자리, weapon 원점) 축으로 돌려 손잡이1→손잡이2 방향을 손잡이1→보조 대상(팔꿈치) 방향에 맞춘다.
+/// weapon 을 손잡이1(primaryHandle — 손이 쥐는 점, 없으면 weapon 원점) 둘레로 돌려 손잡이1→손잡이2 방향을 손잡이1→보조 대상(팔꿈치) 방향에 맞춘다.
+/// 손잡이1 월드 위치는 회전 전과 같다(원점을 pivot 둘레로 같이 돌려 옮김 — <see cref="AlignAboutPivot"/>).
 /// 거리는 맞추지 않는다(단단한 물체). 가중치는 블렌드 시간 동안 0↔1(unscaled — 처치 연출 정지·느려짐에도 끝까지 간다).
 /// Animator 를 각 피어가 재생하므로 네트워크 추가 없이 모든 피어 같다. 순수 계산은 <see cref="AlignToSecondary"/> 등(EditMode 테스트).
 /// </summary>
@@ -24,6 +25,8 @@ public sealed class WeaponTransformRelay : MonoBehaviour
         [Tooltip("같은 줄의 target을 따라가는 무기. 보통 WeaponSlot 자식.")]
         public Transform weapon;
 
+        [Tooltip("손잡이1 — 무기 자식, 손이 쥐는 점. 보조 고정은 이 점을 제자리에 둔 채 돈다. 비우면 무기 원점(= target 자리).")]
+        public Transform primaryHandle;
         [Tooltip("보조 고정점 — 무기 자식의 손잡이2(예: 방패 팔 띠). 비우면 보조 고정 없음(지금처럼 손만 따라감).")]
         public Transform secondaryHandle;
         [Tooltip("보조 대상 — 손잡이2 가 향할 본 자식(예: forearm_stretch.l 아래 ElbowSocket).")]
@@ -106,8 +109,39 @@ public sealed class WeaponTransformRelay : MonoBehaviour
         if (f.weight <= 0f)
             return;
 
-        weapon.rotation = AlignToSecondary(weapon.rotation, weapon.position, f.secondaryHandle.position,
-            f.secondaryTarget.position, f.weight);
+        Vector3 pivot = f.primaryHandle != null ? f.primaryHandle.position : weapon.position;
+        AlignAboutPivot(weapon.position, weapon.rotation, pivot, f.secondaryHandle.position, f.secondaryTarget.position,
+            f.weight, out Vector3 pos, out Quaternion rot);
+        weapon.SetPositionAndRotation(pos, rot);
+    }
+
+    /// <summary>손 소켓 대상과 손잡이1(없으면 null) — 미리보기 창 표시용. 보조 고정 줄이 없으면 false.</summary>
+    public bool TryGetGrip(out Transform handSocket, out Transform primaryHandle)
+    {
+        handSocket = primaryHandle = null;
+        if (follows == null)
+            return false;
+        for (int i = 0; i < follows.Length; i++)
+        {
+            if (follows[i].weapon == null || follows[i].secondaryHandle == null || follows[i].secondaryTarget == null)
+                continue;
+            handSocket = follows[i].target;
+            primaryHandle = follows[i].primaryHandle;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 손잡이1(<paramref name="pivot"/>, 월드) 을 제자리에 둔 채 무기를 돌린다 — <see cref="AlignToSecondary"/> 로 회전을 구하고
+    /// 무기 원점을 pivot 둘레로 같은 만큼 돌려 옮긴다. 결과: 회전 후에도 손잡이1 월드 위치가 그대로(손에서 안 떨어짐).
+    /// </summary>
+    public static void AlignAboutPivot(Vector3 position, Quaternion rotation, Vector3 pivot, Vector3 handle, Vector3 target,
+        float weight, out Vector3 newPosition, out Quaternion newRotation)
+    {
+        newRotation = AlignToSecondary(rotation, pivot, handle, target, weight);
+        Quaternion delta = newRotation * Quaternion.Inverse(rotation);
+        newPosition = pivot + delta * (position - pivot);
     }
 
     private static int StateHash(ref WeaponFollow f)
@@ -150,7 +184,7 @@ public sealed class WeaponTransformRelay : MonoBehaviour
     }
 
     /// <summary>
-    /// 손잡이1(<paramref name="pivot"/> = 무기 원점) 축으로 무기 회전을 돌려, 손잡이1→손잡이2(<paramref name="handle"/>) 방향이
+    /// 손잡이1(<paramref name="pivot"/>) 축으로 무기 회전을 돌려, 손잡이1→손잡이2(<paramref name="handle"/>) 방향이
     /// 손잡이1→보조 대상(<paramref name="target"/>) 방향을 향하게 한다(최소 회전). <paramref name="weight"/> 0 = 그대로, 1 = 완전히. 거리는 안 맞춘다.
     /// </summary>
     public static Quaternion AlignToSecondary(Quaternion rotation, Vector3 pivot, Vector3 handle, Vector3 target, float weight)

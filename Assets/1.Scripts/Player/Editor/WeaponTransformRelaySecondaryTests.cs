@@ -22,6 +22,60 @@ public sealed class WeaponTransformRelaySecondaryTests
     }
 
     [Test]
+    public void 손잡이1을_제자리에_둔_채_돈다()
+    {
+        Vector3 origin = new Vector3(1f, 2f, 3f);
+        Quaternion rot = Quaternion.Euler(10f, 20f, 30f);
+        Vector3 grip1Local = new Vector3(0.05f, -0.3f, 0.02f);   // 손잡이1 이 방패 원점에서 떨어진 경우
+        Vector3 elbow = origin + new Vector3(0.4f, 0.6f, -0.2f);
+        foreach (Vector3 grip2Local in new[] { new Vector3(0f, 0f, 0.5f), new Vector3(-0.1f, 0.2f, 0.3f), new Vector3(0.3f, -0.1f, -0.2f) })
+        {
+            Vector3 grip1 = origin + rot * grip1Local;
+            Vector3 grip2 = origin + rot * grip2Local;
+            WeaponTransformRelay.AlignAboutPivot(origin, rot, grip1, grip2, elbow, 1f, out Vector3 pos, out Quaternion newRot);
+            Assert.Less(Vector3.Distance(grip1, pos + newRot * grip1Local), Tolerance, $"손잡이2 {grip2Local} — 손잡이1 월드 위치 그대로");
+            Vector3 dir = (pos + newRot * grip2Local - grip1).normalized;
+            Assert.AreEqual(1f, Vector3.Dot(dir, (elbow - grip1).normalized), Tolerance, "손잡이1→손잡이2 가 손잡이1→ElbowSocket 쪽");
+            WeaponTransformRelay.AlignAboutPivot(origin, rot, grip1, grip2, elbow, 0.5f, out pos, out newRot);
+            Assert.Less(Vector3.Distance(grip1, pos + newRot * grip1Local), Tolerance, "가중치 중간에도 손잡이1 그대로");
+        }
+    }
+
+    [Test]
+    public void 손잡이2_마커를_옮겨도_손잡이1은_손_소켓_자리에()
+    {
+        var rig = Rig();
+        try
+        {
+            var primary = new GameObject(PaladinShieldGripAuthoring.PrimaryHandleName).transform;
+            primary.SetParent(rig.shield, false);
+            primary.localPosition = new Vector3(0.05f, -0.2f, 0.1f);
+            var so = new SerializedObject(rig.relay);
+            so.FindProperty("follows").GetArrayElementAtIndex(0).FindPropertyRelative("primaryHandle").objectReferenceValue = primary;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            rig.socket.parent.SetPositionAndRotation(new Vector3(0.3f, 1f, -0.5f), Quaternion.Euler(0f, 40f, 15f));
+
+            rig.relay.previewWeight = 0f;
+            rig.relay.ApplyNow();
+            Vector3 before = primary.position;   // 보정 전 = 손 소켓 기준 자리
+            Assert.IsTrue(rig.relay.TryGetGrip(out Transform socket, out Transform p));
+            Assert.AreSame(rig.socket, socket);
+            Assert.AreSame(primary, p);
+
+            foreach (Vector3 grip2Local in new[] { new Vector3(0f, 0f, 0.5f), new Vector3(0.2f, 0.3f, 0.1f), new Vector3(-0.4f, 0.1f, -0.3f) })
+            {
+                rig.handle.localPosition = grip2Local;
+                rig.relay.previewWeight = 1f;
+                rig.relay.ApplyNow();
+                Assert.Less(Vector3.Distance(before, primary.position), Tolerance, $"손잡이2 {grip2Local} — 손잡이1 이 손에서 안 떨어짐");
+                Vector3 dir = (rig.handle.position - primary.position).normalized;
+                Assert.AreEqual(1f, Vector3.Dot(dir, (rig.elbow.position - primary.position).normalized), Tolerance, "방향만 맞춘다");
+            }
+        }
+        finally { Object.DestroyImmediate(rig.root); }
+    }
+
+    [Test]
     public void 가중치_0은_그대로_중간은_사이()
     {
         Quaternion rot = Quaternion.identity;
@@ -66,6 +120,8 @@ public sealed class WeaponTransformRelaySecondaryTests
         Assert.IsNotNull(shield, "방패");
         Transform handle = shield.Find(PaladinShieldGripAuthoring.HandleName);
         Assert.IsNotNull(handle, "방패 자식 손잡이2");
+        Transform primary = shield.Find(PaladinShieldGripAuthoring.PrimaryHandleName);
+        Assert.IsNotNull(primary, "방패 자식 손잡이1");
         Assert.IsNotNull(elbow, "ElbowSocket");
         Assert.AreEqual(PaladinShieldGripAuthoring.ElbowParentName, elbow.parent.name, "팔꿈치 본 자식");
 
@@ -78,6 +134,7 @@ public sealed class WeaponTransformRelaySecondaryTests
             SerializedProperty f = follows.GetArrayElementAtIndex(i);
             if (f.FindPropertyRelative("weapon").objectReferenceValue != shield) continue;
             found = true;
+            Assert.AreEqual(primary, f.FindPropertyRelative("primaryHandle").objectReferenceValue);
             Assert.AreEqual(handle, f.FindPropertyRelative("secondaryHandle").objectReferenceValue);
             Assert.AreEqual(elbow, f.FindPropertyRelative("secondaryTarget").objectReferenceValue);
             Assert.AreEqual(PaladinShieldGripAuthoring.UltimateState, f.FindPropertyRelative("secondaryState").stringValue);
@@ -164,6 +221,11 @@ public sealed class WeaponTransformRelaySecondaryTests
             Assert.AreEqual(new Vector3(-0.4f, 0f, 0.05f), rig.elbow.localPosition);
             rig.relay.TryGetSecondary(out _, out _, out _, out float blend);
             Assert.AreEqual(0.25f, blend, Tolerance);
+            Assert.IsFalse(PaladinShieldGripAuthoring.ApplyGrip(rig.root, Vector3.zero, Vector3.zero, 0.1f, Vector3.one), "손잡이1 값을 줬는데 마커 없으면 false");
+            var primary = new GameObject(PaladinShieldGripAuthoring.PrimaryHandleName).transform;
+            primary.SetParent(rig.shield, false);
+            Assert.IsTrue(PaladinShieldGripAuthoring.ApplyGrip(rig.root, Vector3.zero, Vector3.zero, 0.1f, new Vector3(0.01f, -0.2f, 0f)));
+            Assert.AreEqual(new Vector3(0.01f, -0.2f, 0f), primary.localPosition);
             Object.DestroyImmediate(rig.handle.gameObject);
             Assert.IsFalse(PaladinShieldGripAuthoring.ApplyGrip(rig.root, Vector3.zero, Vector3.zero, 0.1f), "손잡이2 없으면 false");
         }

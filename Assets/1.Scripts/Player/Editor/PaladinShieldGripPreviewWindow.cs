@@ -51,7 +51,7 @@ public sealed class PaladinShieldGripPreviewWindow : EditorWindow
             DrawPlayMode();
             return;
         }
-        EditorGUILayout.LabelField("프리팹 모드에서 궁 자세를 샘플링해 손잡이2·ElbowSocket 을 맞춘다. 위치는 프리팹에 저장(Ctrl+S), 애니 자세는 끄면 원복.", EditorStyles.wordWrappedMiniLabel);
+        EditorGUILayout.LabelField("프리팹 모드에서 궁 자세를 샘플링해 손잡이1(손이 쥐는 점)·손잡이2·ElbowSocket 을 맞춘다. 위치는 프리팹에 저장(Ctrl+S), 애니 자세는 끄면 원복.", EditorStyles.wordWrappedMiniLabel);
         if (!Previewing)
         {
             if (GUILayout.Button("Player_Paladin 열고 미리보기 시작")) StartPreview();
@@ -74,6 +74,7 @@ public sealed class PaladinShieldGripPreviewWindow : EditorWindow
         _align = EditorGUILayout.Toggle(new GUIContent("보정 켜기(손잡이2 → 팔꿈치)", "끄면 손 소켓만 따라간 원래 자세"), _align);
         if (_relay.TryGetSecondary(out _, out Transform handle, out Transform elbow, out float blend))
         {
+            DrawPrimaryInfo(_relay);
             EditorGUILayout.ObjectField("손잡이2", handle, typeof(Transform), true);
             EditorGUILayout.ObjectField("ElbowSocket", elbow, typeof(Transform), true);
             EditorGUILayout.LabelField("블렌드(초)", blend.ToString("0.###") + "  — relay 인스펙터에서 고친다");
@@ -90,11 +91,29 @@ public sealed class PaladinShieldGripPreviewWindow : EditorWindow
             EditorGUILayout.HelpBox("Play 중 팔라딘(보조 고정이 연결된 WeaponTransformRelay)이 없다. 플레이어를 선택하면 그 캐릭터를 쓴다.", MessageType.Info);
             return;
         }
-        EditorGUILayout.LabelField($"런타임 — {_relay.transform.root.name}. Scene 핸들로 손잡이2·ElbowSocket 을 옮기고(궁을 쓰며 확인) 저장.", EditorStyles.wordWrappedMiniLabel);
+        EditorGUILayout.LabelField($"런타임 — {_relay.transform.root.name}. Scene 핸들로 손잡이1·손잡이2·ElbowSocket 을 옮기고(궁을 쓰며 확인) 저장.", EditorStyles.wordWrappedMiniLabel);
+        DrawPrimaryInfo(_relay);
+        _relay.TryGetGrip(out _, out Transform primary);
+        if (primary != null) EditorGUILayout.LabelField("손잡이1 로컬", primary.localPosition.ToString("F3"));
         EditorGUILayout.LabelField("손잡이2 로컬", handle.localPosition.ToString("F3"));
         EditorGUILayout.LabelField("ElbowSocket 로컬", elbow.localPosition.ToString("F3"));
         if (GUILayout.Button("프리팹에 저장(Player_Paladin)"))
-            PaladinShieldGripAuthoring.SaveGripToPrefab(handle.localPosition, elbow.localPosition, blend);
+            PaladinShieldGripAuthoring.SaveGripToPrefab(handle.localPosition, elbow.localPosition, blend,
+                primary != null ? primary.localPosition : (Vector3?)null);
+    }
+
+    /// <summary>손잡이1 칸 + 손잡이1 ↔ 손 소켓 거리(보정은 손잡이1 을 제자리에 둔 채 돈다 — 거리 = 손잡이1 이 소켓에서 떨어진 정도, 보정 켜고 꺼도 같아야 함).</summary>
+    static void DrawPrimaryInfo(WeaponTransformRelay relay)
+    {
+        relay.TryGetGrip(out Transform socket, out Transform primary);
+        if (primary == null)
+        {
+            EditorGUILayout.HelpBox("손잡이1 이 없다 — 방패 원점을 축으로 돈다. 'Tools/Player/팔라딘 방패 손잡이2 연결' 로 만든다.", MessageType.Warning);
+            return;
+        }
+        EditorGUILayout.ObjectField("손잡이1", primary, typeof(Transform), true);
+        if (socket != null)
+            EditorGUILayout.LabelField("손잡이1 ↔ 손 소켓", $"{Vector3.Distance(primary.position, socket.position):0.0000} m");
     }
 
     static WeaponTransformRelay FindRuntimeRelay()
@@ -174,10 +193,18 @@ public sealed class PaladinShieldGripPreviewWindow : EditorWindow
         WeaponTransformRelay relay = EditorApplication.isPlaying ? _relay : (Previewing ? _relay : null);
         if (relay == null || !relay.TryGetSecondary(out Transform weapon, out Transform handle, out Transform elbow, out _)) return;
 
-        Vector3 p1 = weapon.position;
+        relay.TryGetGrip(out Transform socket, out Transform primary);
+        Vector3 p1 = primary != null ? primary.position : weapon.position;
         Handles.color = Color.white;
         Handles.SphereHandleCap(0, p1, Quaternion.identity, 0.04f, EventType.Repaint);
-        Handles.Label(p1 + Vector3.up * 0.05f, "손잡이1");
+        string gap = socket != null ? $" (소켓 {Vector3.Distance(p1, socket.position):0.000}m)" : "";
+        Handles.Label(p1 + Vector3.up * 0.05f, "손잡이1" + gap);
+        if (socket != null)
+        {
+            Handles.color = new Color(1f, 1f, 1f, 0.5f);
+            Handles.DrawDottedLine(p1, socket.position, 2f);
+            Handles.SphereHandleCap(0, socket.position, Quaternion.identity, 0.02f, EventType.Repaint);
+        }
         Handles.color = new Color(0.4f, 0.9f, 1f);
         Handles.DrawAAPolyLine(3f, p1, handle.position);
         Handles.SphereHandleCap(0, handle.position, Quaternion.identity, 0.04f, EventType.Repaint);
@@ -187,6 +214,7 @@ public sealed class PaladinShieldGripPreviewWindow : EditorWindow
         Handles.SphereHandleCap(0, elbow.position, Quaternion.identity, 0.04f, EventType.Repaint);
         Handles.Label(elbow.position + Vector3.up * 0.05f, "ElbowSocket");
 
+        if (primary != null) MoveHandle(primary, "손잡이1 옮기기");
         MoveHandle(handle, "손잡이2 옮기기");
         MoveHandle(elbow, "ElbowSocket 옮기기");
     }

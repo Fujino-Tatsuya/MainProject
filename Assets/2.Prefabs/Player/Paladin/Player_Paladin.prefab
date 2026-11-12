@@ -182,6 +182,7 @@ Transform:
   - {fileID: 4223700713213544706}
   - {fileID: 1751703818906570697}
   - {fileID: 1738092668959973429}
+  - {fileID: 6826122068327134350}
   m_Father: {fileID: 5308830710108680609}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &7472893504349569086
@@ -1568,6 +1569,37 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 5
+--- !u!1 &6825797479697338576
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6826122068327134350}
+  m_Layer: 0
+  m_Name: "\uC190\uC7A1\uC7741"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6826122068327134350
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6825797479697338576}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4933595309215177818}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6847070989216762705
 GameObject:
   m_ObjectHideFlags: 0
@@ -2547,12 +2579,14 @@ MonoBehaviour:
   follows:
   - target: {fileID: 8948941253259155815}
     weapon: {fileID: 4933595309215177818}
+    primaryHandle: {fileID: 6826122068327134350}
     secondaryHandle: {fileID: 1738092668959973429}
     secondaryTarget: {fileID: 3790315467730063098}
     secondaryState: Garen_Ultimate_Skill
     secondaryBlend: 0.1
   - target: {fileID: 6590991787825157118}
     weapon: {fileID: 6168609868067889603}
+    primaryHandle: {fileID: 0}
     secondaryHandle: {fileID: 0}
     secondaryTarget: {fileID: 0}
     secondaryState: 
