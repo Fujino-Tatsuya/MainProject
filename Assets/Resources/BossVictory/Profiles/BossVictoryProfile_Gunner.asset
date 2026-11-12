@@ -25,6 +25,63 @@ MonoBehaviour:
   finisherWithBackDash: 0
   handSwordLightning: 0
   fallingSwordScale: 1
+  killerMove: 2
+  teleportOffset: {x: -3, y: 0, z: 2.5}
+  arrivalOffset: {x: 3, y: 0, z: 2.5}
+  teleportMoveState: Assassin_Q_DashStrike_Transformed
+  teleportMoveInterval: 0
+  teleportMoveEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  retreatDistance: 5
+  retreatSkillSlot: 1
+  chargeScaleFrom: 0.25
+  chargeScaleTo: 1
+  chargeScaleCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   timeline:
     desaturate:
     - start: 0.105
@@ -620,6 +677,7 @@ MonoBehaviour:
     bossHitTrimSeconds: 0
     bossFreezeTime: 0
     bossSlowTime: 0.2
+    chargeStartTime: -1
     killerActionEndTime: 0
   baseColor: {r: 0.83396226, g: 0.35089353, b: 0.7660715, a: 1}
   contrastMode: 0
@@ -633,8 +691,8 @@ MonoBehaviour:
   rectifyOrangeRightToLeft: 0
   rectifyOrangeJitter: 0.2
   rectifyOrangeRowPixels: 4
-  rectifyOrangeLeft: {r: 1, g: 0.2696447, b: 0, a: 1}
-  rectifyOrangeRight: {r: 1, g: 0, b: 0.455451, a: 1}
+  rectifyOrangeLeft: {r: 1, g: 0, b: 0.2331543, a: 1}
+  rectifyOrangeRight: {r: 1, g: 0.01685079, b: 0, a: 1}
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0
