@@ -1735,6 +1735,26 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         ApplySettings(so);
     }
 
+    // RECTIFY 안쪽 원 3개(267 후속) — 원마다 접는 칸(① 마젠타 · ② 블루 · ③ 흰색).
+    static readonly string[] CircleLabels = { "① 마젠타 원", "② 블루 원", "③ 흰 원(회색 → 흰 → 확장)" };
+
+    void DrawRectifyCircleFields()
+    {
+        SerializedObject so = SettingsObject();
+        SerializedProperty arr = so.FindProperty(nameof(BossVictoryGlitchSettings.rectifyCircles));
+        if (arr == null) return;
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("안쪽 원(생성 시각·시작 반지름·페이드·확장·중심·좌우 색)", EditorStyles.miniBoldLabel);
+        if (arr.arraySize != BossVictoryRectifyFill.CircleCount)
+        {
+            EditorGUILayout.HelpBox($"원은 {BossVictoryRectifyFill.CircleCount}개만 쓴다(지금 {arr.arraySize}개).", MessageType.Warning);
+            if (GUILayout.Button("원 3개로 맞추기")) arr.arraySize = BossVictoryRectifyFill.CircleCount;
+        }
+        for (int i = 0; i < arr.arraySize && i < CircleLabels.Length; i++)
+            EditorGUILayout.PropertyField(arr.GetArrayElementAtIndex(i), new GUIContent(CircleLabels[i]), true);
+        ApplySettings(so);
+    }
+
     // 마커 노드 — 시각 외 옵션.
     void DrawMarkerOptions(BossVictoryMarker marker)
     {
@@ -1838,18 +1858,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     nameof(BossVictoryGlitchSettings.rectifyOutline), nameof(BossVictoryGlitchSettings.rectifyColor));
                 break;
             case BossVictoryTrack.RectifyFill:
-                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 Ring Wipe Fill — 클립 시작부터 링 3개(마젠타 → 블루 → 그레이)가 공통 중심에서 간격마다 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. 나중 링이 위, 마지막 링 색으로 고정. 첫 링 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
-                DrawSettingsFields("안쪽 색 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFillColors), nameof(BossVictoryGlitchSettings.rectifyFillCenter), nameof(BossVictoryGlitchSettings.rectifyFillStartRadius),
-                    nameof(BossVictoryGlitchSettings.rectifyFillDelay), nameof(BossVictoryGlitchSettings.rectifyFillFade),
-                    nameof(BossVictoryGlitchSettings.rectifyFillExpand), nameof(BossVictoryGlitchSettings.rectifyFillSoftness),
-                    nameof(BossVictoryGlitchSettings.rectifyFillGradient), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline), nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing),
-                    nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
+                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원 3개 — ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각(클립 시작 기준)에 자기 중심에서 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. ③은 회색으로 페이드 → 회색에서 흰색으로 바뀐 순간부터 확장. 원 안 색 = 왼쪽 색 → 오른쪽 색. 나중 원이 위, 마지막 원으로 고정. 첫 원 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
+                DrawRectifyCircleFields();
+                DrawSettingsFields("안쪽 색 공용", nameof(BossVictoryGlitchSettings.rectifyCircleGrayColor), nameof(BossVictoryGlitchSettings.rectifyCircleGrayToWhite),
+                    nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline),
+                    nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing), nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
                 DrawSettingsFields("RECTIFY 전용 글로우(맵 블룸과 무관)", nameof(BossVictoryGlitchSettings.rectifyGlowIntensity), nameof(BossVictoryGlitchSettings.rectifyGlowRadius),
                     nameof(BossVictoryGlitchSettings.rectifyGlowColor), nameof(BossVictoryGlitchSettings.rectifyGlowTarget));
-                DrawSettingsFields("흰 원(4번째, 링과 따로)", nameof(BossVictoryGlitchSettings.rectifyWhiteColor), nameof(BossVictoryGlitchSettings.rectifyWhiteStart),
-                    nameof(BossVictoryGlitchSettings.rectifyWhiteCenter), nameof(BossVictoryGlitchSettings.rectifyWhiteStartRadius),
-                    nameof(BossVictoryGlitchSettings.rectifyWhiteFade), nameof(BossVictoryGlitchSettings.rectifyWhiteExpand),
-                    nameof(BossVictoryGlitchSettings.rectifyWhiteGradient));
                 DrawSettingsFields("주황 채움(흰 원 뒤)", nameof(BossVictoryGlitchSettings.rectifyOrangeHold), nameof(BossVictoryGlitchSettings.rectifyOrangeWipe),
                     nameof(BossVictoryGlitchSettings.rectifyOrangeRightToLeft), nameof(BossVictoryGlitchSettings.rectifyOrangeJitter),
                     nameof(BossVictoryGlitchSettings.rectifyOrangeRowPixels), nameof(BossVictoryGlitchSettings.rectifyOrangeLeft),

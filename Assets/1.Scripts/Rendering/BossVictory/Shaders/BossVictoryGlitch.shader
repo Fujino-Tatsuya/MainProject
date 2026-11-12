@@ -70,34 +70,46 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 return half3(a, inside, outer);
             }
 
-            float4 _RectifyFillRings[4];     // 링 i(0~2 색 링 · 3 흰 원) — x 반지름(단어 높이 단위), y 알파, zw 중심(단어 UV)
-            float4 _RectifyFillColors[4];    // rgb 색, a 방사형 그라데이션 세기
+            float4 _RectifyFillRings[3];     // 원 i(0~2 — 마지막 = 흰 원) — x 반지름(단어 높이 단위), y 알파, zw 중심(단어 UV)
+            float4 _RectifyFillColors[3];    // 원 i 왼쪽 색(rgb) — 단어 UV x = 0
+            float4 _RectifyFillColorsR[3];   // 원 i 오른쪽 색(rgb) — x = 1
+            float4 _RectifyCircleGray;       // 마지막 원 회색(rgb), w = 흰 섞임(0 회색 ~ 1 좌우 색)
             float4 _RectifyOrange;           // x 와이프 진행, y 들쭉날쭉(단어 폭), z 오른쪽→왼쪽(1), w 줄 굵기(px)
             float4 _RectifyOrangeLeft;
             float4 _RectifyOrangeRight;      // a = 좌→우 보간 세기
             float4 _RectifyFillRect;         // 단어 사각형(뷰포트 min.xy · max.zw)
             float4 _RectifyFillParams;       // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
-            float4 _RectifyFillLook;         // x 주사선 어둡기, y 색이 외곽선도 덮음(1 켬 · 0 = 안쪽만, 외곽선은 늘 흰색)
+            float4 _RectifyFillLook;         // x 주사선 어둡기, y 색이 외곽선도 덮음(1 켬 · 0 = 안쪽만, 외곽선은 늘 흰색), z 마지막(흰) 원 번호
 
-            // 안쪽 색 Ring Wipe Fill — 링을 생성 순으로 덮는다(painter's order). 링 안 방사형 그라데이션(중심 = 원래 색 → 가장자리 어둡게).
-            // 첫 링 전 = 비어 있음(a 0 → 외곽선만). rgb = 색, a = 덮인 정도.
+            // 원 i 색 — 단어 UV x 기준 왼쪽 → 오른쪽. 마지막 원은 회색 → (좌우 색) 섞임.
+            half3 RectifyCircleColor(int i, float wx)
+            {
+                half3 c = lerp((half3)_RectifyFillColors[i].rgb, (half3)_RectifyFillColorsR[i].rgb, (half)saturate(wx));
+                return abs((float)i - _RectifyFillLook.z) < 0.5 ? lerp((half3)_RectifyCircleGray.rgb, c, (half)_RectifyCircleGray.w) : c;
+            }
+
+            // 원 i 마스크(알파 × 원 안, 경계 AA).
+            half RectifyCircleMask(int i, float2 wuv)
+            {
+                float4 ring = _RectifyFillRings[i];
+                if (ring.y <= 0.0) return 0.0h;
+                float d = length((wuv - ring.zw) * float2(_RectifyFillParams.z, 1.0));
+                float soft = max(_RectifyFillParams.y, fwidth(d) * 1.5);
+                return (half)(ring.y * (1.0 - smoothstep(ring.x - soft, ring.x + soft, d)));
+            }
+
+            // 안쪽 원 3개(267 후속 — 원 통합) — 원을 순서대로 덮는다(painter's order). 원 안 색 = 좌 → 우.
+            // 첫 원 전 = 비어 있음(a 0 → 외곽선만). rgb = 색, a = 덮인 정도.
             half4 RectifyFillAt(float2 uv)
             {
                 float2 size = max(_RectifyFillRect.zw - _RectifyFillRect.xy, 1e-5);
                 float2 wuv = (uv - _RectifyFillRect.xy) / size;
                 half3 col = 0.0h;
                 half cov = 0.0h;
-                [unroll] for (int i = 0; i < 4; i++)
+                [unroll] for (int i = 0; i < 3; i++)
                 {
-                    float4 ring = _RectifyFillRings[i];
-                    if (ring.y <= 0.0) continue;
-                    float d = length((wuv - ring.zw) * float2(_RectifyFillParams.z, 1.0));
-                    float soft = max(_RectifyFillParams.y, fwidth(d) * 1.5);
-                    half m = (half)(ring.y * (1.0 - smoothstep(ring.x - soft, ring.x + soft, d)));
-                    half g = (half)saturate(d / max(ring.x, 1e-4));
-                    half3 c = _RectifyFillColors[i].rgb;
-                    c = lerp(c, c * (1.0h - (half)_RectifyFillColors[i].a), g);
-                    col = lerp(col, c, m);
+                    half m = RectifyCircleMask(i, wuv);
+                    col = lerp(col, RectifyCircleColor(i, wuv.x), m);
                     cov = cov + m * (1.0h - cov);
                 }
                 return half4(cov > 0.0001h ? col / cov : col, cov);   // 비어 있는 바탕 위 덮기(premultiplied) → 색 복원
@@ -200,18 +212,14 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 return half4(orangeCol, covered);
             }
 
-            // 흰 원(링 3 — 마지막 링이라 덮인 만큼 그대로 보인다) 마스크 0~1. 글로우 소스용.
-            half RectifyWhiteMask(float2 uv)
+            // 흰 원(마지막 원 — 덮인 만큼 그대로 보인다) 색 × 마스크. 글로우 소스용(회색 단계면 회색으로 약하게).
+            half3 RectifyWhiteCircle(float2 uv)
             {
-                float4 ring = _RectifyFillRings[3];
-                if (ring.y <= 0.0) return 0.0h;
+                int last = (int)(_RectifyFillLook.z + 0.5);
                 float2 size = max(_RectifyFillRect.zw - _RectifyFillRect.xy, 1e-5);
                 float2 wuv = (uv - _RectifyFillRect.xy) / size;
-                float d = length((wuv - ring.zw) * float2(_RectifyFillParams.z, 1.0));
-                float soft = max(_RectifyFillParams.y, 1e-4);
-                return (half)(ring.y * (1.0 - smoothstep(ring.x - soft, ring.x + soft, d)));
+                return RectifyCircleMask(last, wuv) * RectifyCircleColor(last, wuv.x);
             }
-
             // ── RECTIFY 전용 글로우(267 후속 — 맵 블룸과 무관) ──
             float4 _RectifyGlowParams;   // x 흰 원 고름(0/1), y 주황 채움 고름(0/1), z (미사용), w 세기
             float4 _RectifyGlowStep;     // xy 블러 한 칸 간격(글로우 텍스처 UV — C# 이 반경 ÷ 4탭으로 계산)
@@ -361,8 +369,8 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 half visible = (half)_RectifyParams.x * (1.0h - id.r) * (1.0h - id.b);
                 half glyph = RectifyAt(uv).z;
                 half4 orange = RectifyOrangeAt(uv, uv.y * _ScreenParams.y);
-                half white = RectifyWhiteMask(uv) * (1.0h - orange.a);
-                half3 src = (half)_RectifyGlowParams.x * white * _RectifyFillColors[3].rgb
+                half3 white = RectifyWhiteCircle(uv) * (1.0h - orange.a);
+                half3 src = (half)_RectifyGlowParams.x * white
                           + (half)_RectifyGlowParams.y * orange.a * orange.rgb;
                 return half4(src * glyph * visible * (half)_RectifyFillParams.x, 1.0h);
             }

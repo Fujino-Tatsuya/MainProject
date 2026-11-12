@@ -121,43 +121,83 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Range(0.005f, 0.1f)] public float rectifyOutline = 0.04f;
     public Color rectifyColor = Color.white;
 
-    [Header("RECTIFY 안쪽 색 — Ring Wipe Fill(267 후속, 켜는 구간 = 타임라인 'RECTIFY 안쪽 색' 클립)")]
-    [Tooltip("링 색 순서(링 0·1·2) — 마젠타 → 블루 → 그레이. 마지막 링 색으로 고정된다. 3개까지 쓴다.")]
-    public Color[] rectifyFillColors =
+    /// <summary>RECTIFY 안쪽 원 하나(267 후속 — 원 3개 통합). 시각은 'RECTIFY 안쪽 색' 클립 시작 기준 초.</summary>
+    [Serializable]
+    public struct RectifyCircle
     {
-        new Color32(0xFF, 0x2D, 0xB4, 0xFF), new Color32(0x3A, 0x6B, 0xFF, 0xFF), new Color32(0x8A, 0x8A, 0x8A, 0xFF),
+        [Tooltip("생성 시각(초, 클립 시작 기준).")]
+        [Min(0f)] public float start;
+        [Tooltip("시작 반지름(단어 높이 비율) — 이 크기로 생겨 페이드한다.")]
+        [Min(0f)] public float startRadius;
+        [Tooltip("페이드 인(초) — 시작 반지름 그대로 알파 0→1.")]
+        [Min(0f)] public float fade;
+        [Tooltip("확장(초, easeOutCubic) — 시작 반지름 → 단어 사각형 네 모서리까지. 마지막(흰) 원은 회색→흰 전환이 끝난 순간부터.")]
+        [Min(0.01f)] public float expand;
+        [Tooltip("중심(단어 사각형 UV 0~1).")]
+        public Vector2 center;
+        [Tooltip("왼쪽 색(단어 사각형 UV x = 0).")]
+        public Color leftColor;
+        [Tooltip("오른쪽 색(UV x = 1) — 원 안 색은 왼쪽 → 오른쪽 보간.")]
+        public Color rightColor;
+
+        public static RectifyCircle Make(float start, float startRadius, float fade, float expand, Vector2 center, Color left, Color right) =>
+            new RectifyCircle { start = start, startRadius = startRadius, fade = fade, expand = expand, center = center, leftColor = left, rightColor = right };
+    }
+
+    public static RectifyCircle[] DefaultRectifyCircles() => new[]
+    {
+        RectifyCircle.Make(0f, 0.15f, 0.15f, 0.6f, new Vector2(0.46f, 0.5f), new Color32(0xFF, 0x2D, 0xB4, 0xFF), new Color32(0xA0, 0x40, 0xFF, 0xFF)),   // ① 마젠타 → 보라
+        RectifyCircle.Make(4f / 60f, 0.15f, 0.15f, 0.6f, new Vector2(0.46f, 0.5f), new Color32(0x5A, 0xC8, 0xFF, 0xFF), new Color32(0x24, 0x38, 0xA8, 0xFF)),   // ② 하늘 → 남색
+        RectifyCircle.Make(0.2f, 0.15f, 0.15f, 0.6f, new Vector2(0.46f, 0.5f), Color.white, new Color32(0xFF, 0xF6, 0xE0, 0xFF)),   // ③ 흰 → 연크림(회색 단계 뒤)
     };
-    [Tooltip("링 공통 중심(단어 사각형 UV 0~1) — 기본 = 가운데에서 왼쪽으로 조금.")]
-    public Vector2 rectifyFillCenter = new Vector2(0.46f, 0.5f);
-    [Tooltip("링 시작 반지름(단어 높이 비율) — 이 크기로 생겨 페이드한 뒤 확장한다.")]
-    [Min(0f)] public float rectifyFillStartRadius = 0.15f;
-    [Tooltip("링 사이 생성 간격(초, 생성 시각 기준) — 기본 4프레임(4/60).")]
-    [Min(0f)] public float rectifyFillDelay = 4f / 60f;
-    [Tooltip("링 페이드 인(초) — 시작 반지름 그대로 알파 0→1. 끝나면 확장 시작.")]
-    [Min(0f)] public float rectifyFillFade = 0.15f;
-    [Tooltip("링 확장(초, easeOutCubic, 페이드 뒤) — 시작 반지름 → 단어 사각형 네 모서리까지.")]
-    [Min(0.01f)] public float rectifyFillExpand = 0.6f;
-    [Tooltip("링 가장자리 부드러움(단어 높이 비율). 화면 픽셀보다 작으면 픽셀 기준 AA.")]
+
+    [Header("RECTIFY 안쪽 원 3개(267 후속 — 켜는 구간 = 타임라인 'RECTIFY 안쪽 색' 클립)")]
+    [Tooltip("원 ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각·시작 반지름·페이드·확장·중심·좌우 색. 나중 원이 앞 원을 덮고(painter's order) 마지막 원이 다 덮으면 고정.\n" +
+             "③은 작게 생겨 불투명한 회색으로 페이드 → 회색에서 흰색으로 전환 → 흰색이 된 순간부터 확장. 3개만 쓴다.")]
+    public RectifyCircle[] rectifyCircles = DefaultRectifyCircles();
+    [Tooltip("③(흰 원)이 페이드되는 동안의 회색(불투명).")]
+    public Color rectifyCircleGrayColor = new Color32(0x8A, 0x8A, 0x8A, 0xFF);
+    [Tooltip("③ 회색 → 흰색 전환 시간(초) — 페이드가 끝난 뒤. 전환이 끝난 순간부터 확장.")]
+    [Min(0f)] public float rectifyCircleGrayToWhite = 0.1f;
+    [Tooltip("원 가장자리 부드러움(단어 높이 비율). 화면 픽셀보다 작으면 픽셀 기준 AA.")]
     [Min(0f)] public float rectifyFillSoftness = 0.01f;
-    [Tooltip("링 안 방사형 그라데이션 — 가장자리 색 = 색 × (1 − 세기), 중심은 원래 색.")]
-    [Range(0f, 1f)] public float rectifyFillGradient = 0.35f;
-    [Tooltip("색(링·흰 원·주황 채움)이 지나간 자리는 흰 외곽선도 그 색으로 덮는다 — 채움을 외곽선 바깥 경계까지 넓힌다(267 후속). 끄면 예전처럼 안쪽만 칠하고 외곽선은 늘 흰색.")]
+    [Tooltip("색(원·주황 채움)이 지나간 자리는 흰 외곽선도 그 색으로 덮는다 — 채움을 외곽선 바깥 경계까지 넓힌다(267 후속). 끄면 예전처럼 안쪽만 칠하고 외곽선은 늘 흰색.")]
     public bool rectifyFillCoversOutline = true;
 
-    [Header("RECTIFY 흰 원(4번째) — 링 3개와 값 분리(267 후속)")]
-    public Color rectifyWhiteColor = Color.white;
-    [Tooltip("흰 원 생성 시각(초, 'RECTIFY 안쪽 색' 클립 시작 기준).")]
-    [Min(0f)] public float rectifyWhiteStart = 0.2f;
-    [Tooltip("흰 원 중심(단어 사각형 UV 0~1).")]
-    public Vector2 rectifyWhiteCenter = new Vector2(0.46f, 0.5f);
-    [Tooltip("흰 원 시작 반지름(단어 높이 비율).")]
-    [Min(0f)] public float rectifyWhiteStartRadius = 0.15f;
-    [Tooltip("흰 원 페이드(초) — 시작 반지름 그대로 알파 0→1.")]
-    [Min(0f)] public float rectifyWhiteFade = 0.15f;
-    [Tooltip("흰 원 확장(초, easeOutCubic, 페이드 뒤).")]
-    [Min(0.01f)] public float rectifyWhiteExpand = 0.6f;
-    [Tooltip("흰 원 안 방사형 그라데이션 세기(0 = 단색).")]
-    [Range(0f, 1f)] public float rectifyWhiteGradient = 0f;
+    // 옛 칸(링 3개 + 따로 있던 흰 원, 267 후속 원 3개 통합 전) — 옛 에셋 값을 rectifyCircles 로 한 번 옮기는 데만 쓴다(MigrateRectifyCircles). 새 인스턴스는 비어 있어 옮기지 않는다.
+    [SerializeField, HideInInspector] int rectifyCirclesVersion;
+    [HideInInspector] public Color[] rectifyFillColors = new Color[0];
+    [HideInInspector] public Vector2 rectifyFillCenter = new Vector2(0.46f, 0.5f);
+    [HideInInspector] public float rectifyFillStartRadius = 0.15f;
+    [HideInInspector] public float rectifyFillDelay = 4f / 60f;
+    [HideInInspector] public float rectifyFillFade = 0.15f;
+    [HideInInspector] public float rectifyFillExpand = 0.6f;
+    [HideInInspector] public Color rectifyWhiteColor = Color.white;
+    [HideInInspector] public float rectifyWhiteStart = 0.2f;
+    [HideInInspector] public Vector2 rectifyWhiteCenter = new Vector2(0.46f, 0.5f);
+    [HideInInspector] public float rectifyWhiteStartRadius = 0.15f;
+    [HideInInspector] public float rectifyWhiteFade = 0.15f;
+    [HideInInspector] public float rectifyWhiteExpand = 0.6f;
+
+    void OnEnable() => MigrateRectifyCircles();
+
+    /// <summary>
+    /// 옛 링·흰 원 값 → 원 3개(한 번만). ① = 링 0(생성 0 · 색 0 을 왼쪽 색) · ② = 링 1(생성 = 옛 간격, 색 = 새 블루 그라데이션) ·
+    /// ③ = 옛 흰 원(생성·반지름·페이드·확장·중심, 흰색 = 왼쪽 색), 회색 = 옛 링 2 색(있으면). 옛 방사형 그라데이션은 없어졌다. 옮겼으면 true.
+    /// </summary>
+    public bool MigrateRectifyCircles()
+    {
+        if (rectifyCirclesVersion >= 1 || rectifyFillColors == null || rectifyFillColors.Length == 0) return false;   // 옮겼거나 새 인스턴스(옛 값 없음)
+        rectifyCirclesVersion = 1;
+        RectifyCircle[] c = DefaultRectifyCircles();
+        c[0] = RectifyCircle.Make(0f, rectifyFillStartRadius, rectifyFillFade, rectifyFillExpand, rectifyFillCenter, rectifyFillColors[0], c[0].rightColor);
+        c[1] = RectifyCircle.Make(rectifyFillDelay, rectifyFillStartRadius, rectifyFillFade, rectifyFillExpand, rectifyFillCenter, c[1].leftColor, c[1].rightColor);
+        c[2] = RectifyCircle.Make(rectifyWhiteStart, rectifyWhiteStartRadius, rectifyWhiteFade, rectifyWhiteExpand, rectifyWhiteCenter, rectifyWhiteColor, c[2].rightColor);
+        if (rectifyFillColors.Length > 2) rectifyCircleGrayColor = rectifyFillColors[2];
+        rectifyCircles = c;
+        rectifyFillColors = new Color[0];
+        return true;
+    }
 
     [Header("RECTIFY 주황 채움 — 흰 원이 다 퍼진 뒤(267 후속)")]
     [Tooltip("흰 원이 다 퍼진 뒤 흰색으로 머무는 시간(초).")]

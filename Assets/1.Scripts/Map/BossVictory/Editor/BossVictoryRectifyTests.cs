@@ -81,29 +81,57 @@ public class BossVictoryRectifyTests
         finally { BossVictoryRectifyText.Destroy(asset); }
     }
 
-    // ── 안쪽 색 — Ring Wipe Fill(267 후속) ──
-    const float Delay = 4f / 60f, Fade = 0.15f, Expand = 0.6f;
+    // ── 안쪽 원 3개(267 후속 — 원 통합) ──
+    const float Fade = 0.15f, Expand = 0.6f, GrayToWhite = 0.1f;
 
     [Test]
-    public void 링은_시작_반지름으로_생겨_페이드한_뒤_easeOutCubic_확장()
+    public void 원은_자기_생성_시각에_시작_반지름으로_생겨_페이드한_뒤_easeOutCubic_확장()
     {
-        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(0, -0.01f, Delay, Fade, Expand).exists, "클립 전 없음");
-        Assert.IsFalse(BossVictoryRectifyFill.Evaluate(1, Delay - 0.001f, Delay, Fade, Expand).exists, "링 1 은 생성 시각 기준 4프레임 뒤");
-        BossVictoryRectifyFill.Ring r = BossVictoryRectifyFill.Evaluate(1, Delay + 0.075f, Delay, Fade, Expand);
+        const float start = 4f / 60f;
+        Assert.IsFalse(BossVictoryRectifyFill.Circle(-0.01f, 0f, Fade, Expand).exists, "클립 전 없음");
+        Assert.IsFalse(BossVictoryRectifyFill.Circle(start - 0.001f, start, Fade, Expand).exists, "생성 시각 전 없음");
+        BossVictoryRectifyFill.Ring r = BossVictoryRectifyFill.Circle(start + 0.075f, start, Fade, Expand);
         Assert.IsTrue(r.exists);
         Assert.AreEqual(0.5f, r.alpha, 1e-4f, "페이드 반");
         Assert.AreEqual(0f, r.grow, 1e-6f, "페이드 동안 크기 그대로");
-        r = BossVictoryRectifyFill.Evaluate(1, Delay + Fade, Delay, Fade, Expand);
+        r = BossVictoryRectifyFill.Circle(start + Fade, start, Fade, Expand);
         Assert.AreEqual(1f, r.alpha, 1e-5f);
+        Assert.AreEqual(1f, r.white, 1e-6f, "전환 0 = 페이드 끝에 바로");
         Assert.AreEqual(0f, r.grow, 1e-5f, "불투명해진 순간 확장 시작");
-        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Fade + Expand * 0.5f, Delay, Fade, Expand);
+        r = BossVictoryRectifyFill.Circle(start + Fade + Expand * 0.5f, start, Fade, Expand);
         Assert.AreEqual(0.875f, r.grow, 1e-5f, "easeOutCubic(0.5) = 0.875");
-        r = BossVictoryRectifyFill.Evaluate(2, 2f * Delay + Fade + Expand + 0.01f, Delay, Fade, Expand);
-        Assert.AreEqual(1f, r.grow, 1e-6f);
-        Assert.IsTrue(BossVictoryRectifyFill.Evaluate(2, 99f, Delay, Fade, Expand).exists, "마지막 링 = 끝까지 유지(반복 없음)");
-        Assert.AreEqual(3, BossVictoryRectifyFill.RingCount);
+        Assert.AreEqual(1f, BossVictoryRectifyFill.Circle(99f, start, Fade, Expand).grow, 1e-6f, "끝까지 유지(반복 없음)");
+        Assert.AreEqual(3, BossVictoryRectifyFill.CircleCount);
         Assert.AreEqual(0.15f, BossVictoryRectifyFill.Radius(0f, 0.15f, 3f, 0.01f), 1e-6f, "생성 = 시작 반지름");
         Assert.AreEqual(3.01f, BossVictoryRectifyFill.Radius(1f, 0.15f, 3f, 0.01f), 1e-5f, "다 퍼지면 Rmax + 경계");
+    }
+
+    [Test]
+    public void 흰_원은_회색으로_페이드_뒤_흰색으로_바뀐_순간부터_확장()
+    {
+        const float start = 0.2f;
+        BossVictoryRectifyFill.Ring w = BossVictoryRectifyFill.Circle(start + 0.075f, start, Fade, Expand, GrayToWhite);
+        Assert.AreEqual(0.5f, w.alpha, 1e-4f, "회색으로 페이드");
+        Assert.AreEqual(0f, w.white, 1e-6f);
+        w = BossVictoryRectifyFill.Circle(start + Fade + GrayToWhite * 0.5f, start, Fade, Expand, GrayToWhite);
+        Assert.AreEqual(1f, w.alpha, 1e-5f, "불투명한 회색");
+        Assert.AreEqual(0.5f, w.white, 1e-4f, "회색 → 흰 전환 반");
+        Assert.AreEqual(0f, w.grow, 1e-6f, "전환 동안 크기 그대로");
+        w = BossVictoryRectifyFill.Circle(start + Fade + GrayToWhite, start, Fade, Expand, GrayToWhite);
+        Assert.AreEqual(1f, w.white, 1e-6f);
+        Assert.AreEqual(0f, w.grow, 1e-5f, "흰색이 된 순간 확장 시작");
+        w = BossVictoryRectifyFill.Circle(start + Fade + GrayToWhite + Expand * 0.5f, start, Fade, Expand, GrayToWhite);
+        Assert.AreEqual(0.875f, w.grow, 1e-5f);
+    }
+
+    [Test]
+    public void 원_색은_왼쪽에서_오른쪽으로_보간()
+    {
+        Color l = new Color(1f, 0.2f, 0.7f), r = new Color(0.6f, 0.25f, 1f);
+        Assert.AreEqual(l, BossVictoryRectifyFill.CircleColor(0f, l, r));
+        Assert.AreEqual(r, BossVictoryRectifyFill.CircleColor(1f, l, r));
+        Assert.AreEqual(0.8f, BossVictoryRectifyFill.CircleColor(0.5f, l, r).r, 1e-5f);
+        Assert.AreEqual(r, BossVictoryRectifyFill.CircleColor(2f, l, r), "단어 밖은 끝 색");
     }
 
     [Test]
@@ -120,22 +148,70 @@ public class BossVictoryRectifyTests
     }
 
     [Test]
-    public void 링_코드_기본값은_사양값()
+    public void 원_코드_기본값은_사양값()
     {
         // 에셋 값은 사용자가 튜닝하므로 코드 기본값만 고정한다.
         var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
         try
         {
-            Assert.AreEqual(3, s.rectifyFillColors.Length);
-            Assert.Less(Vector4.Distance((Color)new Color32(0xFF, 0x2D, 0xB4, 0xFF), s.rectifyFillColors[0]), 1e-4f, "마젠타");
-            Assert.Less(Vector4.Distance((Color)new Color32(0x8A, 0x8A, 0x8A, 0xFF), s.rectifyFillColors[2]), 1e-4f, "그레이");
-            Assert.AreEqual(0.46f, s.rectifyFillCenter.x, 1e-5f);
-            Assert.AreEqual(0.15f, s.rectifyFillStartRadius, 1e-5f);
-            Assert.AreEqual(4f / 60f, s.rectifyFillDelay, 1e-5f);
-            Assert.AreEqual(0.15f, s.rectifyFillFade, 1e-5f);
-            Assert.AreEqual(0.6f, s.rectifyFillExpand, 1e-5f);
-            Assert.AreEqual(0.35f, s.rectifyFillGradient, 1e-5f);
+            Assert.AreEqual(3, s.rectifyCircles.Length);
+            Assert.Less(Vector4.Distance((Color)new Color32(0xFF, 0x2D, 0xB4, 0xFF), s.rectifyCircles[0].leftColor), 1e-4f, "① 왼쪽 마젠타");
+            Assert.Less(Vector4.Distance((Color)new Color32(0xA0, 0x40, 0xFF, 0xFF), s.rectifyCircles[0].rightColor), 1e-4f, "① 오른쪽 보라");
+            Assert.Less(Vector4.Distance((Color)new Color32(0x5A, 0xC8, 0xFF, 0xFF), s.rectifyCircles[1].leftColor), 1e-4f, "② 왼쪽 하늘");
+            Assert.Less(Vector4.Distance((Color)new Color32(0x24, 0x38, 0xA8, 0xFF), s.rectifyCircles[1].rightColor), 1e-4f, "② 오른쪽 남색");
+            Assert.AreEqual(Color.white, s.rectifyCircles[2].leftColor, "③ 왼쪽 흰색");
+            Assert.Less(Vector4.Distance((Color)new Color32(0xFF, 0xF6, 0xE0, 0xFF), s.rectifyCircles[2].rightColor), 1e-4f, "③ 오른쪽 연크림");
+            Assert.AreEqual(0f, s.rectifyCircles[0].start, 1e-6f);
+            Assert.AreEqual(4f / 60f, s.rectifyCircles[1].start, 1e-5f);
+            Assert.AreEqual(0.2f, s.rectifyCircles[2].start, 1e-5f);
+            Assert.AreEqual(0.46f, s.rectifyCircles[2].center.x, 1e-5f);
+            Assert.AreEqual(0.15f, s.rectifyCircles[2].startRadius, 1e-5f);
+            Assert.Less(Vector4.Distance((Color)new Color32(0x8A, 0x8A, 0x8A, 0xFF), s.rectifyCircleGrayColor), 1e-4f, "③ 회색");
+            Assert.AreEqual(0.1f, s.rectifyCircleGrayToWhite, 1e-6f);
+            Assert.IsFalse(s.MigrateRectifyCircles(), "새 인스턴스 = 옛 값 없음 → 옮기지 않음");
             Assert.AreEqual(0.6f, s.skyAmberMinLuma, 1e-5f);
+        }
+        finally { Object.DestroyImmediate(s); }
+    }
+
+    [Test]
+    public void 옛_링_흰원_값은_원_3개로_한_번만_옮긴다()
+    {
+        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        try
+        {
+            Color magenta = new Color(1f, 0.18f, 0.7f), blue = new Color(0.23f, 0.42f, 1f), gray = new Color(0.4f, 0.4f, 0.4f);
+            s.rectifyFillColors = new[] { magenta, blue, gray };
+            s.rectifyFillCenter = new Vector2(0.4f, 0.55f);
+            s.rectifyFillStartRadius = 0.12f;
+            s.rectifyFillDelay = 0.1f;
+            s.rectifyFillFade = 0.2f;
+            s.rectifyFillExpand = 0.5f;
+            s.rectifyWhiteColor = new Color(1f, 1f, 0.9f);
+            s.rectifyWhiteStart = 0.3f;
+            s.rectifyWhiteCenter = new Vector2(0.5f, 0.45f);
+            s.rectifyWhiteStartRadius = 0.18f;
+            s.rectifyWhiteFade = 0.15f;
+            s.rectifyWhiteExpand = 0.1f;
+            Assert.IsTrue(s.MigrateRectifyCircles());
+            BossVictoryGlitchSettings.RectifyCircle[] c = s.rectifyCircles;
+            Assert.AreEqual(3, c.Length);
+            Assert.AreEqual(0f, c[0].start);
+            Assert.AreEqual(magenta, c[0].leftColor, "① = 옛 링 0 색");
+            Assert.AreEqual(0.12f, c[0].startRadius, 1e-6f);
+            Assert.AreEqual(new Vector2(0.4f, 0.55f), c[0].center);
+            Assert.AreEqual(0.1f, c[1].start, 1e-6f, "② 생성 = 옛 간격");
+            Assert.AreEqual(0.2f, c[1].fade, 1e-6f);
+            Assert.AreEqual(0.5f, c[1].expand, 1e-6f);
+            Assert.AreEqual(0.3f, c[2].start, 1e-6f, "③ = 옛 흰 원");
+            Assert.AreEqual(0.18f, c[2].startRadius, 1e-6f);
+            Assert.AreEqual(0.1f, c[2].expand, 1e-6f);
+            Assert.AreEqual(new Vector2(0.5f, 0.45f), c[2].center);
+            Assert.AreEqual(new Color(1f, 1f, 0.9f), c[2].leftColor);
+            Assert.AreEqual(gray, s.rectifyCircleGrayColor, "회색 = 옛 링 2 색");
+            Assert.AreEqual(0, s.rectifyFillColors.Length, "옛 칸 비움");
+            s.rectifyFillColors = new[] { blue };
+            Assert.IsFalse(s.MigrateRectifyCircles(), "한 번만");
         }
         finally { Object.DestroyImmediate(s); }
     }
@@ -162,22 +238,9 @@ public class BossVictoryRectifyTests
     }
 
     [Test]
-    public void 흰_원은_따로_정한_시각에_생겨_페이드_뒤_확장()
-    {
-        Assert.IsFalse(BossVictoryRectifyFill.WhiteRing(0.19f, 0.2f, 0.15f, 0.6f).exists);
-        BossVictoryRectifyFill.Ring w = BossVictoryRectifyFill.WhiteRing(0.2f + 0.075f, 0.2f, 0.15f, 0.6f);
-        Assert.IsTrue(w.exists);
-        Assert.AreEqual(0.5f, w.alpha, 1e-4f);
-        Assert.AreEqual(0f, w.grow, 1e-6f, "페이드 동안 크기 그대로");
-        w = BossVictoryRectifyFill.WhiteRing(0.2f + 0.15f + 0.3f, 0.2f, 0.15f, 0.6f);
-        Assert.AreEqual(0.875f, w.grow, 1e-5f);
-        Assert.IsFalse(BossVictoryRectifyFill.WhiteRing(-0.1f, 0f, 0.15f, 0.6f).exists, "클립 전 없음");
-    }
-
-    [Test]
     public void 주황은_흰_원이_다_퍼지고_머문_뒤_와이프()
     {
-        float start = BossVictoryRectifyFill.OrangeStart(0.2f, 0.15f, 0.6f, 0.05f);
+        float start = BossVictoryRectifyFill.OrangeStart(0.2f, 0.15f, 0.1f, 0.5f, 0.05f);   // 흰 원 생성 + 페이드 + 회색→흰 + 확장 + 유지
         Assert.AreEqual(1.0f, start, 1e-5f);
         Assert.AreEqual(0f, BossVictoryRectifyFill.OrangeProgress(0.99f, start, 0.1f));
         Assert.AreEqual(0.5f, BossVictoryRectifyFill.OrangeProgress(1.05f, start, 0.1f), 1e-4f);
@@ -212,8 +275,6 @@ public class BossVictoryRectifyTests
         var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
         try
         {
-            Assert.AreEqual(0.2f, s.rectifyWhiteStart, 1e-5f);
-            Assert.AreEqual(Color.white, s.rectifyWhiteColor);
             Assert.IsTrue(s.rectifyOrangeRightToLeft);
             Assert.AreEqual(1f, s.rectifyOrangeGradient, 1e-5f);
         }

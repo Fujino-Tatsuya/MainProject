@@ -1,37 +1,47 @@
 using UnityEngine;
 
 /// <summary>
-/// 배경 글자 RECTIFY 안쪽 'Ring Wipe Fill'(267 후속, _lane-artifacts/Work2/rectify-fill/SPEC-ring-wipe-fill.md) — 링 상태 순수 함수.
-/// 링 i(0 마젠타 · 1 블루 · 2 그레이)는 클립 시작 뒤 i × 간격에 공통 중심에서 시작 반지름으로 생겨, 크기 그대로 페이드(알파 0→1) →
-/// 불투명해진 뒤 시작 반지름 → Rmax 로 easeOutCubic 확장. 나중 링이 앞 링을 덮고(painter's order) 마지막 링(그레이)이 다 덮으면 그대로 고정. 반복 없음.
+/// 배경 글자 RECTIFY 안쪽 원 3개(267 후속 — 원 통합, 처음 사양 _lane-artifacts/Work2/rectify-fill/SPEC-ring-wipe-fill.md) — 원 상태 순수 함수.
+/// 원 i(① 마젠타 · ② 블루 · ③ 흰색)는 저마다의 생성 시각에 저마다의 중심에서 시작 반지름으로 생겨, 크기 그대로 페이드(알파 0→1) →
+/// 불투명해진 뒤 시작 반지름 → Rmax 로 easeOutCubic 확장. ③(마지막)은 페이드 동안 회색이고, 페이드 뒤 회색 → 흰색으로 바뀐 순간부터 확장.
+/// 나중 원이 앞 원을 덮고(painter's order) 마지막 원이 다 덮으면 그대로 고정. 반복 없음. 원 안 색 = 단어 UV x 기준 왼쪽 색 → 오른쪽 색.
 /// 좌표 = 단어 사각형 UV(글자 사각형 합집합, 0~1) — 거리 단위는 단어 높이(가로에 단어 종횡비 보정).
 /// 시각만으로 정해져 스크럽·모든 피어 같다(새 RPC 없음).
 /// </summary>
 public static class BossVictoryRectifyFill
 {
-    public const int RingCount = 3;
+    public const int CircleCount = 3;
 
     public struct Ring
     {
         public bool exists;     // 생겼는가(생성 시각 ≤ t)
         public float alpha;     // 0~1 페이드
+        public float white;     // 0 회색 ~ 1 흰색(마지막 원만 — 회색 단계가 없으면 1)
         public float grow;      // 0~1 확장(easeOutCubic 적용 뒤)
     }
 
-    /// <summary>링 i 의 상태 — t_i = elapsed − i × delay(생성 시각 기준), 알파 = t_i/페이드, 확장 = easeOutCubic((t_i − 페이드)/확장 시간).</summary>
-    public static Ring Evaluate(int i, float elapsed, float delay, float fade, float expand)
+    /// <summary>
+    /// 원 상태 — t = elapsed − 생성 시각. 알파 = t/페이드 · 흰 = (t − 페이드)/회색→흰 전환 · 확장 = easeOutCubic((t − 페이드 − 전환)/확장 시간).
+    /// 전환 0(①·②)이면 흰 = 1 이고 페이드가 끝나자마자 확장.
+    /// </summary>
+    public static Ring Circle(float elapsed, float start, float fade, float expand, float grayToWhite = 0f)
     {
         var r = new Ring();
-        if (i < 0 || elapsed < 0f) return r;
-        float t = elapsed - i * Mathf.Max(0f, delay);
+        if (elapsed < 0f) return r;
+        float t = elapsed - Mathf.Max(0f, start);
         if (t < 0f) return r;
         r.exists = true;
         r.alpha = fade > 0f ? Mathf.Clamp01(t / fade) : 1f;
-        float te = t - Mathf.Max(0f, fade);   // 페이드가 끝난 뒤부터 확장
+        float tw = t - Mathf.Max(0f, fade);   // 페이드가 끝난 뒤 회색 → 흰
+        r.white = grayToWhite > 0f ? Mathf.Clamp01(tw / grayToWhite) : (tw >= 0f ? 1f : 0f);
+        float te = tw - Mathf.Max(0f, grayToWhite);   // 흰색이 된 순간부터 확장
         float p = expand > 0f ? Mathf.Clamp01(te / expand) : (te >= 0f ? 1f : 0f);
         r.grow = EaseOutCubic(p);
         return r;
     }
+
+    /// <summary>원 안 색 — 단어 UV x(0~1) 기준 왼쪽 색 → 오른쪽 색(셰이더와 같은 식).</summary>
+    public static Color CircleColor(float x01, Color left, Color right) => Color.Lerp(left, right, Mathf.Clamp01(x01));
 
     public static float EaseOutCubic(float p)
     {
@@ -71,15 +81,11 @@ public static class BossVictoryRectifyFill
     public static float Radius(float grow, float startRadius, float maxRadius, float softness) =>
         Mathf.Lerp(Mathf.Max(0f, startRadius), maxRadius + Mathf.Max(0f, softness), grow);
 
-    // ── 4번째 흰 원 · 주황 채움(267 후속) ──
+    // ── 주황 채움(267 후속) ──
 
-    /// <summary>흰 원 — 클립 시작 뒤 <paramref name="start"/> 초에 생김. 페이드 → 확장 순서는 링과 같다(값만 따로).</summary>
-    public static Ring WhiteRing(float elapsed, float start, float fade, float expand) =>
-        elapsed < 0f ? default : Evaluate(0, elapsed - Mathf.Max(0f, start), 0f, fade, expand);
-
-    /// <summary>주황 채움 시작 시각(클립 시작 기준) = 흰 원이 다 퍼진 뒤 + 유지.</summary>
-    public static float OrangeStart(float whiteStart, float whiteFade, float whiteExpand, float hold) =>
-        Mathf.Max(0f, whiteStart) + Mathf.Max(0f, whiteFade) + Mathf.Max(0f, whiteExpand) + Mathf.Max(0f, hold);
+    /// <summary>주황 채움 시작 시각(클립 시작 기준) = 마지막(흰) 원이 다 퍼진 뒤 + 유지.</summary>
+    public static float OrangeStart(float lastStart, float lastFade, float grayToWhite, float lastExpand, float hold) =>
+        Mathf.Max(0f, lastStart) + Mathf.Max(0f, lastFade) + Mathf.Max(0f, grayToWhite) + Mathf.Max(0f, lastExpand) + Mathf.Max(0f, hold);
 
     /// <summary>흰 → 주황 와이프 진행 0~1(시작 전 0, 와이프 0초면 시작 즉시 1).</summary>
     public static float OrangeProgress(float elapsed, float orangeStart, float wipe)

@@ -67,11 +67,13 @@ public static class BossVictoryGlitchRender
     static readonly int IdRectifyUV = Shader.PropertyToID("_RectifyUV");           // 글자마다 아틀라스 xy 시작 · zw 크기
     static readonly int IdRectifyParams = Shader.PropertyToID("_RectifyParams");   // x 알파, y 외곽선 반두께(SDF), z 글자 수
     static readonly int IdRectifyColor = Shader.PropertyToID("_RectifyColor");
-    static readonly int IdFillRings = Shader.PropertyToID("_RectifyFillRings");       // 링 i(0~2 색 링 · 3 흰 원) — x 반지름(단어 높이 단위), y 알파, zw 중심(단어 UV)
+    static readonly int IdFillRings = Shader.PropertyToID("_RectifyFillRings");       // 원 i(0~2 — 마지막 = 흰 원) — x 반지름(단어 높이 단위), y 알파, zw 중심(단어 UV)
     static readonly int IdOrange = Shader.PropertyToID("_RectifyOrange");             // x 와이프 진행, y 들쭉날쭉, z 오른쪽→왼쪽(1), w 줄 굵기(px)
     static readonly int IdOrangeLeft = Shader.PropertyToID("_RectifyOrangeLeft");
     static readonly int IdOrangeRight = Shader.PropertyToID("_RectifyOrangeRight");   // a = 좌→우 보간 세기
-    static readonly int IdFillColors = Shader.PropertyToID("_RectifyFillColors");     // rgb 색, a 방사형 그라데이션 세기
+    static readonly int IdFillColors = Shader.PropertyToID("_RectifyFillColors");     // 원 i 왼쪽 색(rgb) — 단어 UV x = 0
+    static readonly int IdFillColorsR = Shader.PropertyToID("_RectifyFillColorsR");   // 원 i 오른쪽 색(rgb) — x = 1
+    static readonly int IdCircleGray = Shader.PropertyToID("_RectifyCircleGray");     // 마지막 원 회색(rgb), w = 흰 섞임 0 회색 ~ 1 흰(좌우 색)
     static readonly int IdFillRect = Shader.PropertyToID("_RectifyFillRect");         // 단어 사각형(뷰포트 min.xy · max.zw)
     static readonly int IdFillParams = Shader.PropertyToID("_RectifyFillParams");     // x 불투명도, y 경계(단어 높이), z 단어 종횡비, w 주사선 간격(px)
     static readonly int IdFillLook = Shader.PropertyToID("_RectifyFillLook");         // x 주사선 어둡기, y 색이 외곽선도 덮음
@@ -251,15 +253,14 @@ public static class BossVictoryGlitchRender
         _composite.SetVectorArray(IdRectifyUV, _rectifyUV);
     }
 
-    // 안쪽 색 Ring Wipe Fill(267 후속) — 설정 값 사본(ApplyLook)·링 3개 배열.
-    static Color[] _fillColors = new Color[0];
-    static Vector2 _fillCenter = new Vector2(0.46f, 0.5f);
-    static float _fillStartRadius, _fillDelay, _fillFade, _fillExpand = 0.6f, _fillSoft, _fillGradient, _scanSpacing = 0.003f, _scanDark;
-    static readonly Vector4[] _fillRings = new Vector4[BossVictoryRectifyFill.RingCount + 1];       // + 흰 원
-    static readonly Vector4[] _fillRingColors = new Vector4[BossVictoryRectifyFill.RingCount + 1];
-    static Color _whiteColor = Color.white;
-    static Vector2 _whiteCenter = new Vector2(0.46f, 0.5f);
-    static float _whiteStart = 0.2f, _whiteStartRadius, _whiteFade, _whiteExpand = 0.6f, _whiteGradient;
+    // 안쪽 원 3개(267 후속 — 원 통합) — 설정 값 사본(ApplyLook)·원 배열. 원마다 생성 시각·반지름·페이드·확장·중심·좌우 색, ③ 회색 단계.
+    static readonly BossVictoryGlitchSettings.RectifyCircle[] _circles = new BossVictoryGlitchSettings.RectifyCircle[BossVictoryRectifyFill.CircleCount];
+    static int _circleCount;
+    static Color _circleGray = new Color(0.54f, 0.54f, 0.54f);
+    static float _grayToWhite = 0.1f, _fillSoft, _scanSpacing = 0.003f, _scanDark;
+    static readonly Vector4[] _fillRings = new Vector4[BossVictoryRectifyFill.CircleCount];
+    static readonly Vector4[] _fillColorsL = new Vector4[BossVictoryRectifyFill.CircleCount];
+    static readonly Vector4[] _fillColorsR = new Vector4[BossVictoryRectifyFill.CircleCount];
     static float _orangeHold, _orangeWipe = 0.1f, _orangeJitter, _orangeRowPx = 4f, _orangeGradient;
     static bool _orangeRightToLeft = true;
     static bool _fillCoversOutline = true;
@@ -269,24 +270,22 @@ public static class BossVictoryGlitchRender
 
     static void ApplyFillLook(BossVictoryGlitchSettings s)
     {
-        _fillColors = s.rectifyFillColors ?? new Color[0];
-        _fillCenter = s.rectifyFillCenter;
-        _fillStartRadius = s.rectifyFillStartRadius;
-        _fillDelay = s.rectifyFillDelay;
-        _fillFade = s.rectifyFillFade;
-        _fillExpand = s.rectifyFillExpand;
+        BossVictoryGlitchSettings.RectifyCircle[] src = s.rectifyCircles ?? new BossVictoryGlitchSettings.RectifyCircle[0];
+        _circleCount = Mathf.Min(src.Length, BossVictoryRectifyFill.CircleCount);
+        for (int i = 0; i < _circleCount; i++)
+        {
+            _circles[i] = src[i];
+            Color l = src[i].leftColor.linear, r = src[i].rightColor.linear;
+            _fillColorsL[i] = new Vector4(l.r, l.g, l.b, 1f);
+            _fillColorsR[i] = new Vector4(r.r, r.g, r.b, 1f);
+        }
+        for (int i = _circleCount; i < BossVictoryRectifyFill.CircleCount; i++) _fillColorsL[i] = _fillColorsR[i] = Vector4.zero;
+        _circleGray = s.rectifyCircleGrayColor.linear;
+        _grayToWhite = Mathf.Max(0f, s.rectifyCircleGrayToWhite);
         _fillSoft = s.rectifyFillSoftness;
-        _fillGradient = Mathf.Clamp01(s.rectifyFillGradient);
         _fillCoversOutline = s.rectifyFillCoversOutline;
         _scanSpacing = s.rectifyScanlineSpacing;
         _scanDark = Mathf.Clamp01(s.rectifyScanlineDark);
-        _whiteColor = s.rectifyWhiteColor;
-        _whiteCenter = s.rectifyWhiteCenter;
-        _whiteStart = s.rectifyWhiteStart;
-        _whiteStartRadius = s.rectifyWhiteStartRadius;
-        _whiteFade = s.rectifyWhiteFade;
-        _whiteExpand = s.rectifyWhiteExpand;
-        _whiteGradient = Mathf.Clamp01(s.rectifyWhiteGradient);
         _orangeHold = s.rectifyOrangeHold;
         _orangeWipe = s.rectifyOrangeWipe;
         _orangeRightToLeft = s.rectifyOrangeRightToLeft;
@@ -303,39 +302,43 @@ public static class BossVictoryGlitchRender
         _composite.SetColor(IdGlowColor, s.rectifyGlowColor.linear);
     }
 
-    // 링 3개 — 단어 사각형 UV(종횡비 보정, 단위 = 단어 높이). Rmax = 중심에서 네 모서리까지.
+    // 원 3개 — 단어 사각형 UV(종횡비 보정, 단위 = 단어 높이). Rmax = 원 중심에서 네 모서리까지. 마지막 원 = 흰 원(회색 → 흰 뒤 확장).
     static void SetFillFrame(in Frame f, float aspect)
     {
-        float opacity = _rectifyCount > 0 && _fillColors.Length > 0 && f.RectifyFillElapsed >= 0f ? Mathf.Clamp01(f.RectifyFill) : 0f;
+        float opacity = _rectifyCount > 0 && _circleCount > 0 && f.RectifyFillElapsed >= 0f ? Mathf.Clamp01(f.RectifyFill) : 0f;
         Vector4 word = BossVictoryRectifyFill.WordRect(_rectifyScreen, _rectifyCount);
         float wordAspect = BossVictoryRectifyFill.WordAspect(word, aspect);
-        float rMax = BossVictoryRectifyFill.MaxRadius(_fillCenter, wordAspect);
-        for (int i = 0; i < BossVictoryRectifyFill.RingCount; i++)
+        int last = _circleCount - 1;
+        float lastWhite = 1f;
+        for (int i = 0; i < BossVictoryRectifyFill.CircleCount; i++)
         {
-            BossVictoryRectifyFill.Ring r = opacity > 0f && i < _fillColors.Length
-                ? BossVictoryRectifyFill.Evaluate(i, f.RectifyFillElapsed, _fillDelay, _fillFade, _fillExpand)
-                : default;
-            _fillRings[i] = r.exists ? new Vector4(BossVictoryRectifyFill.Radius(r.grow, _fillStartRadius, rMax, _fillSoft), r.alpha, _fillCenter.x, _fillCenter.y) : Vector4.zero;
-            Color c = i < _fillColors.Length ? _fillColors[i].linear : Color.clear;
-            _fillRingColors[i] = new Vector4(c.r, c.g, c.b, _fillGradient);
+            if (i >= _circleCount || opacity <= 0f)
+            {
+                _fillRings[i] = Vector4.zero;
+                continue;
+            }
+            BossVictoryGlitchSettings.RectifyCircle c = _circles[i];
+            BossVictoryRectifyFill.Ring r = BossVictoryRectifyFill.Circle(f.RectifyFillElapsed, c.start, c.fade, c.expand, i == last ? _grayToWhite : 0f);
+            float rMax = BossVictoryRectifyFill.MaxRadius(c.center, wordAspect);
+            _fillRings[i] = r.exists ? new Vector4(BossVictoryRectifyFill.Radius(r.grow, c.startRadius, rMax, _fillSoft), r.alpha, c.center.x, c.center.y) : Vector4.zero;
+            if (i == last) lastWhite = r.exists ? r.white : 0f;
         }
-        // 4번째 흰 원 — 값은 링과 따로.
-        BossVictoryRectifyFill.Ring w = opacity > 0f ? BossVictoryRectifyFill.WhiteRing(f.RectifyFillElapsed, _whiteStart, _whiteFade, _whiteExpand) : default;
-        float wMax = BossVictoryRectifyFill.MaxRadius(_whiteCenter, wordAspect);
-        int wi = BossVictoryRectifyFill.RingCount;
-        _fillRings[wi] = w.exists ? new Vector4(BossVictoryRectifyFill.Radius(w.grow, _whiteStartRadius, wMax, _fillSoft), w.alpha, _whiteCenter.x, _whiteCenter.y) : Vector4.zero;
-        Color wc = _whiteColor.linear;
-        _fillRingColors[wi] = new Vector4(wc.r, wc.g, wc.b, _whiteGradient);
-        // 주황 채움 — 흰 원이 다 퍼진 뒤 줄 단위 와이프.
-        float orange = opacity > 0f
-            ? BossVictoryRectifyFill.OrangeProgress(f.RectifyFillElapsed, BossVictoryRectifyFill.OrangeStart(_whiteStart, _whiteFade, _whiteExpand, _orangeHold), _orangeWipe)
-            : 0f;
+        // 주황 채움 — 마지막(흰) 원이 다 퍼진 뒤 줄 단위 와이프.
+        float orange = 0f;
+        if (opacity > 0f)
+        {
+            BossVictoryGlitchSettings.RectifyCircle lc = _circles[last];
+            orange = BossVictoryRectifyFill.OrangeProgress(f.RectifyFillElapsed,
+                BossVictoryRectifyFill.OrangeStart(lc.start, lc.fade, _grayToWhite, lc.expand, _orangeHold), _orangeWipe);
+        }
         _composite.SetVector(IdOrange, new Vector4(orange, _orangeJitter, _orangeRightToLeft ? 1f : 0f, _orangeRowPx));
         _composite.SetVectorArray(IdFillRings, _fillRings);
-        _composite.SetVectorArray(IdFillColors, _fillRingColors);
+        _composite.SetVectorArray(IdFillColors, _fillColorsL);
+        _composite.SetVectorArray(IdFillColorsR, _fillColorsR);
+        _composite.SetVector(IdCircleGray, new Vector4(_circleGray.r, _circleGray.g, _circleGray.b, lastWhite));
         _composite.SetVector(IdFillRect, word);
         _composite.SetVector(IdFillParams, new Vector4(opacity, Mathf.Max(0f, _fillSoft), wordAspect, Mathf.Max(1f, _scanSpacing * Screen.height)));
-        _composite.SetVector(IdFillLook, new Vector4(_scanDark, _fillCoversOutline ? 1f : 0f, 0f, 0f));
+        _composite.SetVector(IdFillLook, new Vector4(_scanDark, _fillCoversOutline ? 1f : 0f, Mathf.Max(0, last), 0f));
         // 글로우 — 채움이 보이고(글자 알파·채움 불투명도 > 0) 세기 > 0 이고 하나라도 고른 프레임만. 한 칸 간격 = 반경 ÷ 4탭(화면 px → UV).
         _glowOn = _glowIntensity > 0f && opacity > 0f && _rectifyCount > 0 && f.Rectify > 0.0001f && (_glowWhite + _glowOrange) > 0f;
         float sw = Mathf.Max(1, Screen.width), sh = Mathf.Max(1, Screen.height);

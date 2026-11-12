@@ -58,24 +58,45 @@ MonoBehaviour:
   rectifyCenterY: 0.58
   rectifyOutline: 0.005
   rectifyColor: {r: 1, g: 1, b: 1, a: 1}
-  rectifyFillColors:
-  - {r: 1, g: 0.1764706, b: 0.7058824, a: 1}
-  - {r: 0.22745098, g: 0.41960785, b: 1, a: 1}
+  rectifyCircles:
+  - start: 0
+    startRadius: 0.15
+    fade: 0.15
+    expand: 0.5
+    center: {x: 0.46, y: 0.5}
+    leftColor: {r: 1, g: 0.1764706, b: 0.7058824, a: 1}
+    rightColor: {r: 0.627451, g: 0.2509804, b: 1, a: 1}
+  - start: 0.1
+    startRadius: 0.15
+    fade: 0.15
+    expand: 0.5
+    center: {x: 0.46, y: 0.5}
+    leftColor: {r: 0.3529412, g: 0.78431374, b: 1, a: 1}
+    rightColor: {r: 0.14117648, g: 0.21960784, b: 0.65882355, a: 1}
+  - start: 0.3
+    startRadius: 0.15
+    fade: 0.15
+    expand: 0.1
+    center: {x: 0.46, y: 0.5}
+    leftColor: {r: 1, g: 1, b: 1, a: 1}
+    rightColor: {r: 1, g: 0.9647059, b: 0.8784314, a: 1}
+  rectifyCircleGrayColor: {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
+  rectifyCircleGrayToWhite: 0.1
+  rectifyFillSoftness: 0.01
+  rectifyFillCoversOutline: 1
+  rectifyCirclesVersion: 1
+  rectifyFillColors: []
   rectifyFillCenter: {x: 0.46, y: 0.5}
   rectifyFillStartRadius: 0.15
   rectifyFillDelay: 0.1
   rectifyFillFade: 0.15
   rectifyFillExpand: 0.5
-  rectifyFillSoftness: 0.01
-  rectifyFillGradient: 0
-  rectifyFillCoversOutline: 1
   rectifyWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   rectifyWhiteStart: 0.3
   rectifyWhiteCenter: {x: 0.46, y: 0.5}
   rectifyWhiteStartRadius: 0.15
   rectifyWhiteFade: 0.15
   rectifyWhiteExpand: 0.1
-  rectifyWhiteGradient: 0
   rectifyOrangeHold: 0.05
   rectifyOrangeWipe: 0.1
   rectifyOrangeRightToLeft: 1
