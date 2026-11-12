@@ -355,14 +355,14 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
             case BossEncounterPhase.Descending:
             case BossEncounterPhase.Impact:
             case BossEncounterPhase.Dialogue:
-                audio.SetBossBgmState(AudioManager.BossBgmState.Intro);
+                audio.SetBossBgmState(AudioManager.BossBgmState.Intro, this);
                 break;
             case BossEncounterPhase.Combat:
-                audio.SetBossBgmState(AudioManager.BossBgmState.Combat);
+                audio.SetBossBgmState(AudioManager.BossBgmState.Combat, this);
                 break;
             case BossEncounterPhase.Idle:
             case BossEncounterPhase.FailedSafe:
-                audio.SetBossBgmState(AudioManager.BossBgmState.None);
+                audio.SetBossBgmState(AudioManager.BossBgmState.None, this);
                 break;
             // AwaitingArrival(텔레포트 도착 대기)은 아직 연출 전 — 스테이지 곡 유지.
         }

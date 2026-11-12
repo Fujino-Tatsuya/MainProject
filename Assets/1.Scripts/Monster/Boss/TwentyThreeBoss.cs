@@ -531,7 +531,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         ResolveTelegraphs();
         // 이미 죽은 채 합류 — 보스 곡을 새로 시작하지 않는다(BGM 은 AudioManager 가 무음 유지, PLAN-sound-spec-apply 4).
         if (State == MonsterState.Dead)
-            AudioManager.Instance?.SetBossBgmState(AudioManager.BossBgmState.Defeated);
+            AudioManager.Instance?.SetBossBgmState(AudioManager.BossBgmState.Defeated, this);
 
         // Wells 는 모든 피어에서 로컬 애니메이터를 구동한다(상태는 이 NetworkObject 가 복제).
         _wells = GetComponentInChildren<BossWells>(true);
@@ -594,6 +594,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 디스폰 시 잡고 있던 플레이어를 반드시 놓는다 — 안 놓으면 풀어 줄 주체가 사라져 영구 구속된다.
         // 체공 중이었다면 메시도 되살린다(꺼진 채 남으면 다음 스폰까지 투명하다).
         AbortAttackChain();
+        // 디스폰(전멸 리스폰·연출 중단·씬 내림)엔 위 정지 RPC 가 안 나간다 — NGO 가 IsSpawned=false 뒤에 이 콜백을 부르고,
+        // 클라는 AbortAttackChain 이 서버 전용이다. 각 피어가 직접 끈다(Codex 교차검증 11-12).
+        StopAttackSoundsLocal();
 
         base.OnNetworkDespawn();
     }
@@ -4184,7 +4187,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
 
     /// <summary>[전 피어] 끊긴 패턴의 공격 소리를 짧게 페이드하며 끈다. Reliable — 놓치면 소리가 끝까지 남는다.</summary>
     [ClientRpc]
-    void StopAttackSoundsClientRpc()
+    void StopAttackSoundsClientRpc() => StopAttackSoundsLocal();
+
+    void StopAttackSoundsLocal()
     {
         AudioManager audio = AudioManager.Instance;
         if (audio == null) return;
@@ -6185,6 +6190,9 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         }
         else if (qPushHit && resolved && State != MonsterState.Dead)
         {
+            // 거부되면 경직만 남는다 — 아래 경직 로그가 "밀림"으로 읽히지 않게 따로 남긴다(11-12).
+            if (!AcceptsKnockback)
+                Debug.LogWarning($"[23호] 취약 중 팔라딘 Q — 밀림 거부(슈퍼아머 · 상태별 {BossCrowdControlRules.StateSuperArmor(IsVulnerable, _suppressed)})", this);
             Knockback(VulnerableKnockbackDirection(hitContext, attackInfo), attackInfo.knockbackStrength);
             float stun = Mathf.Min(attackInfo.staggerDuration, _vulnerableUntil - Time.time);
             if (stun > 0.05f && State != MonsterState.Groggy)
@@ -6576,6 +6584,12 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         _vulnerableUntil = Time.time + VulnerableDuration;
         _environmentConsumed = false;
         _vulnerableVisual.Value = true;
+        // 🔴 끊긴 공격이 걸어 둔 공격별 슈퍼아머를 지운다(취약 = 밀치기·기절 허용, BossCrowdControlRules 표).
+        //    23호는 SO startsWithSuperArmor 라 base 의 "공격 끝 해제"(MonsterBase.OnStateChanged)가 돌지 않아,
+        //    간파로 공격이 끊겨도 공격 시작 때 건 슈퍼아머가 그 공격 예산(_stateTimer, 돌진 ≈4.4초)까지 남았다
+        //    → 취약 중 팔라딘 Q·간파 넉백이 Unit.Knockback 에서 조용히 거부되고 경직만 들어갔다(경석 Play 11-12).
+        //    취약 밖은 상태별 슈퍼아머(StateSuperArmor)가 그대로 막는다.
+        status?.RemoveStatus(StatusEffectType.SuperArmor);
         Debug.Log($"[23호] 취약 진입 — {VulnerableDuration:0.#}초(그로기 포함)", this);
     }
 
@@ -7050,7 +7064,7 @@ public partial class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInt
         // 보스 사망 = BGM 2초 아웃(사운드 명세 — 일반 씬 전환 1초 아웃보다 우선, PLAN-sound-spec-apply 4). 🔴 서버 가드 **앞**(전 피어).
         // 이미 죽은 채 합류한 클라는 이 콜백을 안 거친다(스폰 때 현재값 적용) — 보스 곡이 새로 켜지지도 않는다(phase 는 Combat 일 수 있음 → 아래 OnNetworkSpawn 보정).
         if (previous != MonsterState.Dead && next == MonsterState.Dead)
-            AudioManager.Instance?.SetBossBgmState(AudioManager.BossBgmState.Defeated);
+            AudioManager.Instance?.SetBossBgmState(AudioManager.BossBgmState.Defeated, this);
 
         if (!IsServer) return;
 

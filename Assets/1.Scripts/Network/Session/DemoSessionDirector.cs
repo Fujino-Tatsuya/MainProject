@@ -295,6 +295,9 @@ public sealed class DemoSessionDirector : MonoBehaviour
     {
         Time.timeScale = 1f;
         SessionResult.Clear();
+        // 대기 씬엔 곡이 없다 — 끊긴 판의 곡(보스 곡 포함)·보스 상태를 1초 아웃으로 정리한다(경석 11-12, PLAN-sound-spec-apply 4).
+        // 재합류로 맵에 돌아가면 MainGameReady 가 맵 곡을, 보스 단계 복제값이 보스 곡을 다시 정한다.
+        AudioManager.Instance?.BeginSceneTransition();
         _waitingForWaitScene = true;
         SceneManager.LoadScene(waitSceneName, LoadSceneMode.Single);
     }

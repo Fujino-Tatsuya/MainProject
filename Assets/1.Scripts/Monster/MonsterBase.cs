@@ -2474,7 +2474,10 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
         //    짝 StopEffect 가 안 와 바람 루프가 safetyTimeout 5초까지 남았다). 애니메이터를 바꾸기 **전**이라야
         //    지금 클립이 끊기는 공격 클립이다 — 아래 ResetToLocomotion·PlayStateAnimation 보다 먼저 둔다.
         if (previous == MonsterState.Attack && next != MonsterState.Attack && StopClipLoopsOnAttackExit)
+        {
             StopCurrentClipLoops();
+            RestopExitLoopsAfterTransition();
+        }
 
         // 자세를 붙잡는 상태는 Groggy 하나뿐이다(그로기 클립이 없는 몹의 표현).
         // 그 밖으로 나가면 무조건 푼다 — 해제를 개별 경로에 맡기면 하나만 빠져도 몹이 영구히 얼어붙는다.
@@ -2571,9 +2574,14 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
             if (_clipEffects == null) return;
         }
 
+        _stoppedLoopIds.Clear();
         StopStartedLoops(animator.GetCurrentAnimatorClipInfo(0));
         if (animator.IsInTransition(0)) StopStartedLoops(animator.GetNextAnimatorClipInfo(0));
     }
+
+    // 마지막 StopCurrentClipLoops 가 끈 루프 id — 공격 이탈 전환이 끝난 뒤 한 번 더 끈다(아래).
+    readonly List<string> _stoppedLoopIds = new List<string>();
+    Coroutine _restopExitLoops;
 
     void StopStartedLoops(AnimatorClipInfo[] clips)
     {
@@ -2583,9 +2591,38 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
             foreach (AnimationEvent ev in info.clip.events)
             {
                 if (ev.functionName == "StartEffect" && !string.IsNullOrEmpty(ev.stringParameter))
+                {
                     _clipEffects.StopEffect(ev.stringParameter);
+                    if (!_stoppedLoopIds.Contains(ev.stringParameter)) _stoppedLoopIds.Add(ev.stringParameter);
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// [이 피어] 공격 이탈 때 끈 루프를 <b>전환이 끝난 뒤</b> 한 번 더 끈다(경석 Play 11-12 — 취약 중 CC 로 훅·어퍼가 끊기면 바람이 가끔 남음).
+    /// 🔴 이탈 직후 <c>CrossFadeInFixedTime(…, 0.1)</c> 동안 나가는 공격 클립이 계속 돌아, 그 사이에 있던 <c>StartEffect</c>
+    ///    (훅 L 0.193 — 예고 재개 0.15 바로 뒤)가 방금 끈 루프를 다시 켠다. 그 클립은 전환과 함께 버려져 짝 <c>StopEffect</c> 가
+    ///    영영 안 오므로 <c>safetyTimeout</c>(5초)까지 남았다. 전환이 끝난 뒤엔 그 클립이 없으므로 기억해 둔 id 로 끈다.
+    /// 다시 Attack 이 되면 그 공격의 루프일 수 있어 건너뛴다. 애니메이터가 멈춰 전환이 안 끝나도 1초(실시간) 뒤엔 끈다.
+    /// </summary>
+    void RestopExitLoopsAfterTransition()
+    {
+        if (_stoppedLoopIds.Count == 0 || !isActiveAndEnabled) return;
+        if (_restopExitLoops != null) StopCoroutine(_restopExitLoops);
+        _restopExitLoops = StartCoroutine(RestopExitLoopsRoutine(new List<string>(_stoppedLoopIds)));
+    }
+
+    IEnumerator RestopExitLoopsRoutine(List<string> ids)
+    {
+        float deadline = Time.unscaledTime + 1f;
+        yield return null;   // CrossFade 는 다음 갱신에 전환을 시작한다
+        while (animator != null && animator.IsInTransition(0) && Time.unscaledTime < deadline)
+            yield return null;
+        yield return null;   // 전환 마지막 프레임의 이벤트까지 지나간 뒤
+        _restopExitLoops = null;
+        if (State == MonsterState.Attack || _clipEffects == null) yield break;
+        for (int i = 0; i < ids.Count; i++) _clipEffects.StopEffect(ids[i]);
     }
 
     // 피격 상태는 hitTrigger 와 같은 이름으로 둔다(ChompBot·MortarBot "Hit"). HumanoidBot 은 파라미터만 있고 상태가 없다.

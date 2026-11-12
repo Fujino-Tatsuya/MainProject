@@ -374,6 +374,11 @@ public class AudioManager : MonoBehaviour
     private SoundID _bgmId = SoundID.Invalid;
     private bool _bgmStopping;
     private int _bgmGeneration;
+    private UnityEngine.SceneManagement.Scene _bossBgmScene;   // 보스 상태를 낸 씬(재합류 때 PlayBGM 이 지우지 않게)
+
+    // DontDestroyOnLoad 는 늘 떠 있으므로 "그 씬이 아직 있다"의 근거가 못 된다 — 예전처럼 지운다.
+    private bool IsBossBgmSceneLoaded =>
+        _bossBgmScene.IsValid() && _bossBgmScene.isLoaded && _bossBgmScene.name != "DontDestroyOnLoad";
 
     /// <summary>
     /// [이 피어] 이 씬의 BGM 을 정한다(Title·Lobby <c>Start</c>, Map <c>MainGameReady</c>). 지금 곡과 다르면 아웃 → 끝난 뒤 2초 인.
@@ -383,8 +388,10 @@ public class AudioManager : MonoBehaviour
     {
         _sceneBgmKey = key;
         // 씬 진입(Title·Lobby Start, Map MainGameReady)이다 — 이전 씬의 보스 상태는 남기지 않는다
-        // (보스전 중 ESC → 타이틀처럼 BeginSceneTransition 을 안 거친 이탈도 여기서 풀린다). 보스는 MainGameReady 뒤에 나온다.
-        _bossBgm = BossBgmState.None;
+        // (보스전 중 ESC → 타이틀처럼 BeginSceneTransition 을 안 거친 이탈도 여기서 풀린다).
+        // 🔴 단, 보스 상태를 낸 씬이 아직 떠 있으면 그대로 둔다 — 판 도중 재합류(C14)는 동기화 때 보스 단계·23호 사망을 먼저
+        //    적용하고 그 뒤에 MainGameReady(맵 곡)가 와서, 예전엔 여기서 지워져 보스전 중에 스테이지 곡이 났다(Codex 교차검증 11-12).
+        if (!IsBossBgmSceneLoaded) _bossBgm = BossBgmState.None;
         EvaluateBgm(BgmSceneFadeOut);
     }
 
@@ -393,12 +400,17 @@ public class AudioManager : MonoBehaviour
     {
         _sceneBgmKey = null;
         _bossBgm = BossBgmState.None;
+        _bossBgmScene = default;
         EvaluateBgm(BgmSceneFadeOut);
     }
 
-    /// <summary>[이 피어] 보스 단계(복제값을 각 피어가 본다). 사망 = 2초 아웃, 나머지 전환 = 1초 아웃.</summary>
-    public void SetBossBgmState(BossBgmState state)
+    /// <summary>
+    /// [이 피어] 보스 단계(복제값을 각 피어가 본다). 사망 = 2초 아웃, 나머지 전환 = 1초 아웃.
+    /// <paramref name="owner"/> = 상태를 낸 오브젝트 — 그 씬이 떠 있는 동안은 <see cref="PlayBGM(string)"/> 가 보스 상태를 지우지 않는다(재합류).
+    /// </summary>
+    public void SetBossBgmState(BossBgmState state, Component owner = null)
     {
+        if (owner != null) _bossBgmScene = owner.gameObject.scene;
         if (_bossBgm == state) return;
         // 사망 뒤엔 보스 단계(Combat·Idle 등)가 늦게 와도 곡을 되살리지 않는다 — 씬 전환(BeginSceneTransition)만 푼다.
         // (늦은 합류는 23호 Dead 보정과 보스 단계 현재값 적용의 순서가 정해져 있지 않다.)
