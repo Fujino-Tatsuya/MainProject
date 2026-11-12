@@ -14,6 +14,8 @@ using UnityEngine.Rendering.Universal;
 //  · 적중 섬광(오너, 할 일 132 §15): 방사형 블러 = 카메라 컬러(HDR, 후처리 전)를 적중 지점 중심으로 번지게 한다 — 뒤의 Bloom·색수차(Volume)가 그 위에 걸리고,
 //    HUD(오버레이 캔버스)는 블러 밖이다. 플레어 층 = 켜진 LensFlareComponentSRP 를 투명 검정 RT 에 따로 그린다 — 오너 암전 덮개가 카메라 컬러를
 //    덮으므로 섬광 오버레이 캔버스가 이 RT 를 덮개 위에 더한다(URP 자체 Data Driven Lens Flare 설정과 무관하게 돈다).
+//  · 렌즈 고스트(모든 피어, 할 일 270): 제압 간파 적중 순간 켜진 LensFlareComponentSRP 를 카메라 컬러(HDR, 후처리 전)에 바로 더한다 —
+//    PC URP 에셋은 Data Driven Lens Flare 가 꺼져 있어 URP 가 그리지 않는다. 암전 덮개가 없는 V3 경로라 별도 RT·캔버스 없이 된다.
 // 강도는 DarkAdaptationState 에서 읽는다 — 모드마다 0 이면 그 패스를 넣지 않는다(평소 비용 0).
 public sealed class DarkAdaptationFeature : ScriptableRendererFeature
 {
@@ -22,6 +24,7 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
     public const string MaskCoverPassName = "Interrupt OwnerDim Cover";
     public const string RadialBlurPassName = "Interrupt HitFlash RadialBlur";
     public const string FlareLayerPassName = "Interrupt HitFlash FlareLayer";
+    public const string GhostFlarePassName = "Interrupt HitLight GhostFlare";
 
     [Tooltip("암순응 전체화면 셰이더(패스 0 휘도 · 패스 1 마스크 덮개 · 패스 2 방사형 블러). Shader.Find 는 빌드에서 빠지므로 직접 연결한다.")]
     [SerializeField] private Shader _shader;
@@ -34,6 +37,7 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
     private OwnerMaskPass _maskPass;
     private RadialBlurPass _blurPass;
     private FlareLayerPass _flarePass;
+    private GhostFlarePass _ghostPass;
 
     public override void Create()
     {
@@ -51,6 +55,11 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
         {
             // 카메라 컬러와 무관(외부 RT) — 오버레이 UI 보다 먼저면 어디든 된다. 후처리 뒤에 둔다.
             renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing
+        };
+        _ghostPass = new GhostFlarePass
+        {
+            // URP 자체 Data Driven 플레어와 같은 자리(후처리 전 HDR) — 뒤의 블룸·톤매핑이 고스트에도 걸린다.
+            renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing
         };
         _pass = new DarkAdaptationPass
         {
@@ -72,7 +81,8 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
     {
         DarkAdaptationMode mode = DarkAdaptationModes.Select(DarkAdaptationState.Intensity,
             DarkAdaptationState.MaskIntensity, DarkAdaptationState.MaskCoverTarget != null,
-            DarkAdaptationState.HitFlashBlurStrength, DarkAdaptationState.HitFlashFlareTarget != null);
+            DarkAdaptationState.HitFlashBlurStrength, DarkAdaptationState.HitFlashFlareTarget != null,
+            DarkAdaptationState.HitLightGhostFlare);
         if (mode == DarkAdaptationMode.None || _material == null || _pass == null || _maskPass == null)
             return;
 
@@ -107,6 +117,12 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
         {
             _flarePass.Setup(_lensFlareMaterial, DarkAdaptationState.HitFlashFlareTarget);
             renderer.EnqueuePass(_flarePass);
+        }
+
+        if ((mode & DarkAdaptationMode.GhostFlare) != 0 && _ghostPass != null && _lensFlareMaterial != null)
+        {
+            _ghostPass.Setup(_lensFlareMaterial);
+            renderer.EnqueuePass(_ghostPass);
         }
     }
 
@@ -250,22 +266,85 @@ public sealed class DarkAdaptationFeature : ScriptableRendererFeature
                 {
                     ctx.cmd.SetRenderTarget(d.target);
                     ctx.cmd.ClearRenderTarget(false, true, Color.clear);
+                    DrawFlares(ctx.cmd, d.material, d.cameraData, d.target, d.width, d.height);
+                });
+            }
+        }
+    }
 
-                    Camera camera = d.cameraData.camera;
-                    Matrix4x4 viewProjection = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * camera.worldToCameraMatrix;
-                    LensFlareCommonSRP.DoLensFlareDataDrivenCommon(
-                        d.material, camera, new Rect(0f, 0f, d.width, d.height), d.cameraData.xr, d.cameraData.xr.multipassId,
-                        d.width, d.height,
-                        false, 1f, 1f,
-                        true,
-                        camera.transform.position,
-                        viewProjection,
-                        ctx.cmd,
-                        false, false, null, null,
-                        d.target,
-                        // 섬광 플레어는 Light 없이 컴포넌트 세기만 쓴다.
-                        static (Light light, Camera cam, Vector3 wo) => 1f,
-                        false);
+    // 켜진 LensFlareComponentSRP 들을 target 에 그린다 — URP 후처리와 같은 SRP core 함수. 플레어 층(②)·렌즈 고스트(270) 공용.
+    private static void DrawFlares(UnsafeCommandBuffer cmd, Material material, UniversalCameraData cameraData, TextureHandle target,
+        float width, float height)
+    {
+        Camera camera = cameraData.camera;
+        Matrix4x4 viewProjection = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * camera.worldToCameraMatrix;
+        LensFlareCommonSRP.DoLensFlareDataDrivenCommon(
+            material, camera, new Rect(0f, 0f, width, height), cameraData.xr, cameraData.xr.multipassId,
+            width, height,
+            false, 1f, 1f,
+            true,
+            camera.transform.position,
+            viewProjection,
+            cmd,
+            false, false, null, null,
+            target,
+            // 섬광 플레어·고스트는 Light 없이 컴포넌트 세기만 쓴다.
+            static (Light light, Camera cam, Vector3 wo) => 1f,
+            false);
+    }
+
+    // 제압 간파 렌즈 고스트(할 일 270, 모든 피어) — 켜진 LensFlareComponentSRP 를 카메라 컬러(HDR, 후처리 전)에 더한다(지우지 않음).
+    // 요소 블렌드는 플레어 에셋 칸(가산). 이 패스가 도는 동안 켜진 플레어는 고스트뿐이다(② 플레어 층은 V0 경로라 함께 켜지지 않는다).
+    private sealed class GhostFlarePass : ScriptableRenderPass
+    {
+        private Material _material;
+
+        private sealed class PassData
+        {
+            public Material material;
+            public UniversalCameraData cameraData;
+            public TextureHandle target;
+            public float width;
+            public float height;
+        }
+
+        public GhostFlarePass()
+        {
+            profilingSampler = new ProfilingSampler(GhostFlarePassName);
+            requiresIntermediateTexture = true;
+        }
+
+        public void Setup(Material material)
+        {
+            _material = material;
+        }
+
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+        {
+            if (_material == null)
+                return;
+
+            UniversalResourceData resources = frameData.Get<UniversalResourceData>();
+            if (resources.isActiveTargetBackBuffer)
+                return;
+
+            TextureHandle target = resources.activeColorTexture;
+            if (!target.IsValid())
+                return;
+
+            TextureDesc descriptor = renderGraph.GetTextureDesc(target);
+            using (var builder = renderGraph.AddUnsafePass<PassData>(GhostFlarePassName, out PassData data, profilingSampler))
+            {
+                data.material = _material;
+                data.cameraData = frameData.Get<UniversalCameraData>();
+                data.target = target;
+                data.width = descriptor.width;
+                data.height = descriptor.height;
+                builder.UseTexture(target, AccessFlags.ReadWrite);
+                builder.SetRenderFunc(static (PassData d, UnsafeGraphContext ctx) =>
+                {
+                    ctx.cmd.SetRenderTarget(d.target);
+                    DrawFlares(ctx.cmd, d.material, d.cameraData, d.target, d.width, d.height);
                 });
             }
         }

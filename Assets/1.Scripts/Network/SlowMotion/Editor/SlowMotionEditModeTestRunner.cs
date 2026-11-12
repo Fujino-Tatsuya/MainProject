@@ -35,7 +35,8 @@ internal static class SlowMotionEditModeTestRunner
         "^InterruptHitLightTests$",                // 적중 라이트 연출 V1·V2·V3(레퍼런스 맞춤·채도 Volume)·발생 위치(틈 수직/오른손 무기/대상/대체)·Variant 기준점(할 일 194)
         "^InterruptHitLightCasterOverrideTests$",  // 거너 적중 라이트 — 빛줄기·불꽃 숨김·라이트 색, NetworkManager 캐릭터 간파 VFX 칸 켬(할 일 238)
         "^InterruptTierScalingTests$",            // 간파 연출 단계별 강화 — 단계별 V3 에셋·제압 화이트아웃·오너 제압 예측·제압 성공 슬로우(할 일 219)
-        "^SceneLightDimTests$",                    // 암순응 나 × 23호 차징 태양광 배율 공유(할 일 194)
+        "^InterruptSuppressGhostTests$",           // 제압 간파 렌즈 고스트 — 에셋 5개·제압 SO 만·진행기 켜고 끔·고스트 패스 모드(할 일 270)
+        "^SceneLightDimTests$",                   // 암순응 나 × 23호 차징 태양광 배율 공유(할 일 194)
     };
 
     const string Tag = "[SlowMotionTests]";

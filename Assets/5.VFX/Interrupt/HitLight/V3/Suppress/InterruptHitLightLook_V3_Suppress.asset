@@ -202,3 +202,34 @@ MonoBehaviour:
   rayScreenLength: 1
   rayScreenBrightness: 0.1
   rayScreenMaterial: {fileID: 2100000, guid: d04c16b45e7636a4fbad39483f445774, type: 2}
+  ghostFlare: {fileID: 11400000, guid: 6466e05f7b01e0741a9b2102b297978b, type: 2}
+  ghostIntensity: 1
+  ghostScale: 1
+  ghostDuration: 1.88
+  ghostCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  ghostSourceOffset: {x: 1, y: 0.3, z: 1}
+  ghostAxisOffset: 1
+  ghostScreenOffset: {x: 0, y: 0}
