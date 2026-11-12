@@ -184,59 +184,105 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         TraitSkillFx.Raised -= HandleTraitFx;
         StopTargetFloorLocal();
         EndVictorySword();
+        RestoreStrikeParts();
     }
 
     // ═════════════════════════════════════════════════════════════════
-    //  보스 처치 연출 — 검 번개·검 크기(할 일 269)
+    //  보스 처치 연출 — 손 검 번개·낙하 검 배율(할 일 269)
     // ═════════════════════════════════════════════════════════════════
     //
     // 처치자가 팔라딘이면 BossVictoryGlitchPresentation 이 시작(Begin) 때 켜고 정리(Teardown) 때 끈다 — 복제된 처치 상태로
-    // 각 피어가 연 연출이라 RPC 없이 모든 피어(늦은 참가자 포함) 같다. 켜고 끄는 값은 처치자 프로필 칸(swordLightning·swordScale).
+    // 각 피어가 연 연출이라 RPC 없이 모든 피어(늦은 참가자 포함) 같다. 값은 처치자 프로필 칸(handSwordLightning·fallingSwordScale).
     //
-    // 번개 = R 칼날 전기와 같은 엔트리(swordElectric.Effect)·같은 소켓(검 메쉬)을 쓰되 <b>핸들은 따로</b> 든다 —
+    // 손 검 번개 = R 칼날 전기와 같은 엔트리(swordElectric.Effect)·같은 소켓(손 검 메쉬)을 쓰되 <b>핸들은 따로</b> 든다 —
     // 처치 연출 스킬(R 표시 전용)이 끝나며 OnEnd → StopUltimateVfxLocal 이 swordElectric 을 끄는데, 같은 소켓 플레이어를 쓰면 그때 같이 꺼진다.
-    // 검 크기 = 검 메쉬 localScale(원래 값 × 배율, 피벗 기준). 이펙트는 SetParent 를 안 써 검 배율을 안 타므로 같은 배율을 넘긴다.
+    // 손 검 크기는 안 바꾼다. 느려짐(처치자 이펙트 배율)에서 뺀다(BossVictoryGlitchPresentation.KeepRealtime).
+    //
+    // 낙하 검 = R 마무리 낙뢰(targetStrike, FX_Lightening_Strike 의 HolySword)를 표시 전용 경로(PlayTargetStrikeAtLocal)에서만 배율을 곱해 재생 — 평소 R 은 그대로.
+    // 🔴 매니저 배율은 인스턴스 루트 localScale 만 키우는데, 이 프리팹의 칼 파트(HolySword·SwordGlow·SwordTwinkle)는 scalingMode Local 이라
+    //    부모 배율을 무시한다 — 루트만 키우면 칼 크기는 그대로고 낙하 시작점(15m)만 두 배로 올라가 칼이 공중(15m)에서 멈춘다.
+    //    그래서 Local 파트는 자기 localScale 도 같은 배율로 키우고(크기·낙하 거리 모두 두 배 → 바닥에 닿음), 이펙트가 풀로 돌아가면 원래 값으로 되돌린다.
 
     private EffectHandle _victorySwordFx;
-    private Transform _victorySword;
-    private Vector3 _victorySwordBaseScale;
+    private float _victoryFallingScale = 1f;   // 처치 연출 동안만 1 이 아니다
+    private EffectHandle _victoryStrikeHandle; // 배율을 바꾼 낙하 검(수명이 끝나면 Update 가 Local 파트 배율을 되돌린다)
+    private readonly List<Transform> _scaledStrikeParts = new List<Transform>();
+    private readonly List<Vector3> _scaledStrikeBase = new List<Vector3>();
+    private static readonly List<GameObject> s_strikeInstances = new List<GameObject>();
+    private static readonly List<ParticleSystem> s_strikeSystems = new List<ParticleSystem>();
 
-    /// <summary>[이 피어] 보스 처치 연출 동안 검에 번개를 두르고(<paramref name="lightning"/>) 검을 <paramref name="scale"/> 배로 키운다. 이미 켜져 있으면 걷고 다시.</summary>
-    public void BeginVictorySword(bool lightning, float scale)
+    /// <summary>[이 피어] 보스 처치 연출 시작 — 손 검에 번개(<paramref name="handLightning"/>), 이 연출의 낙하 검 배율(<paramref name="fallingSwordScale"/>). 이미 켜져 있으면 걷고 다시.</summary>
+    public void BeginVictorySword(bool handLightning, float fallingSwordScale)
     {
         EndVictorySword();
-        if (!lightning && Mathf.Approximately(scale, 1f))
+        _victoryFallingScale = Mathf.Max(0.01f, fallingSwordScale);
+        if (!handLightning)
             return;
 
         Transform sword = swordElectric != null ? swordElectric.Socket : null;
-        if (sword == null)
+        if (sword == null || swordElectric.Effect == null)
         {
-            Edit.LogWarning("[PaladinSkillView] 처치 연출 검 — swordElectric 소켓이 비어 검을 못 찾는다(번개·크기 건너뜀).", this);
+            Edit.LogWarning("[PaladinSkillView] 처치 연출 손 검 번개 — swordElectric 소켓·엔트리가 비어 건너뛴다.", this);
             return;
         }
-
-        scale = Mathf.Max(0.01f, scale);
-        if (!Mathf.Approximately(scale, 1f))
-        {
-            _victorySword = sword;
-            _victorySwordBaseScale = sword.localScale;
-            sword.localScale = _victorySwordBaseScale * scale;
-        }
-
-        if (lightning && swordElectric.Effect != null && EffectManager.TryGet(out EffectManager effects, this))
-            _victorySwordFx = effects.PlayLooping(swordElectric.Effect, sword, Vector3.zero, swordElectric.Scale * scale);
+        if (!EffectManager.TryGet(out EffectManager effects, this))
+            return;
+        _victorySwordFx = effects.PlayLooping(swordElectric.Effect, sword, Vector3.zero, swordElectric.Scale);
+        BossVictoryGlitchPresentation.KeepRealtime(_victorySwordFx);
     }
 
-    /// <summary>[이 피어] 처치 연출 검을 원래대로(번개 걷기·원래 크기). 켜져 있지 않으면 no-op.</summary>
+    /// <summary>[이 피어] 처치 연출 끝·취소 — 손 검 번개 걷기, 낙하 검 배율 1(이미 떨어진 검은 수명대로 두고 끝나면 파트 배율 복구). 켜져 있지 않으면 no-op.</summary>
     public void EndVictorySword()
     {
         if (_victorySwordFx.IsSet && EffectManager.Instance != null)
             EffectManager.Instance.Release(_victorySwordFx);
         _victorySwordFx = EffectHandle.None;
+        _victoryFallingScale = 1f;
+    }
 
-        if (_victorySword != null)
-            _victorySword.localScale = _victorySwordBaseScale;
-        _victorySword = null;
+    private void Update()
+    {
+        // 배율을 바꾼 낙하 검이 풀로 돌아갔으면(원샷 수명 끝·걷힘) Local 파트 배율을 되돌린다 — 다음 R 에 남지 않게.
+        if (_scaledStrikeParts.Count > 0 && (EffectManager.Instance == null || EffectManager.Instance.GetInstances(_victoryStrikeHandle, s_strikeInstances) == 0))
+            RestoreStrikeParts();
+    }
+
+    // 표시 전용 낙하 검 — 루트 배율은 매니저가, Local 파트는 여기서(위 설명).
+    private void ScaleStrikeLocalParts(float factor)
+    {
+        RestoreStrikeParts();
+        _victoryStrikeHandle = _targetStrikeHandle;
+        if (Mathf.Approximately(factor, 1f) || EffectManager.Instance == null) return;
+        EffectManager.Instance.GetInstances(_targetStrikeHandle, s_strikeInstances);
+        foreach (GameObject instance in s_strikeInstances)
+        {
+            instance.GetComponentsInChildren(true, s_strikeSystems);
+            foreach (ParticleSystem ps in s_strikeSystems)
+            {
+                Transform t = ps.transform;
+                if (t == instance.transform || ps.main.scalingMode != ParticleSystemScalingMode.Local || HasScaledAncestor(t, instance.transform))
+                    continue;
+                _scaledStrikeParts.Add(t);
+                _scaledStrikeBase.Add(t.localScale);
+                t.localScale *= factor;
+            }
+        }
+    }
+
+    private bool HasScaledAncestor(Transform t, Transform root)
+    {
+        for (Transform p = t.parent; p != null && p != root; p = p.parent)
+            if (_scaledStrikeParts.Contains(p)) return true;
+        return false;
+    }
+
+    private void RestoreStrikeParts()
+    {
+        for (int i = 0; i < _scaledStrikeParts.Count; i++)
+            if (_scaledStrikeParts[i] != null) _scaledStrikeParts[i].localScale = _scaledStrikeBase[i];
+        _scaledStrikeParts.Clear();
+        _scaledStrikeBase.Clear();
+        _victoryStrikeHandle = EffectHandle.None;
     }
 
     /// <summary>
@@ -405,10 +451,11 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     public void PlayTargetStrikeAtLocal(Transform target, float playRate)
     {
         LockTargetPosition(target, target != null ? target.position : transform.position);
-        PlayTargetStrikeLocal(playRate);
+        PlayTargetStrikeLocal(playRate, _victoryFallingScale);   // 처치 연출 낙하 검 배율(269) — 평소 R 경로는 1
+        ScaleStrikeLocalParts(_victoryFallingScale);
     }
 
-    private void PlayTargetStrikeLocal(float playRate)
+    private void PlayTargetStrikeLocal(float playRate, float scaleMultiplier = 1f)
     {
         if (targetStrike == null || EffectManager.Instance == null) return;
 
@@ -416,7 +463,7 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         // 둘이 어긋나면 "표식 옆에 칼이 꽂히는" 그림이 된다.
         // 원샷이라 엔트리 수명 뒤에 매니저가 알아서 반납한다. 핸들은 도중에 걷을 때만 쓴다.
         _targetStrikeHandle = EffectManager.Instance.PlayRecallable(targetStrike, _targetPosition, Quaternion.identity,
-            targetStrikeScale, 0f, playRate);
+            targetStrikeScale * scaleMultiplier, 0f, playRate);
     }
 
     /// <summary>

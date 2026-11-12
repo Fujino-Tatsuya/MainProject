@@ -38,11 +38,11 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Tooltip("스킬 연출 시작 때 백대쉬를 끊지 않고 같이 간다(267 후속) — 스킬 애니가 몸을 쥐고 백대쉬는 이동만(밀림 리액션 애니·끝 Idle 복귀 없음). 스킬 연출 시작이 백대쉬 시작보다 앞이어도 백대쉬는 자기 마커 시각에 시작. 하던 평타는 스킬 재생(0층 CrossFade 0.05초)이 끊는다. 표시만(각 피어), 판정·RPC 무관.")]
     public bool finisherWithBackDash;
 
-    [Header("처치자 검(269 — 팔라딘만. 검이 있는 처치자(PaladinSkillView)에서만 동작, 다른 캐릭터는 무시)")]
-    [Tooltip("처치 연출 시작부터 끝(끝·취소)까지 검에 번개를 두른다 — 팔라딘 R 칼날 전기(FX_Sword_Electric) 재사용, 검을 따라간다. 엔트리 파트 delay(0.45초)만큼 늦게 보인다. 각 피어 표시만(새 RPC 없음).")]
-    public bool swordLightning;
-    [Tooltip("처치 연출 동안 검 크기 배율(1 = 그대로). 끝·취소면 원래 크기. 번개도 같은 배율로 커진다.")]
-    [Min(0.01f)] public float swordScale = 1f;
+    [Header("처치자 검(269 — 팔라딘만. 처치자가 PaladinSkillView 를 가질 때만 동작, 다른 캐릭터는 무시)")]
+    [Tooltip("처치 연출 시작부터 끝(끝·취소)까지 손에 든 검에 번개를 두른다 — 팔라딘 R 칼날 전기(FX_Sword_Electric) 재사용, 검을 따라간다(손 검 크기는 그대로). 엔트리 파트 delay(0.45초)만큼 늦게 보인다. 느려짐 구간에도 원래 속도. 각 피어 표시만(새 RPC 없음).")]
+    public bool handSwordLightning;
+    [Tooltip("처치 연출의 낙하 검(R 마무리 낙뢰 FX_Lightening_Strike — 하늘에서 떨어지는 검) 크기 배율(1 = 그대로). 이 연출에서만 — 평소 R 은 그대로.")]
+    [Min(0.01f)] public float fallingSwordScale = 1f;
 
     [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 캐릭터를 골라 편집)")]
     [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]

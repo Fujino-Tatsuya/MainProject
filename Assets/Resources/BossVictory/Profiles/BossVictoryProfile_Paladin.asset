@@ -23,8 +23,8 @@ MonoBehaviour:
   backDashAngle: -30
   backDashIdleDelay: 0.35
   finisherWithBackDash: 1
-  swordLightning: 1
-  swordScale: 2
+  handSwordLightning: 1
+  fallingSwordScale: 2
   timeline:
     desaturate:
     - start: 0.105

@@ -320,6 +320,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     {
         presentationVortex = true;
         HandleTransformChanged(true);
+        BossVictoryGlitchPresentation.KeepRealtime(transformLoop);   // 느려짐 구간에도 원래 속도(269 사용자 결정)
     }
 
     /// <summary>처치 연출 오라를 접을 때인가 — 오라를 켰고 연출이 끝났다(순수 판단, EditMode).</summary>
