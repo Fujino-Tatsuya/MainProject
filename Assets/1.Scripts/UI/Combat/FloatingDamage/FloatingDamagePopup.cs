@@ -36,6 +36,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
     Vector3 _anchorWorld;
     Vector2 _scatter;
+    int _side;                       // 맞은 반대쪽(268): +1 오른쪽 · -1 왼쪽 · 0 위로만. 생성 때 정하고 누적 중에도 유지
     bool _accumulates;
     bool _suppressHasteKey;          // 제압 가속 합산 숫자(할 일 174)
     bool _holdsWhileSuppressHaste;   // 공격자의 가속이 끝날 때까지 사라지지 않게 붙잡는 중
@@ -75,6 +76,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         FloatingPopupStyle style,
         FloatingDamageTier tier,
         Vector3 anchorWorld,
+        float hurtboxScale,
+        int side,
         Canvas canvas,
         FloatingDamageEmphasisGate emphasisGate,
         Action<FloatingDamagePopup> release)
@@ -86,6 +89,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _emphasisGate = emphasisGate;
         _release = release;
         _anchorWorld = anchorWorld;
+        _side = side;
         _accumulates = accumulation != FloatingDamageAccumulation.None;
         _suppressHasteKey = accumulation == FloatingDamageAccumulation.SuppressHaste;
         _holdsWhileSuppressHaste = _suppressHasteKey;
@@ -118,7 +122,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
             request.fromLocalPlayer,
             settings.TeammateScaleMultiplier,
             settings.TeammateAlpha);
-        _displayScaleMultiplier = displayDecision.scaleMultiplier;
+        // 판정 크기 배율(268) — 구간 크기·팀원 배율과 곱한다. 생성 때 1회(누적 숫자도 첫 값 유지).
+        _displayScaleMultiplier = displayDecision.scaleMultiplier * Mathf.Max(0.01f, hurtboxScale);
         _displayAlphaMultiplier = displayDecision.alphaMultiplier;
         _alpha = _baseColor.a * _displayAlphaMultiplier;
 
@@ -215,7 +220,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
         float scaleFactor = Mathf.Max(0.0001f, _canvas.scaleFactor);
         Vector2 position = new Vector2(screen.x / scaleFactor, screen.y / scaleFactor);
-        position.x += _styleOffset.x + _scatter.x + ShakeOffset();
+        position.x += _styleOffset.x + _scatter.x + ShakeOffset() + SideOffset();
         position.y += _settings.SpawnOffset + _styleOffset.y + _scatter.y + VerticalOffset();
 
         Vector2 size = _canvasRect.rect.size;
@@ -283,6 +288,16 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         return scale * _displayScaleMultiplier;
     }
 
+    // 맞은 반대쪽(268) — 생성 때 sidePush 만큼 밀고, sideDriftDuration 동안 sideDrift 만큼 더 흘러간 뒤 머문다.
+    float SideOffset()
+    {
+        if (_side == 0)
+            return 0f;
+
+        float drift = Easing.Evaluate(_settings.SideDriftEase, Mathf.Clamp01(_elapsed / _settings.SideDriftDuration));
+        return FloatingDamageSidePolicy.OffsetX(_side, _settings.SidePush, _settings.SideDrift, drift);
+    }
+
     // 좌우로 짧게 1회 — sin 한 주기라 +max → -max → 0 으로 끝난다. 숫자에만 적용(카메라 아님).
     float ShakeOffset()
     {
@@ -345,7 +360,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         Color fill = _baseColor;
         fill.a = alpha;
         Color outline = _digitSet.OutlineColor;
-        outline.a *= alpha;
+        // 외곽선 알파(268) — alpha 에 팀원 최대 알파·페이드가 이미 들어 있다.
+        outline.a = FloatingDamageOutlinePolicy.Alpha(outline.a, _settings.OutlineAlpha, alpha);
         _view.SetColors(fill, outline);
     }
 

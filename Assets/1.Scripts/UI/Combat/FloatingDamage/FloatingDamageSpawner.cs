@@ -14,6 +14,7 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
     readonly Dictionary<FloatingDamageAccumulationKey, FloatingDamagePopup> _activeByKey = new();
     readonly List<FloatingDamagePopup> _livePopups = new();
     readonly FloatingDamageEmphasisGate _emphasisGate = new();
+    readonly Dictionary<int, float> _hurtboxSizeById = new();
     ObjectPool<FloatingDamagePopup> _pool;
     Canvas _canvas;
 
@@ -59,8 +60,9 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         }
 
         // 제압 가속 중인 공격자의 피해는 Multi 여부와 무관하게 대상별 숫자 하나로 합친다(할 일 174). 상태이상은 복제값이라 전 피어 같다.
+        // 힐 숫자(268)는 늘 힐한 사람·대상별 합산.
         FloatingDamageAccumulation accumulation = FloatingDamageAccumulationPolicy.Resolve(
-            request.hitPattern, SuppressHastePresence.IsActiveForClient(request.attackerClientId));
+            request.kind, request.hitPattern, SuppressHastePresence.IsActiveForClient(request.attackerClientId));
         bool canAccumulate = FloatingDamageAccumulationPolicy.TryCreateKey(
             request.attackerClientId,
             request.attackType,
@@ -81,8 +83,48 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         _livePopups.Add(popup);
         if (canAccumulate)
             _activeByKey[key] = popup;
-        popup.Initialize(request, accumulation, settings, style, tier, ResolveAnchor(request.target),
+        Vector3 anchor = ResolveAnchor(request.target);
+        popup.Initialize(request, accumulation, settings, style, tier, anchor,
+            settings.HurtboxScale(ResolveHurtboxSize(request.target)),
+            ResolveSide(request, anchor),
             _canvas, _emphasisGate, ReleasePopup);
+    }
+
+    /// <summary>
+    /// 맞은 반대쪽(268) — 생성 순간 대상 생성점과 공격자 위치의 화면 x 로 정한다(누적 숫자는 이 첫 방향을 유지).
+    /// 비교는 Canvas 단위(1080p px)라 문턱이 해상도와 무관하다.
+    /// </summary>
+    int ResolveSide(FloatingPopupRequest request, Vector3 anchor)
+    {
+        Camera camera = Camera.main;
+        if (!request.hasSource || camera == null)
+            return 0;
+
+        Vector3 target = camera.WorldToScreenPoint(anchor);
+        Vector3 source = camera.WorldToScreenPoint(request.sourceWorld);
+        if (target.z <= 0f || source.z <= 0f)
+            return 0;
+
+        float scaleFactor = Mathf.Max(0.0001f, _canvas.scaleFactor);
+        return FloatingDamageSidePolicy.Side(true, target.x / scaleFactor, source.x / scaleFactor,
+            settings.SideFrontThreshold);
+    }
+
+    /// <summary>
+    /// 대상 판정 크기(m, 268). 판정이 잠깐 꺼진 순간(무적 구간 등)에도 크기가 튀지 않게 마지막으로 잰 값을 대상별로 기억한다.
+    /// </summary>
+    public float ResolveHurtboxSize(Unit target)
+    {
+        if (target == null)
+            return 0f;
+
+        int id = target.GetInstanceID();
+        float size = FloatingDamageHurtboxMeasure.Measure(target);
+        if (size > 0f)
+            _hurtboxSizeById[id] = size;
+        else
+            _hurtboxSizeById.TryGetValue(id, out size);
+        return size;
     }
 
     void OnEnable()

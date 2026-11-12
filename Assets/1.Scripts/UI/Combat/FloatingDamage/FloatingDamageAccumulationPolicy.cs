@@ -66,6 +66,17 @@ public static class FloatingDamageAccumulationPolicy
             : FloatingDamageAccumulation.None;
     }
 
+    /// <summary>
+    /// 숫자 종류까지 본 누적 방식. 힐 숫자(268)는 늘 힐한 사람·대상별 합산(Multi)이고 제압 가속 합산은 타지 않는다
+    /// (가속은 피해 연출 — 힐 숫자가 가속 끝까지 붙잡히지 않게). 나머지는 <see cref="Resolve"/>.
+    /// </summary>
+    public static FloatingDamageAccumulation Resolve(PopupKind kind, AttackHitPattern hitPattern, bool attackerSuppressHaste)
+    {
+        return kind == PopupKind.Heal
+            ? FloatingDamageAccumulation.Multi
+            : Resolve(hitPattern, attackerSuppressHaste);
+    }
+
     public static bool TryCreateKey(
         ulong attackerClientId,
         AttackType attackType,

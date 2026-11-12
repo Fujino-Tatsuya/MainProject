@@ -55,7 +55,8 @@ public sealed class TrainingDummyDamagePresenter : MonoBehaviour
             if (decision.shouldDisplay)
                 spawner.Submit(new FloatingPopupRequest(_dummy, PopupKind.Damage, damage.amount,
                     filter != FloatingDamageDisplayFilter.AllDamage && fromLocalPlayer,
-                    damage.attackerClientId, damage.attackType, damage.hitPattern));
+                        damage.attackerClientId, damage.attackType, damage.hitPattern)
+                    .WithPlayerSource(damage.attackerClientId)); // 반대쪽 연출 기준점(268)
         }
 
         if (fromLocalPlayer)

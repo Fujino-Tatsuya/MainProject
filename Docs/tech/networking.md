@@ -11,6 +11,17 @@
   - 프리팹에 NetworkObject 가 없어 RPC 대신 named message 를 쓴다(`GlobalTimeScale` 과 같음).
   - 선착순/동시(첫 승인 + 0.05초)·보스 효과 1회·피해는 여전히 서버가 정한다. 상세 [interrupt-client-judge.md](interrupt-client-judge.md).
 
+## 표시용 전투 알림 RPC (`Unit`, 서버 → 전 피어)
+판정에 쓰지 않는 로컬 연출용(피해 숫자·피격음·카메라 반응 등). 체력 자체는 `_currentHp` NetworkVariable 로 따로 복제된다.
+
+| RPC | 인자 | 언제 | 소비 이벤트 |
+|---|---|---|---|
+| `ClientDamageDealtClientRpc` | hp, shield, attackerClientId, **attackerObjectId**(268), attackType, hitPattern | 피해가 HP·보호막을 실제로 깎을 때마다(체력 클램프 전 값) | `ClientDamagedAttributed`·`ClientHitAttributed` |
+| `ClientHealedClientRpc` (268 신규) | healed, healerClientId | `HealHp(…, countInStats: true)` 실제 회복량 &gt; 0 · 플레이어 소생 `Revive(reportHeal: true)` | `ClientHealedAttributed` |
+
+- `attackerClientId` = 플레이어 공격자(아니면 ulong.MaxValue). `attackerObjectId` = 플레이어가 아닌 공격자 Unit(몬스터·보스)의 NetworkObjectId(아니면 ulong.MaxValue) — 피해 숫자 반대쪽 연출 기준점.
+- 힐 RPC 제외: 기본 체력 재생·훈련 보정(countInStats false)·재합류 복원·전멸 리스폰·몬스터 재사용 `Revive()`·훈련 더미 리필(`ReportsHealNumbers` false). 상세 [floating-damage-design.md §6·§13](floating-damage-design.md).
+
 ## Lobby Demo (target, 2026-10-19)
 > Status: **implementation in progress** on `feature/LobbyDemo` (PLAN-48 v2, commits C1~C13). The code may still differ from this section until those commits land.
 > Where this section conflicts with the sections below marked **(old / current code)**, this section is the decision for the booth demo.

@@ -52,4 +52,25 @@ public sealed class FloatingDamageDebugLabTests
             Object.DestroyImmediate(settings);
         }
     }
+
+    [Test]
+    public void 공격자_자리_왼쪽_오른쪽_정면_없음()
+    {
+        Vector3 target = new Vector3(1f, 2f, 3f);
+        Vector3 right = new Vector3(0.7071f, -0.5f, 0.7071f); // 기울어진 카메라 오른쪽 — 바닥 평면으로 눕힌다
+        Vector3 back = new Vector3(-0.5f, 0.8f, 0.5f);  // 카메라 쪽(오른쪽과 수직)
+
+        Assert.IsTrue(DebugFloatingDamageLabRules.TryGetSource(DebugFloatingDamageLab.SourceChoice.Left, target, right, back, 3f, out Vector3 left));
+        Assert.AreEqual(target.y, left.y, 1e-4f, "높이는 대상과 같다");
+        Assert.AreEqual(3f, Vector3.Distance(target, left), 1e-3f);
+        Assert.Less(Vector3.Dot(left - target, right), 0f, "카메라 왼쪽");
+
+        Assert.IsTrue(DebugFloatingDamageLabRules.TryGetSource(DebugFloatingDamageLab.SourceChoice.Right, target, right, back, 3f, out Vector3 rightPoint));
+        Assert.Greater(Vector3.Dot(rightPoint - target, right), 0f, "카메라 오른쪽");
+
+        Assert.IsTrue(DebugFloatingDamageLabRules.TryGetSource(DebugFloatingDamageLab.SourceChoice.Front, target, right, back, 3f, out Vector3 front));
+        Assert.AreEqual(0f, Vector3.Dot(front - target, new Vector3(right.x, 0f, right.z).normalized), 1e-3f, "정면 = 화면 x 차이 없음");
+
+        Assert.IsFalse(DebugFloatingDamageLabRules.TryGetSource(DebugFloatingDamageLab.SourceChoice.None, target, right, back, 3f, out _));
+    }
 }
