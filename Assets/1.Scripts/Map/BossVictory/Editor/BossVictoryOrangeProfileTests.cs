@@ -4,31 +4,49 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// RECTIFY 주황 채움 = 캐릭터별 프로필(11-12) — 세 프로필 값 = 옮기기 전 공용 값 · 렌더 값(<see cref="BossVictoryOrangeLook"/>)·팔레트 기준 색은 처치자 프로필에서.
+/// RECTIFY 주황 채움 = 캐릭터별 프로필(11-12) — 세 프로필에 칸 존재·코드 기본값 = 옮기기 전 공용 값 · 렌더 값(<see cref="BossVictoryOrangeLook"/>)·팔레트 기준 색은 처치자 프로필에서.
 /// </summary>
 public sealed class BossVictoryOrangeProfileTests
 {
     const string ProfileDir = "Assets/Resources/BossVictory/Profiles/";
     const float Tolerance = 1e-5f;
 
+    // 세 프로필 값은 사용자 튜닝 대상이라 고정값으로 비교하지 않는다(272 후속) — 칸이 직렬화돼 있는지 + 코드 기본값 = 옮기기 전 공용 값(관계)만 고정.
+    static readonly string[] OrangeFields =
+    {
+        nameof(BossVictoryProfile.rectifyOrangeHold), nameof(BossVictoryProfile.rectifyOrangeWipe), nameof(BossVictoryProfile.rectifyOrangeRightToLeft),
+        nameof(BossVictoryProfile.rectifyOrangeJitter), nameof(BossVictoryProfile.rectifyOrangeRowPixels), nameof(BossVictoryProfile.rectifyOrangeLeft),
+        nameof(BossVictoryProfile.rectifyOrangeRight), nameof(BossVictoryProfile.rectifyOrangeGradient), nameof(BossVictoryProfile.rectifyScanlineSpacing),
+        nameof(BossVictoryProfile.rectifyScanlineDark),
+    };
+
     [Test]
-    public void 프로필_3개_주황_값은_옮기기_전_공용_값()
+    public void 프로필_3개에_주황_칸이_있고_코드_기본값은_옮기기_전_공용_값()
     {
         foreach (string ch in new[] { "Paladin", "Gunner", "Assassin" })
         {
             var p = AssetDatabase.LoadAssetAtPath<BossVictoryProfile>($"{ProfileDir}BossVictoryProfile_{ch}.asset");
             Assert.IsNotNull(p, ch);
-            Assert.AreEqual(0.05f, p.rectifyOrangeHold, Tolerance, $"{ch} Hold");
-            Assert.AreEqual(0.1f, p.rectifyOrangeWipe, Tolerance, $"{ch} Wipe");
-            Assert.IsFalse(p.rectifyOrangeRightToLeft, $"{ch} RightToLeft");
-            Assert.AreEqual(0.2f, p.rectifyOrangeJitter, Tolerance, $"{ch} Jitter");
-            Assert.AreEqual(4f, p.rectifyOrangeRowPixels, Tolerance, $"{ch} RowPixels");
-            AssertColor(new Color(1f, 0.2696447f, 0f, 1f), p.rectifyOrangeLeft, $"{ch} Left");
-            AssertColor(new Color(1f, 0f, 0.455451f, 1f), p.rectifyOrangeRight, $"{ch} Right");
-            Assert.AreEqual(1f, p.rectifyOrangeGradient, Tolerance, $"{ch} Gradient");
-            Assert.AreEqual(0.003f, p.rectifyScanlineSpacing, Tolerance, $"{ch} ScanlineSpacing");
-            Assert.AreEqual(0f, p.rectifyScanlineDark, Tolerance, $"{ch} ScanlineDark");
+            var so = new SerializedObject(p);
+            foreach (string field in OrangeFields)
+                Assert.IsNotNull(so.FindProperty(field), $"{ch} {field} 칸");
         }
+
+        var d = ScriptableObject.CreateInstance<BossVictoryProfile>();
+        try
+        {
+            Assert.AreEqual(0.05f, d.rectifyOrangeHold, Tolerance, "Hold");
+            Assert.AreEqual(0.1f, d.rectifyOrangeWipe, Tolerance, "Wipe");
+            Assert.IsFalse(d.rectifyOrangeRightToLeft, "RightToLeft");
+            Assert.AreEqual(0.2f, d.rectifyOrangeJitter, Tolerance, "Jitter");
+            Assert.AreEqual(4f, d.rectifyOrangeRowPixels, Tolerance, "RowPixels");
+            AssertColor(new Color(1f, 0.2696447f, 0f, 1f), d.rectifyOrangeLeft, "Left");
+            AssertColor(new Color(1f, 0f, 0.455451f, 1f), d.rectifyOrangeRight, "Right");
+            Assert.AreEqual(1f, d.rectifyOrangeGradient, Tolerance, "Gradient");
+            Assert.AreEqual(0.003f, d.rectifyScanlineSpacing, Tolerance, "ScanlineSpacing");
+            Assert.AreEqual(0f, d.rectifyScanlineDark, Tolerance, "ScanlineDark");
+        }
+        finally { Object.DestroyImmediate(d); }
     }
 
     [Test]

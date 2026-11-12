@@ -81,15 +81,18 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     BossVictoryKillerMove _move;
     bool _tooClose;                   // 후퇴 차징 — 처치 순간 보스와 수평 거리 < 후퇴 거리(각 피어가 자기 화면 위치로)
     PlayerSkillBase _finisherSkill;   // 지금 처치 연출 스킬(End 구독 대상 — 후퇴 스킬 E 의 End 는 무시, 순간이동 Q 는 null)
-    // 순간이동 Q(어쌔신) — 두 점은 보스 기준(모든 피어 같은 값). 이동은 오너만(모터), 일섬·애니는 각 피어.
-    bool _teleported;
-    Vector3 _tpPoint, _tpArrival;
-    bool _tpMoveOn;                   // 순간이동 Q 재생 중(이동 구간 판정 대상)
-    float _tpMoveStart, _tpMoveStop;  // 이동 구간(클립 시간 초)
-    float _tpMoveDone;                // 오너 — 지금까지 옮긴 진행(곡선 값)
-    bool _tpMoveBegun, _tpMoveEnded;
-    PlayerMotor _tpMotor;
-    AssassinSkillView _tpPierce;
+    // 순간이동 Q(어쌔신, 272 후속) — 타임라인 '어쌔신 순간이동·Q 이동' 클립마다(시작 순). 두 점은 보스 기준(모든 피어 같은 값). 이동은 오너만(모터), 일섬·애니는 각 피어.
+    bool _dashOn;                     // 처치 연출 단계에 들어와 트랙을 돌리는 중
+    readonly List<int> _dashOrder = new List<int>();
+    int _dashSeg = -1;                // 지금 이동 순서(아직이면 -1)
+    bool _dashSegEnded;               // 지금 이동이 끝났다(일섬 그음) — 다음 클립 전 빈 시간·마지막 뒤
+    Vector3 _dashFrom, _dashTo;       // 지금 이동 두 점(월드, 높이 = 처치자 발)
+    float _dashMoved;                 // 오너 — 지금 이동에서 옮긴 진행(곡선 값)
+    float _dashClipSpan = -1f;        // 애니 Custom0 → End 클립 구간(초) — 이동 중 애니 배율
+    float _dashCustom0;               // 애니 Custom0 클립 시각(초) — 클립마다 이 프레임부터
+    float _dashAnimScale = -1f;       // 이동 중 처치자 애니 배율(아니면 -1)
+    PlayerMotor _dashMoveMotor;
+    AssassinSkillView _dashPierce;
 
     // 처치 연출 스킬 끝 자르기(255 후속 7) — 자른 프레임에 닿으면 처치자 애니 배율 0(BossVictoryAnimTrim).
     int _finisherState;          // 처치 연출 스킬 상태 짧은 이름 해시(재생 시작 뒤에만 0 아님)
@@ -384,10 +387,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _finisherEndEvent = -1f;
         _killerFrozen = false;
         _finisherSkill = null;
-        _teleported = false;
-        _tpMoveOn = _tpMoveBegun = _tpMoveEnded = false;
-        _tpMotor = null;
-        _tpPierce = null;
+        _dashOn = _dashSegEnded = false;
+        _dashSeg = -1;
+        _dashAnimScale = -1f;
+        _dashMoveMotor = null;
+        _dashPierce = null;
         _finisherTimingKey = _bossTimingKey = null;
         _clockLogPrevT = -1f;
 
@@ -527,8 +531,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
                 ClockLog($"백대쉬 시작(스킬과 같이) {times.BackDashStart:0.000}s");
                 BeginBackDash(motionOnly: true);
             }
-            if (_killerStep == BossVictoryKillerSequence.Step.Finisher && !_killerFrozen) TickFinisherTrim();
-            if (_tpMoveOn) TickTeleportMove();
+            if (_dashOn) TickAssassinDash();
+            // 순간이동 Q(272 후속) — 정지 프레임은 마지막 이동이 끝난 뒤에만(클립 사이 빈 시간엔 애니가 이어 재생된다).
+            if (_killerStep == BossVictoryKillerSequence.Step.Finisher && !_killerFrozen && (!_dashOn || DashAllDone)) TickFinisherTrim();
         }
         if (_phase == Phase.Finisher && BossVictoryKillerSequence.SlowByMarker(tl.slowStartTime, _glitchTime))
             EnterSlow("느려짐 시작 마커");
@@ -549,9 +554,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
                 ClockLog($"백대쉬 시작 {KillerTimes.BackDashStart:0.000}s ({_move})");
                 switch (_move)
                 {
-                    case BossVictoryKillerMove.TeleportDash:
-                        Teleport();
-                        break;
                     case BossVictoryKillerMove.RetreatCharge:   // 가까울 때만 이 단계가 온다(멀면 백대쉬 시작 = 무한대)
                         BeginBackDash(motionOnly: true);        // 후퇴 스킬 애니가 몸을 쥔다 — 백대쉬는 이동만
                         PlayRetreatSkill();
@@ -564,9 +566,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             case BossVictoryKillerSequence.Step.Finisher:
                 if (_move == BossVictoryKillerMove.TeleportDash)
                 {
-                    // 272 — 스킬 연출 시작이 백대쉬 시작보다 앞이어도 순간이동은 먼저(그 자리에서 Q 를 쓰면 의미가 없다).
-                    if (!_teleported) Teleport();
-                    StartTeleportMove();
+                    StartAssassinDash();   // 272 후속 — 첫 클립 시작(이 단계 시각)부터 트랙이 순간이동·Q 이동을 낸다
                     break;
                 }
                 if (FinisherWithBackDash)
@@ -622,106 +622,136 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         Edit.Log($"[BossVictory] 후퇴 스킬 — {_killer.name} {_profile.retreatSkillSlot} {skill.Data.AnimatorStateName} + 백대쉬 (글리치 t {_glitchTime:0.00})", this);
     }
 
-    // [순간이동] 보스 기준 두 점(보스가 없으면 처치자 기준). 모든 피어 같은 값 — 보스 위치·회전은 복제.
-    void ResolveTeleportPoints()
+    // ── [순간이동 Q 트랙(272 후속)] 타임라인 '어쌔신 순간이동·Q 이동' 클립마다 — 시작에 그 클립 시작 지점으로 순간이동 → 길이 동안 도착 지점까지 Q 이동(곡선) → 끝에 일섬.
+    // 순서 = 시작 순(#1 #2 …), 겹치면 앞 클립은 다음 클립 시작에서 끝. 마지막 뒤엔 애니가 정지 프레임까지 가서 멈춘다(TickFinisherTrim).
+    // 위치는 처치자 오너만 옮기고(다른 피어는 NetworkTransform 복제), 애니·일섬은 각 피어 로컬 — 새 RPC 없음.
+    List<BossVictoryClip> DashClips => _profile.timeline.assassinDash;
+    bool DashAllDone => BossVictoryAssassinDash.AllDone(DashClips, _dashOrder, _glitchTime);
+
+    void StartAssassinDash()
     {
-        Transform basis = _boss != null ? _boss.transform : _killer.transform;
-        _tpPoint = BossVictoryKillerMoves.BossPoint(basis.position, basis.rotation, _profile.teleportOffset);
-        _tpArrival = BossVictoryKillerMoves.BossPoint(basis.position, basis.rotation, _profile.arrivalOffset);
-        _tpPoint.y = _tpArrival.y = _killer.transform.position.y;   // 높이 = 처치자 발(보스 피벗 높이와 무관)
+        _finisherSkill = null;
+        if (_killer == null || _killerSkills == null) return;
+        BossVictoryAssassinDash.Order(DashClips, _dashOrder);
+        if (_dashOrder.Count == 0)
+        {
+            Edit.LogWarning($"[BossVictory] 순간이동 Q — 타임라인 '어쌔신 순간이동·Q 이동' 클립이 없다({_profile.name}).", this);
+            return;
+        }
+        string state = _profile.teleportMoveState;
+        RuntimeAnimatorController controller = _killerAnimator != null ? _killerAnimator.runtimeAnimatorController : null;
+        AnimationClip clip = controller != null ? AnimationEventRequirements.FindStateClip(controller, state) : null;
+        if (clip == null)
+        {
+            Edit.LogError($"[BossVictory] 순간이동 Q 상태 '{state}' 가 {_killer.name} Animator 에 없다(프로필 teleportMoveState).", this);
+            return;
+        }
+        float custom0 = SkillEventTime(clip, SkillAnimationEventType.Custom0);
+        float end = SkillEventTime(clip, SkillAnimationEventType.End);
+        _dashCustom0 = Mathf.Max(0f, custom0);
+        _dashClipSpan = (end > _dashCustom0 ? end : clip.length) - _dashCustom0;
+        _finisherState = Animator.StringToHash(state);
+        _dashPierce = _killer.GetComponent<AssassinSkillView>();
+        _dashOn = true;
+        _dashSeg = -1;
+        _dashSegEnded = false;
+        Edit.Log($"[BossVictory] 순간이동 Q 트랙 — 클립 {_dashOrder.Count}개 · {state} Custom0 {_dashCustom0:0.###}초부터(구간 {_dashClipSpan:0.###}초)" +
+                 (FinisherTrim > 0f ? $" · 마지막 뒤 정지 {FinisherTrim:0.###}초" : "") + $" (글리치 t {_glitchTime:0.00})", this);
     }
 
-    // [순간이동] 처치자 오너만 실제로 옮긴다(LobbyPodLaunch.TeleportOwner 와 같은 순서) — 다른 피어는 NetworkTransform 순간이동 복제로 본다.
-    void Teleport()
+    // [이 피어] 매 프레임 — 다음 클립 시작이면 들어가고, 지금 이동 끝 시각이면 일섬. 이동 중 애니 배율도 여기서.
+    void TickAssassinDash()
     {
-        _teleported = true;
-        if (_killer == null) return;
-        ResolveTeleportPoints();
-        Vector3 facing = _tpArrival - _tpPoint;
-        facing.y = 0f;
+        List<BossVictoryClip> clips = DashClips;
+        int k = BossVictoryAssassinDash.Current(clips, _dashOrder, _glitchTime);
+        while (_dashSeg < k)
+        {
+            if (_dashSeg >= 0 && !_dashSegEnded) EndDashSegment();
+            EnterDashSegment(_dashSeg + 1);
+        }
+        if (_dashSeg >= 0 && !_dashSegEnded && _glitchTime >= BossVictoryAssassinDash.SegmentEnd(clips, _dashOrder, _dashSeg))
+            EndDashSegment();
+        _dashAnimScale = _dashSeg >= 0 && !_dashSegEnded
+            ? BossVictoryKillerMoves.MoveAnimScale(_dashClipSpan, clips[_dashOrder[_dashSeg]].length, StateSpeed(_killerAnimator, _finisherState))
+            : -1f;
+    }
+
+    void EnterDashSegment(int k)
+    {
+        _dashSeg = k;
+        _dashSegEnded = false;
+        _dashMoved = 0f;
+        BossVictoryClip c = DashClips[_dashOrder[k]];
+        Transform basis = _boss != null ? _boss.transform : _killer.transform;   // 보스 위치·회전은 복제 — 모든 피어 같은 점
+        _dashFrom = BossVictoryKillerMoves.BossPoint(basis.position, basis.rotation, c.dashFrom);
+        _dashTo = BossVictoryKillerMoves.BossPoint(basis.position, basis.rotation, c.dashTo);
+        _dashFrom.y = _dashTo.y = _killer.transform.position.y;   // 높이 = 처치자 발(보스 피벗 높이와 무관)
+        Vector3 dir = _dashTo - _dashFrom;
+        dir.y = 0f;
+
+        // 오너만 실제로 옮긴다(LobbyPodLaunch.TeleportOwner 와 같은 순서).
         if (_killer.IsOwner && _killer.TryGetComponent(out PlayerMotor motor))
         {
             EndDash();
             if (_killer.TryGetComponent(out PlayerStateController state)) state.EndDash();
             motor.ClearKnockbackVelocity();
-            motor.TeleportAuthoritative(_tpPoint);
-            if (facing.sqrMagnitude > 0.0001f && _killer.TryGetComponent(out PlayerMovement movement)) movement.RotateImmediately(facing);
+            motor.TeleportAuthoritative(_dashFrom);
+            if (dir.sqrMagnitude > 0.0001f && _killer.TryGetComponent(out PlayerMovement movement)) movement.RotateImmediately(dir);
             if (_killer.TryGetComponent(out Unity.Netcode.Components.NetworkTransform netTransform))
-                netTransform.Teleport(_tpPoint, _killer.transform.rotation, _killer.transform.localScale);
-        }
-        Edit.Log($"[BossVictory] 처치자 순간이동 — {_tpPoint} → 도착 {_tpArrival}{(_killer.IsOwner ? "(오너 이동)" : "(위치는 복제)")} (글리치 t {_glitchTime:0.00})", this);
-    }
-
-    // [순간이동] Q 대신 프로필 애니 상태(Combo_Attack_03_04)를 표시로만 — 스킬 없이 0층을 쥔다(그 End 는 스킬 끝이 아님). 이동 구간 = 클립 이벤트.
-    void StartTeleportMove()
-    {
-        if (_killer == null || _killerSkills == null) return;
-        string state = _profile.teleportMoveState;
-        Vector3 dir = _tpArrival - _tpPoint;
-        dir.y = 0f;
-        if (!_killerSkills.PlayPresentationStateOnly(state, dir))
-        {
-            Edit.LogError($"[BossVictory] 순간이동 Q 상태 '{state}' 가 {_killer.name} Animator 에 없다(프로필 teleportMoveState).", this);
-            return;
-        }
-        _finisherSkill = null;
-        _finisherState = Animator.StringToHash(state);
-        RuntimeAnimatorController controller = _killerAnimator != null ? _killerAnimator.runtimeAnimatorController : null;
-        AnimationClip clip = controller != null ? AnimationEventRequirements.FindStateClip(controller, state) : null;
-        float freeze = FinisherTrim > 0f ? FinisherTrim : clip != null ? clip.length : 0f;
-        BossVictoryKillerMoves.MoveInterval(SkillEventTime(clip, SkillAnimationEventType.Custom0), SkillEventTime(clip, SkillAnimationEventType.End),
-            freeze, _profile.teleportMoveInterval, out _tpMoveStart, out _tpMoveStop);
-        _tpMoveOn = true;
-        _tpMoveBegun = _tpMoveEnded = false;
-        _tpMoveDone = 0f;
-        _tpPierce = _killer.GetComponent<AssassinSkillView>();
-        _tpMotor = null;
-        if (_killer.IsOwner && _killer.TryGetComponent(out PlayerMotor motor))
-        {
-            motor.ClearKnockbackVelocity();
+                netTransform.Teleport(_dashFrom, _killer.transform.rotation, _killer.transform.localScale);
             motor.PassThroughUnitsOverride = true;   // 보스 몸을 지나간다(백대쉬와 같다)
-            _tpMotor = motor;
+            _dashMoveMotor = motor;
         }
-        ClockLog($"순간이동 Q 시작 {_profile.timeline.finisherStartTime:0.000}s");
-        Edit.Log($"[BossVictory] 순간이동 Q — {state} · 이동 클립 {_tpMoveStart:0.###}~{_tpMoveStop:0.###}초({_profile.teleportMoveInterval})" +
-                 (FinisherTrim > 0f ? $" · 정지 {FinisherTrim:0.###}초" : "") + $" (글리치 t {_glitchTime:0.00})", this);
+
+        // 애니 — 첫 클립은 상태를 쥐고(스킬 없이 표시만), 클립마다 Custom0 프레임부터 다시.
+        if (k == 0 && !_killerSkills.PlayPresentationStateOnly(_profile.teleportMoveState, dir))
+            Edit.LogError($"[BossVictory] 순간이동 Q 상태 '{_profile.teleportMoveState}' 를 못 틀었다({_killer.name}).", this);
+        else if (k > 0 && dir.sqrMagnitude > 0.0001f) _killer.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+        if (_killerAnimator != null && _killerAnimator.runtimeAnimatorController != null)
+        {
+            AnimationClip clip = AnimationEventRequirements.FindStateClip(_killerAnimator.runtimeAnimatorController, _profile.teleportMoveState);
+            float len = clip != null && clip.length > 0f ? clip.length : 1f;
+            _killerAnimator.Play(_finisherState, 0, _dashCustom0 / len);
+        }
+        if (_dashPierce != null) _dashPierce.BeginPierce(_dashFrom, dir);
+        ClockLog($"순간이동 Q #{k + 1} 시작 {c.start:0.000}s");
+        Edit.Log($"[BossVictory] 순간이동 Q #{k + 1} — {_dashFrom} → {_dashTo} · {c.length:0.###}초{(_killer.IsOwner ? "(오너 이동)" : "(위치는 복제)")} (글리치 t {_glitchTime:0.00})", this);
     }
 
-    // [이 피어] 순간이동 Q 일섬 — 이동 구간 시작에 BeginPierce, 끝에 기본 Q 일섬·버스트(특성 색 없음). 애니는 각 피어 로컬이라 RPC 없음.
-    void TickTeleportMove()
+    // 지금 이동 끝 — 일섬 끝점 = 진행 점(겹쳐 잘렸으면 거기까지). 기본 Q 일섬·버스트(특성 색 없음).
+    void EndDashSegment()
     {
-        if (!TryStateClipTime(_killerAnimator, _finisherState, out float clipTime)) return;
-        Vector3 dir = _tpArrival - _tpPoint;
-        dir.y = 0f;
-        if (!_tpMoveBegun && clipTime >= _tpMoveStart)
-        {
-            _tpMoveBegun = true;
-            if (_tpPierce != null) _tpPierce.BeginPierce(_tpPoint, dir);
-        }
-        if (_tpMoveBegun && !_tpMoveEnded && clipTime >= _tpMoveStop)
-        {
-            _tpMoveEnded = true;
-            if (_tpPierce != null) _tpPierce.EndPresentationPierce(_tpArrival);
-            ClockLog("순간이동 Q 이동 끝");
-        }
+        _dashSegEnded = true;
+        float eased = BossVictoryAssassinDash.Progress(DashClips, _dashOrder, _dashSeg, _glitchTime, _profile.teleportMoveEase);
+        if (_dashPierce != null) _dashPierce.EndPresentationPierce(Vector3.LerpUnclamped(_dashFrom, _dashTo, eased));
+        ClockLog($"순간이동 Q #{_dashSeg + 1} 이동 끝");
     }
 
-    // [오너] 순간이동 Q 이동 — 클립 시간으로 진행(곡선)을 구해 그만큼 모터로 민다(벽이면 모터 스윕이 멈춘다). FixedUpdate.
-    void StepTeleportMove()
+    // [오너] FixedUpdate — 진행(곡선)만큼 모터로 민다(벽이면 모터 스윕이 멈춘다). 이동이 끝나면 모터를 놓는다.
+    void StepDashSegment()
     {
-        if (_tpMotor == null || !TryStateClipTime(_killerAnimator, _finisherState, out float clipTime)) return;
-        float eased = BossVictoryKillerMoves.MoveProgress(clipTime, _tpMoveStart, _tpMoveStop, _profile.teleportMoveEase);
-        Vector3 path = _tpArrival - _tpPoint;
+        if (_dashMoveMotor == null || _dashSeg < 0) return;
+        float eased = BossVictoryAssassinDash.Progress(DashClips, _dashOrder, _dashSeg, _glitchTime, _profile.teleportMoveEase);
+        Vector3 path = _dashTo - _dashFrom;
         path.y = 0f;
-        if (!Mathf.Approximately(eased, _tpMoveDone)) _tpMotor.AddGroundedDisplacement(path * (eased - _tpMoveDone));
-        _tpMoveDone = eased;
-        if (clipTime >= _tpMoveStop) EndTeleportMotor();
+        if (!Mathf.Approximately(eased, _dashMoved)) _dashMoveMotor.AddGroundedDisplacement(path * (eased - _dashMoved));
+        _dashMoved = eased;
+        if (_glitchTime >= BossVictoryAssassinDash.SegmentEnd(DashClips, _dashOrder, _dashSeg)) ReleaseDashMotor();
     }
 
-    void EndTeleportMotor()
+    void ReleaseDashMotor()
     {
-        if (_tpMotor != null) _tpMotor.PassThroughUnitsOverride = false;
-        _tpMotor = null;
+        if (_dashMoveMotor != null) _dashMoveMotor.PassThroughUnitsOverride = false;
+        _dashMoveMotor = null;
+    }
+
+    // 0층 그 상태의 상태 속도(speed × multiplier) — Animator.speed 는 빼고. 그 상태가 아니면 1.
+    static float StateSpeed(Animator a, int stateHash)
+    {
+        if (a == null || !a.isActiveAndEnabled || stateHash == 0) return 1f;
+        AnimatorStateInfo info = a.IsInTransition(0) && a.GetNextAnimatorStateInfo(0).shortNameHash == stateHash
+            ? a.GetNextAnimatorStateInfo(0) : a.GetCurrentAnimatorStateInfo(0);
+        return info.shortNameHash == stateHash && info.speed > 0f ? info.speed : 1f;
     }
 
     static float SkillEventTime(AnimationClip clip, SkillAnimationEventType type)
@@ -800,7 +830,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void FixedUpdate()
     {
         if (!_running || _killer == null) return;
-        if (_tpMotor != null) StepTeleportMove();
+        if (_dashMoveMotor != null) StepDashSegment();
         if (!_dashRunning) return;
         if (!BossEncounterDirector.StepSkid(_killer, _dashMotor, _dashDir, _profile.backDashDistance, _dashStartAt, _profile.backDashDuration,
                                             Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle, _dashEase, _profile.backDashIdleDelay,
@@ -1544,6 +1574,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     float Scale(Role role) => role switch
     {
         Role.Killer => _killerFrozen ? 0f   // 처치 연출 스킬 끝 자르기(255 후속 7) — 그 프레임에 멈춤
+                     : _dashAnimScale >= 0f ? _dashAnimScale   // 순간이동 Q 이동 중(272 후속) — 애니 Custom0→End 가 클립 길이에 맞게
                      : _phase == Phase.Slow ? _profile.killerAfterFinisherScale
                      : _killerStep == BossVictoryKillerSequence.Step.CurrentAction ? _profile.killerCurrentActionScale
                      : -1f,   // 백대쉬·처치 연출 스킬 동안은 덮지 않는다(1)
@@ -1617,8 +1648,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _bossHitAnimators.Clear();
         _bossPlayedAnimators.Clear();
         EndDash();
-        EndTeleportMotor();
-        _tpMoveOn = false;
+        ReleaseDashMotor();
+        _dashOn = false;
+        _dashAnimScale = -1f;
         _finisherSkill = null;
         if (_killer != null && _killer.TryGetComponent(out GunnerBeamView beam)) beam.ClearPresentationChargeScale();
         EndKillerSword();

@@ -388,6 +388,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (BossVictoryTimeline.IsBob(track))
             GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
                 $"±{clip.bobAmplitude:0.##}% · {clip.bobPeriod:0.##}s", EditorStyles.miniLabel);
+        if (BossVictoryTimeline.IsAssassinDash(track))
+            GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
+                $"#{BossVictoryAssassinDash.Number(Timeline.assassinDash, index)}", EditorStyles.miniBoldLabel);
         if (track == BossVictoryTrack.CameraCut)
         {
             EditorGUI.DrawRect(new Rect(r.x, r.y, 2f, r.height), Color.white);   // 컷 = 시작 순간
@@ -1287,12 +1290,36 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         List<BossVictoryClip> clips = Timeline.Clips(track);
         BossVictoryClip added = NewClip(track, start);
         if (BossVictoryTimeline.HasFades(track)) added.MigrateFadesToKeys();   // 효과 세기 = 키(255 후속 6)
+        if (BossVictoryTimeline.IsAssassinDash(track)) InitAssassinDash(clips, ref added);
         clips.Add(added);
         if (track == BossVictoryTrack.CameraCut) Timeline.cameraCutShots.Add(BossVictoryCameraCuts.Cut.Default);
         Select((int)track, clips.Count - 1, -1);
         Save();
         Repaint();
     }
+
+    // 새 어쌔신 순간이동·Q 이동 클립(272 후속) — 길이 = Custom0 → End 구간, 두 점 = 앞 클립(시작 순 마지막) 값, 없으면 기본.
+    static void InitAssassinDash(List<BossVictoryClip> clips, ref BossVictoryClip added)
+    {
+        added.length = BossVictoryAssassinDash.DefaultLength;
+        added.fadeIn = added.fadeOut = 0f;
+        added.weight = 1f;
+        var order = new List<int>(clips.Count);
+        BossVictoryAssassinDash.Order(clips, order);
+        if (order.Count > 0)
+        {
+            BossVictoryClip last = clips[order[order.Count - 1]];
+            added.dashFrom = last.dashFrom;
+            added.dashTo = last.dashTo;
+        }
+        else
+        {
+            added.dashFrom = BossVictoryAssassinDash.DefaultFrom;
+            added.dashTo = BossVictoryAssassinDash.DefaultTo;
+        }
+    }
+
+    static Vector3 FlatOffset(Vector3 v) => new Vector3(v.x, 0f, v.z);   // 높이는 런타임이 처치자 발 높이로 맞춘다
 
     void MoveMarker(BossVictoryMarker marker, float t)
     {
@@ -1403,7 +1430,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryMarker.FocusKiller => "처치자가 아닌 피어의 카메라가 이 시각에 처치자로 즉시 넘어간다(처치자 화면 그대로).",
         BossVictoryMarker.HideOthers => "이 시각에 처치자 외 플레이어 캐릭터를 모든 화면에서 숨긴다.",
         BossVictoryMarker.BackDashStart =>
-            "이 시각에 처치자가 백대쉬한다(처치자 이동 = 순간이동이면 순간이동, 후퇴 차징이면 가까울 때만 E + 백대쉬 — 272) — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다(순간이동은 스킬 직전에 한다). " +
+            "이 시각에 처치자가 백대쉬한다(처치자 이동 = 순간이동이면 이 마커는 안 씀 — 어쌔신 순간이동·Q 이동 트랙, 후퇴 차징이면 가까울 때만 E + 백대쉬 — 272) — 하던 동작이 남아 있으면 끊고, 먼저 끝났으면 그 사이 대기 자세. 스킬 연출 시작보다 늦으면 건너뛴다. " +
             "처치자 순서 노드는 각 피어가 자기 화면 시계로 앞으로만 판정 — 스크럽으로 되돌아가지 않는다(다시 보려면 ⏮).",
         BossVictoryMarker.FinisherStart =>
             "클립 시작 = 처치 연출 스킬을 표시용으로 바로 트는 시각 — 백대쉬가 덜 끝났으면 끊고, 처치 순간 쓰던 스킬이 남아 있어도 기다리지 않는다. " +
@@ -1511,6 +1538,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             c.uvTo = EditorGUILayout.FloatField(new GUIContent("끝 오프셋(UV)", "클립 끝 이후에도 이 값 유지 — 다음 클립은 여기에 더해진다."), c.uvTo);
             c.uvEase = (BossVictoryKeyCurve)EditorGUILayout.Popup("이징", (int)c.uvEase, KeyCurveLabels);
         }
+        if (BossVictoryTimeline.IsAssassinDash(track))
+        {
+            EditorGUILayout.LabelField("실행 순서", $"#{BossVictoryAssassinDash.Number(Timeline.assassinDash, _selIndex)}(시작 순 — 겹치면 앞 클립은 다음 클립 시작에서 끝)");
+            c.dashFrom = FlatOffset(EditorGUILayout.Vector3Field(new GUIContent("시작 지점(보스 기준)", "클립 시작에 이 점으로 순간이동. +Z = 보스 정면, 높이는 무시(처치자 발 높이)."), c.dashFrom));
+            c.dashTo = FlatOffset(EditorGUILayout.Vector3Field(new GUIContent("도착 지점(보스 기준)", "클립 길이 동안 여기까지 Q 이동(곡선 = 프로필 teleportMoveEase). 끝에 일섬."), c.dashTo));
+        }
         if (BossVictoryTimeline.IsBob(track))
         {
             c.bobAmplitude = EditorGUILayout.FloatField(new GUIContent("진폭(화면 높이 %)", "+ = 화면 내용이 위로. 레퍼런스 0.22."), c.bobAmplitude);
@@ -1563,7 +1596,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 저장 = 기준 좌표계(기준점 + 처치자→보스 축). 그 기준이 되는 처치자·보스 위치:
     // Play 중 연출이 돌면 지금 컷이 잡은 위치(컷 전이면 지금 위치) · 아니면 이 에디터 세션에서 마지막으로 본 회차 위치(SessionState). 없으면 버튼을 막는다.
 
-    // ── 순간이동 Q 두 점(272) — 이 창이 열려 있고 프로필 이동이 '순간이동'이면 Scene 뷰에 순간이동 지점·도착 지점·경로 + 끌기 핸들 ──
+    // ── 순간이동 Q 두 점(272 후속) — 이 창이 열려 있고 프로필 이동이 '순간이동'이면 Scene 뷰에 클립마다 시작·도착 지점·경로(#n) + 선택 클립 끌기 핸들 ──
     // 기준 보스 = 재생 중 보스 → 이 세션 마지막 회차 보스(SessionState) → 열린 씬의 23호. 저장 = 보스 기준 오프셋(BossVictoryKillerMoves.BossLocalOffset, 높이 0).
 
     const string BossPoseKey = "BossVictoryTimeline.LastBossPose";
@@ -1597,42 +1630,56 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return scene != null;
     }
 
+    // 어쌔신 순간이동·Q 이동 클립(272 후속) — 모든 클립 두 점·경로 + '#n' 표시, 선택한 클립만 밝게 + 핸들.
     void OnSceneGUI(SceneView view)
     {
         if (_profile == null || _profile.killerMove != BossVictoryKillerMove.TeleportDash) return;
         if (!TryGetBossPose(out Vector3 bossPos, out Quaternion bossRot, out string source)) return;
-        Vector3 a = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, _profile.teleportOffset);
-        Vector3 b = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, _profile.arrivalOffset);
+        List<BossVictoryClip> clips = Timeline.assassinDash;
 
         Handles.color = new Color(1f, 1f, 1f, 0.6f);
         Handles.DrawWireDisc(bossPos, Vector3.up, 0.6f);
         Handles.DrawAAPolyLine(2f, bossPos, bossPos + BossVictoryKillerMoves.Yaw(bossRot) * Vector3.forward * 1.5f);   // 보스 정면(+Z)
-        Handles.color = ArrivalColor;
-        Handles.DrawAAPolyLine(5f, a, b);
-        Vector3 path = b - a;
-        if (path.sqrMagnitude > 0.01f) Handles.ConeHandleCap(0, b - path.normalized * 0.3f, Quaternion.LookRotation(path), 0.35f, EventType.Repaint);
-        Handles.color = TeleportColor;
-        Handles.DrawWireDisc(a, Vector3.up, 0.4f);
-        Handles.color = ArrivalColor;
-        Handles.DrawWireDisc(b, Vector3.up, 0.4f);
-        Handles.Label(a + Vector3.up * 0.6f, "순간이동 지점");
-        Handles.Label(b + Vector3.up * 0.6f, "도착 지점");
         Handles.Label(bossPos + Vector3.up * 0.8f, $"기준: {source}");
+        if (clips == null || clips.Count == 0) return;
 
+        int selected = _selTrack == (int)BossVictoryTrack.AssassinDash && HasClipSelection ? _selIndex : -1;
+        var order = new List<int>(clips.Count);
+        BossVictoryAssassinDash.Order(clips, order);
+        for (int k = 0; k < order.Count; k++)
+        {
+            int i = order[k];
+            bool on = i == selected;
+            float alpha = selected < 0 || on ? 1f : 0.35f;
+            Vector3 a = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, clips[i].dashFrom);
+            Vector3 b = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, clips[i].dashTo);
+            Handles.color = WithAlpha(ArrivalColor, alpha);
+            Handles.DrawAAPolyLine(on ? 6f : 3f, a, b);
+            Vector3 path = b - a;
+            if (path.sqrMagnitude > 0.01f) Handles.ConeHandleCap(0, b - path.normalized * 0.3f, Quaternion.LookRotation(path), 0.35f, EventType.Repaint);
+            Handles.color = WithAlpha(TeleportColor, alpha);
+            Handles.DrawWireDisc(a, Vector3.up, on ? 0.5f : 0.4f);
+            Handles.color = WithAlpha(ArrivalColor, alpha);
+            Handles.DrawWireDisc(b, Vector3.up, on ? 0.5f : 0.4f);
+            Handles.Label(a + Vector3.up * 0.6f, $"#{k + 1} 시작");
+            Handles.Label(b + Vector3.up * 0.6f, $"#{k + 1} 도착");
+        }
+        if (selected < 0) return;
+
+        BossVictoryClip c = clips[selected];
         EditorGUI.BeginChangeCheck();
-        Vector3 na = Handles.PositionHandle(a, Quaternion.identity);
-        Vector3 nb = Handles.PositionHandle(b, Quaternion.identity);
+        Vector3 na = Handles.PositionHandle(BossVictoryKillerMoves.BossPoint(bossPos, bossRot, c.dashFrom), Quaternion.identity);
+        Vector3 nb = Handles.PositionHandle(BossVictoryKillerMoves.BossPoint(bossPos, bossRot, c.dashTo), Quaternion.identity);
         if (!EditorGUI.EndChangeCheck()) return;
-        Undo.RecordObject(_profile, "처치 연출 순간이동 지점");
-        Vector3 ta = BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, na);
-        Vector3 tb = BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, nb);
-        ta.y = tb.y = 0f;   // 높이는 런타임이 처치자 발 높이로 맞춘다
-        _profile.teleportOffset = ta;
-        _profile.arrivalOffset = tb;
-        EditorUtility.SetDirty(_profile);
-        _profileSo?.Update();
+        RecordField("처치 연출 순간이동 지점");
+        c.dashFrom = FlatOffset(BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, na));
+        c.dashTo = FlatOffset(BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, nb));
+        clips[selected] = c;
+        Save();
         Repaint();
     }
+
+    static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, c.a * a);
 
     const string SubjectsKey = "BossVictoryTimeline.LastSubjects";
 
@@ -1855,29 +1902,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawProfileFields("처치자 이동(272 · 이 캐릭터 프로필)", nameof(BossVictoryProfile.killerMove));
                 if (_profile.killerMove == BossVictoryKillerMove.TeleportDash)
                 {
-                    DrawProfileFields("순간이동 Q(이 마커 = 순간이동 · 스킬 연출 시작 = Q, 정지 프레임 = 처치 연출 스킬 클립 끝 자르기)",
-                        nameof(BossVictoryProfile.teleportOffset), nameof(BossVictoryProfile.arrivalOffset),
-                        nameof(BossVictoryProfile.teleportMoveState), nameof(BossVictoryProfile.teleportMoveInterval),
-                        nameof(BossVictoryProfile.teleportMoveEase));
-                    EditorGUILayout.LabelField("두 점 = 보스 기준 오프셋(+Z = 보스 정면). 이 창이 열려 있으면 Scene 뷰에 두 점·경로가 보이고 핸들로 끈다(기준 보스 = 재생 중 보스 → 마지막 회차 → 씬의 23호).", EditorStyles.wordWrappedMiniLabel);
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        if (GUILayout.Button($"스킬 연출 시작 = 이 마커({Timeline.backDashStartTime:0.00}s)", GUILayout.Width(240f)))
-                        {
-                            Record("처치 연출 타임라인 순간이동 Q 시작 맞추기");
-                            Timeline.SetMarkerTime(BossVictoryMarker.FinisherStart, Timeline.backDashStartTime);
-                            Save();
-                        }
-                        if (GUILayout.Button($"정지 프레임 = {BossVictoryKillerMoves.DefaultFreezeFrame}f", GUILayout.Width(140f)))
-                        {
-                            Record("처치 연출 타임라인 순간이동 Q 정지 프레임");
-                            FinisherFull(out AnimationClip clip, out _);
-                            float fps = clip != null ? clip.frameRate : 60f;
-                            Timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(
-                                BossVictoryKillerMoves.FreezeSeconds(BossVictoryKillerMoves.DefaultFreezeFrame, fps), clip != null ? clip.length : 0f, fps);
-                            Save();
-                        }
-                    }
+                    EditorGUILayout.HelpBox("순간이동(272 후속) — 이 마커는 쓰지 않는다. 순간이동·Q 이동은 '어쌔신 순간이동·Q 이동' 트랙 클립이 낸다(트랙 이름을 누르면 애니 상태·곡선·정지 프레임).", MessageType.Info);
                     break;
                 }
                 if (_profile.killerMove == BossVictoryKillerMove.RetreatCharge)
@@ -1950,6 +1975,24 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         switch (track)
         {
+            case BossVictoryTrack.AssassinDash:
+                if (_profile.killerMove != BossVictoryKillerMove.TeleportDash)
+                    EditorGUILayout.HelpBox("이 캐릭터 처치자 이동이 순간이동이 아니라 이 트랙은 쓰지 않는다(백대쉬 시작 마커의 '처치자 이동').", MessageType.Info);
+                EditorGUILayout.LabelField("클립 = 시작에 그 클립 시작 지점으로 순간이동 → 길이 동안 도착 지점까지 Q 이동 → 끝에 일섬. 여러 개 = 시작 순 #1 #2 …, 겹치면 앞 클립은 다음 클립 시작에서 끝. " +
+                    "클립마다 애니를 Custom0 프레임부터 다시 틀고 Custom0→End 가 클립 길이에 맞게 속도를 맞춘다. 클립 사이엔 제자리에서 애니가 이어지고, 마지막 뒤엔 정지 프레임까지 가서 로비 전환까지 멈춘다. " +
+                    "두 점 = 보스 기준(+Z = 보스 정면) — 클립을 고르면 Scene 뷰 핸들로 끈다.", EditorStyles.wordWrappedMiniLabel);
+                DrawProfileFields("순간이동 Q(이 캐릭터 프로필)", nameof(BossVictoryProfile.teleportMoveState), nameof(BossVictoryProfile.teleportMoveEase));
+                if (GUILayout.Button($"정지 프레임 = {BossVictoryKillerMoves.DefaultFreezeFrame}f", GUILayout.Width(140f)))
+                {
+                    Record("처치 연출 타임라인 순간이동 Q 정지 프레임");
+                    FinisherFull(out AnimationClip clip, out _);
+                    float fps = clip != null ? clip.frameRate : 60f;
+                    Timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(
+                        BossVictoryKillerMoves.FreezeSeconds(BossVictoryKillerMoves.DefaultFreezeFrame, fps), clip != null ? clip.length : 0f, fps);
+                    Save();
+                }
+                EditorGUILayout.LabelField($"정지 = {Timeline.finisherTrimSeconds:0.###}초(클립 시간 · '처치 연출 스킬' 클립 끝 자르기와 같은 칸)", EditorStyles.miniLabel);
+                break;
             case BossVictoryTrack.Amber:
                 DrawPaletteHint();
                 DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor), nameof(BossVictoryGlitchSettings.amberLumaLift),

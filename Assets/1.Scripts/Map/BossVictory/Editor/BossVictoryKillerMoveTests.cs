@@ -1,9 +1,10 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 보스 처치 연출 처치자 이동(할 일 272) — 순수 함수(<see cref="BossVictoryKillerMoves"/>): 보스 기준 두 점·가까움 판정·이동 구간·정지 프레임·단계 시각·차징 구체 크기,
+/// 보스 처치 연출 처치자 이동(할 일 272) — 순수 함수(<see cref="BossVictoryKillerMoves"/>): 보스 기준 두 점·가까움 판정·이동 진행·어쌔신 순간이동·Q 이동 트랙(순서·겹침·진행·애니 배율)·정지 프레임·단계 시각·차징 구체 크기,
 /// 그리고 정본 프로필 연결(어쌔신 = 순간이동 Q·71프레임, 거너 = 후퇴 차징, 팔라딘 = 백대쉬).
 /// 실행 = <c>Tools/Tests/전투 EditMode 테스트 실행</c>(필터 ^BossVictory).
 /// </summary>
@@ -57,34 +58,7 @@ public sealed class BossVictoryKillerMoveTests
         Assert.IsFalse(BossVictoryKillerMoves.IsTooClose(Vector3.zero, Vector3.zero, 0f), "거리 0 칸 = 늘 멂");
     }
 
-    // ── 이동 구간(어쌔신) ──
-
-    [Test]
-    public void 이동_구간_A는_Custom0에서_End()
-    {
-        BossVictoryKillerMoves.MoveInterval(0.15f, 0.425f, 1.1833f, BossVictoryMoveInterval.Custom0ToEnd, out float start, out float stop);
-        Assert.AreEqual(0.15f, start, Tolerance);
-        Assert.AreEqual(0.425f, stop, Tolerance);
-        Assert.AreEqual(0.275f, stop - start, Tolerance, "결정 A = 0.275초(클립 시간)");
-    }
-
-    [Test]
-    public void 이동_구간_B는_Custom0에서_정지_프레임()
-    {
-        BossVictoryKillerMoves.MoveInterval(0.15f, 0.425f, 1.1833f, BossVictoryMoveInterval.Custom0ToFreeze, out float start, out float stop);
-        Assert.AreEqual(0.15f, start, Tolerance);
-        Assert.AreEqual(1.1833f, stop, Tolerance);
-    }
-
-    [Test]
-    public void 이벤트가_없으면_구간_대체값()
-    {
-        BossVictoryKillerMoves.MoveInterval(-1f, -1f, 1f, BossVictoryMoveInterval.Custom0ToEnd, out float start, out float stop);
-        Assert.AreEqual(0f, start, Tolerance, "Custom0 없음 = 0");
-        Assert.AreEqual(1f, stop, Tolerance, "End 없음 = 정지 프레임");
-        BossVictoryKillerMoves.MoveInterval(0.5f, 0.2f, 0f, BossVictoryMoveInterval.Custom0ToFreeze, out start, out stop);
-        Assert.AreEqual(0.5f, stop, Tolerance, "끝이 시작보다 앞 = 시작(바로 도착)");
-    }
+    // ── 이동 진행(어쌔신) ──
 
     [Test]
     public void 이동_진행은_구간_밖에서_0과_끝()
@@ -98,6 +72,80 @@ public sealed class BossVictoryKillerMoveTests
         Assert.Less(BossVictoryKillerMoves.MoveProgress(0.2875f, 0.15f, 0.425f, easeIn), 0.5f, "곡선 적용");
     }
 
+    // ── 어쌔신 순간이동·Q 이동 트랙(272 후속) ──
+
+    static List<BossVictoryClip> Dash(params (float start, float length)[] spans)
+    {
+        var clips = new List<BossVictoryClip>();
+        foreach (var s in spans) clips.Add(new BossVictoryClip { start = s.start, length = s.length, weight = 1f });
+        return clips;
+    }
+
+    static List<int> OrderOf(List<BossVictoryClip> clips)
+    {
+        var order = new List<int>();
+        BossVictoryAssassinDash.Order(clips, order);
+        return order;
+    }
+
+    [Test]
+    public void 순서는_시작_순이고_같으면_목록_순()
+    {
+        var clips = Dash((0.8f, 0.2f), (0.2f, 0.275f), (0.8f, 0.1f));
+        CollectionAssert.AreEqual(new[] { 1, 0, 2 }, OrderOf(clips));
+        Assert.AreEqual(2, BossVictoryAssassinDash.Number(clips, 0), "#2");
+        Assert.AreEqual(1, BossVictoryAssassinDash.Number(clips, 1), "#1");
+        Assert.AreEqual(3, BossVictoryAssassinDash.Number(clips, 2), "#3");
+        Assert.AreEqual(0.2f, BossVictoryAssassinDash.FirstStart(clips), Tolerance);
+        Assert.IsTrue(float.IsPositiveInfinity(BossVictoryAssassinDash.FirstStart(new List<BossVictoryClip>())), "없으면 무한대");
+    }
+
+    [Test]
+    public void 겹치면_앞_클립은_다음_클립_시작에서_끝()
+    {
+        var clips = Dash((0.2f, 0.5f), (0.5f, 0.275f), (1.0f, 0.2f));
+        List<int> order = OrderOf(clips);
+        Assert.AreEqual(0.5f, BossVictoryAssassinDash.SegmentEnd(clips, order, 0), Tolerance, "#1 = #2 시작에서 잘림");
+        Assert.AreEqual(0.775f, BossVictoryAssassinDash.SegmentEnd(clips, order, 1), Tolerance, "#2 = 자기 끝(#3 보다 앞)");
+        Assert.AreEqual(1.2f, BossVictoryAssassinDash.SegmentEnd(clips, order, 2), Tolerance, "마지막 = 자기 끝");
+    }
+
+    [Test]
+    public void 지금_이동과_모두_끝남()
+    {
+        var clips = Dash((0.2f, 0.275f), (0.8f, 0.275f));
+        List<int> order = OrderOf(clips);
+        Assert.AreEqual(-1, BossVictoryAssassinDash.Current(clips, order, 0.19f), "아직");
+        Assert.AreEqual(0, BossVictoryAssassinDash.Current(clips, order, 0.2f), "#1 시작");
+        Assert.AreEqual(0, BossVictoryAssassinDash.Current(clips, order, 0.6f), "#1 끝난 뒤 빈 시간도 #1");
+        Assert.AreEqual(1, BossVictoryAssassinDash.Current(clips, order, 0.8f), "#2");
+        Assert.IsFalse(BossVictoryAssassinDash.AllDone(clips, order, 0.6f), "빈 시간 = 아직(정지 프레임 안 함)");
+        Assert.IsFalse(BossVictoryAssassinDash.AllDone(clips, order, 1.0f));
+        Assert.IsTrue(BossVictoryAssassinDash.AllDone(clips, order, 1.075f), "마지막 끝");
+        Assert.IsTrue(BossVictoryAssassinDash.AllDone(clips, new List<int>(), 0f), "클립 없음 = 끝");
+    }
+
+    [Test]
+    public void 이동_진행은_클립_길이_기준이고_잘리면_그_자리에서_멈춤()
+    {
+        AnimationCurve linear = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+        var clips = Dash((0f, 1f), (0.4f, 1f));
+        List<int> order = OrderOf(clips);
+        Assert.AreEqual(0.25f, BossVictoryAssassinDash.Progress(clips, order, 0, 0.25f, linear), Tolerance, "진행 중");
+        Assert.AreEqual(0.4f, BossVictoryAssassinDash.Progress(clips, order, 0, 0.9f, linear), Tolerance, "#2 시작(0.4)에서 멈춤 — 도착점까지 안 감");
+        Assert.AreEqual(0.5f, BossVictoryAssassinDash.Progress(clips, order, 1, 0.9f, linear), Tolerance, "#2");
+        Assert.AreEqual(1f, BossVictoryAssassinDash.Progress(clips, order, 1, 5f, linear), Tolerance, "끝 = 도착");
+    }
+
+    [Test]
+    public void 이동_중_애니_배율은_Custom0_End_구간을_클립_길이에_맞춤()
+    {
+        Assert.AreEqual(0.275f / 0.275f / 1.5f, BossVictoryKillerMoves.MoveAnimScale(0.275f, 0.275f, 1.5f), Tolerance, "기본 클립 0.275초 · 상태 속도 1.5");
+        Assert.AreEqual(1f / 1.5f * 2f, BossVictoryKillerMoves.MoveAnimScale(0.275f, 0.1375f, 1.5f), Tolerance, "절반 길이 = 두 배");
+        Assert.AreEqual(1f, BossVictoryKillerMoves.MoveAnimScale(0f, 0.275f, 1.5f), Tolerance, "구간 없음 = 1");
+        Assert.AreEqual(1f, BossVictoryKillerMoves.MoveAnimScale(0.275f, 0f, 1.5f), Tolerance, "길이 0 = 1");
+        Assert.AreEqual(0.5f, BossVictoryKillerMoves.MoveAnimScale(0.5f, 1f, 0f), Tolerance, "상태 속도 0 = 1 로 봄");
+    }
     // ── 정지 프레임 ──
 
     [Test]
@@ -113,17 +161,28 @@ public sealed class BossVictoryKillerMoveTests
     // ── 단계 시각 ──
 
     [Test]
-    public void 백대쉬와_순간이동은_마커_그대로()
+    public void 백대쉬는_마커_그대로()
     {
         var tl = BossVictoryTimeline.CreateDefault();
         tl.backDashStartTime = 0.2f;
         tl.finisherStartTime = 0.65f;
-        foreach (BossVictoryKillerMove move in new[] { BossVictoryKillerMove.BackDash, BossVictoryKillerMove.TeleportDash })
-        {
-            BossVictoryKillerSequence.Times t = BossVictoryKillerMoves.Times(tl, move, tooClose: true);
-            Assert.AreEqual(0.2f, t.BackDashStart, Tolerance, move.ToString());
-            Assert.AreEqual(0.65f, t.FinisherStart, Tolerance, move.ToString());
-        }
+        BossVictoryKillerSequence.Times t = BossVictoryKillerMoves.Times(tl, BossVictoryKillerMove.BackDash, tooClose: true);
+        Assert.AreEqual(0.2f, t.BackDashStart, Tolerance);
+        Assert.AreEqual(0.65f, t.FinisherStart, Tolerance);
+    }
+
+    [Test]
+    public void 순간이동은_백대쉬_없이_트랙_첫_클립_시작에_처치_연출_단계()
+    {
+        var tl = BossVictoryTimeline.CreateDefault();
+        tl.backDashStartTime = 0.2f;
+        tl.finisherStartTime = 0.65f;
+        tl.assassinDash = Dash((0.9f, 0.275f), (0.3f, 0.275f));
+        BossVictoryKillerSequence.Times t = BossVictoryKillerMoves.Times(tl, BossVictoryKillerMove.TeleportDash, tooClose: true);
+        Assert.IsTrue(float.IsPositiveInfinity(t.BackDashStart), "백대쉬 시작 마커 안 씀");
+        Assert.AreEqual(0.3f, t.FinisherStart, Tolerance, "첫 클립 시작(마커 0.65 아님)");
+        tl.assassinDash.Clear();
+        Assert.IsTrue(float.IsPositiveInfinity(BossVictoryKillerMoves.Times(tl, BossVictoryKillerMove.TeleportDash, true).FinisherStart), "클립 없음 = 안 함");
     }
 
     [Test]
@@ -187,7 +246,6 @@ public sealed class BossVictoryKillerMoveTests
         {
             Assert.AreEqual(BossVictoryKillerMove.BackDash, p.killerMove, "기본 = 지금 흐름");
             Assert.AreEqual(BossVictoryKillerMoves.DefaultTeleportMoveState, p.teleportMoveState);
-            Assert.AreEqual(BossVictoryMoveInterval.Custom0ToEnd, p.teleportMoveInterval, "결정 A");
             Assert.AreEqual(PlayerSkillSlot.Sub, p.retreatSkillSlot, "후퇴 스킬 = E");
         }
         finally { Object.DestroyImmediate(p); }
@@ -218,8 +276,12 @@ public sealed class BossVictoryKillerMoveTests
         Assert.AreEqual("Combo_Attack_03_04", clip.name);
         Assert.IsTrue(AnimationEventRequirements.HasEvent(clip, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)SkillAnimationEventType.Custom0), "이동 시작 Custom0");
         Assert.IsTrue(AnimationEventRequirements.HasEvent(clip, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)SkillAnimationEventType.End), "이동 끝 End");
-        Assert.AreEqual(BossVictoryKillerMoves.DefaultFreezeFrame, BossVictoryAnimTrim.Frames(assassin.timeline.finisherTrimSeconds, clip.frameRate),
-            "정지 프레임 = 처치 연출 스킬 클립 끝 자르기");
-        Assert.LessOrEqual(assassin.timeline.finisherStartTime, assassin.timeline.backDashStartTime, "순간이동 직후 Q");
+        // 값은 사용자 튜닝 대상 — 고정값 대신 관계만(정지 프레임은 이동 끝 End 뒤 · 클립 안, 트랙 클립 1개 이상·길이 > 0).
+        float end = clip.events[System.Array.FindIndex(clip.events, ev => ev.functionName == nameof(PlayerAnimationEventRelay.HandleSkillEvent) && ev.intParameter == (int)SkillAnimationEventType.End)].time;
+        Assert.Greater(assassin.timeline.finisherTrimSeconds, end, "정지 프레임 = 처치 연출 스킬 클립 끝 자르기 — 이동 끝(End) 뒤");
+        Assert.LessOrEqual(assassin.timeline.finisherTrimSeconds, clip.length, "클립 안");
+        Assert.IsNotNull(assassin.timeline.assassinDash);
+        Assert.GreaterOrEqual(assassin.timeline.assassinDash.Count, 1, "순간이동·Q 이동 클립 1개 이상(옛 값 이관)");
+        foreach (BossVictoryClip c in assassin.timeline.assassinDash) Assert.Greater(c.length, 0f, "클립 길이");
     }
 }

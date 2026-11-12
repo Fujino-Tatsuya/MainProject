@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -69,14 +70,23 @@ public static class BossVictoryProfileAuthoring
         {
             Undo.RecordObject(assassin, "처치자 이동 프로필 적용 (272)");
             assassin.killerMove = BossVictoryKillerMove.TeleportDash;
-            assassin.timeline.finisherStartTime = assassin.timeline.backDashStartTime;
+            // 272 후속 — 순간이동·Q 이동 트랙이 비었으면 기본 클립 1개(옛 두 점 이관은 끝남). 이미 있으면 그대로(사용자 튜닝 유지).
+            if (assassin.timeline.assassinDash == null || assassin.timeline.assassinDash.Count == 0)
+            {
+                (assassin.timeline.assassinDash ??= new List<BossVictoryClip>()).Add(new BossVictoryClip
+                {
+                    start = Mathf.Min(assassin.timeline.backDashStartTime, assassin.timeline.finisherStartTime), length = BossVictoryAssassinDash.DefaultLength, weight = 1f,
+                    dashFrom = BossVictoryAssassinDash.DefaultFrom, dashTo = BossVictoryAssassinDash.DefaultTo,
+                });
+            }
             AnimationClip clip = TeleportMoveClip(assassin.teleportMoveState);
             float fps = clip != null ? clip.frameRate : 60f;
-            assassin.timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(
-                BossVictoryKillerMoves.FreezeSeconds(BossVictoryKillerMoves.DefaultFreezeFrame, fps), clip != null ? clip.length : 0f, fps);
+            if (assassin.timeline.finisherTrimSeconds <= 0f)   // 정지 프레임 — 비었을 때만 71f(사용자 튜닝 유지)
+                assassin.timeline.finisherTrimSeconds = BossVictoryAnimTrim.ClampTrim(
+                    BossVictoryKillerMoves.FreezeSeconds(BossVictoryKillerMoves.DefaultFreezeFrame, fps), clip != null ? clip.length : 0f, fps);
             EditorUtility.SetDirty(assassin);
             AssetDatabase.SaveAssetIfDirty(assassin);
-            Debug.Log($"[BossVictory] 어쌔신 프로필 — 순간이동 Q · 스킬 연출 시작 {assassin.timeline.finisherStartTime:0.###}s · 정지 {assassin.timeline.finisherTrimSeconds:0.####}s({clip?.name})", assassin);
+            Debug.Log($"[BossVictory] 어쌔신 프로필 — 순간이동 Q · 트랙 클립 {assassin.timeline.assassinDash.Count}개(첫 시작 {BossVictoryAssassinDash.FirstStart(assassin.timeline.assassinDash):0.###}s) · 정지 {assassin.timeline.finisherTrimSeconds:0.####}s({clip?.name})", assassin);
         }
         var gunner = AssetDatabase.LoadAssetAtPath<BossVictoryProfile>(ProfilePath(TutorialCharacter.Gunner));
         if (gunner != null)

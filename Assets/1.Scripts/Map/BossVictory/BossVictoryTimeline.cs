@@ -20,6 +20,7 @@ public enum BossVictoryTrack
     Rectify,      // 배경 글자 'RECTIFY'(267 후속) — 세기 = 알파(들어오는 동안 가로줄이 무작위로 켜지며 찢기듯 등장). 외곽선만, 인물·보스 뒤·배경 앞
     RectifyFill,  // RECTIFY 안쪽 색(267 후속) — Ring Wipe Fill(링 3개). 세기 = 채움 불투명도, 링 시간표 = 클립 시작 기준
     CameraBob,    // 카메라 두둥실(267 후속) — 화면 세로 흔들림 = 세기 × 진폭(화면 높이 %) × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영 행렬 세로 이동(카메라 위치는 안 건드림)
+    AssassinDash, // 어쌔신 순간이동·Q 이동(272 후속) — 클립 = 시작에 그 클립 시작 지점으로 순간이동 → 길이 동안 도착 지점까지 Q 이동. 여러 개 = 시작 순 #1 #2 …(겹치면 앞 클립을 그 순간 끝냄). 처치자 이동이 순간이동일 때만 쓴다
 }
 
 /// <summary>보스 처치 연출 타임라인 순간 마커.</summary>
@@ -61,6 +62,9 @@ public struct BossVictoryClip
     public float bobPeriod;
     public float bobPhase;
     public float bobDamping;
+    /// <summary>[어쌔신 순간이동·Q 이동 트랙만] 시작·도착 지점 = 보스 기준 오프셋(m, +Z = 보스 정면 — <see cref="BossVictoryKillerMoves.BossPoint"/>, 272 후속).</summary>
+    public Vector3 dashFrom;
+    public Vector3 dashTo;
 
     public float End => start + length;
 
@@ -160,6 +164,8 @@ public sealed class BossVictoryTimeline
     [SerializeField, HideInInspector] bool cameraBobSeeded;
     /// <summary>발밑 회색 원 클립(246 복원 — 267 후속) — 세기 = 반경 비율. 페이드 인 = 0 → 목표 반경으로 커짐.</summary>
     public List<BossVictoryClip> groundCircle = new List<BossVictoryClip>();
+    /// <summary>어쌔신 순간이동·Q 이동 클립(272 후속) — <see cref="BossVictoryAssassinDash"/>.</summary>
+    public List<BossVictoryClip> assassinDash = new List<BossVictoryClip>();
     // 옛 에셋(이 트랙 전)에 기본 원 클립을 한 번 넣었는가 — 넣은 뒤 사용자가 지우면 그대로 둔다(<see cref="SeedGroundCircle"/>).
     [SerializeField, HideInInspector] bool groundCircleSeeded;
 
@@ -217,6 +223,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.Rectify => rectify ??= new List<BossVictoryClip>(),
         BossVictoryTrack.RectifyFill => rectifyFill ??= new List<BossVictoryClip>(),
         BossVictoryTrack.GroundCircle => groundCircle ??= new List<BossVictoryClip>(),
+        BossVictoryTrack.AssassinDash => assassinDash ??= new List<BossVictoryClip>(),
         _ => throw new ArgumentOutOfRangeException(nameof(track)),
     };
 
@@ -263,7 +270,7 @@ public sealed class BossVictoryTimeline
 
     /// <summary>페이드·세기가 의미 있는 트랙인가(TV 꺼짐·처치자 평타는 구간만 · 카메라 컷은 시작만).</summary>
     public static bool HasFades(BossVictoryTrack track) =>
-        track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut && track != BossVictoryTrack.KillerAction && track != BossVictoryTrack.NoiseScrollV;
+        track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut && track != BossVictoryTrack.KillerAction && track != BossVictoryTrack.NoiseScrollV && track != BossVictoryTrack.AssassinDash;
 
     /// <summary>카메라 두둥실 트랙인가(세기 키 + 진폭·주기·위상·감쇠 칸 — 267 후속).</summary>
     public static bool IsBob(BossVictoryTrack track) => track == BossVictoryTrack.CameraBob;
@@ -273,6 +280,9 @@ public sealed class BossVictoryTimeline
 
     /// <summary>값 = UV 오프셋(시작·끝·이징)인 트랙인가(세기 키 없음 — 267 후속).</summary>
     public static bool IsUvScroll(BossVictoryTrack track) => track == BossVictoryTrack.NoiseScrollV;
+
+    /// <summary>값 = 시작·도착 지점인 트랙인가(어쌔신 순간이동·Q 이동 — 세기 키 없음, 272 후속).</summary>
+    public static bool IsAssassinDash(BossVictoryTrack track) => track == BossVictoryTrack.AssassinDash;
 
     /// <summary>시작이 0 고정인 트랙인가(처치자 평타 — 처치 순간부터, 끝만 고친다).</summary>
     public static bool StartFixed(BossVictoryTrack track) => track == BossVictoryTrack.KillerAction;
@@ -294,6 +304,7 @@ public sealed class BossVictoryTimeline
         BossVictoryTrack.Rectify => "배경 글자 RECTIFY",
         BossVictoryTrack.RectifyFill => "RECTIFY 안쪽 색",
         BossVictoryTrack.GroundCircle => "발밑 회색 원",
+        BossVictoryTrack.AssassinDash => "어쌔신 순간이동·Q 이동",
         _ => track.ToString(),
     };
 
