@@ -65,6 +65,28 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Tooltip("칸별 직접 지정(기본 = 비어 있음 = 전부 자동). manual 켬 = 그 칸은 이 색 그대로.")]
     public List<BossVictoryPaletteOverride> paletteOverrides = new List<BossVictoryPaletteOverride>();
 
+    [Header("RECTIFY 주황 채움(캐릭터별) — 흰 원이 다 퍼진 뒤(11-12 공용 설정에서 옮김)")]
+    [Tooltip("흰 원이 다 퍼진 뒤 흰색으로 머무는 시간(초).")]
+    [Min(0f)] public float rectifyOrangeHold = BossVictoryOrangeLook.DefaultHold;
+    [Tooltip("흰 → 주황 와이프 시간(초) — 레퍼런스: 가로줄마다 들쭉날쭉한 경계가 한쪽에서 지나감(약 6프레임).")]
+    [Min(0f)] public float rectifyOrangeWipe = BossVictoryOrangeLook.DefaultWipe;
+    [Tooltip("와이프 방향 — 켬 = 오른쪽에서 왼쪽.")]
+    public bool rectifyOrangeRightToLeft = BossVictoryOrangeLook.DefaultRightToLeft;
+    [Tooltip("와이프 경계 줄마다 어긋남(단어 폭 비율).")]
+    [Range(0f, 1f)] public float rectifyOrangeJitter = BossVictoryOrangeLook.DefaultJitter;
+    [Tooltip("와이프 줄 굵기(px).")]
+    [Min(1f)] public float rectifyOrangeRowPixels = BossVictoryOrangeLook.DefaultRowPixels;
+    [Tooltip("주황 채움 왼쪽 색(W 쪽) — 팔레트 칸 OrangeLeft 의 기준 색(기준 색을 따라 자동 변환, 칸 직접 지정이 있으면 그 색).")]
+    public Color rectifyOrangeLeft = BossVictoryOrangeLook.DefaultLeft;
+    [Tooltip("주황 채움 오른쪽 색(T 쪽) — 팔레트 칸 OrangeRight 의 기준 색.")]
+    public Color rectifyOrangeRight = BossVictoryOrangeLook.DefaultRight;
+    [Tooltip("좌→우 색 보간 세기(0 = 왼쪽 색만).")]
+    [Range(0f, 1f)] public float rectifyOrangeGradient = BossVictoryOrangeLook.DefaultGradient;
+    [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
+    [Min(0.0005f)] public float rectifyScanlineSpacing = BossVictoryOrangeLook.DefaultScanlineSpacing;
+    [Tooltip("안쪽 주사선 어둡기(0 = 없음 — 기본. 다시 켜려면 0.25 근처).")]
+    [Range(0f, 1f)] public float rectifyScanlineDark = BossVictoryOrangeLook.DefaultScanlineDark;
+
     void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 
     // 옛 형식 타임라인(255 후속 4·6 전)을 읽으면 새 형식으로 옮긴다 — 설정 SO 에 있던 이관을 프로필로(267).
@@ -94,4 +116,47 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
         p.name = "BossVictoryProfile(코드 기본값)";
         return p;
     }
+}
+
+/// <summary>RECTIFY 주황 채움 값(캐릭터별, 11-12) — 처치자 프로필에서 읽어 렌더에 넘긴다. 프로필 null = 코드 기본값.</summary>
+public readonly struct BossVictoryOrangeLook
+{
+    public const float DefaultHold = 0.05f;
+    public const float DefaultWipe = 0.1f;
+    public const bool DefaultRightToLeft = false;
+    public const float DefaultJitter = 0.2f;
+    public const float DefaultRowPixels = 4f;
+    public static readonly Color DefaultLeft = new Color(1f, 0.2696447f, 0f, 1f);
+    public static readonly Color DefaultRight = new Color(1f, 0f, 0.455451f, 1f);
+    public const float DefaultGradient = 1f;
+    public const float DefaultScanlineSpacing = 0.003f;
+    public const float DefaultScanlineDark = 0f;
+
+    public readonly float Hold, Wipe, Jitter, RowPixels, Gradient, ScanlineSpacing, ScanlineDark;
+    public readonly bool RightToLeft;
+    /// <summary>기준 색(팔레트 칸 OrangeLeft/Right 의 원본 — 실제 그리는 색은 팔레트 결과).</summary>
+    public readonly Color Left, Right;
+
+    BossVictoryOrangeLook(float hold, float wipe, bool rightToLeft, float jitter, float rowPixels, Color left, Color right,
+        float gradient, float scanlineSpacing, float scanlineDark)
+    {
+        Hold = Mathf.Max(0f, hold);
+        Wipe = Mathf.Max(0f, wipe);
+        RightToLeft = rightToLeft;
+        Jitter = Mathf.Clamp01(jitter);
+        RowPixels = Mathf.Max(1f, rowPixels);
+        Left = left;
+        Right = right;
+        Gradient = Mathf.Clamp01(gradient);
+        ScanlineSpacing = scanlineSpacing;
+        ScanlineDark = Mathf.Clamp01(scanlineDark);
+    }
+
+    public static BossVictoryOrangeLook Default => new BossVictoryOrangeLook(DefaultHold, DefaultWipe, DefaultRightToLeft, DefaultJitter,
+        DefaultRowPixels, DefaultLeft, DefaultRight, DefaultGradient, DefaultScanlineSpacing, DefaultScanlineDark);
+
+    public static BossVictoryOrangeLook From(BossVictoryProfile p) => p == null ? Default
+        : new BossVictoryOrangeLook(p.rectifyOrangeHold, p.rectifyOrangeWipe, p.rectifyOrangeRightToLeft, p.rectifyOrangeJitter,
+            p.rectifyOrangeRowPixels, p.rectifyOrangeLeft, p.rectifyOrangeRight, p.rectifyOrangeGradient,
+            p.rectifyScanlineSpacing, p.rectifyScanlineDark);
 }

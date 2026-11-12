@@ -1880,17 +1880,18 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.RectifyFill:
                 DrawPaletteHint();
-                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원 3개 — ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각(클립 시작 기준)에 자기 중심에서 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. ③은 회색으로 페이드 → 회색에서 흰색으로 바뀐 순간부터 확장. 원 안 색 = 왼쪽 색 → 오른쪽 색. 나중 원이 위, 마지막 원으로 고정. 첫 원 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원 3개 — ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각(클립 시작 기준)에 자기 중심에서 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. ③은 회색으로 페이드 → 회색에서 흰색으로 바뀐 순간부터 확장. 원 안 색 = 왼쪽 색 → 오른쪽 색. 나중 원이 위, 마지막 원으로 고정. 첫 원 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용(주황 채움·안쪽 주사선은 캐릭터별 프로필).", EditorStyles.wordWrappedMiniLabel);
                 DrawRectifyCircleFields();
                 DrawSettingsFields("안쪽 색 공용", nameof(BossVictoryGlitchSettings.rectifyCircleGrayColor), nameof(BossVictoryGlitchSettings.rectifyCircleGrayToWhite),
-                    nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline),
-                    nameof(BossVictoryGlitchSettings.rectifyScanlineSpacing), nameof(BossVictoryGlitchSettings.rectifyScanlineDark));
+                    nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline));
                 DrawSettingsFields("RECTIFY 전용 글로우(맵 블룸과 무관)", nameof(BossVictoryGlitchSettings.rectifyGlowIntensity), nameof(BossVictoryGlitchSettings.rectifyGlowRadius),
                     nameof(BossVictoryGlitchSettings.rectifyGlowColor), nameof(BossVictoryGlitchSettings.rectifyGlowTarget));
-                DrawSettingsFields("주황 채움(흰 원 뒤)", nameof(BossVictoryGlitchSettings.rectifyOrangeHold), nameof(BossVictoryGlitchSettings.rectifyOrangeWipe),
-                    nameof(BossVictoryGlitchSettings.rectifyOrangeRightToLeft), nameof(BossVictoryGlitchSettings.rectifyOrangeJitter),
-                    nameof(BossVictoryGlitchSettings.rectifyOrangeRowPixels), nameof(BossVictoryGlitchSettings.rectifyOrangeLeft),
-                    nameof(BossVictoryGlitchSettings.rectifyOrangeRight), nameof(BossVictoryGlitchSettings.rectifyOrangeGradient));
+                if (_profile != null)
+                    DrawProfileFields("RECTIFY 주황 채움(캐릭터별 — 이 캐릭터 프로필, 11-12)", nameof(BossVictoryProfile.rectifyOrangeHold), nameof(BossVictoryProfile.rectifyOrangeWipe),
+                        nameof(BossVictoryProfile.rectifyOrangeRightToLeft), nameof(BossVictoryProfile.rectifyOrangeJitter),
+                        nameof(BossVictoryProfile.rectifyOrangeRowPixels), nameof(BossVictoryProfile.rectifyOrangeLeft),
+                        nameof(BossVictoryProfile.rectifyOrangeRight), nameof(BossVictoryProfile.rectifyOrangeGradient),
+                        nameof(BossVictoryProfile.rectifyScanlineSpacing), nameof(BossVictoryProfile.rectifyScanlineDark));
                 break;
             case BossVictoryTrack.CameraBob:
                 EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);

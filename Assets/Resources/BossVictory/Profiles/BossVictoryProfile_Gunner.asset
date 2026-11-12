@@ -628,3 +628,13 @@ MonoBehaviour:
   contrastMinSaturation: 0.45
   contrastMinValue: 0.6
   paletteOverrides: []
+  rectifyOrangeHold: 0.05
+  rectifyOrangeWipe: 0.1
+  rectifyOrangeRightToLeft: 0
+  rectifyOrangeJitter: 0.2
+  rectifyOrangeRowPixels: 4
+  rectifyOrangeLeft: {r: 1, g: 0.2696447, b: 0, a: 1}
+  rectifyOrangeRight: {r: 1, g: 0, b: 0.455451, a: 1}
+  rectifyOrangeGradient: 1
+  rectifyScanlineSpacing: 0.003
+  rectifyScanlineDark: 0

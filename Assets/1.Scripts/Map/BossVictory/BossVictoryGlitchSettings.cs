@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// 보스 처치 연출 — ZZZ 글리치(PLAN-boss-victory-glitch) 공용 수치. 정본 에셋: <c>Resources/BossVictory/BossVictoryGlitchSettings.asset</c>
 /// (없으면 코드 기본값). 화면 효과 모양(글리치 색·노이즈·찢김·CRT·셰이더·벽 숨김 기준)·보스 피격 애니·마커 옵션은 여기(공용).
-/// <b>캐릭터별 값</b>(타임라인 전체·백대쉬·시간 배율·처치 연출 스킬 칸)은 <see cref="BossVictoryProfile"/> — '캐릭터 → 프로필' 표(<see cref="characterProfiles"/>)로 고르고,
+/// <b>캐릭터별 값</b>(타임라인 전체·백대쉬·시간 배율·처치 연출 스킬 칸·팔레트·RECTIFY 주황 채움)은 <see cref="BossVictoryProfile"/> — '캐릭터 → 프로필' 표(<see cref="characterProfiles"/>)로 고르고,
 /// 없거나 비면 기본 프로필(<see cref="defaultProfile"/>, 정본은 비어 있어 코드 기본값 — 11-12). 할 일 267(Docs/tech/boss-victory-character-profiles.md).
 /// </summary>
 [CreateAssetMenu(menuName = "MainProject/Boss Victory Glitch Settings", fileName = "BossVictoryGlitchSettings")]
@@ -198,28 +198,6 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
         rectifyFillColors = new Color[0];
         return true;
     }
-
-    [Header("RECTIFY 주황 채움 — 흰 원이 다 퍼진 뒤(267 후속)")]
-    [Tooltip("흰 원이 다 퍼진 뒤 흰색으로 머무는 시간(초).")]
-    [Min(0f)] public float rectifyOrangeHold = 0.05f;
-    [Tooltip("흰 → 주황 와이프 시간(초) — 레퍼런스: 가로줄마다 들쭉날쭉한 경계가 한쪽에서 지나감(약 6프레임).")]
-    [Min(0f)] public float rectifyOrangeWipe = 0.1f;
-    [Tooltip("와이프 방향 — 켬 = 오른쪽에서 왼쪽(레퍼런스).")]
-    public bool rectifyOrangeRightToLeft = true;
-    [Tooltip("와이프 경계 줄마다 어긋남(단어 폭 비율).")]
-    [Range(0f, 1f)] public float rectifyOrangeJitter = 0.2f;
-    [Tooltip("와이프 줄 굵기(px).")]
-    [Min(1f)] public float rectifyOrangeRowPixels = 4f;
-    [Tooltip("주황 채움 왼쪽 색(W 쪽).")]
-    public Color rectifyOrangeLeft = new Color32(0xFF, 0xA5, 0x3A, 0xFF);
-    [Tooltip("주황 채움 오른쪽 색(T 쪽).")]
-    public Color rectifyOrangeRight = new Color32(0xF8, 0xE8, 0x62, 0xFF);
-    [Tooltip("좌→우 색 보간 세기(0 = 왼쪽 색만).")]
-    [Range(0f, 1f)] public float rectifyOrangeGradient = 1f;
-    [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
-    [Min(0.0005f)] public float rectifyScanlineSpacing = 0.003f;
-    [Tooltip("안쪽 주사선 어둡기(0 = 없음 — 기본, 267 후속 사용자 요청으로 RECTIFY 위 주사선을 뺐다. 다시 켜려면 0.25 근처).")]
-    [Range(0f, 1f)] public float rectifyScanlineDark = 0f;
 
     public enum RectifyGlowTarget { WhiteCircle, Orange, Both }
 

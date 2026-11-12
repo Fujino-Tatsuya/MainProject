@@ -78,11 +78,12 @@ public sealed class BossVictoryPaletteTests
         foreach (TutorialCharacter character in new[] { TutorialCharacter.Paladin, TutorialCharacter.Gunner, TutorialCharacter.Assassin })
         {
             BossVictoryProfile p = s.ProfileFor(character);
+            Color[] refP = BossVictoryPaletteCalc.ReferenceColors(s, p);   // 주황 채움 기준 색 = 그 프로필(11-12)
             BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;   // 그 프로필의 직접 지정만 살리고 기준·대비는 공용 기준
             inputs.BaseColor = s.amberColor;
             inputs.ContrastHueOffset = BossVictoryPaletteCalc.ReferenceContrastHueOffset(s);
             inputs.Overrides = p.paletteOverrides;
-            AssertSameAsReference(reference, BossVictoryPaletteCalc.Compute(reference, inputs), character.ToString(), false);
+            AssertSameAsReference(refP, BossVictoryPaletteCalc.Compute(refP, inputs), character.ToString(), false);
         }
     }
 

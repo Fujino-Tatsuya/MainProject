@@ -11,6 +11,7 @@
 | 대상별 시간 배율 4개(하던 동작·처치자 End 후·팀원·보스 End 후) | `BossVictoryProfile.*Scale` | ✅ |
 | 처치 연출 스킬 칸 | `BossVictoryProfile.finisherSlot` | ✅ |
 | 팔레트 기준 색·대비 설정·칸별 직접 지정(271, §4.11) | `BossVictoryProfile.baseColor`·`contrast*`·`paletteOverrides` | ✅ (공용 색 = 기준 팔레트) |
+| **RECTIFY 주황 채움 = 캐릭터별(11-12, §4.12)** — 머무름·와이프·방향·들쭉날쭉·줄 굵기·좌우 색·보간 세기·안쪽 주사선 간격·어둡기 | `BossVictoryProfile.rectifyOrange*`·`rectifyScanline*` | ✅
 | 화면 효과 모양(호박색·주사선·찢김·보스 노이즈·CRT 색·셰이더)·벽 숨김 기준·보스 피격 애니 상태·마커 옵션(포커스 블렌드·숨김 대상) | `BossVictoryGlitchSettings` | ❌ 공용 |
 
 - 에셋: 공용 `Assets/Resources/BossVictory/BossVictoryGlitchSettings.asset` · 프로필 `Assets/Resources/BossVictory/Profiles/BossVictoryProfile_{Paladin,Gunner,Assassin}.asset`. 기본 프로필 에셋 `BossVictoryProfile_Default` 는 **11-12 삭제**(사용자 지시) — 공용 `defaultProfile` 칸은 비어 있다.
@@ -81,10 +82,10 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - 원 안 색 = 단어 UV x 기준 왼쪽 색 → 오른쪽 색(옛 방사형 그라데이션은 없앰). 코드 기본값: ① #FF2DB4 → #A040FF · ② #5AC8FF(하늘) → #2438A8(남색) · ③ #FFFFFF → #FFF6E0. 생성 0 / 4/60 / 0.2초, 반지름 0.15, 페이드 0.15, 확장 0.6, 중심 (0.46, 0.5).
 - 좌표 = 단어 사각형(글자 사각형 합집합) UV, 거리 단위 = 단어 높이(가로에 단어 종횡비 보정). Rmax = 원 중심에서 네 모서리까지(+경계, 다 덮음). 경계 0.01(`rectifyFillSoftness`, 픽셀보다 작으면 fwidth AA).
 - **옛 값 자동 이전**(`MigrateRectifyCircles`, `OnEnable` 1회 — `rectifyCirclesVersion` 1): ① = 옛 링 0(생성 0·옛 반지름·페이드·확장·중심, 왼쪽 = 옛 링 0 색) · ② = 옛 링 1(생성 = 옛 간격 `rectifyFillDelay`, 색 = 새 블루 그라데이션) · ③ = 옛 흰 원(생성·반지름·페이드·확장·중심, 왼쪽 = 옛 흰색) · 회색 = 옛 링 2 색(있으면). 옛 칸(`rectifyFillColors`·`rectifyFillCenter/StartRadius/Delay/Fade/Expand`·`rectifyWhite*`)은 숨김, 그라데이션 칸은 삭제. 에셋(`BossVictoryGlitchSettings.asset`)은 11-12 튜닝값(링 색 2개·간격 0.1·확장 0.5·흰 원 0.3초/확장 0.1·그라데이션 0)을 이 규칙으로 옮겨 저장했다 — ② 옛 #3A6BFF 는 하늘 → 남색으로 바뀜.
-- **주황 채움**(`rectifyOrange*`): 마지막(흰) 원이 다 퍼진 뒤(생성 + 페이드 + 회색→흰 + 확장) `rectifyOrangeHold`(0.05초) 머물고, 레퍼런스(raw 12~23 프레임)처럼 가로줄(4px)마다 들쭉날쭉한 경계가 오른쪽 → 왼쪽으로 지나가며(0.1초, 들쭉날쭉 단어 폭 0.2) 흰색을 불투명한 주황으로 바꾼다. 색 = 왼쪽 #FFA53A → 오른쪽 #F8E862 보간(세기 `rectifyOrangeGradient`).
+- **주황 채움**(`rectifyOrange*` — 11-12부터 캐릭터별 프로필, §4.12): 마지막(흰) 원이 다 퍼진 뒤(생성 + 페이드 + 회색→흰 + 확장) `rectifyOrangeHold`(0.05초) 머물고, 레퍼런스(raw 12~23 프레임)처럼 가로줄(4px)마다 들쭉날쭉한 경계가 한쪽에서(`rectifyOrangeRightToLeft`) 지나가며(0.1초, 들쭉날쭉 단어 폭 0.2) 흰색을 불투명한 주황으로 바꾼다. 색 = 왼쪽 → 오른쪽 보간(세기 `rectifyOrangeGradient`, 옮길 때 값: 왼쪽→오른쪽 방향·#FF4500 근처 → 분홍 #FF0074 근처 — 사용자 튜닝).
 - 블룸: 글리치 합성은 `AfterRenderingTransparents`(후처리 전)라 RECTIFY 도 볼륨 블룸을 받지만, 값이 0~1(LDR)이라 맵 볼륨 threshold(0.9~1.25)를 거의 못 넘어 번짐이 없다 — 대신 전용 글로우(§4.8).
 - 순수 함수 `BossVictoryRectifyFill`(원 상태 `Circle`·원 색·주황 시작/진행·와이프·색·단어 사각형·Rmax) → 셰이더가 글자 SDF 마스크에 그린다 — `rectifyFillCoversOutline`(기본 켬, 11-12 사용자 요청)이면 마스크를 외곽선 바깥 경계(sd = −외곽선 반두께, 바깥 AA 유지)까지 넓혀 색이 지나간 자리는 외곽선도 같은 색, 흰 외곽선은 색이 아직 닿지 않은 만큼(1 − 덮인 정도)만 남는다(첫 원 전 = 흰 외곽선만). 끄면 예전처럼 안쪽만·외곽선 흰색. 안쪽 가는 가로 주사선 칸(간격 화면 높이 0.3%, `rectifyScanlineDark`) — 11-12 사용자 요청으로 기본 0(끔), 칸은 다시 켤 여지로 남김. 덮기 끔일 때만 흰 외곽선이 그 위.
-- 모양 값은 공용 설정 `rectifyCircles`·`rectifyCircleGray*`·`rectifyFillSoftness/CoversOutline`·`rectifyScanline*`. 시각 t 로 결정 — 스크럽·피어 동일, 새 RPC 없음. 복사 = 클립 추가.
+- 모양 값은 공용 설정 `rectifyCircles`·`rectifyCircleGray*`·`rectifyFillSoftness/CoversOutline`(주황 채움·`rectifyScanline*` 는 캐릭터별 프로필, §4.12). 시각 t 로 결정 — 스크럽·피어 동일, 새 RPC 없음. 복사 = 클립 추가.
 
 ## 4.6 CRT 주사선 = 벽·하늘에만(267 후속)
 
@@ -133,7 +134,7 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 
 프로필 칸 하나(`baseColor`, 기준 색)로 처치 연출 화면 효과 색 15칸을 계산한다. 순수 함수 `BossVictoryPaletteCalc`(`Map/BossVictory/BossVictoryPalette.cs`), EditMode `BossVictoryPaletteTests`.
 
-- **기준 팔레트 = 공용 설정 색 그대로**: `BossVictoryGlitchSettings` 의 amberColor·bossNoiseBright/Dark·rectifyColor·rectifyCircles[0..2] 좌우·rectifyCircleGrayColor·rectifyOrangeLeft/Right·rectifyGlowColor·crtOffGlowColor 는 이제 '팔라딘 기준 팔레트'다. 기준 색의 기준 = 공용 `amberColor`, 대비 기준 색의 기준 = 공용 `crtOffGlowColor`. (`rectifyWhiteColor` 는 옛 이관 전용 숨은 칸이라 빠진다.)
+- **기준 팔레트 = 공용 설정 색 그대로**: `BossVictoryGlitchSettings` 의 amberColor·bossNoiseBright/Dark·rectifyColor·rectifyCircles[0..2] 좌우·rectifyCircleGrayColor·rectifyGlowColor·crtOffGlowColor(+ 처치자 프로필 rectifyOrangeLeft/Right, 11-12 §4.12)는 이제 '팔라딘 기준 팔레트'다. 기준 색의 기준 = 공용 `amberColor`, 대비 기준 색의 기준 = 공용 `crtOffGlowColor`. (`rectifyWhiteColor` 는 옛 이관 전용 숨은 칸이라 빠진다.)
 - **칸** = `BossVictoryPaletteSlot`(호박색·노이즈 밝음/어두움·RECTIFY 외곽선·①②③ 원 좌우·③ 회색·주황 좌우·글로우·TV 꺼짐). 직렬화 값이라 순서를 바꾸지 않는다.
 - **기조 그룹 규칙**(HSV, sRGB 값): 색 = 공용 색에서 색조 += (새 기준 색조 − 공용 호박색 색조), 채도·밝기 ×= (새 기준 ÷ 공용 호박색). 호박색 칸 = 기준 색 자체. 1 이하(LDR) 색은 밝기 1 에서 자르고, 1 넘는 HDR 색은 세기를 비율 그대로 유지(노이즈 밝은 색 배율 `bossNoiseBrightIntensity` 는 색 계산 뒤 그대로 곱한다).
 - **무채색 그대로**: 채도 < 0.02(흰 외곽선·③ 흰·③ 회색·글로우 흰색)는 색조가 없어 기준 색을 바꿔도 그대로.
@@ -143,8 +144,16 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
   - `contrastMode = Manual`: `contrastColor` 를 그대로 대비 기준 색으로(하한 안 걸림).
 - **칸별 직접 지정**: 프로필 `paletteOverrides`(칸·manual·색). manual 켬 = 그 칸은 그 색 그대로(HDR 가능), 끄면 자동(색은 다시 켤 때를 위해 남김). 같은 칸 두 줄이면 앞 줄. 기본 = 비어 있음(전부 자동).
 - **처음 값**: 세 프로필(팔라딘·거너·어쌔신)과 코드 기본값 모두 기준 색 #D6AB69(= 공용 호박색) → 지금 색과 같다. 테스트는 값이 아니라 관계를 고정한다(기준 색 = 공용 호박색이면 공용 색 그대로, 오차 1e-3 — 세 프로필 기준 색은 사용자 튜닝 값, 코드 기본값만 #D6AB69 고정). 기본 프로필 에셋은 11-12 삭제.
-- **런타임**: `BossVictoryGlitchPresentation.Begin` 이 처치자 프로필을 고르는 순간 `_palette` 를 계산해 `BossVictoryGlitchRender.Enable(settings, palette)`·TV 꺼짐 `BossVictoryCrtOff` 에 넘긴다. 새 RPC 없음 — 복제된 `KillerClientId` → 처치자 캐릭터 → 프로필 → 같은 팔레트(늦은 참가자도). 렌더러 `Enable` 은 이미 켜져 있으면 색만 다시 넣는다.
+- **런타임**: `BossVictoryGlitchPresentation.Begin` 이 처치자 프로필을 고르는 순간 `_palette` 를 계산해 `BossVictoryGlitchRender.Enable(settings, palette, orange)`·TV 꺼짐 `BossVictoryCrtOff` 에 넘긴다. 새 RPC 없음 — 복제된 `KillerClientId` → 처치자 캐릭터 → 프로필 → 같은 팔레트(늦은 참가자도). 렌더러 `Enable` 은 이미 켜져 있으면 색만 다시 넣는다.
 - **편집**: 타임라인 창 인스펙터 위 **'팔레트'** 버튼(또는 노란 틴트·보스 노이즈·TV 꺼짐·RECTIFY 트랙 칸의 '팔레트') — 기준 색·대비 모드/색조 차이/하한(또는 대비 색), 계산된 대비 기준 색, 15칸 견본(자동/직접 표시·체크 = 직접 지정·직접이면 색 편집). Play 중 연출이 돌면 바꾼 값이 바로 화면에(`RefreshLook`, TV 꺼짐은 다음 꺼짐부터). 트랙 칸의 공용 색을 고치면 기준 팔레트가 바뀌어 모든 캐릭터에 같은 관계로 퍼진다.
+
+## 4.12 RECTIFY 주황 채움 = 캐릭터별(11-12)
+
+공용 설정의 'RECTIFY 주황 채움' 10칸(`rectifyOrangeHold/Wipe/RightToLeft/Jitter/RowPixels/Left/Right/Gradient`·`rectifyScanlineSpacing/Dark`)을 `BossVictoryProfile`(인스펙터 'RECTIFY 주황 채움(캐릭터별)')로 옮기고 공용에서는 지웠다.
+- **이전**: 세 프로필에 옮기기 전 공용 값(사용자 튜닝 포함 — 왼쪽→오른쪽·좌 (1, 0.27, 0)·우 (1, 0, 0.455))을 Unity 에서 그대로 복사 → 화면은 옮기기 전과 같다. `CreateDefault()`(표에 없는 캐릭터) 기본값도 같은 값(`BossVictoryOrangeLook.Default*`).
+- **런타임**: 처치자 프로필 → `BossVictoryOrangeLook.From(profile)`(하한·0~1 자르기) → `BossVictoryGlitchRender.Enable/ApplyLook(settings, palette, orange)`. 처치자 = 복제된 `KillerClientId`(새 RPC·복제 값 없음).
+- **팔레트(271)**: 칸 `OrangeLeft/Right` 는 그대로, 기준(원본) 색만 처치자 프로필 `rectifyOrangeLeft/Right`(`ReferenceColors(settings, profile)`). 기준 색 따라가기·칸별 직접 지정 규칙은 같고 팔레트 견본도 프로필 값을 따른다.
+- **편집**: 타임라인 창 RECTIFY 안쪽 색 트랙 칸 — '주황 채움' 칸이 지금 고른 캐릭터 프로필 값. 테스트 `BossVictoryOrangeProfileTests`(세 프로필 값 = 옛 공용 값 · 렌더 값 = 처치자 프로필).
 
 ## 5. 알려진 한계
 

@@ -117,9 +117,10 @@ public static class BossVictoryPaletteCalc
         };
     }
 
-    /// <summary>공용 설정 색 = 기준(팔라딘) 팔레트. 칸 순서 = <see cref="BossVictoryPaletteSlot"/>.</summary>
-    public static Color[] ReferenceColors(BossVictoryGlitchSettings s)
+    /// <summary>기준 팔레트 — 공용 설정 색 + 주황 채움 좌우 = 프로필 rectifyOrangeLeft/Right(11-12, <paramref name="p"/> null = 코드 기본값). 칸 순서 = <see cref="BossVictoryPaletteSlot"/>.</summary>
+    public static Color[] ReferenceColors(BossVictoryGlitchSettings s, BossVictoryProfile p = null)
     {
+        BossVictoryOrangeLook orange = BossVictoryOrangeLook.From(p);
         var c = new Color[BossVictoryPalette.Count];
         BossVictoryGlitchSettings.RectifyCircle[] circles = s.rectifyCircles ?? Array.Empty<BossVictoryGlitchSettings.RectifyCircle>();
         BossVictoryGlitchSettings.RectifyCircle[] fallback = BossVictoryGlitchSettings.DefaultRectifyCircles();
@@ -135,8 +136,8 @@ public static class BossVictoryPaletteCalc
         c[(int)BossVictoryPaletteSlot.Circle3Left] = Circle(2).leftColor;
         c[(int)BossVictoryPaletteSlot.Circle3Right] = Circle(2).rightColor;
         c[(int)BossVictoryPaletteSlot.CircleGray] = s.rectifyCircleGrayColor;
-        c[(int)BossVictoryPaletteSlot.OrangeLeft] = s.rectifyOrangeLeft;
-        c[(int)BossVictoryPaletteSlot.OrangeRight] = s.rectifyOrangeRight;
+        c[(int)BossVictoryPaletteSlot.OrangeLeft] = orange.Left;
+        c[(int)BossVictoryPaletteSlot.OrangeRight] = orange.Right;
         c[(int)BossVictoryPaletteSlot.Glow] = s.rectifyGlowColor;
         c[(int)BossVictoryPaletteSlot.CrtGlow] = s.crtOffGlowColor;
         return c;
@@ -144,7 +145,7 @@ public static class BossVictoryPaletteCalc
 
     /// <summary>처치자 프로필 기준 팔레트(프로필 null = 코드 기본 입력).</summary>
     public static BossVictoryPalette Compute(BossVictoryGlitchSettings s, BossVictoryProfile p) =>
-        Compute(ReferenceColors(s), Inputs.From(p));
+        Compute(ReferenceColors(s, p), Inputs.From(p));
 
     /// <summary>순수 계산 — <paramref name="reference"/> = 기준 팔레트(칸 순서, 기준 색 = Amber · 대비 기준 = CrtGlow).</summary>
     public static BossVictoryPalette Compute(Color[] reference, in Inputs inputs)

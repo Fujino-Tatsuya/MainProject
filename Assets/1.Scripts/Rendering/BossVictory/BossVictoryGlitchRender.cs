@@ -98,12 +98,12 @@ public static class BossVictoryGlitchRender
     public static bool Active => _hooked;
 
     /// <summary>켠다(멱등 — 이미 켜져 있으면 색·모양만 다시 넣는다). 셰이더가 없으면 false(호출측이 진단을 남긴다).
-    /// <paramref name="palette"/> = 처치자 프로필 기준 계산 팔레트(271), null = 공용 설정 색 그대로.</summary>
-    public static bool Enable(BossVictoryGlitchSettings settings, BossVictoryPalette palette)
+    /// <paramref name="palette"/> = 처치자 프로필 기준 계산 팔레트(271), null = 공용 설정 색 그대로. <paramref name="orange"/> = 처치자 프로필 RECTIFY 주황 채움 값(11-12).</summary>
+    public static bool Enable(BossVictoryGlitchSettings settings, BossVictoryPalette palette, BossVictoryOrangeLook orange)
     {
         if (_hooked)
         {
-            ApplyLook(settings, palette);
+            ApplyLook(settings, palette, orange);
             return true;
         }
         Shader mask = settings != null && settings.maskShader != null ? settings.maskShader : Shader.Find(MaskShaderName);
@@ -113,7 +113,7 @@ public static class BossVictoryGlitchRender
         _maskPlayer = NewMask(mask, new Color(1f, 0f, 0f, 1f));
         _maskBoss = NewMask(mask, new Color(0f, 0f, 1f, 1f));
         _composite = CoreUtils.CreateEngineMaterial(comp);
-        ApplyLook(settings, palette);
+        ApplyLook(settings, palette, orange);
         _anyEffect = false;
 
         _maskPass = new MaskPass(_maskPlayer, _maskBoss)
@@ -156,7 +156,7 @@ public static class BossVictoryGlitchRender
     }
 
     /// <summary>색·노이즈·모양 칸(설정 SO) — 켤 때 + 창에서 값을 바꿨을 때. 색 = <paramref name="palette"/>(271 — null 이면 공용 설정 색 그대로 = 기준 팔레트).</summary>
-    public static void ApplyLook(BossVictoryGlitchSettings s, BossVictoryPalette palette)
+    public static void ApplyLook(BossVictoryGlitchSettings s, BossVictoryPalette palette, BossVictoryOrangeLook orange)
     {
         if (_composite == null || s == null) return;
         palette ??= BossVictoryPaletteCalc.Compute(s, null);
@@ -175,7 +175,7 @@ public static class BossVictoryGlitchRender
         _composite.SetVector(IdGrade, new Vector4(Mathf.Clamp01(s.amberLumaLift), Mathf.Clamp01(s.scanlineDarkness), 0f, 0f));
         ApplyVolume(s);
         ApplyRectify(s, palette);
-        ApplyFillLook(s, palette);
+        ApplyFillLook(s, palette, orange);
     }
 
     // 처치 연출 전용 볼륨(267 후속) — 켤 때 만들고(전역·우선순위 높음) 끌 때 지운다. 각 피어 로컬, 네트워크 없음.
@@ -274,7 +274,7 @@ public static class BossVictoryGlitchRender
     static float _glowIntensity, _glowRadius = 24f, _glowWhite, _glowOrange;
     static bool _glowOn;
 
-    static void ApplyFillLook(BossVictoryGlitchSettings s, BossVictoryPalette palette)
+    static void ApplyFillLook(BossVictoryGlitchSettings s, BossVictoryPalette palette, BossVictoryOrangeLook orange)
     {
         BossVictoryGlitchSettings.RectifyCircle[] src = s.rectifyCircles ?? new BossVictoryGlitchSettings.RectifyCircle[0];
         _circleCount = Mathf.Min(src.Length, BossVictoryRectifyFill.CircleCount);
@@ -291,14 +291,14 @@ public static class BossVictoryGlitchRender
         _grayToWhite = Mathf.Max(0f, s.rectifyCircleGrayToWhite);
         _fillSoft = s.rectifyFillSoftness;
         _fillCoversOutline = s.rectifyFillCoversOutline;
-        _scanSpacing = s.rectifyScanlineSpacing;
-        _scanDark = Mathf.Clamp01(s.rectifyScanlineDark);
-        _orangeHold = s.rectifyOrangeHold;
-        _orangeWipe = s.rectifyOrangeWipe;
-        _orangeRightToLeft = s.rectifyOrangeRightToLeft;
-        _orangeJitter = Mathf.Clamp01(s.rectifyOrangeJitter);
-        _orangeRowPx = Mathf.Max(1f, s.rectifyOrangeRowPixels);
-        _orangeGradient = Mathf.Clamp01(s.rectifyOrangeGradient);
+        _scanSpacing = orange.ScanlineSpacing;
+        _scanDark = orange.ScanlineDark;
+        _orangeHold = orange.Hold;
+        _orangeWipe = orange.Wipe;
+        _orangeRightToLeft = orange.RightToLeft;
+        _orangeJitter = orange.Jitter;
+        _orangeRowPx = orange.RowPixels;
+        _orangeGradient = orange.Gradient;
         _composite.SetColor(IdOrangeLeft, palette[BossVictoryPaletteSlot.OrangeLeft].linear);
         Color right = palette[BossVictoryPaletteSlot.OrangeRight].linear;
         _composite.SetVector(IdOrangeRight, new Vector4(right.r, right.g, right.b, _orangeGradient));
