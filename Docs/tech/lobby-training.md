@@ -130,8 +130,11 @@
 
 - T20 = `Gather_Train02Start` 유지 3초 = 서버 카운트다운(`countdownEndServerTime` 복제). 그동안 표시 상태 T21(목표 `LOBBY_OBJ_COMBAT`·진행 '시작까지 {n}'). 한 명이라도 나가면 취소 → T20, 다시 모이면 처음부터.
 - 카운트다운 동안 상대 없음. 확정 → T22 에서 로비 전용 `LobbyCombatSpawnSet.asset` **6마리** 스폰(`LobbyRules.combatSpawnSet`, 기준점 씬 `Train02Spawns` — 비면 옛 존2 9마리) + 훈련 리셋 `CombatStart`.
-- **6마리 전부 진짜 월봇**(`Assets/2.Prefabs/Monster/WallBot.prefab`, AI·수치 그대로 — 할 일 274, 사용자 확정 2026-11-12). 자리는 옛 6자리 그대로(지점 이름 `Center`·`North_West`·`North_East`·`South_West`·`South_East`·`East`, 오프셋·방향 동일).
-  옛 구성(MortarBot 1·ChompBot 3·HumanoidBot 2)보다 어렵다 — 월봇은 중간보스(체력 600·평상 슈퍼아머·방패 3단 돌진/충격파)다. 값은 바꾸지 않았다(난이도 상승은 사용자 승인).
+- **6마리 전부 튜토리얼 월봇** `Assets/2.Prefabs/Lobby/WallBot_Tutorial.prefab`(할 일 274) — 진짜 `WallBot.prefab` 의 Variant(AI 코드 그대로, 본편 원본은 안 건드림). 자리는 옛 6자리 그대로(지점 이름 `Center`·`North_West`·`North_East`·`South_West`·`South_East`·`East`, 오프셋·방향 동일).
+  - 약화(274 후속 — "너무 셈"): 데이터 `Assets/2.Prefabs/Monster/Data/WallBotData_Tutorial.asset`(WallBotData 복사) — 체력 600→180 · 공격력 16→6 · 방어 8→0 · 등급 MidBoss→Normal(중간보스 상시 슈퍼아머·중간보스 바 꺼짐, 일반 몹 피격 경직) · 공격 중 슈퍼아머 끔 · 쿨 0.83→1.5 · 인지 9→7 · 첫 공격 지연 0→0.6 · 사거리 2→1.3(크기 배율에 맞춤).
+    프리팹 칸 `shieldChance` 0.5→0 = 방패 3단(카운터 창·돌진·충격파) 끔, 단발 평타만. 6마리 동시 어그로는 코드가 없어 인지 반경으로만 줄였다.
+  - 크기(274 후속 — "너무 큼"): 루트 스케일 **0.65** 한 칸. 몸·Hurtbox 캡슐·NavMeshAgent 반경·평타 판정(`ColliderInfo` = lossyScale 반영)이 같이 준다. 충격파 반경·돌진 거리(월드 m)는 안 따라가지만 방패 3단을 꺼서 무관. 피해 숫자 = 몸 콜라이더 중심(같이 줄어듦), 머리 위 체력 바 = 발 기준 화면 오프셋(크기 무관). 배율을 바꾸면 데이터 `attackRange` 도 2×배율로.
+  - 데이터 테이블: `Monster` 시트에 대상 열 `WallBotData_Tutorial`, `MidBoss` 시트에 대상 열 `WallBot_Tutorial` 이 없으면 경고만·인스펙터 값(열 이름 = 에셋/프리팹 파일 이름).
 - 완료 = 생성 집합 전원 사망 1회(`MonsterDeathEvents.ServerMonsterDied` → `LobbyCombatLedger`, 마지막 사망 중복 무시). 끼임 복구 = 0.5초마다 훈련실 경계 밖·오래 멈춤 → 초기 위치 Warp.
 - '남은 상대' 수는 계약에 없다(옛 `LobbyTrainingCombat` 남은 수 복제는 158 이 끄는 옛 뷰 전용).
 
@@ -139,7 +142,8 @@
 
 - **프리팹** `Assets/2.Prefabs/Lobby/TrainingSparringBot_WallBot.prefab` = `WallBot.prefab` Variant(`WallBot` 컴포넌트 → `TrainingSparringBot`, 할 일 274 — 겉모습만 월봇). 규칙 값 = 23호 데이터 `No23_A.asset`(`counterRules` — 그로기·취약·넉백·칸 감소 등).
   씬 `LobbyTrainingSparring.sparringPrefab` 이 이걸 가리킨다. 옛 `TrainingSparringBot.prefab`(SpinnerBot Variant)은 지우지 않고 참조만 끊었다(guid 보존, NetworkPrefabs 등록 유지).
-  - 동작은 옛 상대와 같다: 수치 `data` = `SpinnerBotData`(체력 260·공격력·사거리 2·쿨 등 그대로 — 월봇 데이터 아님), 간파 창 `MonsterCounterWindow` 1.5초/그로기 1초, 채찍 판정 상자 = SpinnerBot 과 같은 크기(2.5×1.5×2.8, 중심 z 1.4).
+  - 동작은 옛 상대와 같다: 수치 `data` = `SpinnerBotData`(체력 260·공격력·사거리 2·쿨 등 그대로 — 월봇 데이터 아님), 간파 창 `MonsterCounterWindow` 1.5초/그로기 1초, 채찍 판정 상자 = SpinnerBot 과 같은 **월드** 크기(2.5×1.5×2.8, 중심 z 1.4).
+  - 크기: 루트 스케일 **0.65**(274 후속). 채찍 판정 상자는 사거리 2m·아레나 배치가 그 크기 기준이라 로컬 값을 ÷0.65(3.846×2.308×4.308, 중심 y 1.538·z 2.154)로 넣어 월드 크기를 유지했다 — 배율을 바꾸면 이 값도 다시 나눈다.
   - 애니: `whipState` = `AttackStart`(월봇 컨트롤러 — **루프 클립**, `OnAttackHit` 가 바퀴마다 온다) → 히트는 base 가 공격당 1회, 히트 순간 `whipFinishTrigger` = `AttackEnd` 를 전 피어에 1회(새 RPC `WhipFinishRpc`) → `AttackEnd` 클립의 `OnAttackEnd` 로 공격 종료. 다음 채찍 시작 때 트리거 래치를 지운다.
     피격 트리거 `Hit` 는 두 컨트롤러가 같다(보스 규칙이라 자동 피격 반응은 원래 없음). 월봇엔 그로기 클립(`IsDizzy`)이 없어 `freezePoseWhileGroggy` = 켬 → 그로기 동안 대기 자세 첫 프레임 정지(GauntletBot 과 같은 표현, 해제 = base 가 Groggy 이탈마다).
   - 정리한 것: 월봇 AI 전용 `DashHitbox` 자식 제거, Hurtbox `ownerUnit` → `TrainingSparringBot`, `interruptFlash` = 월봇 `VFX/InterruptFlashVFX`, 옛 상대의 `DirectionIndicator`(BossDirectionIndicator) 자식을 같은 값으로 추가. 새 칸 2개(`whipFinishTrigger`·`freezePoseWhileGroggy`)는 옛 프리팹에선 빈 값/꺼짐 = 옛 동작.
@@ -174,7 +178,7 @@
 - 상대 사망 뒤 허수아비 1개(`LobbyRules.freePracticeDummyPrefab` = `TrainingDummy_TutorialWallBot` — 사망 없음, 자리 = A/B 위치). 체력 하한은 행 `trainingProfile` = Training.
   - 할 일 274: `TrainingDummy_Tutorial.prefab` 의 Variant — `TrainingDummy` 동작(불사·피해 숫자·회복·복귀·간파 연습) 그대로, 캡슐 `Model` 자식을 빼고 월봇 아트 `P_WallBot`(SVN, 참조만) 을 `Model` 로 중첩.
     판정 = `WallBot.prefab` 과 같게(몸 캡슐 r0.5·h2·중심 y1, Hurtbox 캡슐 r0.5·h2.597·중심 y1.299). `FloatingDamageAnchor` 는 월봇처럼 두지 않았다 → 피해 숫자 = 몸 콜라이더 중심(실제 월봇과 같은 높이).
-    머리 위 체력 바는 옛 높이(2.4) 그대로 — 월봇 모델 꼭대기 ≈2.2 바로 위. 아트 Animator(`Controller_WallBot`)는 대기 블렌드만 돈다(이동·공격 신호 없음). 옛 `TrainingDummy_Tutorial` 은 그대로 남겼다(참조만 교체).
+    크기 = 루트 스케일 **0.65**(274 후속) — 모델·판정·자식 체력 바(로컬 2.4 → 월드 ≈1.56, 모델 꼭대기 ≈1.43 바로 위)가 같이 준다. 아트 Animator(`Controller_WallBot`)는 대기 블렌드만 돈다(이동·공격 신호 없음). 옛 `TrainingDummy_Tutorial` 은 그대로 남겼다(참조만 교체).
 - 출구 `Gather_TrainEnd` 0.3초 전원 집결 확정 → 허수아비·훈련 보정 정리 → 종료 텔레포트(중앙 `Gather_Brief` 안) → L30. 이후 행엔 훈련 내용이 없어 재입장해도 재시작 없음.
 
 ## 5. 브리핑 — L30 ~ L34

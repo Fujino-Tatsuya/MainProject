@@ -142,6 +142,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1240990384104714249, guid: 5d7b685ab112ee143a4618eb498caa31, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 1240990384104714249, guid: 5d7b685ab112ee143a4618eb498caa31, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 1240990384104714249, guid: 5d7b685ab112ee143a4618eb498caa31, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.65
+      objectReference: {fileID: 0}
     - target: {fileID: 1499259539980126395, guid: 5d7b685ab112ee143a4618eb498caa31, type: 3}
       propertyPath: m_Name
       value: TrainingDummy_TutorialWallBot
