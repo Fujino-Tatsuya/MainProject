@@ -25,6 +25,8 @@ MonoBehaviour:
   finisherWithBackDash: 0
   handSwordLightning: 0
   fallingSwordScale: 1
+  fallingSwordOffset: {x: 0, y: 0, z: 0}
+  fallingSwordLife: 0
   killerMove: 1
   teleportMoveState: Assassin_Q_DashStrike_Transformed
   teleportMoveEase:
@@ -81,7 +83,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   timeline:
     desaturate:
-    - start: 0.105
+    - start: 1.29
       length: 7.095
       fadeIn: 0.09
       fadeOut: 0
@@ -106,8 +108,8 @@ MonoBehaviour:
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
     amber:
-    - start: 0.24
-      length: 2.15
+    - start: 1.29
+      length: 0.59000003
       fadeIn: 0.15
       fadeOut: 0
       weight: 1
@@ -115,7 +117,7 @@ MonoBehaviour:
       - u: 0
         value: 0
         curve: 1
-      - u: 0.028301883
+      - u: 0
         value: 1
         curve: 0
       - u: 1
@@ -130,8 +132,8 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 3.75
-      length: 0.8699999
+    - start: 0.3
+      length: 0.19999999
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -139,11 +141,11 @@ MonoBehaviour:
       - u: 0
         value: 0
         curve: 1
-      - u: 0.1
-        value: 1
+      - u: 0
+        value: 0.01
         curve: 0
-      - u: 0.9
-        value: 1
+      - u: 1
+        value: 0.1
         curve: 1
       - u: 1
         value: 0
@@ -157,8 +159,8 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 2.4
-      length: 1.3499999
+    - start: 0.5
+      length: 0.39
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -166,11 +168,11 @@ MonoBehaviour:
       - u: 0
         value: 0
         curve: 1
-      - u: 0.1
-        value: 1
+      - u: 0
+        value: 0.4
         curve: 0
-      - u: 0.9
-        value: 1
+      - u: 1
+        value: 0.4
         curve: 1
       - u: 1
         value: 0
@@ -184,8 +186,8 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 0.13
-      length: 0.050000012
+    - start: 0.89
+      length: 0.39999992
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -193,11 +195,11 @@ MonoBehaviour:
       - u: 0
         value: 0
         curve: 1
-      - u: 0.1
-        value: 1
+      - u: 0
+        value: 0.7
         curve: 0
-      - u: 0.9
-        value: 1
+      - u: 1
+        value: 0.7
         curve: 1
       - u: 1
         value: 0
@@ -237,8 +239,8 @@ MonoBehaviour:
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
     bossNoise:
-    - start: 0.12
-      length: 6.1800003
+    - start: 0.1
+      length: 6.2000003
       fadeIn: 0.05
       fadeOut: 0
       weight: 1
@@ -262,62 +264,8 @@ MonoBehaviour:
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
     tear:
-    - start: 0.09
-      length: 0.22999999
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
-      keys:
-      - u: 0
-        value: 0
-        curve: 1
-      - u: 0.65625
-        value: 1
-        curve: 0
-      - u: 0.6875
-        value: 1
-        curve: 1
-      - u: 1
-        value: 0
-        curve: 0
-      uvFrom: 0
-      uvTo: 0
-      uvEase: 0
-      bobAmplitude: 0
-      bobPeriod: 0
-      bobPhase: 0
-      bobDamping: 0
-      dashFrom: {x: 0, y: 0, z: 0}
-      dashTo: {x: 0, y: 0, z: 0}
-    - start: 0.32
-      length: 0.09
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
-      keys:
-      - u: 0
-        value: 0
-        curve: 1
-      - u: 0.111111104
-        value: 1
-        curve: 0
-      - u: 0.111111164
-        value: 1
-        curve: 1
-      - u: 1
-        value: 0
-        curve: 0
-      uvFrom: 0
-      uvTo: 0
-      uvEase: 0
-      bobAmplitude: 0
-      bobPeriod: 0
-      bobPhase: 0
-      bobDamping: 0
-      dashFrom: {x: 0, y: 0, z: 0}
-      dashTo: {x: 0, y: 0, z: 0}
-    - start: 0.96
-      length: 0.2
+    - start: 1.23
+      length: 0.44999993
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -343,8 +291,8 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 2.16
-      length: 0.28999996
+    - start: 1.67
+      length: 0.42000008
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -370,35 +318,8 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 3.64
-      length: 0.2
-      fadeIn: 0
-      fadeOut: 0
-      weight: 1
-      keys:
-      - u: 0
-        value: 0
-        curve: 1
-      - u: 0.5
-        value: 1
-        curve: 0
-      - u: 0.5
-        value: 1
-        curve: 1
-      - u: 1
-        value: 0
-        curve: 0
-      uvFrom: 0
-      uvTo: 0
-      uvEase: 0
-      bobAmplitude: 0
-      bobPeriod: 0
-      bobPhase: 0
-      bobDamping: 0
-      dashFrom: {x: 0, y: 0, z: 0}
-      dashTo: {x: 0, y: 0, z: 0}
-    - start: 4.35
-      length: 1.9500003
+    - start: 4.26
+      length: 1.4499998
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -410,6 +331,87 @@ MonoBehaviour:
         value: 1
         curve: 0
       - u: 1
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+      dashFrom: {x: 0, y: 0, z: 0}
+      dashTo: {x: 0, y: 0, z: 0}
+    - start: 0.16
+      length: 0.09000003
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+      dashFrom: {x: 0, y: 0, z: 0}
+      dashTo: {x: 0, y: 0, z: 0}
+    - start: 0.51
+      length: 0.100000024
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
+        value: 1
+        curve: 1
+      - u: 1
+        value: 0
+        curve: 0
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+      dashFrom: {x: 0, y: 0, z: 0}
+      dashTo: {x: 0, y: 0, z: 0}
+    - start: 0.9
+      length: 0.07999992
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys:
+      - u: 0
+        value: 0
+        curve: 1
+      - u: 0.5
+        value: 1
+        curve: 0
+      - u: 0.5
         value: 1
         curve: 1
       - u: 1
@@ -480,8 +482,8 @@ MonoBehaviour:
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
     hudHide:
-    - start: 0.08
-      length: 6.2200003
+    - start: 0
+      length: 6.3
       fadeIn: 0.04
       fadeOut: 0
       weight: 1
@@ -489,7 +491,7 @@ MonoBehaviour:
       - u: 0
         value: 0
         curve: 1
-      - u: 0.0072463765
+      - u: 0
         value: 1
         curve: 0
       - u: 1
@@ -506,8 +508,8 @@ MonoBehaviour:
       dashTo: {x: 0, y: 0, z: 0}
     crtOff: []
     cameraCut:
-    - start: 0.96
-      length: 4.61
+    - start: 0.09
+      length: 1.0899999
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -521,8 +523,8 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
-    - start: 5.57
-      length: 0.1
+    - start: 1.18
+      length: 3.3200002
       fadeIn: 0
       fadeOut: 0
       weight: 1
@@ -540,9 +542,9 @@ MonoBehaviour:
     - anchor: 0
       keys:
       - u: 0
-        position: {x: 1.6458317, y: 0.7546348, z: -5.37314}
-        rotation: {x: -0.027950438, y: -0.12646225, z: -0.0036580502, w: 0.9915709}
-        fov: 60.000004
+        position: {x: 3.72, y: 16.657612, z: 6.64}
+        rotation: {x: -0.3195841, y: 0.6749104, z: -0.5197531, w: -0.41499236}
+        fov: 42.04
         curve: 1
       smoothPath: 0
       hideWalls: 1
@@ -559,13 +561,13 @@ MonoBehaviour:
     - anchor: 0
       keys:
       - u: 0
-        position: {x: 0.7309832, y: 0.7548896, z: -5.6136727}
-        rotation: {x: -0.03416963, y: -0.028053746, z: -0.0010535398, w: 0.9990217}
-        fov: 60.000004
+        position: {x: -9.924023, y: 0.026340425, z: -4.0049987}
+        rotation: {x: 0.08954522, y: -0.5462063, z: -0.058906857, w: -0.8307649}
+        fov: 49.16
         curve: 1
       smoothPath: 0
       hideWalls: 1
-      blendSeconds: 3.711
+      blendSeconds: 0
       blendCurve: 1
       startPosition: {x: 0, y: 0, z: 0}
       startRotation: {x: 0, y: 0, z: 0, w: 0}
@@ -608,7 +610,7 @@ MonoBehaviour:
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
     cameraBob:
-    - start: 1.23
+    - start: 1.25
       length: 5.36
       fadeIn: 0
       fadeOut: 0
@@ -636,7 +638,7 @@ MonoBehaviour:
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
     rectify:
-    - start: 0.81
+    - start: 1.31
       length: 5.4900002
       fadeIn: 0
       fadeOut: 0
@@ -662,7 +664,7 @@ MonoBehaviour:
       dashTo: {x: 0, y: 0, z: 0}
     rectifySeeded: 1
     rectifyFill:
-    - start: 0.72
+    - start: 1.25
       length: 5.58
       fadeIn: 0
       fadeOut: 0
@@ -685,22 +687,14 @@ MonoBehaviour:
       dashTo: {x: 0, y: 0, z: 0}
     rectifyFillSeeded: 1
     cameraBobSeeded: 1
-    groundCircle:
-    - start: 0.3
-      length: 3.49
+    groundCircle: []
+    assassinDash:
+    - start: 0.06
+      length: 0.17
       fadeIn: 0
       fadeOut: 0
       weight: 1
-      keys:
-      - u: 0
-        value: 0
-        curve: 1
-      - u: 0.11320756
-        value: 1
-        curve: 0
-      - u: 1
-        value: 1
-        curve: 0
+      keys: []
       uvFrom: 0
       uvTo: 0
       uvEase: 0
@@ -708,10 +702,39 @@ MonoBehaviour:
       bobPeriod: 0
       bobPhase: 0
       bobDamping: 0
-      dashFrom: {x: 0, y: 0, z: 0}
-      dashTo: {x: 0, y: 0, z: 0}
-    assassinDash:
-    - start: 0.2
+      dashFrom: {x: 8.200965, y: 0, z: -6.331591}
+      dashTo: {x: -5.067833, y: 0, z: 3.9966779}
+    - start: 0.43
+      length: 0.14999998
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+      dashFrom: {x: 0.9491856, y: 0, z: -11.3631525}
+      dashTo: {x: -0.18117791, y: 0, z: 6.0022664}
+    - start: 0.8
+      length: 0.13
+      fadeIn: 0
+      fadeOut: 0
+      weight: 1
+      keys: []
+      uvFrom: 0
+      uvTo: 0
+      uvEase: 0
+      bobAmplitude: 0
+      bobPeriod: 0
+      bobPhase: 0
+      bobDamping: 0
+      dashFrom: {x: -6.108206, y: 0, z: -6.08895}
+      dashTo: {x: 4.4968395, y: 0, z: 3.8434763}
+    - start: 1.18
       length: 0.275
       fadeIn: 0
       fadeOut: 0
@@ -724,12 +747,12 @@ MonoBehaviour:
       bobPeriod: 0
       bobPhase: 0
       bobDamping: 0
-      dashFrom: {x: -3.0159504, y: 0, z: -6.602978}
-      dashTo: {x: 1.8154507, y: 0, z: 4.519139}
+      dashFrom: {x: -7.5957274, y: 0, z: -0.52254164}
+      dashTo: {x: 8.590039, y: 0, z: 0.19280392}
     groundCircleSeeded: 1
     focusKillerTime: 0.2
     hideOthersTime: 0.2
-    lobbyTransitionTime: 5.6
+    lobbyTransitionTime: 4.5
     backDashStartTime: 1.36
     finisherStartTime: 0.2
     finisherTrimSeconds: 1.1833333
@@ -749,11 +772,11 @@ MonoBehaviour:
   paletteOverrides: []
   rectifyOrangeHold: 0.05
   rectifyOrangeWipe: 0.1
-  rectifyOrangeRightToLeft: 1
+  rectifyOrangeRightToLeft: 0
   rectifyOrangeJitter: 0.2
   rectifyOrangeRowPixels: 4
-  rectifyOrangeLeft: {r: 1, g: 0.8387288, b: 0, a: 1}
-  rectifyOrangeRight: {r: 1, g: 0.11638947, b: 0, a: 1}
+  rectifyOrangeLeft: {r: 0, g: 0, b: 0, a: 1}
+  rectifyOrangeRight: {r: 0.4792453, g: 0.1895526, b: 0, a: 1}
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0

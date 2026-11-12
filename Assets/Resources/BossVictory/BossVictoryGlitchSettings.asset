@@ -64,22 +64,22 @@ MonoBehaviour:
     fade: 0.15
     expand: 0.5
     center: {x: 0.46, y: 0.5}
-    leftColor: {r: 1, g: 0.1764706, b: 0.7058824, a: 1}
-    rightColor: {r: 0.627451, g: 0.2509804, b: 1, a: 1}
+    leftColor: {r: 0.17647058, g: 1, b: 0.6863666, a: 1}
+    rightColor: {r: 0.701684, g: 1, b: 0.25098038, a: 1}
   - start: 0.1
     startRadius: 0.15
     fade: 0.15
     expand: 0.5
     center: {x: 0.46, y: 0.5}
-    leftColor: {r: 0.3529412, g: 0.78431374, b: 1, a: 1}
-    rightColor: {r: 0.14117648, g: 0.21960784, b: 0.65882355, a: 1}
+    leftColor: {r: 0.35294116, g: 1, b: 0.98865074, a: 1}
+    rightColor: {r: 0.3546108, g: 0.14117645, b: 0.65882355, a: 1}
   - start: 0.25
     startRadius: 0.15
     fade: 0.15
     expand: 0.1
     center: {x: 0.46, y: 0.5}
-    leftColor: {r: 1, g: 1, b: 1, a: 1}
-    rightColor: {r: 1, g: 0.9647059, b: 0.8784314, a: 1}
+    leftColor: {r: 0, g: 0.20979707, b: 0.4117647, a: 1}
+    rightColor: {r: 0.47441348, g: 0.06005683, b: 0.90943396, a: 1}
   rectifyCircleGrayColor: {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
   rectifyCircleGrayToWhite: 0.1
   rectifyFillSoftness: 0.01
