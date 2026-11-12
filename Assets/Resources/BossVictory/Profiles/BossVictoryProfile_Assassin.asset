@@ -550,6 +550,7 @@ MonoBehaviour:
       hideWalls: 1
       blendSeconds: 0
       blendCurve: 1
+      weaponFollowSmoothing: 0
       startPosition: {x: 0, y: 0, z: 0}
       startRotation: {x: 0, y: 0, z: 0, w: 0}
       startFov: 0
@@ -569,6 +570,7 @@ MonoBehaviour:
       hideWalls: 1
       blendSeconds: 0
       blendCurve: 1
+      weaponFollowSmoothing: 0
       startPosition: {x: 0, y: 0, z: 0}
       startRotation: {x: 0, y: 0, z: 0, w: 0}
       startFov: 0
@@ -780,3 +782,7 @@ MonoBehaviour:
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0
+  bossLook: 1
+  bossRimWidth: 0.35
+  bossRimSoftness: 0.1
+  bossRimInsideIntensity: 2

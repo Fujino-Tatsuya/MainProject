@@ -113,6 +113,16 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Tooltip("안쪽 주사선 어둡기(0 = 없음 — 기본. 다시 켜려면 0.25 근처).")]
     [Range(0f, 1f)] public float rectifyScanlineDark = BossVictoryOrangeLook.DefaultScanlineDark;
 
+    [Header("보스 표현(캐릭터별, 11-12) — '보스 노이즈' 트랙 구간 동안 보스를 노이즈 이미지 / 역림라이트로")]
+    [Tooltip("노이즈 = 보스 노이즈 텍스처(지금까지). 림라이트 = 보스 안쪽 전부 밝은 색 × 세기(블룸이 받는 과노출) · 테두리(프레넬 — 카메라 기준 모든 가장자리)만 어두운 색. 색 = 팔레트 칸 '보스 림 안쪽'·'보스 림 테두리'.")]
+    public BossVictoryBossLookMode bossLook = BossVictoryBossLook.DefaultMode;
+    [Tooltip("림라이트 — 테두리 굵기(0~1, 프레넬 문턱 = 1 − 굵기). 클수록 어두운 테두리가 안쪽까지.")]
+    [Range(0f, 1f)] public float bossRimWidth = BossVictoryBossLook.DefaultRimWidth;
+    [Tooltip("림라이트 — 테두리 경계 부드러움(0 = 칼같이).")]
+    [Range(0f, 1f)] public float bossRimSoftness = BossVictoryBossLook.DefaultRimSoftness;
+    [Tooltip("림라이트 — 안쪽 밝은 색 배율(1 넘으면 블룸이 받는 과노출).")]
+    [Min(0f)] public float bossRimInsideIntensity = BossVictoryBossLook.DefaultInsideIntensity;
+
     void ISerializationCallbackReceiver.OnBeforeSerialize() { }
 
     // 옛 형식 타임라인(255 후속 4·6 전)을 읽으면 새 형식으로 옮긴다 — 설정 SO 에 있던 이관을 프로필로(267).
@@ -185,4 +195,52 @@ public readonly struct BossVictoryOrangeLook
         : new BossVictoryOrangeLook(p.rectifyOrangeHold, p.rectifyOrangeWipe, p.rectifyOrangeRightToLeft, p.rectifyOrangeJitter,
             p.rectifyOrangeRowPixels, p.rectifyOrangeLeft, p.rectifyOrangeRight, p.rectifyOrangeGradient,
             p.rectifyScanlineSpacing, p.rectifyScanlineDark);
+}
+
+/// <summary>보스 표현(캐릭터별, 11-12) — '보스 노이즈' 트랙 구간 동안의 보스 그림. 🔴 직렬화 값 — 새 값은 끝에.</summary>
+public enum BossVictoryBossLookMode
+{
+    Noise = 0,     // 보스 노이즈 텍스처(지금까지)
+    RimLight = 1,  // 역림라이트 — 안쪽 밝게(과노출)·프레넬 테두리 어둡게
+}
+
+/// <summary>보스 표현 값(처치자 프로필에서 읽어 렌더에 넘긴다, 프로필 null = 코드 기본값 = 노이즈).</summary>
+public readonly struct BossVictoryBossLook
+{
+    public const BossVictoryBossLookMode DefaultMode = BossVictoryBossLookMode.Noise;
+    public const float DefaultRimWidth = 0.35f;
+    public const float DefaultRimSoftness = 0.1f;
+    public const float DefaultInsideIntensity = 2f;
+
+    public readonly BossVictoryBossLookMode Mode;
+    public readonly float RimWidth, RimSoftness, InsideIntensity;
+
+    public BossVictoryBossLook(BossVictoryBossLookMode mode, float rimWidth, float rimSoftness, float insideIntensity)
+    {
+        Mode = mode;
+        RimWidth = Mathf.Clamp01(rimWidth);
+        RimSoftness = Mathf.Clamp01(rimSoftness);
+        InsideIntensity = Mathf.Max(0f, insideIntensity);
+    }
+
+    public bool IsRim => Mode == BossVictoryBossLookMode.RimLight;
+
+    /// <summary>프레넬 문턱(이 값부터 테두리) = 1 − 굵기.</summary>
+    public float RimThreshold => 1f - RimWidth;
+
+    public static BossVictoryBossLook Default => new BossVictoryBossLook(DefaultMode, DefaultRimWidth, DefaultRimSoftness, DefaultInsideIntensity);
+
+    public static BossVictoryBossLook From(BossVictoryProfile p) => p == null ? Default
+        : new BossVictoryBossLook(p.bossLook, p.bossRimWidth, p.bossRimSoftness, p.bossRimInsideIntensity);
+
+    /// <summary>
+    /// 림 가중치(셰이더와 같은 식 — EditMode 확인용). <paramref name="fresnel"/> = 1 − saturate(N·V)(0 = 정면, 1 = 가장자리).
+    /// 0 = 안쪽(밝은 색 × 세기), 1 = 테두리(어두운 색).
+    /// </summary>
+    public float RimWeight(float fresnel)
+    {
+        float t = RimThreshold;
+        float lo = t - RimSoftness, hi = t + RimSoftness + 1e-4f;
+        return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((fresnel - lo) / (hi - lo)));
+    }
 }

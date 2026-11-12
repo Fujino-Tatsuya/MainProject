@@ -22,6 +22,8 @@ public enum BossVictoryPaletteSlot
     OrangeRight = 12,   // 주황 채움 오른쪽
     Glow = 13,          // RECTIFY 글로우 색(흰색 — 그대로)
     CrtGlow = 14,       // TV 꺼짐 발광 = 대비 기준 색 자체
+    RimInside = 15,     // 보스 림라이트 안쪽 밝은 색(기준 = 보스 노이즈 밝은 색, 11-12)
+    RimEdge = 16,       // 보스 림라이트 테두리 어두운 색(기준 = 보스 노이즈 어두운 색, 11-12)
 }
 
 /// <summary>대비 기준 색 고르기 — 자동(기준 색 색조 + 색조 차이) / 직접 지정.</summary>
@@ -40,7 +42,7 @@ public struct BossVictoryPaletteOverride
 /// <summary>계산된 처치 연출 팔레트 — 칸마다 sRGB 색 + 직접 지정 여부. <see cref="BossVictoryPaletteCalc.Compute(BossVictoryGlitchSettings, BossVictoryProfile)"/> 가 만든다.</summary>
 public sealed class BossVictoryPalette
 {
-    public const int Count = 15;
+    public const int Count = 17;
     public static readonly BossVictoryPaletteSlot[] Slots = (BossVictoryPaletteSlot[])Enum.GetValues(typeof(BossVictoryPaletteSlot));
 
     internal readonly Color[] Colors = new Color[Count];
@@ -140,6 +142,8 @@ public static class BossVictoryPaletteCalc
         c[(int)BossVictoryPaletteSlot.OrangeRight] = orange.Right;
         c[(int)BossVictoryPaletteSlot.Glow] = s.rectifyGlowColor;
         c[(int)BossVictoryPaletteSlot.CrtGlow] = s.crtOffGlowColor;
+        c[(int)BossVictoryPaletteSlot.RimInside] = s.bossNoiseBrightColor;   // 림라이트 기본 = 노이즈 두 색(11-12)
+        c[(int)BossVictoryPaletteSlot.RimEdge] = s.bossNoiseDarkColor;
         return c;
     }
 

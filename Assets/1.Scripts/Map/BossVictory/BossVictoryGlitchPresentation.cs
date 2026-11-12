@@ -125,7 +125,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         if (!_running || _profile == null) return;
         _palette = BossVictoryPaletteCalc.Compute(_settings, _profile);
-        if (_renderOn) BossVictoryGlitchRender.ApplyLook(_settings, _palette, BossVictoryOrangeLook.From(_profile));
+        if (_renderOn) BossVictoryGlitchRender.ApplyLook(_settings, _palette, BossVictoryOrangeLook.From(_profile), BossVictoryBossLook.From(_profile));
     }
 
     // ── 시계 진단(디버그 씬 — 랩 timelineClockLog) · 클립 노드 실측 표본(에디터 — 창이 클립 시간을 타임라인 초로 그린다) ──
@@ -1029,7 +1029,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _noiseOffset = Vector2.zero;
         _noiseCamValid = false;
         _cutJumped = false;
-        _renderOn = BossVictoryGlitchRender.Enable(_settings, _palette, BossVictoryOrangeLook.From(_profile));   // 주황 채움 = 처치자 프로필(11-12)
+        _renderOn = BossVictoryGlitchRender.Enable(_settings, _palette, BossVictoryOrangeLook.From(_profile), BossVictoryBossLook.From(_profile));   // 주황 채움 = 처치자 프로필(11-12)
         if (!_renderOn)
         {
             Edit.LogWarning($"[BossVictory] 셰이더({BossVictoryGlitchRender.MaskShaderName}·{BossVictoryGlitchRender.CompositeShaderName})가 없어 글리치 없이 돈다.", this);

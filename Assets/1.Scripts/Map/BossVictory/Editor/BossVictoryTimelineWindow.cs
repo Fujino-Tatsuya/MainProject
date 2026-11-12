@@ -2050,6 +2050,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.BossNoise:
                 DrawPaletteHint();
+                if (_profile != null)
+                {
+                    EditorGUILayout.LabelField("보스 표현(캐릭터별) — 노이즈 = 아래 노이즈 모양 · 림라이트 = 안쪽 '보스 림 안쪽' 색 × 세기(블룸 과노출), 프레넬 테두리만 '보스 림 테두리' 색(팔레트 칸). 켜고 끄는 시각 = 이 트랙 클립.", EditorStyles.wordWrappedMiniLabel);
+                    DrawProfileFields("보스 표현(캐릭터별)", nameof(BossVictoryProfile.bossLook), nameof(BossVictoryProfile.bossRimWidth),
+                        nameof(BossVictoryProfile.bossRimSoftness), nameof(BossVictoryProfile.bossRimInsideIntensity));
+                }
                 DrawSettingsFields("보스 노이즈 모양",
                     nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseSpace),
                     nameof(BossVictoryGlitchSettings.bossNoiseTiling), nameof(BossVictoryGlitchSettings.bossNoiseCameraScale),
@@ -2135,6 +2141,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         { BossVictoryPaletteSlot.OrangeRight, "주황 채움 오른쪽" },
         { BossVictoryPaletteSlot.Glow, "RECTIFY 글로우" },
         { BossVictoryPaletteSlot.CrtGlow, "TV 꺼짐 발광(= 대비 기준 색)" },
+        { BossVictoryPaletteSlot.RimInside, "보스 림 안쪽(밝은 색, 림라이트)" },
+        { BossVictoryPaletteSlot.RimEdge, "보스 림 테두리(어두운 색, 림라이트)" },
     };
 
     void DrawPalette()

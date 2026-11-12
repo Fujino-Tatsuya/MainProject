@@ -201,6 +201,18 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - **타임라인 창**: 컷 인스펙터 '기준' = "처치자 무기(매 프레임)" → '무기 따라가기 부드러움(초)' 칸. 'Scene 뷰로'·'이 카메라 뷰로 Scene 카메라 세팅하기' = Play 중이면 실제 무기 위치(지금 컷이 이 기준이면 화면과 같은 추종 값), 아니면 이 세션 마지막 회차 무기 위치(SessionState). 디버그 씬 재생·스크럽도 같은 경로(TickCuts).
 - 각 피어 로컬 카메라, 새 RPC 없음. 순수 계산 `AnchorPoint`·`SmoothFollow`·`FollowWeapon` — EditMode `BossVictoryWeaponAnchorTests`.
 
+
+## 4.16 보스 표현 = 노이즈 / 역림라이트(11-12 — 어쌔신)
+
+'보스 노이즈' 트랙 클립 구간(켜고 끄는 시각·세기 그대로) 동안 보스를 무엇으로 덮을지 프로필 칸 `bossLook`(`BossVictoryBossLookMode`)이 고른다. 어쌔신 = **림라이트**, 팔라딘·거너 = **노이즈**(지금과 같음). 보스에만, 플레이어 불변.
+
+- **림라이트(역림)**: 보스 실루엣 안쪽 전부 = 팔레트 칸 '보스 림 안쪽'(`RimInside`) × `bossRimInsideIntensity`(기본 2 — 1 넘으면 블룸이 받는 과노출), 테두리만 '보스 림 테두리'(`RimEdge`). 노이즈 텍스처 없음.
+- **테두리 = 프레넬**(카메라 기준 모든 가장자리, 방향 치우침 없음): 마스크 패스(`BossVictoryGlitchMask.shader`)가 보스를 그릴 때 G 채널 = 1 − saturate(N·V)(플레이어 G 0). 합성(`BossVictoryGlitch.shader`)에서 림 가중치 = smoothstep(문턱 − 부드러움, 문턱 + 부드러움, G), 문턱 = 1 − `bossRimWidth`(기본 0.35), 부드러움 `bossRimSoftness`(기본 0.1). 같은 식 = `BossVictoryBossLook.RimWeight`. 새 텍스처·메시·패스 없음(기존 마스크 ID 텍스처의 빈 G 채널), 셰이더는 공용 설정 `maskShader`·`compositeShader` 칸 그대로(빌드 포함 참조).
+- **색(271 팔레트)**: 칸 15 `RimInside` 기준 = 공용 `bossNoiseBrightColor`, 칸 16 `RimEdge` 기준 = `bossNoiseDarkColor` — 처치자 프로필 기준 색을 노이즈 두 색과 같은 규칙으로 따라가고 팔레트 패널에서 직접 지정 가능. 노이즈 밝은 색 배율 `bossNoiseBrightIntensity` 는 노이즈에만(림 안쪽은 `bossRimInsideIntensity`).
+- **편집**: 타임라인 창 '보스 노이즈' 클립 노드 칸 '보스 표현(캐릭터별)'(모드·굵기·부드러움·안쪽 세기) + '팔레트' 패널 두 칸. Play 중 바꾸면 바로 반영. 디버그 랩(DebugBossVictory) F1 로 어쌔신을 고르면 바로 확인. 어쌔신 설정 메뉴 `Tools/Boss Victory/어쌔신 보스 표현 = 림라이트`.
+- 각 피어 로컬 표시, 새 RPC 없음. EditMode `BossVictoryBossLookTests`(기본값·캐릭터별 모드·팔레트 칸·림 가중치·셰이더 오류 없음).
+- 한계: 프레넬은 메시 법선 기준이라 평평한 면이 넓은 부위는 테두리가 굵거나 얇게 보일 수 있다(굵기·부드러움으로 맞춤). 마스크는 점 샘플이라 테두리 경계가 픽셀 단위.
+
 ## 5. 알려진 한계
 
 - (272) 거너 가까움 판정은 처치 순간 각 피어 화면의 처치자 위치로 한다(새 복제 값 없음) — 문턱 근처면 피어마다 E·백대쉬 유무가 갈릴 수 있다(이동은 오너 기준이라 위치는 결국 같다).
