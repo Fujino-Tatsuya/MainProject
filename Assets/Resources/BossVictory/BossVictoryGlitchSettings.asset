@@ -29,6 +29,7 @@ MonoBehaviour:
   scanlineFloorNormalMin: 0.55
   scanlineFloorNormalMax: 0.8
   scanlineFloorKeep: 0
+  skyAmberMinLuma: 0.6
   tearLinePixels: 1.75
   tearLineMaxMultiplier: 1.75
   tearMaxShift: 0.04
@@ -56,11 +57,27 @@ MonoBehaviour:
   - {r: 0.22745098, g: 0.41960785, b: 1, a: 1}
   - {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
   rectifyFillCenter: {x: 0.46, y: 0.5}
-  rectifyFillDelay: 0.15
+  rectifyFillStartRadius: 0.15
+  rectifyFillDelay: 0.1
   rectifyFillFade: 0.15
   rectifyFillExpand: 0.5
   rectifyFillSoftness: 0.01
   rectifyFillGradient: 0.35
+  rectifyWhiteColor: {r: 1, g: 1, b: 1, a: 1}
+  rectifyWhiteStart: 0.3
+  rectifyWhiteCenter: {x: 0.46, y: 0.5}
+  rectifyWhiteStartRadius: 0.15
+  rectifyWhiteFade: 0.15
+  rectifyWhiteExpand: 0.1
+  rectifyWhiteGradient: 0
+  rectifyOrangeHold: 0.05
+  rectifyOrangeWipe: 0.1
+  rectifyOrangeRightToLeft: 1
+  rectifyOrangeJitter: 0.2
+  rectifyOrangeRowPixels: 4
+  rectifyOrangeLeft: {r: 1, g: 0.64705884, b: 0.22745098, a: 1}
+  rectifyOrangeRight: {r: 0.972549, g: 0.9098039, b: 0.38431373, a: 1}
+  rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0.25
   wallFacingThreshold: 0.3
