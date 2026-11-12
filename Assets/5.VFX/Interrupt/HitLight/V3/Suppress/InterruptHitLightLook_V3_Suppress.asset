@@ -230,3 +230,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  ghostSourceOffset: {x: 1, y: 0.3, z: 1}
+  ghostAxisOffset: 1
+  ghostScreenOffset: {x: 0, y: 0}

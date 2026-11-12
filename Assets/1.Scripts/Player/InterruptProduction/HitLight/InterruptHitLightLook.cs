@@ -96,6 +96,12 @@ public sealed class InterruptHitLightLook : ScriptableObject
     [SerializeField, Min(0f)] private float ghostDuration = 1.88f;
     [Tooltip("고스트 세기 곡선 — 가로 = 진행(0~1), 세로 = 세기 배율. 끝에서 0 이 되게")]
     [SerializeField] private AnimationCurve ghostCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+    [Tooltip("광원 위치 오프셋(월드, m) — 고스트 줄의 출발점(광원)을 옮긴다. 상 전체가 함께 움직인다")]
+    [SerializeField] private Vector3 ghostSourceOffset = Vector3.zero;
+    [Tooltip("직선 위치 오프셋 — 모든 상의 Position(광원 0 → 화면 중심 1 → 반대편)에 더한다. + = 반대편 쪽으로 밀림")]
+    [SerializeField] private float ghostAxisOffset = 0f;
+    [Tooltip("화면 오프셋(x, y) — 모든 상의 Position Offset 에 더한다(직선에서 옆으로 비껴 놓기)")]
+    [SerializeField] private Vector2 ghostScreenOffset = Vector2.zero;
 
     public Color LightColor => lightColor;
     public int WhiteoutFrames => whiteoutFrames;
@@ -139,6 +145,9 @@ public sealed class InterruptHitLightLook : ScriptableObject
     public float GhostScale => ghostScale;
     public float GhostDuration => ghostDuration;
     public AnimationCurve GhostCurve => ghostCurve;
+    public Vector3 GhostSourceOffset => ghostSourceOffset;
+    public float GhostAxisOffset => ghostAxisOffset;
+    public Vector2 GhostScreenOffset => ghostScreenOffset;
 
     /// <summary>적중 순간 1 → 끝 0 으로 부드럽게 줄어드는 기본 곡선(Q5 — 약 0.9초에 걸쳐 복귀).</summary>
     public static AnimationCurve Decay() =>

@@ -33,36 +33,28 @@ public sealed class InterruptSuppressGhostTests
     // ---- 에셋 ----
 
     [Test]
-    public void 고스트_에셋은_원과_육각형_5개_가산_광원쪽_없음()
+    public void 고스트_에셋은_부드러운_원_여러개_크기섞임_가산_광원쪽_없음()
     {
         var ghost = AssetDatabase.LoadAssetAtPath<LensFlareDataSRP>(InterruptSuppressGhostAuthoring.GhostPath);
         Assert.IsNotNull(ghost, InterruptSuppressGhostAuthoring.GhostPath);
-        Assert.AreEqual(5, ghost.elements.Length, "상 5개");
+        Assert.GreaterOrEqual(ghost.elements.Length, 8, "상 여러 개가 줄지어");
 
-        int circles = 0, hexagons = 0;
+        float minSize = float.MaxValue, maxSize = 0f;
         var positions = new HashSet<float>();
         foreach (LensFlareDataElementSRP e in ghost.elements)
         {
             Assert.IsTrue(e.visible);
             Assert.AreEqual(SRPLensFlareBlendMode.Additive, e.blendMode, "가산");
+            Assert.AreEqual(SRPLensFlareType.Circle, e.flareType, "부드러운 원(보케)");
             Assert.Greater(e.position, 0.3f, "광원 쪽 빛 없음(상만)");
             Assert.LessOrEqual(e.localIntensity, 0.5f, "은은하게(낮은 세기)");
             positions.Add(e.position);
-            if (e.flareType == SRPLensFlareType.Circle)
-            {
-                circles++;
-                Assert.AreEqual(SRPLensFlareColorType.RadialGradient, e.tintColorType, "원 테두리 무지개빛");
-            }
-            else if (e.flareType == SRPLensFlareType.Polygon)
-            {
-                hexagons++;
-                Assert.AreEqual(6, e.sideCount, "육각형(조리개)");
-            }
+            minSize = Mathf.Min(minSize, e.uniformScale);
+            maxSize = Mathf.Max(maxSize, e.uniformScale);
         }
 
-        Assert.Greater(circles, 0, "원 섞임");
-        Assert.Greater(hexagons, 0, "육각형 섞임");
-        Assert.AreEqual(5, positions.Count, "위치가 다 다르다");
+        Assert.Greater(maxSize, minSize * 4f, "작은 점과 큰 원판이 섞임");
+        Assert.AreEqual(ghost.elements.Length, positions.Count, "위치가 다 다르다");
         Assert.That(positions, Has.Some.GreaterThan(1f), "화면 중심 너머 반대편 포함");
     }
 

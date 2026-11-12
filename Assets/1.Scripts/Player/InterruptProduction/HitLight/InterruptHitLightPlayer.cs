@@ -107,6 +107,9 @@ public sealed class InterruptHitLightPlayer : IDisposable
     private Volume _bloomVolume;
     private Volume _gradeVolume;
     private LensFlareComponentSRP _ghost; // 렌즈 고스트(할 일 270 — 제압 SO 에만 모양이 있다)
+    private LensFlareDataSRP _ghostData; // 직선·화면 오프셋을 더한 복제본(오프셋 0 이면 안 만든다)
+    private LensFlareDataSRP _ghostDataSource;
+    private float _ghostDataStart = -1f;
     private InterruptHitLightFx _playedFx; // 마지막으로 튼 월드 이펙트(V1·V2 와 V3 는 인스턴스가 다르다)
     private float _startTime;
     private InterruptHitLightRequest _request;
@@ -267,12 +270,57 @@ public sealed class InterruptHitLightPlayer : IDisposable
             ghostObject.SetActive(true);
         }
 
-        _ghost.transform.position = Placement.Position;
-        _ghost.lensFlareData = look.GhostFlare;
+        _ghost.transform.position = Placement.Position + look.GhostSourceOffset;
+        _ghost.lensFlareData = ResolveGhostData(look);
         _ghost.intensity = amount * look.GhostIntensity;
         _ghost.scale = look.GhostScale;
         _ghost.enabled = true;
         DarkAdaptationState.HitLightGhostFlare = true;
+    }
+
+    /// <summary>
+    /// 직선·화면 오프셋(Look 칸)이 0 이면 에셋 그대로, 아니면 재생마다 복제본을 만들어 모든 상의 Position·Position Offset 에 더한다.
+    /// 오프셋은 매 프레임 다시 써서 Play 중 Look 칸을 바꾸면 바로 보인다(에셋의 다른 칸은 다음 재생부터).
+    /// </summary>
+    private LensFlareDataSRP ResolveGhostData(InterruptHitLightLook look)
+    {
+        LensFlareDataSRP source = look.GhostFlare;
+        if (Mathf.Approximately(look.GhostAxisOffset, 0f) && look.GhostScreenOffset == Vector2.zero)
+            return source;
+
+        if (_ghostData == null || _ghostDataSource != source || _ghostDataStart != _startTime
+            || _ghostData.elements == null || source.elements == null || _ghostData.elements.Length != source.elements.Length)
+        {
+            DestroyGhostData();
+            _ghostData = UnityEngine.Object.Instantiate(source);
+            _ghostData.hideFlags = HideFlags.DontSave;
+            _ghostDataSource = source;
+            _ghostDataStart = _startTime;
+        }
+
+        for (int i = 0; i < _ghostData.elements.Length; i++)
+        {
+            if (_ghostData.elements[i] == null || source.elements[i] == null)
+                continue;
+            _ghostData.elements[i].position = source.elements[i].position + look.GhostAxisOffset;
+            _ghostData.elements[i].positionOffset = source.elements[i].positionOffset + look.GhostScreenOffset;
+        }
+
+        return _ghostData;
+    }
+
+    private void DestroyGhostData()
+    {
+        if (_ghostData != null)
+        {
+            if (Application.isPlaying)
+                UnityEngine.Object.Destroy(_ghostData);
+            else
+                UnityEngine.Object.DestroyImmediate(_ghostData);
+        }
+
+        _ghostData = null;
+        _ghostDataSource = null;
     }
 
     private void HideGhost()
@@ -379,6 +427,7 @@ public sealed class InterruptHitLightPlayer : IDisposable
         _bloomVolume = null;
         _gradeVolume = null;
         _ghost = null;
+        DestroyGhostData();
         _playedFx = null;
     }
 
