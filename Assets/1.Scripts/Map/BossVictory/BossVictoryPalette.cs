@@ -69,11 +69,11 @@ public static class BossVictoryPaletteCalc
     public const float NeutralSaturation = 0.02f;
     const float Epsilon = 1e-4f;
 
-    /// <summary>팔라딘·거너·어쌔신·코드 기본값 기준 색(= 지금 공용 설정 amberColor #D6AB69).</summary>
-    public static readonly Color DefaultBaseColor = new Color32(0xD6, 0xAB, 0x69, 0xFF);
+    /// <summary>코드 기본값(처치자 없음·표에 없는 캐릭터) 기준 색 = 팔라딘 기준 색(11-12 — 공용 색을 팔라딘 기준으로 구움, 공용 amberColor 와 같음 → 공용 색 그대로). 옛 값 #D6AB69.</summary>
+    public static readonly Color DefaultBaseColor = new Color(0.9169811f, 0.67380774f, 0.29585615f, 1f);
     /// <summary>대비 기준 색 직접 지정 기본(= 지금 TV 꺼짐 발광 파랑).</summary>
     public static readonly Color DefaultContrastColor = new Color(0.25f, 0.62f, 1f, 1f);
-    /// <summary>기본 색조 차이(도) = 색조(#3FA0FF 계열 TV 꺼짐 파랑) − 색조(#D6AB69) — 팔라딘 결과가 지금과 같게 역산한 값.</summary>
+    /// <summary>기본 색조 차이(도) = 색조(공용 TV 꺼짐) − 색조(공용 호박색) — 처음 #D6AB69·파랑에서 역산, 11-12 팔라딘 기준 굽기 뒤에도 같은 값(팔라딘 대비 기준 색을 그대로 구웠으므로).</summary>
     public const float DefaultContrastHueOffset = 174.0697f;
     public const float DefaultContrastMinSaturation = 0.45f;
     public const float DefaultContrastMinValue = 0.6f;
