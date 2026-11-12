@@ -1485,6 +1485,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[_selIndex];
         EditorGUILayout.LabelField("클립", $"카메라 컷 #{_selIndex + 1}", EditorStyles.boldLabel);
         DrawSceneViewButtons(shot);
+        DrawApplyToSceneViewButtons();
 
         EditorGUI.BeginChangeCheck();
         c.start = Mathf.Max(0f, EditorGUILayout.FloatField("시작(초)", c.start));
@@ -1569,6 +1570,50 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             if (GUILayout.Button("지금 Scene 뷰로 끝 화면")) CaptureSceneView(s, -1);
         }
         EditorGUILayout.LabelField(reason ?? $"기준 = {source} 처치자·보스 위치 · 컷 기준 '{AnchorLabel(shot.anchor)}'", EditorStyles.wordWrappedMiniLabel);
+    }
+
+    // ── 컷 → Scene 뷰(267 후속) — 'Scene 뷰로' 의 반대. 자세 = 런타임 재생과 같은 BossVictoryCameraCuts.Pose(컷, 기준, 진행) ──
+    // 컷 시작(진행 0) 또는 재생 헤드 시각(CameraCutProgress — 이동 컷이면 그 순간 위치). 블렌드는 앞 컷과 섞는 구간이라 넣지 않는다(이 컷 자신의 화면).
+
+    static string ApplyToSceneViewBlockReason(out BossVictoryCameraCuts.Subjects s, out string source)
+    {
+        if (!TryGetSubjects(out s, out source)) return "기준 위치 없음 — 처치자·보스 기준 좌표계라 디버그 씬(DebugBossVictory)에서 Play 해 연출을 한 번 돌리면 생긴다";
+        if (SceneView.lastActiveSceneView == null) return "Scene 뷰 없음 — Scene 뷰 창을 열어 둘 것";
+        return null;
+    }
+
+    void DrawApplyToSceneViewButtons()
+    {
+        string reason = ApplyToSceneViewBlockReason(out BossVictoryCameraCuts.Subjects s, out _);
+        float start = Timeline.cameraCut[_selIndex].start, end = Timeline.CameraCutEnd(_selIndex);
+        bool inCut = _playhead >= start && _playhead <= end;
+        using (new EditorGUILayout.HorizontalScope())
+        using (new EditorGUI.DisabledScope(reason != null))
+        {
+            if (GUILayout.Button(new GUIContent("이 카메라 뷰로 Scene 카메라 세팅하기",
+                    "Scene 뷰 카메라를 이 컷 시작 화면(위치·회전·FOV)으로 맞춘다 — 런타임 재생과 같은 자세 계산."))) ApplyCutToSceneView(s, 0f);
+            using (new EditorGUI.DisabledScope(!inCut))
+                if (GUILayout.Button(new GUIContent($"재생 헤드 {_playhead:0.00}초 화면으로",
+                        inCut ? "이동 컷이면 재생 헤드 순간의 위치·회전·FOV 로 맞춘다." : "재생 헤드가 이 컷 구간 밖이다.")))
+                    ApplyCutToSceneView(s, Timeline.CameraCutProgress(_selIndex, _playhead));
+        }
+        if (reason != null) EditorGUILayout.LabelField(reason, EditorStyles.wordWrappedMiniLabel);
+    }
+
+    void ApplyCutToSceneView(in BossVictoryCameraCuts.Subjects s, float u)
+    {
+        SceneView sv = SceneView.lastActiveSceneView;
+        if (sv == null || !HasClipSelection || _selTrack != (int)BossVictoryTrack.CameraCut) return;
+        BossVictoryCameraCuts.Pose(Timeline.CameraCutShot(_selIndex), s, u, out Vector3 pos, out Quaternion rot, out float fov);
+        sv.in2DMode = false;
+        sv.orthographic = false;
+        SceneView.CameraSettings cs = sv.cameraSettings;
+        cs.fieldOfView = fov;
+        sv.cameraSettings = cs;
+        // Scene 뷰 카메라 = 피벗 − 회전 앞쪽 × 거리(크기·FOV 로 정해짐). 크기를 먼저 맞추고 그 거리만큼 앞에 피벗을 둔다.
+        sv.LookAtDirect(pos, rot, 1f);
+        sv.LookAtDirect(pos + rot * Vector3.forward * sv.cameraDistance, rot, 1f);
+        sv.Repaint();
     }
 
     // key = 그 키 화면을 지금 Scene 뷰로 · -1 = 끝 화면(키 1개면 끝 키를 만들어 이동 컷으로).
