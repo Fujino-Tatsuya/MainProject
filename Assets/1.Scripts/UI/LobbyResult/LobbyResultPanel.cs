@@ -125,7 +125,7 @@ public sealed class LobbyResultPanel : MonoBehaviour
         if (!Rules.IsOpen)
             return;
 
-        if (closeWithEscape && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        if (closeWithEscape && GamepadButtons.BackPressedThisFrame) // ESC 또는 패드 B(할 일 278)
         {
             s_escapeClaimedFrame = Time.frameCount;
             if (Rules.HandleEscape())

@@ -219,16 +219,12 @@ public sealed class LobbyInteractor : MonoBehaviour
         return player != null && player.IsSpawned;
     }
 
-    // 설정창 키를 그대로 쓰는 독립 액션 — ZoneBridgeGateManager 와 같은 경로(플레이어 PlayerInput 에 Interact 가 없다).
+    // 설정창 키 + 패드 Y(할 일 278)를 쓰는 독립 액션 — ZoneBridgeGateManager 와 같은 경로(플레이어 PlayerInput 에 Interact 가 없다).
     private bool InteractPressedThisFrame()
     {
-        if (Keyboard.current == null)
-            return false;
-
         if (_interactAction == null)
         {
-            var path = KeyBindingConfig.EffectivePath(InteractActionPath) ?? "<Keyboard>/f";
-            _interactAction = new InputAction("LobbyInteract", InputActionType.Button, path);
+            _interactAction = KeyBindingConfig.CreatePressAction("LobbyInteract", InteractActionPath, "<Keyboard>/f");
             _interactAction.Enable();
         }
 

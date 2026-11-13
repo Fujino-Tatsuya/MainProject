@@ -48,6 +48,9 @@ internal static class PlayerEditModeTestRunner
         "^ActiveRegistryTests$", // 할 일 69 — 전멸 판정 등록식 목록: 켜짐 등록·꺼짐 해제·중복 무시·초기화
         "^PlayerHealthRegenModelTests$", // 할 일 31 — 기본 체력 재생: 지연·틱·상한·피격 리셋·누적기·사망 차단
         "^AimIndicatorPlacementTests$", // 할 일 33 — 에임 인디케이터 3D 쿼드: yaw·수평 회전·발밑 높이·전방 오프셋·스케일
+        "^GamepadAimRulesTests$", // 할 일 278 — 패드 조준 혼합: 데드존·뷰 yaw 변환·기준 방향·자동 보정 선택
+        "^GamepadTargetCycleTests$", // 할 일 278 — 단일 대상 패드 후보 순환: 돌아감·튕김 엣지·왼→오른쪽·처음 가장 가까운 것
+        "^InputDeviceModeRulesTests$", // 할 일 278 — 장치 모드: 마지막 장치·마우스 우선·축 엣지·떨림 무시
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
         "^UnitWallImpactJudgeTests$", // 할 일 32 — 공용 벽 충돌: 스윕 결과 → 벽 충돌·제외 규칙(자기·배리어·유닛·상자·시작 겹침)·막힘 거리·에피소드당 1회
         // 튜토리얼 픽스처(특성·안내 UI·스피너봇 연습)는 MapSceneEditModeTestRunner 로 옮겼다(할 일 15 I0).

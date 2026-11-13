@@ -40,6 +40,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private InputAction skillSubAction;
     private InputAction skillUltimateAction;
     private InputAction dashAction;
+    private InputAction aimAction; // 패드 오른쪽 스틱 조준(할 일 278). 에셋에 없으면 null
     private bool inputEnabled = true;
     // 입력 차단 토큰(할 일 48 C9) — 요청자마다 막고 풀며 하나라도 남으면 이동·대시·전투 입력이 모두 막힌다. 생명주기 정책과 AND.
     private readonly PlayerInputBlockTokens blockTokens = new PlayerInputBlockTokens();
@@ -89,6 +90,9 @@ public class PlayerInputReader : BaseNetworkBehaviour
     //    DashValidationPolicy(Dead||Soul)와 TryBeginPredictedDash의 CanMove가 담당한다.
     public bool DashPressed => EffectiveInputEnabled && dashPressedLatched;
 
+    /// <summary>패드 오른쪽 스틱(입력 에셋 "Aim", 할 일 278). 입력이 막혀 있거나 액션이 없으면 zero. 조준 혼합은 <see cref="PlayerAimIndicator"/>.</summary>
+    public Vector2 AimStick => EffectiveInputEnabled && aimAction != null ? aimAction.ReadValue<Vector2>() : Vector2.zero;
+
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
     private bool CanReadCombatInput =>
@@ -115,6 +119,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         skillSubAction = playerInput.actions.FindAction("SkillSub");
         skillUltimateAction = playerInput.actions.FindAction("SkillUltimate");
         dashAction = playerInput.actions.FindAction("Dash");
+        aimAction = playerInput.actions.FindAction("Aim");
         RegisterDashCallback();
 
         // 액션이 없으면 대시 입력이 조용히 사라진다(예전 Shift 직접 판정과 달리 폴백이 없다).

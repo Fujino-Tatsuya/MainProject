@@ -295,6 +295,9 @@ public class PlayerMovement : MonoBehaviour
         return worldDir.sqrMagnitude > 0.0001f ? worldDir.normalized : Vector3.zero;
     }
 
+    /// <summary>이동 입력을 월드로 바꾸는 뷰 yaw(도). 패드 오른쪽 스틱 조준이 같은 매핑을 쓴다(할 일 278).</summary>
+    public float ViewYaw => viewYaw;
+
     /// <summary>현재 캐릭터(armature)가 바라보는 평면 정면. 대시 무입력 시 기본 방향.</summary>
     public Vector3 CurrentFacing
     {

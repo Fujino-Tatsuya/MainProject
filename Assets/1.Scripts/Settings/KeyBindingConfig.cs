@@ -48,6 +48,26 @@ public static class KeyBindingConfig
         return i >= 0 ? a.bindings[i].effectivePath : null;
     }
 
+    /// <summary>
+    /// 씬 매니저가 따로 듣는 '누름' 버튼 액션(로비 상호작용·다리 게이트) — 설정창 키보드 키(없으면 <paramref name="fallbackKeyboardPath"/>) +
+    /// 에셋의 같은 액션 패드 바인딩(할 일 278 — Interact = Y). 인터랙션(Hold 등)은 붙이지 않는다(예전처럼 누른 순간).
+    /// 만든 쪽이 Enable·Dispose 한다.
+    /// </summary>
+    public static InputAction CreatePressAction(string name, string actionPath, string fallbackKeyboardPath)
+    {
+        var action = new InputAction(name, InputActionType.Button, EffectivePath(actionPath) ?? fallbackKeyboardPath);
+        InputAction source = Asset != null ? Asset.FindAction(actionPath) : null;
+        if (source != null)
+        {
+            foreach (InputBinding b in source.bindings)
+            {
+                if (!b.isComposite && !b.isPartOfComposite && (b.path ?? string.Empty).StartsWith("<Gamepad>", StringComparison.Ordinal))
+                    action.AddBinding(b.path);
+            }
+        }
+        return action;
+    }
+
     /// <summary>사람이 읽는 키 이름(예: "F", "Space", "Right Button").</summary>
     public static string DisplayName(string actionPath)
     {

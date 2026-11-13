@@ -156,6 +156,13 @@ public class PlayerEnemyHoverOutline : MonoBehaviour
         if (reportedFrame == Time.frameCount)
             return CursorUnitPick.IsSelectable(reportedTarget, owner) ? reportedTarget : null;
 
+        // 패드 모드 — 커서 대신 조준 방향 원뿔 안 적(할 일 278). 조준 쪽이 이번 프레임 이미 골라 뒀다.
+        if (InputDeviceMode.IsGamepad)
+        {
+            Unit aimed = aimIndicator != null ? aimIndicator.GamepadAimedEnemy : null;
+            return CursorUnitPick.IsSelectable(aimed, owner) ? aimed : null;
+        }
+
         Camera cam = aimIndicator != null ? aimIndicator.TargetCamera : null;
         if (cam == null || Mouse.current == null)
             return null;

@@ -106,7 +106,8 @@ public sealed class CinematicOverlay
         bool menuOpen = menu != null && menu.IsOpen;
         Keyboard keyboard = Keyboard.current;
         // Space = Dash 바인딩이지만 연출 잠금 중엔 대시가 막혀 있고, 잠금이 풀린 뒤에는 새로 눌러야 대시가 나간다(PLAN-boss-encounter-cutscene 정정 9).
-        bool pressed = !menuOpen && keyboard != null && keyboard.spaceKey.isPressed;
+        // 패드 = A 홀드(할 일 278, A = Dash 바인딩이라 Space 와 같은 사정).
+        bool pressed = !menuOpen && ((keyboard != null && keyboard.spaceKey.isPressed) || GamepadButtons.PadConfirmHeld);
         return _hold.Tick(pressed, Time.unscaledDeltaTime, holdSeconds);
     }
 

@@ -104,8 +104,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     {
         if (_interactAction == null)
         {
-            string path = KeyBindingConfig.EffectivePath(InteractActionPath) ?? "<Keyboard>/f";
-            _interactAction = new InputAction("BridgeInteract", InputActionType.Button, path);
+            _interactAction = KeyBindingConfig.CreatePressAction("BridgeInteract", InteractActionPath, "<Keyboard>/f");
             _interactAction.Enable();
         }
         return _interactAction.WasPressedThisFrame();
@@ -224,7 +223,8 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         TickOpening();
         UpdateHighlight();   // 🔴 키보드 검사 앞 — 외곽선은 F 와 무관하게 매 프레임(Codex 10-03)
 
-        if (Keyboard.current == null)
+        // 패드만 꽂힌 PC 도 Y 로 연다(할 일 278) — 키보드·패드 둘 다 없을 때만 막는다.
+        if (Keyboard.current == null && Gamepad.current == null)
         {
             // 마지막 남은 조용한 경로 — Active Input Handling이 Input System을 포함하지 않으면 여기서 끝난다.
             if (!_warnedNoKeyboard)

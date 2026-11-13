@@ -104,10 +104,19 @@ public sealed class GameMenuController : MonoBehaviour
     }
 
     // ESC 는 LateUpdate — 로비 결과·캐릭터 선택·스킬 조준이 Update 에서 "이 프레임 ESC 를 썼다"를 남긴 뒤에 본다(실행 순서 무관).
+    // 패드(할 일 278): Start = 열기/닫기, B = 열려 있을 때만 ESC 와 같은 뒤로/닫기(닫혀 있으면 열지 않는다).
     private void LateUpdate()
     {
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard == null || !keyboard.escapeKey.wasPressedThisFrame)
+        if (GamepadButtons.PadMenuPressedThisFrame && !KeyRebindRow.IsRebinding)
+        {
+            if (IsOpen) Close();
+            else if (!(LobbyResultPanel.IsEscapeClaimed || CharacterSelectPanel.IsEscapeClaimed)) OpenMenu();
+            return;
+        }
+
+        bool escape = GamepadButtons.EscapePressedThisFrame;
+        bool padBack = !escape && IsOpen && GamepadButtons.PadBackPressedThisFrame;
+        if (!escape && !padBack)
             return;
 
         bool claimed = LobbyResultPanel.IsEscapeClaimed || CharacterSelectPanel.IsEscapeClaimed || PlayerSkillTargeting.IsEscapeClaimed;

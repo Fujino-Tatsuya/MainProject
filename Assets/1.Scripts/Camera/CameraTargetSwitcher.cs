@@ -318,17 +318,16 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         EnsureValidSpectatorTarget();
 
-        if (Keyboard.current == null)
-        {
-            return;
-        }
+        // [ ] 또는 패드 십자키 좌·우(할 일 278).
+        Keyboard keyboard = Keyboard.current;
+        int padStep = GamepadButtons.PadDpadHorizontalPressedThisFrame;
 
-        if (Keyboard.current.leftBracketKey.wasPressedThisFrame)
+        if ((keyboard != null && keyboard.leftBracketKey.wasPressedThisFrame) || padStep < 0)
         {
             SwitchToPreviousTarget();
         }
 
-        if (Keyboard.current.rightBracketKey.wasPressedThisFrame)
+        if ((keyboard != null && keyboard.rightBracketKey.wasPressedThisFrame) || padStep > 0)
         {
             SwitchToNextTarget();
         }

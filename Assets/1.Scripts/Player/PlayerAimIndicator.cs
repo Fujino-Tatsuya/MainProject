@@ -22,6 +22,16 @@ public class PlayerAimIndicator : NetworkBehaviour
     [Tooltip("대시 재충전 중 인디케이터 원래 색에 곱하는 색. 충전되면 원래 색으로 돌아간다. tintOnDashCooldown 이 켜졌을 때만 쓴다.")]
     [SerializeField] private Color dashCooldownTint = new Color(0.3f, 0.3f, 0.3f, 1f);
 
+    [Header("게임패드 조준 (할 일 278)")]
+    [Tooltip("오른쪽 스틱 데드존(0~1). 이 값보다 덜 기울이면 '놓음'으로 보고 이동 방향 근처 적 자동 보정으로 넘어간다.")]
+    [SerializeField, Range(0.05f, 0.9f)] private float gamepadStickDeadzone = 0.3f;
+    [Tooltip("패드 조준 지점 거리(m). 보정 대상이 없을 때 AimGroundPoint = 발 위치 + 조준 방향 × 이 거리.")]
+    [SerializeField, Min(0.5f)] private float gamepadAimDistance = 5f;
+    [Tooltip("자동 보정 거리(m). 스틱을 놓았을 때 이 거리 안 적만 보정 대상. 호버 외곽선(패드 모드)도 같은 거리·각도.")]
+    [SerializeField, Min(0f)] private float aimAssistRange = 10f;
+    [Tooltip("자동 보정 원뿔 반각(도). 기준 방향(이동 방향·마지막 조준)에서 이 각도 안 적만 보정 대상.")]
+    [SerializeField, Range(0f, 180f)] private float aimAssistHalfAngle = 45f;
+
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
     // 발밑 지면 레이: 캐릭터 위치 조금 위에서 아래로. 계단·단차 위에서도 지면을 잡는다.
@@ -29,6 +39,11 @@ public class PlayerAimIndicator : NetworkBehaviour
     private const float FootRayLength = 3f;
 
     private PlayerDashController dash;
+    private PlayerInputReader input;
+    private PlayerMovement movement;
+    private Unit self;
+    private readonly System.Collections.Generic.List<GamepadAimCandidate<Unit>> gamepadCandidates =
+        new System.Collections.Generic.List<GamepadAimCandidate<Unit>>(32);
     private MeshRenderer indicatorRenderer;
     private Material indicatorMaterial; // 인스턴스 — 프리팹 애셋 오염 금지
     private Color indicatorBaseColor;
@@ -50,6 +65,15 @@ public class PlayerAimIndicator : NetworkBehaviour
     // groundMask 공유 — 타겟팅 컨트롤러가 별도 마스크를 들지 않도록 노출한다.
     public LayerMask GroundMask => groundMask;
 
+    /// <summary>[패드 모드] 조준 방향 원뿔 안 적(호버 외곽선·자동 보정 대상). 마우스 모드거나 없으면 null(할 일 278).</summary>
+    public Unit GamepadAimedEnemy { get; private set; }
+
+    /// <summary>[패드 모드] 이번 프레임 오른쪽 스틱이 데드존을 넘었는가(직접 조준 중).</summary>
+    public bool GamepadStickActive { get; private set; }
+
+    public float GamepadStickDeadzone => gamepadStickDeadzone;
+    public float GamepadAimDistance => gamepadAimDistance;
+
     private void Awake()
     {
         if (targetCamera == null)
@@ -58,6 +82,9 @@ public class PlayerAimIndicator : NetworkBehaviour
         indicator_rot_offset = 90.0f;
 
         dash = GetComponent<PlayerDashController>();
+        input = GetComponent<PlayerInputReader>();
+        movement = GetComponent<PlayerMovement>();
+        self = GetComponent<Unit>();
         CacheIndicatorMaterial();
     }
 
@@ -172,6 +199,15 @@ public class PlayerAimIndicator : NetworkBehaviour
         if (targetCamera == null)
             targetCamera = Camera.main;
 
+        if (InputDeviceMode.IsGamepad)
+        {
+            UpdateGamepadAim();
+            return;
+        }
+
+        GamepadAimedEnemy = null;
+        GamepadStickActive = false;
+
         if (targetCamera == null || indicator == null || Mouse.current == null)
             return;
 
@@ -210,6 +246,57 @@ public class PlayerAimIndicator : NetworkBehaviour
             return;
 
         AimDirection = direction.normalized;
+    }
+
+    /// <summary>
+    /// 패드 조준 혼합(할 일 278, Docs/tech/gamepad-support.md §3) — 스틱이 데드존을 넘으면 그 방향, 놓으면 기준 방향(이동·마지막 조준)
+    /// 원뿔 안 적에게 자동 보정. 지점 = 보정 대상 위치 또는 발 위치 + 방향 × <see cref="gamepadAimDistance"/>.
+    /// 호버 외곽선 대상(<see cref="GamepadAimedEnemy"/>)은 최종 조준 방향 원뿔 안 적.
+    /// </summary>
+    private void UpdateGamepadAim()
+    {
+        Vector3 origin = transform.position;
+        float viewYaw = movement != null ? movement.ViewYaw : 0f;
+        Vector2 stick = input != null ? input.AimStick : Vector2.zero;
+        GamepadStickActive = GamepadAimRules.IsStickActive(stick, gamepadStickDeadzone);
+
+        GamepadAimQuery.CollectUnits(origin, aimAssistRange, GameLayers.EnemyTargetMask, self, gamepadCandidates);
+
+        Vector3 direction;
+        Unit assist = null;
+        if (GamepadStickActive)
+        {
+            direction = GamepadAimRules.StickToWorld(stick, viewYaw);
+        }
+        else
+        {
+            Vector3 moveWorld = movement != null ? movement.GetInputWorldDirection() : Vector3.zero;
+            Vector3 facing = movement != null ? movement.CurrentFacing : transform.forward;
+            direction = GamepadAimRules.BaseDirection(moveWorld, AimDirection, facing);
+            int index = GamepadAimRules.SelectAssist(gamepadCandidates, origin, direction, aimAssistRange, aimAssistHalfAngle);
+            if (index >= 0)
+            {
+                assist = gamepadCandidates[index].Item;
+                if (GamepadAimRules.TryFlat(gamepadCandidates[index].Position - origin, out Vector3 toTarget))
+                    direction = toTarget;
+            }
+        }
+
+        if (direction.sqrMagnitude < 0.0001f)
+            direction = AimDirection.sqrMagnitude > 0f ? AimDirection : transform.forward;
+
+        AimDirection = direction.normalized;
+        AimGroundPoint = assist != null ? assist.transform.position : origin + AimDirection * gamepadAimDistance;
+        HasAimGroundPoint = true;
+
+        if (assist == null)
+        {
+            int aimed = GamepadAimRules.SelectAssist(gamepadCandidates, origin, AimDirection, aimAssistRange, aimAssistHalfAngle);
+            assist = aimed >= 0 ? gamepadCandidates[aimed].Item : null;
+        }
+
+        GamepadAimedEnemy = assist;
+        gamepadCandidates.Clear();
     }
 
     // 발밑 지면 높이 + heightOffset 에 수평으로 눕히고, 조준 방향으로 Y축만 돌린다. 부모 회전과 무관하다.

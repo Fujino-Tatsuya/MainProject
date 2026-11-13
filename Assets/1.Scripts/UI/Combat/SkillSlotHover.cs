@@ -32,7 +32,9 @@ public sealed class SkillSlotHover : MonoBehaviour,
     public Sprite FallbackIcon { get; private set; }
 
     /// <summary>스킬 칸 위 좌클릭이 기본 공격·조준 확정으로 새는 것을 막는 전역 게이트.</summary>
-    public static bool BlocksPrimaryInput => Hovering.Count > 0 || Pressing.Count > 0 || IsPointerInsideActiveSlot();
+    // 패드 모드에선 커서가 숨어 있어 막지 않는다(할 일 278 — 숨은 커서가 칸 위에 남아 X·RB 가 먹히던 것).
+    public static bool BlocksPrimaryInput =>
+        !InputDeviceMode.IsGamepad && (Hovering.Count > 0 || Pressing.Count > 0 || IsPointerInsideActiveSlot());
 
     private void OnEnable() => ActiveSlots.Add(this);
 

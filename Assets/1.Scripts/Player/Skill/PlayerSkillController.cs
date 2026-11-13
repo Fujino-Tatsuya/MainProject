@@ -169,6 +169,9 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         {
             if (targeting == null || !targeting.IsTargeting)
                 return false;
+            // 패드 모드에선 A 가 대시이자 조준 확정이라 대시로 조준을 물리지 않는다(할 일 278 — B 로 취소 뒤 대시).
+            if (InputDeviceMode.IsGamepad)
+                return false;
             PlayerSkillBase skill = GetSkill(targeting.CurrentSlot);
             return skill != null && skill.CanCancelAimByDash;
         }

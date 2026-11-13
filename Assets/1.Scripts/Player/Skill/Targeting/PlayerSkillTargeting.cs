@@ -28,6 +28,21 @@ public class PlayerSkillTargeting : MonoBehaviour
     [SerializeField] private SkillRangeIndicator rangeIndicator;
     [SerializeField] private SkillCursorView cursorView;
 
+    [Header("게임패드 단일 대상 (할 일 278)")]
+    [Tooltip("패드로 단일 대상 스킬을 누른 순간의 조준 방향 원뿔 반각(도). 이 안 적만 후보 — 처음 = 가장 가까운 적, 십자키·오른쪽 스틱 튕김으로 순환.")]
+    [SerializeField, Range(5f, 180f)] private float gamepadTargetHalfAngle = 60f;
+    [Tooltip("패드 후보 거리 = 스킬 사거리 + 이 값(m). 사거리 밖 후보를 확정하면 마우스와 같이 자동 접근한다.")]
+    [SerializeField, Min(0f)] private float gamepadTargetExtraRange = 6f;
+
+    // 패드 단일 대상 후보(오너 로컬). 원뿔 축은 조준 시작 때 고정 — 스틱 튕김이 순환이라 축을 움직이지 않는다.
+    private readonly System.Collections.Generic.List<GamepadAimCandidate<Unit>> padCandidates =
+        new System.Collections.Generic.List<GamepadAimCandidate<Unit>>(32);
+    private readonly System.Collections.Generic.List<GamepadAimCandidate<Unit>> padOrdered =
+        new System.Collections.Generic.List<GamepadAimCandidate<Unit>>(32);
+    private Vector3 padAxis;
+    private Unit padSelected;
+    private bool padFlickArmed;
+
     private Player owner;
     private PlayerSkillController controller;
     private PlayerAimIndicator aimIndicator;
@@ -142,6 +157,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         hasCandidateGroundPoint = false;
         lastGroundPointDirection = Vector3.zero;
         hasLastGroundPointDirection = false;
+        BeginGamepadTargeting();
 
         if (rangeIndicator != null)
         {
@@ -384,18 +400,74 @@ public class PlayerSkillTargeting : MonoBehaviour
 
     private bool WasCancelPressed()
     {
-        // Esc / 우클릭 / 같은 스킬키 재입력으로 조준 취소.
+        // Esc(패드 B) / 우클릭 / 같은 스킬키 재입력으로 조준 취소.
         // 조준 중엔 FSM이 우클릭(단죄의 방패)을 억제하므로 우클릭을 취소로 재활용한다.
-        bool escPressed = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+        // 패드 모드에선 같은 스킬 재입력이 취소가 아니라 확정이다(WasConfirmPressed, 할 일 278).
+        bool escPressed = GamepadButtons.BackPressedThisFrame;
         if (escPressed) s_escapeClaimedFrame = Time.frameCount;
         bool rightClick = Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame;
-        return escPressed || rightClick || (controller != null && controller.WasSkillRePressed(currentSlot));
+        if (escPressed || rightClick)
+            return true;
+        return !InputDeviceMode.IsGamepad && controller != null && controller.WasSkillRePressed(currentSlot);
     }
 
     private bool WasConfirmPressed()
     {
+        // 패드 모드 — A 또는 같은 스킬 버튼 재입력(할 일 278). A 가 대시로 새지 않는 것은 IsInterceptingInput(조준 중·확정 프레임)이 막는다.
+        if (InputDeviceMode.IsGamepad)
+            return GamepadButtons.PadConfirmPressedThisFrame ||
+                   (controller != null && controller.WasSkillRePressed(currentSlot));
+
         return !SkillSlotHover.BlocksPrimaryInput &&
                Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+    }
+
+    // ── 패드 단일 대상(할 일 278, Docs/tech/gamepad-support.md §4) ──
+
+    private void BeginGamepadTargeting()
+    {
+        padSelected = null;
+        padCandidates.Clear();
+        padOrdered.Clear();
+        Vector3 aim = aimIndicator != null ? aimIndicator.AimDirection : Vector3.zero;
+        padAxis = GamepadAimRules.BaseDirection(Vector3.zero, aim, owner != null ? owner.transform.forward : Vector3.forward);
+        // 누른 순간 이미 스틱이 기울어져 있으면 한 번 돌아온 뒤에 튕김을 받는다.
+        float x = input != null ? input.AimStick.x : 0f;
+        padFlickArmed = Mathf.Abs(x) < GamepadTargetCycle.FlickRearmThreshold;
+    }
+
+    // 원뿔(시작 때 축 고정) 안 후보를 왼→오른쪽으로 세우고, 고른 것을 유지하거나(사라지면 가장 가까운 것) 십자키·스틱 튕김으로 순환한다.
+    private void UpdateGamepadSingleTargetPreview()
+    {
+        Vector3 origin = owner.transform.position;
+        float range = currentData.CastRange + gamepadTargetExtraRange;
+        GamepadAimQuery.CollectUnits(origin, range, currentData.TargetableLayers, owner, padCandidates);
+        GamepadTargetCycle.BuildOrder(padCandidates, origin, padAxis, range, gamepadTargetHalfAngle, padOrdered);
+        padCandidates.Clear();
+
+        int index = GamepadTargetCycle.Reselect(padOrdered, origin, padSelected, padSelected != null);
+        int step = GamepadButtons.PadDpadHorizontalPressedThisFrame;
+        if (step == 0 && input != null)
+            step = GamepadTargetCycle.FlickStep(ref padFlickArmed, input.AimStick.x);
+        if (step != 0)
+            index = GamepadTargetCycle.Step(padOrdered.Count, index, step);
+
+        Unit unit = index >= 0 ? padOrdered[index].Item : null;
+        padSelected = unit;
+        padOrdered.Clear();
+
+        SetHighlightedTarget(unit);
+        if (unit == null)
+        {
+            SetTargetMarker(null, 0f);
+            SetCursorState(SkillCursorState.Targeting);
+            return;
+        }
+
+        hoveredTarget = unit;
+        hoveredInRange = IsWithinRange(unit.transform.position, currentData.CastRange);
+        SetTargetMarker(unit, GetGroundMarkerRadius(currentData));
+        SetCursorState(hoveredInRange ? SkillCursorState.ValidTarget : SkillCursorState.OutOfRange);
     }
 
     private void UpdatePreview()
@@ -418,6 +490,12 @@ public class PlayerSkillTargeting : MonoBehaviour
     {
         hoveredTarget = null;
         hoveredInRange = false;
+
+        if (InputDeviceMode.IsGamepad)
+        {
+            UpdateGamepadSingleTargetPreview();
+            return;
+        }
 
         Camera cam = aimIndicator != null ? aimIndicator.TargetCamera : null;
         if (cam == null || Mouse.current == null)
@@ -675,7 +753,7 @@ public class PlayerSkillTargeting : MonoBehaviour
     // 자동 이동 중 "다른 입력"이 들어왔는지. 대기 중인 스킬키 재입력은 제외(같은 스킬은 '다른 입력'이 아님).
     private bool ShouldCancelAutoMove()
     {
-        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        if (GamepadButtons.BackPressedThisFrame) // ESC 또는 패드 B(할 일 278)
         {
             s_escapeClaimedFrame = Time.frameCount;
             return true;
