@@ -2104,6 +2104,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                         nameof(BossVictoryProfile.rectifyOrangeRowPixels), nameof(BossVictoryProfile.rectifyOrangeLeft),
                         nameof(BossVictoryProfile.rectifyOrangeRight), nameof(BossVictoryProfile.rectifyOrangeGradient),
                         nameof(BossVictoryProfile.rectifyScanlineSpacing), nameof(BossVictoryProfile.rectifyScanlineDark));
+                if (_profile != null) DrawTextColorFields();
                 break;
             case BossVictoryTrack.CameraBob:
                 EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);
@@ -2154,6 +2155,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         DrawProfileFields(null, _profile.contrastMode == BossVictoryContrastMode.Auto
             ? new[] { nameof(BossVictoryProfile.contrastHueOffset), nameof(BossVictoryProfile.contrastMinSaturation), nameof(BossVictoryProfile.contrastMinValue) }
             : new[] { nameof(BossVictoryProfile.contrastColor) });
+        DrawTextColorFields();
         using (new EditorGUILayout.HorizontalScope())
         {
             if (GUILayout.Button(new GUIContent("기준 색 = 공용 호박색", "프로필 기준 색을 공용 설정 amberColor 로 — 결과 = 공용 색 그대로(직접 지정 칸 제외)."), GUILayout.Width(140f)))
@@ -2184,7 +2186,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             using (new EditorGUILayout.HorizontalScope())
             {
                 bool manual = palette.IsManual(slot);
-                EditorGUILayout.LabelField(PaletteLabels.TryGetValue(slot, out string label) ? label : slot.ToString(), GUILayout.Width(170f));
+                string label = PaletteLabels.TryGetValue(slot, out string l) ? l : slot.ToString();
+                if (_profile.separateTextColor && BossVictoryPaletteCalc.IsText(slot)) label += " · 글자 기준";   // 11-13
+                EditorGUILayout.LabelField(label, GUILayout.Width(170f));
                 GUILayout.Label(manual ? "직접" : "자동", manual ? EditorStyles.miniBoldLabel : EditorStyles.miniLabel, GUILayout.Width(28f));
                 bool newManual = GUILayout.Toggle(manual, new GUIContent("", "켬 = 직접 지정(기준 색을 바꿔도 안 따라감) · 끔 = 자동"), GUILayout.Width(18f));
                 if (newManual != manual) SetPaletteManual(slot, newManual, palette[slot]);
@@ -2195,6 +2199,24 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     if (EditorGUI.EndChangeCheck() && manual) SetPaletteColor(slot, c);
                 }
             }
+        }
+    }
+
+    // 글자 색 따로(11-13) — 켜면 RECTIFY 글자 칸만 글자 기준 색을 따라간다(배경 호박색 틴트 = 기준 색과 분리). 팔레트 패널·RECTIFY 안쪽 색 트랙 칸 공용.
+    void DrawTextColorFields()
+    {
+        DrawProfileFields("글자 색 따로(RECTIFY 글자 ↔ 배경 틴트 분리)", nameof(BossVictoryProfile.separateTextColor));
+        if (!_profile.separateTextColor)
+        {
+            EditorGUILayout.LabelField("끔 = 글자 색(주황 채움 등)도 기준 색을 따라가 배경 틴트와 같이 움직인다.", EditorStyles.wordWrappedMiniLabel);
+            return;
+        }
+        DrawProfileFields(null, nameof(BossVictoryProfile.textBaseColor));
+        if (GUILayout.Button(new GUIContent("글자 기준 색 = 공용 호박색", "글자 칸 = 프로필 주황 채움 좌우 색 원본 그대로(기준 색 변환 없음)."), GUILayout.Width(170f)))
+        {
+            Undo.RecordObject(_profile, "처치 연출 글자 기준 색");
+            _profile.textBaseColor = _settings.amberColor;
+            SavePalette();
         }
     }
 

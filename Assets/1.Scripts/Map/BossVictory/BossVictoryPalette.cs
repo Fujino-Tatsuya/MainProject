@@ -62,6 +62,7 @@ public sealed class BossVictoryPalette
 /// <item>기조 그룹: 각 색 = 기준 색과의 관계 유지 — 색조 = 원래 색조 + (새 기준 색조 − 옛 기준 색조), 채도·밝기 = 원래 값 × (새/옛 기준 비율). HSV(sRGB) 계산, HDR 밝기(1 초과)는 유지.</item>
 /// <item>채도 ≈ 0(흰·회색)은 색조가 없어 그대로.</item>
 /// <item>대비 그룹(①·② 원 좌우·TV 꺼짐 발광): 대비 기준 색 = 자동(새 기준 색조 + <c>contrastHueOffset</c>, 채도·밝기는 기조와 같은 비율 뒤 하한) 또는 직접 지정. 그룹 안 색 = 대비 기준 색에서 같은 규칙.</item>
+/// <item>글자 색 따로(11-13, 프로필 <c>separateTextColor</c>): 켜면 글자 그룹(<see cref="IsText"/>)만 앵커 = 프로필 <c>textBaseColor</c> — 배경 호박색 틴트(= 기준 색)와 분리. 끄면 예전과 같다.</item>
 /// <item>직접 지정 칸은 계산을 건너뛰고 그 색.</item>
 /// </list>
 /// </summary>
@@ -86,10 +87,23 @@ public static class BossVictoryPaletteCalc
         slot == BossVictoryPaletteSlot.Circle2Left || slot == BossVictoryPaletteSlot.Circle2Right ||
         slot == BossVictoryPaletteSlot.CrtGlow;
 
+    /// <summary>
+    /// RECTIFY 글자 그룹 칸(11-13) — 프로필 '글자 색 따로'(<see cref="Inputs.SeparateText"/>)를 켜면 기준 색 대신 글자 기준 색을 따라간다.
+    /// 외곽선·③ 흰 원·③ 회색·주황 채움·글로우. ①·② 원은 대비 그룹(대비 기준 색)이라 여기 없다. 흰·회색은 무채색이라 실제로는 그대로.
+    /// </summary>
+    public static bool IsText(BossVictoryPaletteSlot slot) =>
+        slot == BossVictoryPaletteSlot.RectifyOutline ||
+        slot == BossVictoryPaletteSlot.Circle3Left || slot == BossVictoryPaletteSlot.Circle3Right ||
+        slot == BossVictoryPaletteSlot.CircleGray ||
+        slot == BossVictoryPaletteSlot.OrangeLeft || slot == BossVictoryPaletteSlot.OrangeRight ||
+        slot == BossVictoryPaletteSlot.Glow;
+
     /// <summary>계산 입력(프로필 칸 묶음 — 테스트가 SO 없이 만든다).</summary>
     public struct Inputs
     {
         public Color BaseColor;
+        public bool SeparateText;           // 켬 = 글자 그룹(IsText)은 TextBaseColor 를 따라간다(11-13). 끔 = BaseColor(예전과 같음)
+        public Color TextBaseColor;
         public BossVictoryContrastMode ContrastMode;
         public float ContrastHueOffset;     // 도
         public Color ContrastColor;         // 직접 지정일 때
@@ -100,6 +114,8 @@ public static class BossVictoryPaletteCalc
         public static Inputs Default => new Inputs
         {
             BaseColor = DefaultBaseColor,
+            SeparateText = false,
+            TextBaseColor = DefaultBaseColor,
             ContrastMode = BossVictoryContrastMode.Auto,
             ContrastHueOffset = DefaultContrastHueOffset,
             ContrastColor = DefaultContrastColor,
@@ -110,6 +126,8 @@ public static class BossVictoryPaletteCalc
         public static Inputs From(BossVictoryProfile p) => p == null ? Default : new Inputs
         {
             BaseColor = p.baseColor,
+            SeparateText = p.separateTextColor,
+            TextBaseColor = p.textBaseColor,
             ContrastMode = p.contrastMode,
             ContrastHueOffset = p.contrastHueOffset,
             ContrastColor = p.contrastColor,
@@ -167,7 +185,7 @@ public static class BossVictoryPaletteCalc
             if (slot == BossVictoryPaletteSlot.Amber) c = WithAlpha(inputs.BaseColor, reference[i].a);
             else if (slot == BossVictoryPaletteSlot.CrtGlow) c = WithAlpha(contrast, reference[i].a);
             else if (IsContrast(slot)) c = Follow(reference[i], refContrast, contrast);
-            else c = Follow(reference[i], refBase, inputs.BaseColor);
+            else c = Follow(reference[i], refBase, inputs.SeparateText && IsText(slot) ? inputs.TextBaseColor : inputs.BaseColor);   // 글자 따로(11-13) — 같은 규칙, 앵커만 글자 기준 색
             result.Colors[i] = c;
         }
 

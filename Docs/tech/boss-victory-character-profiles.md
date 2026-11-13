@@ -10,7 +10,7 @@
 | 백대쉬(거리·시간·곡선·보정 각·후 대기) | `BossVictoryProfile.backDash*` | ✅ |
 | 대상별 시간 배율 4개(하던 동작·처치자 End 후·팀원·보스 End 후) | `BossVictoryProfile.*Scale` | ✅ |
 | 처치 연출 스킬 칸 | `BossVictoryProfile.finisherSlot` | ✅ |
-| 팔레트 기준 색·대비 설정·칸별 직접 지정(271, §4.11) | `BossVictoryProfile.baseColor`·`contrast*`·`paletteOverrides` | ✅ (공용 색 = 기준 팔레트) |
+| 팔레트 기준 색·대비 설정·글자 색 따로(11-13)·칸별 직접 지정(271, §4.11) | `BossVictoryProfile.baseColor`·`separateTextColor`·`textBaseColor`·`contrast*`·`paletteOverrides` | ✅ (공용 색 = 기준 팔레트) |
 | **RECTIFY 주황 채움 = 캐릭터별(11-12, §4.12)** — 머무름·와이프·방향·들쭉날쭉·줄 굵기·좌우 색·보간 세기·안쪽 주사선 간격·어둡기 | `BossVictoryProfile.rectifyOrange*`·`rectifyScanline*` | ✅
 | 화면 효과 모양(호박색·주사선·찢김·보스 노이즈·CRT 색·셰이더)·벽 숨김 기준·보스 피격 애니 상태·마커 옵션(포커스 블렌드·숨김 대상) | `BossVictoryGlitchSettings` | ❌ 공용 |
 
@@ -143,6 +143,12 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
   - `contrastMode = Auto`(기본): 색조 = 기준 색 색조 + `contrastHueOffset`(기본 174.0697° = 공용 TV 꺼짐 파랑 − 공용 호박색, 팔라딘 결과 그대로 — 창 '색조 차이 = 공용에서 역산' 버튼). 채도·밝기 = 공용 TV 꺼짐 × 기조와 같은 비율 → **하한** `contrastMinSaturation`(0.45)·`contrastMinValue`(0.6).
   - **하한을 둔 이유**: 비율 규칙만 쓰면 기준 색이 회색(채도 0)일 때 대비 기준 채도도 0 → ①·② 원·TV 꺼짐까지 회색이 돼 RECTIFY 안쪽 색 연출의 '색이 터지는' 단계가 사라진다. 어두운 기준 색도 같은 이유로 밝기 하한. 기조 그룹은 하한 없이 회색·어둡게 따라간다(회색 캐릭터 = 회색 화면이 자연스러움). 팔라딘 값(채도 0.75·밝기 1)은 하한 위라 영향 없음.
   - `contrastMode = Manual`: `contrastColor` 를 그대로 대비 기준 색으로(하한 안 걸림).
+- **글자 색 따로(11-13, 사용자 요청 — 어쌔신 튜닝 중 "글자 색과 배경 틴트가 왜 엮여 있나")**: 원래 RECTIFY 글자 칸(주황 채움 좌우·③ 크림 등)은 기조 그룹이라 배경 틴트(호박색 = 기준 색 자체)와 같은 기준 색을 따라가, 기준 색을 바꾸면 둘이 같이 움직였다. 프로필 `separateTextColor`(기본 끔 = 예전 그대로, 에셋 수정 불필요) + `textBaseColor`.
+  - 켬 = 글자 그룹 칸(`BossVictoryPaletteCalc.IsText` — RECTIFY 외곽선·③ 흰 원 좌우·③ 회색·주황 채움 좌우·글로우)만 앵커 = `textBaseColor`(규칙은 기준 색과 같음 — 공용 호박색 관계 유지). 배경 틴트·보스 노이즈·림·대비 그룹은 `baseColor` 그대로. 흰·회색 칸은 무채색이라 실제로 바뀌는 건 주황 채움 좌우·③ 크림.
+  - `textBaseColor` = 공용 `amberColor` 면 글자 = 프로필 `rectifyOrangeLeft/Right` 원본 그대로(창 버튼 '글자 기준 색 = 공용 호박색').
+  - ①·② 원(대비 그룹)은 글자 안이지만 TV 꺼짐 발광과 묶인 대비 기준 색을 따른다 — 따로 바꾸려면 `contrastMode = Manual` 또는 칸별 직접 지정.
+  - '배경 틴트 따로'는 만들지 않았다: 배경 틴트 = 기준 색 자체(`Amber` 칸)라 글자를 떼어 내면 `baseColor` 가 곧 배경 틴트 칸이 된다(노이즈·림이 같이 따라가는 건 271 설계). 틴트만 고정하려면 칸별 직접 지정 '배경 호박색'.
+  - 직접 지정 칸이 여전히 이긴다. 편집 = 타임라인 창 '팔레트' 패널(대비 칸 아래) + RECTIFY 안쪽 색 트랙 칸 맨 아래 — 켜면 견본 이름에 '· 글자 기준'. Play 중 창에서 바꾸면 바로 반영(`RefreshLook`, 다른 팔레트 칸과 같음 — 프로필 에셋 인스펙터 직접 수정은 다른 칸처럼 다음 회차부터). EditMode `BossVictoryPaletteTests` 글자 3건(끔 = 예전 값 · 켬 = 글자 칸만 · 직접 지정 우선).
 - **칸별 직접 지정**: 프로필 `paletteOverrides`(칸·manual·색). manual 켬 = 그 칸은 그 색 그대로(HDR 가능), 끄면 자동(색은 다시 켤 때를 위해 남김). 같은 칸 두 줄이면 앞 줄. 기본 = 비어 있음(전부 자동).
 - **처음 값**: 세 프로필(팔라딘·거너·어쌔신)과 코드 기본값 모두 기준 색 #D6AB69(= 공용 호박색) → 지금 색과 같다. 테스트는 값이 아니라 관계를 고정한다(기준 색 = 공용 호박색이면 공용 색 그대로, 오차 1e-3 — 세 프로필 기준 색은 사용자 튜닝 값, 코드 기본값만 #D6AB69 고정). 기본 프로필 에셋은 11-12 삭제.
 - **런타임**: `BossVictoryGlitchPresentation.Begin` 이 처치자 프로필을 고르는 순간 `_palette` 를 계산해 `BossVictoryGlitchRender.Enable(settings, palette, orange)`·TV 꺼짐 `BossVictoryCrtOff` 에 넘긴다. 새 RPC 없음 — 복제된 `KillerClientId` → 처치자 캐릭터 → 프로필 → 같은 팔레트(늦은 참가자도). 렌더러 `Enable` 은 이미 켜져 있으면 색만 다시 넣는다.

@@ -78,6 +78,11 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Header("팔레트(271 — 기준 색 하나로 화면 효과 색 자동, 계산 = BossVictoryPaletteCalc)")]
     [Tooltip("이 캐릭터 기준 색. 공용 설정 색들은 '공용 amberColor 기준' 관계로 해석해 이 색을 따라간다(색조 회전 + 채도·밝기 비율). 공용 amberColor 와 같으면 공용 색 그대로.")]
     public Color baseColor = BossVictoryPaletteCalc.DefaultBaseColor;
+    [Tooltip("글자 색 따로(11-13). 끔(기본) = RECTIFY 글자 색(주황 채움·③ 크림 등)도 기준 색을 따라간다 — 배경 호박색 틴트와 같이 움직임(예전 그대로). " +
+             "켬 = 글자 칸만 아래 '글자 기준 색'을 따라가고, 배경 틴트·보스 노이즈·림은 기준 색 그대로. ①·② 원은 대비 그룹(대비 설정)이라 영향 없음.")]
+    public bool separateTextColor;
+    [Tooltip("글자 색 따로를 켰을 때 글자 칸의 기준 색 — 규칙은 기준 색과 같다(공용 amberColor 관계 유지). 공용 amberColor 와 같으면 글자 = 프로필 주황 채움 좌우 색 원본 그대로.")]
+    public Color textBaseColor = BossVictoryPaletteCalc.DefaultBaseColor;
     [Tooltip("대비 그룹(① 마젠타·② 블루 원 좌우·TV 꺼짐 발광) 기준 색 — 자동 = 기준 색 색조 + 색조 차이 / 직접 지정 = 아래 대비 색.")]
     public BossVictoryContrastMode contrastMode = BossVictoryContrastMode.Auto;
     [Tooltip("자동일 때 대비 기준 색 색조 = 기준 색 색조 + 이 값(도). 기본 = 공용 TV 꺼짐 파랑 − 공용 amberColor 에서 역산(팔라딘 결과 그대로).")]

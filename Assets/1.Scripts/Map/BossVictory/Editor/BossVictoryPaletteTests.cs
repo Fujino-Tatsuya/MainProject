@@ -212,4 +212,64 @@ public sealed class BossVictoryPaletteTests
         foreach (BossVictoryPaletteSlot slot in BaseChromatic)
             AssertColor(reference[(int)slot], palette[slot], $"{slot} 기조는 그대로(기준 색 안 바뀜)");
     }
+
+    // ── 글자 색 따로(11-13) — 끔 = 예전 값 그대로 · 켬 = 글자 칸만 글자 기준 색, 배경 틴트(호박색)·노이즈·대비는 기준 색 그대로 ──
+
+    [Test]
+    public void 글자_색_따로_끔이면_글자_기준_색을_바꿔도_예전과_같다()
+    {
+        Color[] reference = Reference();
+        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
+        inputs.BaseColor = RotateHue(BossVictoryPaletteCalc.DefaultBaseColor, 120f);
+        BossVictoryPalette before = BossVictoryPaletteCalc.Compute(reference, inputs);
+
+        inputs.SeparateText = false;
+        inputs.TextBaseColor = new Color(0.2f, 0.9f, 0.3f, 1f);   // 꺼져 있으면 무시
+        BossVictoryPalette after = BossVictoryPaletteCalc.Compute(reference, inputs);
+        foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots) AssertColor(before[slot], after[slot], $"{slot} 끔 = 예전 값");
+    }
+
+    [Test]
+    public void 글자_색_따로_켬이면_글자_칸만_글자_기준_색을_따라간다()
+    {
+        Color[] reference = Reference();
+        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
+        inputs.BaseColor = RotateHue(BossVictoryPaletteCalc.DefaultBaseColor, 120f);   // 배경 틴트 = 초록 쪽
+        BossVictoryPalette shared = BossVictoryPaletteCalc.Compute(reference, inputs);
+
+        inputs.SeparateText = true;
+        inputs.TextBaseColor = BossVictoryPaletteCalc.DefaultBaseColor;   // 글자 기준 = 공용 호박색 → 글자 = 기준 팔레트 원본
+        BossVictoryPalette separate = BossVictoryPaletteCalc.Compute(reference, inputs);
+
+        foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots)
+        {
+            if (BossVictoryPaletteCalc.IsText(slot)) AssertColor(reference[(int)slot], separate[slot], $"{slot}(글자) = 글자 기준 색 따라감");
+            else AssertColor(shared[slot], separate[slot], $"{slot}(글자 아님) = 기준 색 그대로");
+        }
+        AssertColor(inputs.BaseColor, separate[BossVictoryPaletteSlot.Amber], "배경 틴트 = 기준 색");
+        AssertColor(shared.ContrastBase, separate.ContrastBase, "대비 기준 색 = 기준 색에서(글자와 무관)");
+
+        inputs.TextBaseColor = RotateHue(BossVictoryPaletteCalc.DefaultBaseColor, -60f);   // 글자만 −60°
+        BossVictoryPalette rotated = BossVictoryPaletteCalc.Compute(reference, inputs);
+        foreach (BossVictoryPaletteSlot slot in new[] { BossVictoryPaletteSlot.OrangeLeft, BossVictoryPaletteSlot.OrangeRight, BossVictoryPaletteSlot.Circle3Right })
+            Assert.AreEqual(-60f, Mathf.DeltaAngle(Hue(reference[(int)slot]), Hue(rotated[slot])), 0.5f, $"{slot} 색조 −60°");
+        AssertColor(inputs.BaseColor, rotated[BossVictoryPaletteSlot.Amber], "글자 기준 색을 바꿔도 배경 틴트 그대로");
+    }
+
+    [Test]
+    public void 글자_색_따로_켬이어도_직접_지정_칸이_이긴다()
+    {
+        Color[] reference = Reference();
+        Color green = new Color(0.1f, 0.9f, 0.2f, 1f);
+        BossVictoryPaletteCalc.Inputs inputs = BossVictoryPaletteCalc.Inputs.Default;
+        inputs.SeparateText = true;
+        inputs.TextBaseColor = RotateHue(BossVictoryPaletteCalc.DefaultBaseColor, 90f);
+        inputs.Overrides = new List<BossVictoryPaletteOverride>
+        {
+            new BossVictoryPaletteOverride { slot = BossVictoryPaletteSlot.OrangeLeft, manual = true, color = green },
+        };
+        BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, inputs);
+        Assert.AreEqual(green, palette[BossVictoryPaletteSlot.OrangeLeft]);
+        Assert.IsTrue(palette.IsManual(BossVictoryPaletteSlot.OrangeLeft));
+    }
 }
