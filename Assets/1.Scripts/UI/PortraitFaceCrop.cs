@@ -39,7 +39,7 @@ public struct PortraitFaceCrop
 
     /// <summary>
     /// <paramref name="image"/> 의 부모에 <see cref="RectMask2D"/>(사각) 또는 <see cref="Mask"/>(원형 등 그래픽 모양)가 있으면 그 칸 안에서 얼굴이 가운데 오게 Image 를 키우고 옮긴다.
-    /// 마스크가 없는 칸(예: 5.ResultScene 행)은 건드리지 않는다. 스프라이트가 null 이면 칸에 꽉 채운다(미접속 회색 칸).
+    /// 마스크가 없는 칸은 건드리지 않는다. 스프라이트가 null 이면 칸에 꽉 채운다(미접속 회색 칸).
     /// </summary>
     public static void Apply(Image image, PortraitFaceCrop crop)
     {

@@ -128,7 +128,8 @@
   - 로비 결과 행 `ResultPlayerRowView` — `LobbyResultPlayerRow.prefab` `Cell_Player/PortraitMask`(사각 `RectMask2D` 84×84)/`Image_Portrait`. 저작 메뉴(`LobbyResultPanelAuthoring`)도 같은 구조를 만든다.
   - 크롭 값 = 로스터 칸 `faceCrop`(`PortraitFaceCrop`: `center` = 얼굴 가운데, 스프라이트 비율 좌표 · `size` = 칸 짧은 변에 꽉 찰 정사각 한 변 = 스프라이트 너비의 몇 배, 작을수록 확대). 팔라딘 (0.533, 0.713)·거너 (0.518, 0.761)·어쌔신 (0.518, 0.737), 셋 다 size 0.26.
   - 동작: 뷰가 스프라이트를 넣은 뒤 `PortraitFaceCrop.Apply` 가 **초상화 Image 의 부모에 `RectMask2D` 나 `Mask` 가 있을 때만** Image 를 키우고 옮긴다(가운데 앵커·피벗, preserveAspect 끔). 원본 png 그대로 — 텍스처 생성·스프라이트 자르기 없음. 미접속(스프라이트 없음)이면 칸을 꽉 채운 회색.
-  - 안 건드린 곳: 캐릭터 선택 카드(760×760, 위 항목) · 이름판(연결 없음) · **5.ResultScene 행 `ResultPlayerRow.prefab`**(레이아웃 그룹 64 칸, 마스크 없음 → 크롭 안 됨, 같은 방식 적용 여부 미정).
+  - 5.ResultScene 행 `ResultPlayerRow.prefab` — 레이아웃 칸 `Cell_Portrait`(LayoutElement 64) 안 `PortraitMask`(RectMask2D **64×64 가운데 고정**)/`Image_Portrait`. 마스크를 레이아웃이 키우지 않아 Bind 순간(레이아웃 전)에도 칸 크기가 정해져 있다. 저작 메뉴 `Tools/UI/Authoring/Result Stats Rows` 도 같은 구조(사용자 결정 11-13).
+  - 안 건드린 곳: 캐릭터 선택 카드(760×760, 위 항목) · 이름판(연결 없음).
   - 미리보기: `C:\UnityProject\_lane-artifacts\Work1\276-portrait-face-crop\index.html`. 테스트 `Assets/Tests/EditMode/PortraitFaceCrop/Editor/PortraitFaceCropTests.cs`.
 
 ## 조작

@@ -64,4 +64,21 @@ public sealed class PortraitFaceCropTests
         Assert.That(img.parent.GetComponent<RectMask2D>(), Is.Not.Null);
         Assert.That(((RectTransform)img.parent).sizeDelta, Is.EqualTo(new Vector2(84f, 84f)));
     }
+
+    // 5.ResultScene 행: 레이아웃 칸 안 고정 64×64 마스크(레이아웃이 마스크 크기를 정하지 않음 — Bind 순간에도 크기 확정).
+    [Test]
+    public void ResultSceneRow_PortraitIsInsideFixedRectMask()
+    {
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/2.Prefabs/UI/Result/ResultPlayerRow.prefab");
+        var img = go.transform.Find("Cell_Portrait/PortraitMask/Image_Portrait");
+        Assert.That(img, Is.Not.Null);
+        var mask = (RectTransform)img.parent;
+        Assert.That(mask.GetComponent<RectMask2D>(), Is.Not.Null);
+        Assert.That(mask.GetComponent<LayoutElement>(), Is.Null);
+        Assert.That(mask.anchorMin, Is.EqualTo(mask.anchorMax));
+        Assert.That(mask.sizeDelta, Is.EqualTo(new Vector2(64f, 64f)));
+        Assert.That(mask.parent.GetComponent<LayoutElement>().preferredWidth, Is.EqualTo(64f));
+        var view = new SerializedObject(go.GetComponent<ResultPlayerRowView>());
+        Assert.That(view.FindProperty("portraitImage").objectReferenceValue, Is.EqualTo(img.GetComponent<Image>()));
+    }
 }
