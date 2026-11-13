@@ -96,6 +96,16 @@ public sealed class LoadingScreenLayoutTests
         }
     }
 
+    // 283 후속(사용자 결정 나안) — 진행 바 판 자체가 진행률만큼 왼쪽부터 차오른다(코드 = progressFill.fillAmount).
+    [Test]
+    public void ProgressFill_IsFilledHorizontalFromLeft()
+    {
+        var image = FindChild("progress fill").GetComponent<Image>();
+        Assert.That(image.type, Is.EqualTo(Image.Type.Filled), "Simple 이면 fillAmount 가 안 보인다");
+        Assert.That(image.fillMethod, Is.EqualTo(Image.FillMethod.Horizontal));
+        Assert.That(image.fillOrigin, Is.EqualTo((int)Image.OriginHorizontal.Left));
+    }
+
     private RectTransform FindChild(string name)
     {
         foreach (RectTransform child in _view.transform)
