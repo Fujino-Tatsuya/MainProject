@@ -159,4 +159,15 @@ public class EffectAnimEvents : MonoBehaviour
 
     /// <summary>[릴레이] 루프 종료.</summary>
     public void StopEffect(string id) => Find(id)?.Stop();
+
+    /// <summary>
+    /// [코드] 루프를 남김없이 바로 걷는다 — 이미 나온 입자·종료(outro) 파트 없이(<see cref="EffectSocketPlayer.StopImmediate"/>).
+    /// 클립 이벤트용이 아니다(릴레이에 없다). 즉시 회수를 아는 것은 소켓 이펙트뿐이라 그 밖의 구현체는 <see cref="StopEffect"/> 와 같다.
+    /// </summary>
+    public void StopEffectImmediate(string id)
+    {
+        IAnimEventEffect effect = Find(id);
+        if (effect is EffectSocketPlayer socket) socket.StopImmediate();
+        else effect?.Stop();
+    }
 }
