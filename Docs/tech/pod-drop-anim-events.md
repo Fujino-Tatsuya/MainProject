@@ -1,4 +1,4 @@
-# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198 · 230)
+# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198 · 230 · 284)
 
 로비 포드 발사(`LobbyPodLaunch`)와 맵 포드 착륙(`MapPodArrival`)에서 **어느 구간을 클립 애니 이벤트가 정하고, 어느 구간을 SO 초가 정하는지** 한 곳에 모은다.
 수치 원본은 `GameData.xlsx` Lobby 시트(`PodDropSettings`), 이벤트 원본은 SVN FBX 임포트 설정이다.
@@ -84,3 +84,24 @@
 - 맵 착륙: 진입(로딩 화면 아래)부터 **연출 끝**(`EndAt` — UI·튜토리얼이 돌아오는 순간, `ClearLocal`)까지. 예전엔 디졸브 끝(조작 복귀)에 되켰다 — 조작은 그대로 디졸브 끝에 돌아오고, 실루엣만 UI 와 같이 돌아온다.
 - 방식: `PlayerSilhouetteSuppression`(`Rendering/Silhouette/`) — 스폰된 `PlayerSilhouetteTag` 마다 `SetSuppressed(true)`, 태그 수가 바뀌면 다시 찾아 늦게 스폰된 플레이어도 잡는다. 로컬 시각 값(복제 없음, 피어마다 자기 화면). 두 연출이 같은 묶음 클래스를 쓴다.
 - 보스 승리 연출의 `PlayerSilhouetteFeature.SuppressedByCinematic`(피처 전체 끔, 정적 bool 하나)은 쓰지 않는다 — 여러 연출이 한 bool 을 쓰면 먼저 끝난 쪽이 다른 연출의 끔을 풀 수 있다. 보스 엘리베이터(`BossTeleportManager`)도 태그별 경로다.
+
+## 7. 포드 베이 호박색 회전 경광등 (할 일 284)
+
+로비 출격 때 포드 베이 벽 윗단의 경광등 3개가 호박색 빛줄기를 돌린다. 표시 전용 — **새 복제 값·RPC 없음**, 모든 피어가 같은 시간표로 켜고 끈다.
+
+- **켜는 구간**: 포드 연출 시작(경과 0 = 출격 확정, 시작 시각 복제 — 레터박스·시작 암전과 같은 순간) ~ 끝 페이드가 **다 검어진 순간**(`EndBlackAt` = 하강 시작 + `launchEndWaitSeconds` + `launchEndFadeSeconds`, §2).
+  하강 시각을 아직 모르면(+∞) 켜진 채다. 해치 열림(종류 0)보다 앞선 가장 이른 포드 연출 지점이라 이 시점을 골랐다(사용자 11-13 "그냥 포드 연출 시작부터").
+  - 판정 = 순수 함수 `PodLaunchBeaconRules.IsOn(elapsed, endBlackAt)`.
+- **회전 빨라짐**: 발사 클립 가속 단계마다 한 바퀴 주기 1.2초 → 0.8초(가속 1, 종류 1) → 0.5초(가속 2, 종류 2).
+  단계 = 복제된 가속 1·2단계 시각(`_launchFastAt`·`_launchFast2At`)과 이 피어 발사 클립의 가속 단계(`_launchFastStage`, 자기 이벤트) 중 큰 쪽(`PodLaunchBeaconRules.Stage`).
+- **끄는 곳**: 매 프레임 판정 + `LobbyPodLaunch.ClearLocal`(연출 취소·재시작·디스폰·로비 씬 내려감). 경광등 자체도 `Awake` 에서 꺼진 채 시작하고 프리팹 Spot 은 꺼진 채 저장돼 있다 —
+  회차 반복(로비 씬 새로 로드)·재접속(늦게 들어온 피어는 복제 시각으로 같은 상태 계산)·튜토리얼 재시작 때 꺼진 상태로 돌아온다. 끄면 회전 각도 0 으로.
+- **프리팹**: `Assets/2.Prefabs/Lobby/PodLaunchBeacon/PF_PodLaunchBeacon.prefab`(git — 기본 도형 Cylinder 받침 + Sphere 돔, 지름 약 0.3m, 콜라이더·그림자 없음, **Static 끔** — 회전하므로).
+  - `Rotor`(Y 회전) 아래 `Spot_A`·`Spot_B`(등 맞댄 2개, 아래로 28°) — Realtime·그림자 끔·세기 70·거리 12·각 34°(안쪽 12°). 세기·각도·거리는 Light 칸에서 고친다.
+  - `PodLaunchBeacon` 칸: 색(Spot·돔 공용, 기본 호박색 1/0.55/0.08)·켜짐 돔 이미시브 배율(10)·꺼짐 배율(0)·단계별 한 바퀴 주기(1.2/0.8/0.5).
+  - 돔 머티리얼 `M_PodLaunchBeacon_Dome`(URP Lit) — 이미시브는 `MaterialPropertyBlock` 으로만 바꾼다(277 `PropEmissiveAnimator` 와 같은 방식).
+    머티리얼 `_EmissionColor` 를 아주 어두운 호박색, GI 플래그를 Realtime Emissive 로 둔 건 의도다 — 검정·None 이면 URP 검증이 `_EMISSION` 키워드를 꺼서 MPB 색이 안 먹는다.
+- **씬**: `3.LobbyScene` 루트 `PodLaunch/PodLaunchBeacons` 아래 `Beacon_1_NW`(−4.25, 2.05, 11.75)·`Beacon_2_NE`(7.0, 2.05, 11.75)·`Beacon_3_W`(−4.25, 2.05, 7.0), `LobbyPodLaunch.beacons` 칸에 연결. 비우면 경광등 없음.
+- **소리**: 따로 없다 — 기존 출발음(`Direct_Pod_Start`)만(사용자 결정).
+- **알려진 한계**: Spot 그림자를 꺼서 빛줄기가 벽을 뚫고 옆방(락커룸) 바닥에도 조금 닿는다. 거슬리면 Spot 거리·각도를 줄이거나 그림자를 켠다(비용).
+- 테스트: `PodLaunchBeaconTests`(켜고 끄는 구간·가속 단계·주기·회전·프리팹 배선·켜고 끔).
