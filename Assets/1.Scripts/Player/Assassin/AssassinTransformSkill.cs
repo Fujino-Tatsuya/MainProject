@@ -18,6 +18,8 @@ public sealed class AssassinTransformSkill : PlayerInstantSkill
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Ultimate;
     public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
     public override bool CanMoveWhileActive => false;
+    // 변신 모션(Parry_R)이 끝난 뒤 좌클릭을 아직 누르고 있으면 기본 공격을 잇는다(할 일 146 장치, 할 일 280). 쓰러짐·사망은 잇지 않는다.
+    public override bool ResumesBasicAttackOnHold => true;
 
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;
 

@@ -887,7 +887,9 @@ public abstract class PlayerStateBase : IPlayerState
     /// 예약하지 않는 기본 공격(가붕이·어쌔신) 중 버퍼에 평타보다 우선순위가 높은 스킬 입력(우클릭·R·Q·E)이 살아 있으면
     /// 다음 타를 잇지 않고 지금 타로 마무리시킨다(<see cref="IPlayerBasicAttack.FinishWithoutChaining"/>, 할 일 77 후속).
     /// 평타를 누르고 있으면 콤보 창마다 다음 타가 예약돼 체인이 끝나지 않고, 그동안 스킬 입력이 0.2초 만에 만료됐다.
-    /// 입력은 버퍼에 그대로 두고 — 현재 타가 끝나 Idle/Move 로 돌아온 첫 틱에 기존 우선순위 순서로 시도된다.
+    /// 마무리를 건 스킬 입력은 버퍼에서 공격 뒤 예약(거너와 같은 <see cref="PlayerInputReader.ReserveSkillAfterAttack"/>)으로 옮긴다 —
+    /// 이 타 남은 시간이 버퍼 유지 시간(0.2초)보다 길면 입력이 만료돼, 체인은 끝났는데 스킬도 안 나가고 홀드 평타도 다시 시작되지 않았다(할 일 280).
+    /// 예약은 Idle/Move 첫 틱에 <see cref="TryStartReservedSkill"/> 이 쓰고, 대시·피격·입력 차단 때 기존 경로가 비운다.
     /// 쓸 수 없어 보이는 입력(빈 슬롯·차단 효과·쿨타임)은 체인을 끊지 않는다 — 거부 처리는 Idle/Move 의 기존 규칙 그대로.
     /// </summary>
     protected void TryFinishAttackForBufferedSkill()
@@ -914,6 +916,9 @@ public abstract class PlayerStateBase : IPlayerState
             if (!finish)
                 continue;
 
+            // 우클릭 인터럽트 상태 경로(스킬 없음)는 예약으로 쓸 수 없다 — 버퍼에 둔다.
+            if (skill != null && Context.Input.ReserveSkillAfterAttack(kind))
+                Edit.Log($"[Skill] {slot} — 기본 공격({Context.Controller.CurrentState}) 이 타 마무리 뒤 시전 예약", Context.Player);
             attack.FinishWithoutChaining();
             return;
         }

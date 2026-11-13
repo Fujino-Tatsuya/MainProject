@@ -71,15 +71,9 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // 전진은 스킬이 직접 수행 — 기본 이동/회전은 잠근다
     public override bool CanMoveWhileActive => false;
 
-    // 돌파의 방패(PAL_2_DASH)면 돌진이 끝난 뒤 좌클릭 홀드로 기본 공격을 잇는다(할 일 146). 특성 보유는 모든 피어가 같은 값으로 읽는다.
-    public override bool ResumesBasicAttackOnHold
-    {
-        get
-        {
-            PaladinShieldDashSettings dash = ResolveShieldDash(out bool hasDashTrait);
-            return PaladinTraitRules.QResumesBasicAttack(hasDashTrait, dash);
-        }
-    }
+    // Q 가 끝난 뒤 좌클릭을 아직 누르고 있으면 기본 공격을 잇는다(할 일 146 장치, 할 일 280 — 원래 Q·돌파의 방패 모두).
+    // 원래 Q = 홀드 해제(Released), 돌파의 방패 = 회수 끝(Completed). 대시·피격·사망·안전망 끊김은 잇지 않는다.
+    public override bool ResumesBasicAttackOnHold => true;
 
     private FirstMeleeMainSkillData MainSkillData => Data as FirstMeleeMainSkillData;
 

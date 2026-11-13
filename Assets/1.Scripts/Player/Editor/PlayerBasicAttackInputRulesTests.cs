@@ -45,13 +45,73 @@ public sealed class PlayerBasicAttackInputRulesTests
     }
 
     [Test]
-    public void ResumeAfterSkill_PrefabSkills_AssassinEAlways_PaladinQNeedsTrait_GunnerByHoldStart()
+    public void ResumeAfterSkill_PrefabSkills_AssassinEAlways_PaladinQAlways_GunnerByHoldStart()
     {
         var assassin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab");
         var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
         Assert.That(assassin.GetComponent<AssassinEnhanceSkill>().ResumesBasicAttackOnHold, Is.True, "어쌔신 일반 E = 항상");
-        Assert.That(paladin.GetComponent<FirstMeleeMainSkill>().ResumesBasicAttackOnHold, Is.False, "특성 없는 가붕이 Q = 원래 Q — 이어가기 없음");
+        Assert.That(paladin.GetComponent<FirstMeleeMainSkill>().ResumesBasicAttackOnHold, Is.True, "특성 없는 가붕이 Q(원래 Q)도 이어가기 — 할 일 280");
         Assert.That(assassin.GetComponent<AssassinBasicAttack>().StartsOnHold, Is.False, "어쌔신은 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
+    }
+
+    // 할 일 280 — 가붕이 E(수호자의 의지)도 끝난 뒤 좌클릭 홀드로 평타를 잇는다. E 뗌·최대 유지 시간 종료 모두
+    // 해제 클립 End → Completed 로 끝나므로 같은 결과여야 한다. 대시·피격·사망 끊김은 안 잇는다.
+    [TestCase(SkillEndReason.Completed, true)]
+    [TestCase(SkillEndReason.Released, true)]
+    [TestCase(SkillEndReason.MaxDurationReached, false)]
+    [TestCase(SkillEndReason.Cancelled, false)]
+    [TestCase(SkillEndReason.CasterDied, false)]
+    [TestCase(SkillEndReason.DashCancelled, false)]
+    public void ResumeAfterSkill_PaladinE_ResumesOnNormalEnd(SkillEndReason reason, bool expected)
+    {
+        var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
+        var guard = paladin.GetComponentInChildren<FirstMeleeSubSkill>(true);
+        Assert.That(guard, Is.Not.Null, "가붕이 E 가 팔라딘 프리팹에 있다");
+        Assert.That(guard.ResumesBasicAttackOnHold, Is.True, "가붕이 E = 항상");
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(guard.ResumesBasicAttackOnHold, reason), Is.EqualTo(expected));
+        Assert.That(paladin.GetComponentInChildren<DefaultAttackController>(true).StartsOnHold, Is.False, "가붕이는 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
+    }
+
+    // 할 일 280 — 이어가기가 꺼져 있던 스킬 전부 켬: 가붕이 원래 Q·R, 어쌔신 Q(대시 타격)·R(변신), 모든 캐릭터 우클릭 간파.
+    // 거너 스킬은 평타가 홀드 시작이라 이 값과 무관하지만 간파는 공용 베이스라 같이 켜진다.
+    [Test]
+    public void ResumeAfterSkill_AllPlayerSkills_Resume()
+    {
+        string[] prefabs =
+        {
+            "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab",
+            "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab",
+        };
+        foreach (string path in prefabs)
+        {
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(path);
+            Assert.That(prefab, Is.Not.Null, path);
+            PlayerSkillBase[] skills = prefab.GetComponentsInChildren<PlayerSkillBase>(true);
+            Assert.That(skills, Is.Not.Empty, path);
+            foreach (PlayerSkillBase skill in skills)
+                Assert.That(skill.ResumesBasicAttackOnHold, Is.True, $"{path} — {skill.GetType().Name}");
+        }
+
+        var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
+        var assassin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab");
+        Assert.That(paladin.GetComponentInChildren<FirstMeleeUltimateSkill>(true), Is.Not.Null, "가붕이 R");
+        Assert.That(paladin.GetComponentInChildren<PlayerInterruptSkillBase>(true), Is.Not.Null, "가붕이 간파");
+        Assert.That(assassin.GetComponentInChildren<AssassinDashStrikeSkill>(true), Is.Not.Null, "어쌔신 Q");
+        Assert.That(assassin.GetComponentInChildren<AssassinTransformSkill>(true), Is.Not.Null, "어쌔신 R");
+        Assert.That(assassin.GetComponentInChildren<PlayerInterruptSkillBase>(true), Is.Not.Null, "어쌔신 간파");
+    }
+
+    // 원래 Q(홀드)는 홀드 해제(Released)로 끝난다 — 정상 종료로 보고 잇는다. 끊김은 안 잇는다.
+    [TestCase(SkillEndReason.Released, true)]
+    [TestCase(SkillEndReason.Completed, true)]
+    [TestCase(SkillEndReason.Cancelled, false)]
+    [TestCase(SkillEndReason.DashCancelled, false)]
+    [TestCase(SkillEndReason.CasterDied, false)]
+    public void ResumeAfterSkill_PaladinOriginalQ_ResumesOnRelease(SkillEndReason reason, bool expected)
+    {
+        var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
+        var q = paladin.GetComponent<FirstMeleeMainSkill>();
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(q.ResumesBasicAttackOnHold, reason), Is.EqualTo(expected));
     }
 
     // 변신 E(원형 5타)도 어쌔신 일반 E 와 같은 규칙 — 정상 종료(완료·홀드 해제)만 잇고 대시·피격·사망 끊김은 안 잇는다.
@@ -184,7 +244,7 @@ public sealed class PlayerBasicAttackInputRulesTests
     private static bool SimulateMeleeStep(
         PlayerInputBuffer buffer, float stepStart, float windowOpen, float windowClose, float stepEnd,
         bool attackHeld, ref bool finishingChain, float skillPressAt = -1f,
-        PlayerBufferedInput skill = PlayerBufferedInput.None)
+        PlayerBufferedInput skill = PlayerBufferedInput.None, PlayerSkillReservation reservation = null)
     {
         const float frame = 1f / 60f;
         bool queued = false;
@@ -194,15 +254,27 @@ public sealed class PlayerBasicAttackInputRulesTests
                 buffer.Record(skill, t);
 
             bool skillAlive = false;
+            PlayerBufferedInput aliveKind = PlayerBufferedInput.None;
             foreach (PlayerBufferedInput kind in new[] {
                          PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub,
                          PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate })
-                skillAlive |= buffer.ContainsAbove(kind, PlayerBufferedInput.Attack, t);
+            {
+                if (!buffer.ContainsAbove(kind, PlayerBufferedInput.Attack, t) || skillAlive)
+                    continue;
+                skillAlive = true;
+                aliveKind = kind;
+            }
 
             if (PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, skillAlive, true, false, false))
             {
                 finishingChain = true;
                 queued = false; // 오너 래치가 받은 예약도 지운다(FinishWithoutChaining — 할 일 256부터 체인은 오너 주도)
+                // 할 일 280 — 마무리를 건 스킬 입력은 공격 뒤 예약으로 옮긴다(TryFinishAttackForBufferedSkill, 만료 없음).
+                if (reservation != null)
+                {
+                    reservation.Reserve(aliveKind);
+                    buffer.Remove(aliveKind);
+                }
             }
 
             bool inWindow = t >= windowOpen && t <= windowClose;
@@ -246,6 +318,28 @@ public sealed class PlayerBasicAttackInputRulesTests
 
         // 이 타가 끝난 첫 틱(Idle) — 꺼낼 입력은 Q.
         Assert.That(buffer.Peek(1.10f), Is.EqualTo(PlayerBufferedInput.SkillMain), "현재 타가 끝난 첫 틱에 Q 시작");
+    }
+
+    // 할 일 280 제보 — 좌클릭 홀드 평타 중 타 초반에 스킬: 이 타 남은 시간(0.5초) > 버퍼 0.2초.
+    // 예전(버퍼만): 체인은 끊겼는데 Q 는 만료 → 평타도 멈추고 스킬도 안 나감(가붕이·어쌔신은 홀드 시작이 아님).
+    // 지금: 마무리를 건 입력을 공격 뒤 예약으로 옮겨 만료 없이 들고 있다가 Idle 첫 틱에 쓴다.
+    [Test]
+    public void MeleeHold_SkillPressedEarlyInSwing_OutlivesBuffer_ViaReservation()
+    {
+        var oldBuffer = CreatePrioritizedBuffer();
+        bool oldFinishing = false;
+        bool oldChained = SimulateMeleeStep(oldBuffer, 0.55f, 0.85f, 1.00f, 1.10f, true, ref oldFinishing,
+            skillPressAt: 0.60f, skill: PlayerBufferedInput.SkillMain);
+        Assert.That(oldChained, Is.False, "재현: 체인 종료");
+        Assert.That(oldBuffer.Peek(1.10f), Is.EqualTo(PlayerBufferedInput.None), "재현: 버퍼만이면 Q 가 만료돼 아무것도 안 나감");
+
+        var buffer = CreatePrioritizedBuffer();
+        var reservation = new PlayerSkillReservation();
+        bool finishing = false;
+        bool chained = SimulateMeleeStep(buffer, 0.55f, 0.85f, 1.00f, 1.10f, true, ref finishing,
+            skillPressAt: 0.60f, skill: PlayerBufferedInput.SkillMain, reservation: reservation);
+        Assert.That(chained, Is.False, "체인 종료(이 타로 마무리)");
+        Assert.That(reservation.Reserved, Is.EqualTo(PlayerBufferedInput.SkillMain), "이 타가 끝난 첫 틱에 예약한 Q 시작");
     }
 
     [Test]
