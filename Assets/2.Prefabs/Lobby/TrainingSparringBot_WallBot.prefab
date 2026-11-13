@@ -223,6 +223,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b36f1d86b3d4e2b9caab399d5d37b65, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterOverheadHealthBarOffset
+  anchorLocalOffset: {x: 0, y: 0, z: 1.2}
   footScreenOffset: 130
 --- !u!114 &4815490959051287160 stripped
 MonoBehaviour:

@@ -287,6 +287,8 @@ public sealed class MonsterOverheadHealthBarVisibilityTests
         var o = prefab.GetComponent<MonsterOverheadHealthBarOffset>();
         Assert.That(o, Is.Not.Null, path + " 루트에 MonsterOverheadHealthBarOffset");
         Assert.That(o.FootScreenOffset, Is.GreaterThanOrEqualTo(0f), path + " — 값은 사용자 튜닝(정확한 값은 검사하지 않음)");
+        // 월봇 모델은 루트보다 앞(+z)으로 쏠려 있다 — 기준점이 루트(0)면 봇 방향마다 바가 몸 대비 다른 자리에 뜬다.
+        Assert.That(o.AnchorLocalOffset.z, Is.GreaterThan(0f), path + " — 기준점을 몸 쪽(앞)으로");
     }
 
     static MonsterHealthBarInstall Decide(MonsterRank rank, bool bossHud = false, bool thisRule = false, bool bar = false, bool otherRule = false)

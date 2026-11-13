@@ -22,7 +22,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7143512002797822706, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 3747501928
+      value: 1474662369
+      objectReference: {fileID: 0}
+    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.65
       objectReference: {fileID: 0}
     - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
       propertyPath: m_LocalPosition.x
@@ -51,18 +63,6 @@ PrefabInstance:
     - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.65
-      objectReference: {fileID: 0}
-    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.65
-      objectReference: {fileID: 0}
-    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 0.65
       objectReference: {fileID: 0}
     - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -101,4 +101,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b36f1d86b3d4e2b9caab399d5d37b65, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterOverheadHealthBarOffset
-  footScreenOffset: 50
+  anchorLocalOffset: {x: 0, y: 0, z: 1.2}
+  footScreenOffset: 90
