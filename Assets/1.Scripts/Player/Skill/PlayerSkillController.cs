@@ -492,7 +492,12 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
             : GetCurrentAimDirection();
 
         if (!IsNetworkActive)
-            return StartSkillServer(slot, skillIndex, direction, target, aimPoint, hasAimPoint);
+        {
+            bool startedOffline = StartSkillServer(slot, skillIndex, direction, target, aimPoint, hasAimPoint);
+            if (startedOffline)
+                PlayCastHaptic(slot);
+            return startedOffline;
+        }
 
         if (!IsOwner)
             return false;
@@ -518,7 +523,16 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         // 누른 순간의 클라 추정 서버 시각 — 간파 지연 측정 전용(판정에 안 쓴다, 다른 슬롯은 서버가 무시).
         RequestUseSkillRpc(slot, skillIndex, direction, targetRef, aimPoint, hasAimPoint, player.CreateStatReport(),
             NetworkManager.ServerTime.Time, false);
+        PlayCastHaptic(slot);
         return true;
+    }
+
+    // 278 햅틱 — 오너가 스킬을 낸 순간(Q·E 약하게, R 중간). 간파 슬롯은 판정 cue(연출 디렉터)가 울린다.
+    private void PlayCastHaptic(PlayerSkillSlot slot)
+    {
+        if (slot == PlayerSkillSlot.Interrupt) // 호출 지점이 오프라인 또는 IsOwner 경로뿐이다
+            return;
+        GamepadHaptics.Play(slot == PlayerSkillSlot.Ultimate ? GamepadHapticEvent.UltimateCast : GamepadHapticEvent.SkillCast);
     }
 
     /// <summary>

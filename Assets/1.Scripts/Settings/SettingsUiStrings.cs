@@ -38,7 +38,8 @@ public static class SettingsUiStrings
     public static readonly UiString GameplayDamageNumbersMine = S("Gameplay.DamageNumbers.Mine", "내 것만", "Mine Only", "설정창 — 데미지 숫자 드롭다운(코드)");
     public static readonly UiString GameplayDamageNumbersAllEmphasized = S("Gameplay.DamageNumbers.AllEmphasized", "전체 (내 것 강조)", "All (Mine Emphasized)", "설정창 — 데미지 숫자 드롭다운(코드)");
     public static readonly UiString GameplayScreenShake = S("Gameplay.ScreenShake", "화면 흔들림", "Screen Shake", Body + "ScreenShake 라벨");
-    public static readonly UiString GameplayLanguage = S("Gameplay.Language", "언어 (Language)", "Language", Body + "Language 라벨(버튼 글자 = 언어 이름, 번역 안 함)");
+    public static readonly UiString GameplayHaptics = S("Gameplay.Haptics", "패드 진동", "Controller Vibration", Body + "Haptics 라벨(코드 — 화면 흔들림 행을 런타임 복제, 할 일 278)");
+    public static readonly UiString GameplayLanguage =S("Gameplay.Language", "언어 (Language)", "Language", Body + "Language 라벨(버튼 글자 = 언어 이름, 번역 안 함)");
     public static readonly UiString GameplayPerformance = S("Gameplay.Performance", "성능 표시", "Performance Info", Body + "Performance 라벨");
     public static readonly UiString GameplayPerformanceFps = S("Gameplay.Performance.Fps", "FPS", "FPS", "설정창 — 성능 표시 드롭다운(코드)");
     public static readonly UiString GameplayPerformanceFpsPing = S("Gameplay.Performance.FpsPing", "FPS + 핑", "FPS + Ping", "설정창 — 성능 표시 드롭다운(코드)");

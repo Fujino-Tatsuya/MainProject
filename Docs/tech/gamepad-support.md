@@ -84,3 +84,35 @@
 - 패드 모드 거너 R 조준 중 대시 취소 없음(B 로 취소 뒤 대시).
 - 장치 모드는 프로세스 전역 하나 — 한 PC 에서 두 사람이 키보드·패드를 나눠 쓰는 경우는 고려하지 않는다.
 - 설정창 키 리바인드는 키보드·마우스만 받는다(패드로 리바인드 버튼을 누르면 키보드 입력 대기 — ESC 로 취소).
+
+## 9. 패드 진동(햅틱)
+**진입점 하나**: `GamepadHaptics.Play(GamepadHapticEvent, scale)` (`Assets/1.Scripts/Settings/GamepadHaptics.cs`). 호출자는 사건만 알린다. 모터 세기·길이·감쇠·겹침은 서비스가 처리한다.
+- **겹침**: 모터마다 살아 있는 진동 중 **가장 센 값**을 쓴다(합산하지 않음). 같은 사건은 프리셋 `minInterval` 안에 다시 오면 무시한다(평타 다단 히트용).
+- **시간**: unscaled 시간을 쓴다. 히트스톱·간파 슬로우 중에도 정해진 길이에 끝난다. 매 프레임 `InputDeviceModeDriver.Update` 가 `Tick` 을 부르고, `SetMotorSpeeds` 는 값이 바뀔 때만 보낸다.
+- **0 으로 되돌리는 때**: 포커스 잃음 · 앱 일시정지 · 게임 메뉴(ESC/Start) 열림 · 씬 전환(activeSceneChanged) · Play 끝/종료 · 패드 분리·교체 · 마우스 모드 전환 · 설정 0%.
+- **누가 울리나**: 패드 모드(`InputDeviceMode.IsGamepad`)일 때만 울린다. 플레이어 사건은 **이 피어 오너 자신의 사건**만 울린다(남이 맞아도 내 패드는 조용). 보스 처치·등장 충격은 공용 사건이라 모든 피어가 각자 자기 패드를 울린다.
+- **새 RPC 없음**: 아래 표의 기존 지점에서만 부른다.
+
+| 사건 | low / high | 길이(초) | 감쇠 | 연결한 기존 이벤트 |
+|---|---|---|---|---|
+| 내 피격 `DamageTaken` | 0.25 / 0.35 × 피해 배율 | 0.15 | 직선, 최소 간격 0.1 | `UnitCameraFeedbackReporter.HandleReplicatedDamage`(로컬 플레이어 대상). 배율 = 피해 ÷ (최대 체력 × 0.25), 최소 0.3, 최대 1 |
+| 간파 성공 일반 | 0.45 / 0.6 | 0.25 | ^1.5 | `InterruptProductionDirector.OwnerJudgeSucceeded`(오너 판정 cue, `IInterruptOwnerCueSink`) 단계 Normal |
+| 간파 성공 대쉬 | 0.6 / 0.75 | 0.3 | ^1.5 | 같은 곳, 단계 Dash |
+| 간파 성공 제압 | 0.85 / 1.0 | 0.45 | ^1.5 | 같은 곳, 단계 Suppress |
+| 간파 실패 | 0.15 / 0.3 | 0.08 | 직선 | `OwnerEnded(JudgeFailed)`만. 서버 거부(성공 진동이 이미 남)·끊김·판정 버림은 안 울림 |
+| 대시 | 0 / 0.12 | 0.06 | 직선 | `PlayerDashController.TryBeginPredictedDash` 성공(입력 주체) |
+| 평타 적중 | 0.05 / 0.18 | 0.05 | 직선, 최소 간격 0.08 | `UnitCameraFeedbackReporter.HandleAttributedDamage` — 내가 공격자, `AttackType.Default`, 대상이 플레이어 아님 |
+| 스킬 시전 Q·E | 0.12 / 0.2 | 0.1 | 직선 | `PlayerSkillController.Cast` 오너 요청 순간(오프라인은 시작 성공) |
+| 궁극기 R | 0.3 / 0.4 | 0.25 | 직선 | 같은 곳, 슬롯 Ultimate |
+| 쓰러짐 | 0.5 / 0.3 | 0.8 | ^1.5 | `PlayerLifeCycleController.NotifyStateObservers` — 오너, Alive → DeadPresentation |
+| 보스 처치 | 0.8 / 0.9 | 0.6 | ^1.5 | `BossVictoryGlitchPresentation.Begin`(처치 판정 순간, 모든 피어) |
+| 보스 등장 큰 충격 | 0.5 / 0.4 | 0.4 | ^1.5 | `BossEncounterDirector.IntroImpactShakeClientRpc`(기존 카메라 충격 RPC) |
+
+- **수치 원본**: `Assets/Resources/GamepadHaptics/GamepadHapticsSettings.asset` (`GamepadHapticsSettings`). 사건별 프리셋(켜기·low·high·길이·감쇠 지수·최소 간격·선택 곡선) + 전체 켜기 + 전체 배율(`masterScale`) + 피해 비율. 에셋이 없으면 코드 기본값(위 표와 같음)으로 돈다. 기본값은 보수적으로 잡았다.
+- **끄는 법**: 플레이어는 설정창 → 게임플레이 → **패드 진동** 슬라이더(0~100%, 0 = 끔, PlayerPrefs `Settings.Gameplay.Haptics`, 기본 100%)로 끈다. 개발에서는 에셋 `enabled` 를 끄거나, 사건별 `enabled` 를 끈다. 이 행은 프리팹에 없다. `GameplaySettingsController.Awake` 가 화면 흔들림 행을 복제해 만든다(문구 키 `UI.Settings.Gameplay.Haptics`).
+- **한계**:
+  - 원격 클라의 스킬 시전 진동은 요청 순간 울린다. 서버가 거부해도 이미 울린 진동은 되돌리지 않는다.
+  - 피격 진동은 복제 피해 RPC 기준이라 왕복 지연만큼 늦다.
+  - 평타 판정은 `AttackType.Default` 를 쓴다. 특성·스킬이 평타 타입으로 넣는 피해도 같이 울린다.
+  - 진동 대상은 `Gamepad.current` 하나다. Xbox 트리거 모터(임펄스 트리거)는 쓰지 않는다.
+  - 게임 메뉴가 열린 동안은 설정 슬라이더 맛보기 진동도 울리지 않는다(타이틀 설정창에서는 울린다).

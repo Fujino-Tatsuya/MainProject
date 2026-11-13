@@ -507,6 +507,10 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         LifeStateChanged?.Invoke(previousState, currentState);
         GameplayAccessChanged?.Invoke(access);
 
+        // 278 햅틱 — 내 플레이어가 쓰러진 순간(살아 있음 → 사망 연출) 길게 감쇠.
+        if (IsOwner && previousState == PlayerLifeState.Alive && currentState == PlayerLifeState.DeadPresentation)
+            GamepadHaptics.Play(GamepadHapticEvent.Death);
+
         if (IsServer)
             ServerLifeStateChanged?.Invoke(OwnerClientId, previousState, currentState);
     }

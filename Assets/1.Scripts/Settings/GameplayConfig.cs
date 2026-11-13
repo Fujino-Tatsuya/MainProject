@@ -16,6 +16,7 @@ public static class GameplayConfig
 {
     const string DamageNumbersKey = "Settings.Gameplay.DamageNumbers";
     const string ScreenShakeKey = "Settings.Gameplay.ScreenShake";
+    const string HapticsKey = "Settings.Gameplay.Haptics";
 
     /// <summary>
     /// 데미지 숫자 표시 방식. 저장값이 없으면 <paramref name="authoredDefault"/>(SO 저작값 — FloatingDamageSettings.asset 은 AllWithOwnEmphasis)를 그대로 쓴다.
@@ -58,6 +59,17 @@ public static class GameplayConfig
         set
         {
             PlayerPrefs.SetFloat(ScreenShakeKey, Mathf.Clamp01(value));
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>패드 진동 세기 0~1(기본 1, 0 = 끔, 할 일 278 햅틱). <see cref="GamepadHaptics"/> 가 모든 사건에 곱한다.</summary>
+    public static float Haptics
+    {
+        get => Mathf.Clamp01(PlayerPrefs.GetFloat(HapticsKey, 1f));
+        set
+        {
+            PlayerPrefs.SetFloat(HapticsKey, Mathf.Clamp01(value));
             PlayerPrefs.Save();
         }
     }

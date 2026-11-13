@@ -993,6 +993,8 @@ public sealed partial class BossEncounterDirector : NetworkBehaviour
     private void IntroImpactShakeClientRpc(float amplitude, float duration)
     {
         CameraFeedback.Instance?.PlayImpactShake(amplitude, duration);
+        // 278 햅틱 — 보스 등장 큰 충격(모든 피어 각자, 기존 RPC 재사용).
+        GamepadHaptics.Play(GamepadHapticEvent.BossIntroImpact);
     }
 
     private void FixedUpdate()

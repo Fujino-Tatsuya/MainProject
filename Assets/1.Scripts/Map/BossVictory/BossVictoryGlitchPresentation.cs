@@ -383,6 +383,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _bossEffectRate = -1f;
         _bossHitAnimators.Clear();
         _finisherWarned = false;
+        // 278 햅틱 — 처치 순간 세게(모든 피어가 각자 자기 패드 — 공용 사건).
+        GamepadHaptics.Play(GamepadHapticEvent.BossKill);
         _killerStep = BossVictoryKillerSequence.Step.None;
         _dashRunning = false;
         _dashStarted = false;

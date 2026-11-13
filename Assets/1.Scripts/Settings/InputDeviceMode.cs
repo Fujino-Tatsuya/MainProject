@@ -163,11 +163,20 @@ public sealed class InputDeviceModeDriver : MonoBehaviour
 
     private void OnDestroy()
     {
+        GamepadHaptics.ResetHaptics();
         if (s_instance == this)
             s_instance = null;
     }
 
-    private void Update() => InputDeviceMode.Tick();
+    // 패드 진동(할 일 278 햅틱) — 포커스 잃음·일시정지면 모터 0.
+    private void OnApplicationFocus(bool focus) => GamepadHaptics.SetFocused(focus);
+    private void OnApplicationPause(bool pause) { if (pause) GamepadHaptics.ResetHaptics(); }
+
+    private void Update()
+    {
+        InputDeviceMode.Tick();
+        GamepadHaptics.Tick();
+    }
 
     // 패널들이 Update 에서 열고 닫은 뒤에 첫 선택을 건다(할 일 278 2단계).
     private void LateUpdate() => GamepadUiFocus.Tick();

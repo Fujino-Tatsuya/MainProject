@@ -586,6 +586,9 @@ public class PlayerDashController : NetworkBehaviour
                  $"재충전 {config.RechargeDuration:F2}s, now={now:F3}, " +
                  $"시계={(ClockRunning ? "NetworkClock" : "Time.timeAsDouble")}", this);
 
+        // 278 햅틱 — 로컬 입력 주체의 대시 시작(아주 약하게).
+        GamepadHaptics.Play(GamepadHapticEvent.Dash);
+
         // 온라인이면 서버 승인을 요청한다. 오프라인(테스트)에서는 예측만.
         if (IsSpawned && IsOwner)
         {

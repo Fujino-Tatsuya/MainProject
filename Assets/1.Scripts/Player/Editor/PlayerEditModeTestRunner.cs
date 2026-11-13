@@ -51,6 +51,7 @@ internal static class PlayerEditModeTestRunner
         "^GamepadAimRulesTests$", // 할 일 278 — 패드 조준 혼합: 데드존·뷰 yaw 변환·기준 방향·자동 보정 선택
         "^GamepadTargetCycleTests$", // 할 일 278 — 단일 대상 패드 후보 순환: 돌아감·튕김 엣지·왼→오른쪽·처음 가장 가까운 것
         "^InputDeviceModeRulesTests$", // 할 일 278 — 장치 모드: 마지막 장치·마우스 우선·축 엣지·떨림 무시
+        "^GamepadHapticsTests$", // 할 일 278 햅틱 — 겹침 센 쪽·감쇠·종료·최소 간격·오너 전용·피해 배율·기본 단계 순서
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
         "^UnitWallImpactJudgeTests$", // 할 일 32 — 공용 벽 충돌: 스윕 결과 → 벽 충돌·제외 규칙(자기·배리어·유닛·상자·시작 겹침)·막힘 거리·에피소드당 1회
         // 튜토리얼 픽스처(특성·안내 UI·스피너봇 연습)는 MapSceneEditModeTestRunner 로 옮겼다(할 일 15 I0).
