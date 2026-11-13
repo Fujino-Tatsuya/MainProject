@@ -66,9 +66,9 @@ public sealed class MonsterOverheadHealthBarRule : MonoBehaviour, IOverheadHealt
         }
 
         UnitOverheadHealthBar bar = Instantiate(prefab, monster.transform);
+        bar.transform.localPosition = Vector3.zero;
         bar.transform.localRotation = Quaternion.identity;
         bool hasOverride = monster.TryGetComponent(out MonsterOverheadHealthBarOffset offsetOverride);
-        bar.transform.localPosition = hasOverride ? offsetOverride.AnchorLocalOffset : Vector3.zero; // 기준점 — 없으면 루트(발)
         float footOffset = MonsterOverheadHealthBarVisibility.ResolveFootOffset(
             hasOverride, hasOverride ? offsetOverride.FootScreenOffset : 0f, settings.FootScreenOffset(monster.Rank));
         bar.ConfigurePlacement(0f, MonsterOverheadHealthBarVisibility.FootScreenOffset(footOffset));

@@ -135,7 +135,8 @@
     프리팹 칸 `shieldChance` 0.5→0 = 방패 3단(카운터 창·돌진·충격파) 끔, 단발 평타만. 6마리 동시 어그로는 코드가 없어 인지 반경으로만 줄였다.
   - 크기(274 후속 — "너무 큼"): 루트 스케일 **0.65** 한 칸. 몸·Hurtbox 캡슐·NavMeshAgent 반경·평타 판정(`ColliderInfo` = lossyScale 반영)이 같이 준다. 충격파 반경·돌진 거리(월드 m)는 안 따라가지만 방패 3단을 꺼서 무관. 피해 숫자 = 몸 콜라이더 중심(같이 줄어듦), 머리 위 체력 바 = 발 기준 화면 오프셋(크기 무관). 배율을 바꾸면 데이터 `attackRange` 도 2×배율로.
   - 머리 위 체력바 위치: 루트 `MonsterOverheadHealthBarOffset.footScreenOffset`(발밑에서 화면 아래로 px, 처음 값 50 = 일반 몬스터 공용 값) — 있으면 공용 `Resources/MonsterOverheadHealthBarSettings` 등급별 값 대신 이 값(본편 몬스터엔 없음 = 그대로). 훈련 상대 `TrainingSparringBot_WallBot` 도 같은 칸(처음 값 100 = 중간보스 공용 값). 스폰 때 1회 읽는다.
-    - 기준점 `anchorLocalOffset`(루트 로컬, 기본 0 = 발): 월봇 모델 덩어리는 루트보다 앞(로컬 z ≈1.2, 0.65 배율에서 ≈0.78m)에 있어 루트 기준이면 스폰 방향(0·169·191·11·349·281°)·회전마다 바가 몸 대비 다른 자리에 뜬다 → 두 봇 프리팹 = (0, 0, 1.2). 루트 회전·스케일을 따라가므로 방향과 무관. Play 중 값 변경·기즈모·Scene 핸들 끌기 모두 이 기준점 기준.
+    - 허수아비 월봇(`TrainingDummy_TutorialWallBot`, T10·T50)도 같은 자리: `TrainingDummyHealthBar.screenFootBar` = 켬(Variant 오버라이드, 본편 허수아비는 끔 = 월드 캔버스 그대로) → 바를 공용 오버레이 캔버스로 옮겨 몬스터 바와 같은 계산으로 루트(발)에서 루트 `MonsterOverheadHealthBarOffset.footScreenOffset`(90) px 아래. 크기 `screenScale` 0.6. 게이지·체력 숫자 표기는 그대로, 간파 암전 중 숨김은 몬스터 바와 같음. 기즈모·Scene 핸들 끌기·Play 중 값 변경도 같은 컴포넌트라 그대로 동작.
+    - (참고) 월봇 기준점은 루트(발) 그대로 맞다 — 실제 메쉬(BakeMesh) 중심은 루트 위(z −0.1~+0.03). 렌더러 bounds(AABB 고정값)는 앞으로 0.78 쏠려 보이지만 실제 모양이 아니다.
   - 데이터 테이블: `Monster` 시트에 대상 열 `WallBotData_Tutorial`, `MidBoss` 시트에 대상 열 `WallBot_Tutorial` 이 없으면 경고만·인스펙터 값(열 이름 = 에셋/프리팹 파일 이름).
 - 완료 = 생성 집합 전원 사망 1회(`MonsterDeathEvents.ServerMonsterDied` → `LobbyCombatLedger`, 마지막 사망 중복 무시). 끼임 복구 = 0.5초마다 훈련실 경계 밖·오래 멈춤 → 초기 위치 Warp.
 - '남은 상대' 수는 계약에 없다(옛 `LobbyTrainingCombat` 남은 수 복제는 158 이 끄는 옛 뷰 전용).

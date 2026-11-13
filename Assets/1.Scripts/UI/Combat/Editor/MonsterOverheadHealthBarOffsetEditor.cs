@@ -27,7 +27,7 @@ public sealed class MonsterOverheadHealthBarOffsetEditor : Editor
         Vector3 moved = Handles.FreeMoveHandle(center, size, Vector3.zero, Handles.DotHandleCap);
         if (!EditorGUI.EndChangeCheck()) return;
 
-        Vector3 feet = cam.WorldToScreenPoint(t.AnchorWorld);
+        Vector3 feet = cam.WorldToScreenPoint(t.transform.position);
         Vector3 now = cam.WorldToScreenPoint(moved);
         float offset = MonsterOverheadHealthBarVisibility.FootOffsetFromScreenDrop(feet.y - now.y, ppu);
         Undo.RecordObject(t, "체력바 발밑 오프셋");
