@@ -64,10 +64,10 @@ public class LobbyUIController : MonoBehaviour
         return false;
     }
 
-    private Sprite GetCharacterPortrait(int characterId)
+    private CharacterRoster.Entry GetCharacter(int characterId)
     {
         return characterRoster != null && characterRoster.TryGetAvailableCharacter(characterId, out var entry)
-            ? entry.Portrait
+            ? entry
             : null;
     }
 
@@ -103,7 +103,7 @@ public class LobbyUIController : MonoBehaviour
                 }
 
                 var entry = session.GetEntry(i);
-                slot.SetState(true, entry.Ready, GetCharacterPortrait(entry.CharacterId), BuildSlotLabel(entry));
+                slot.SetState(true, entry.Ready, GetCharacter(entry.CharacterId), BuildSlotLabel(entry));
             }
         }
 

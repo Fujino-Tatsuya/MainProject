@@ -220,10 +220,16 @@ public static class LobbyResultPanelAuthoring
 
                 if (column.Name == "Player")
                 {
-                    RectTransform portrait = NewRect("Image_Portrait", cell);
-                    portrait.anchorMin = portrait.anchorMax = new Vector2(0f, 0.5f);
-                    portrait.pivot = new Vector2(0f, 0.5f);
-                    portrait.anchoredPosition = new Vector2(Padding + 12f, 0f);
+                    // 84×84 칸 = RectMask2D, 초상화는 그 안에서 캐릭터별 얼굴 크롭으로 키워진다(할 일 276 후속, PortraitFaceCrop)
+                    RectTransform portraitMask = NewRect("PortraitMask", cell);
+                    portraitMask.anchorMin = portraitMask.anchorMax = new Vector2(0f, 0.5f);
+                    portraitMask.pivot = new Vector2(0f, 0.5f);
+                    portraitMask.anchoredPosition = new Vector2(Padding + 12f, 0f);
+                    portraitMask.sizeDelta = new Vector2(84f, 84f);
+                    portraitMask.gameObject.AddComponent<RectMask2D>();
+                    RectTransform portrait = NewRect("Image_Portrait", portraitMask);
+                    portrait.anchorMin = portrait.anchorMax = new Vector2(0.5f, 0.5f);
+                    portrait.pivot = new Vector2(0.5f, 0.5f);
                     portrait.sizeDelta = new Vector2(84f, 84f);
                     Image portraitImage = AddImage(portrait.gameObject, null, false, Color.white);
                     portraitImage.preserveAspect = true;

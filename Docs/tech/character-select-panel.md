@@ -123,7 +123,13 @@
   `Card_Template` 은 이 값을 그대로 물려받는다(덮어쓴 값 없음) — 더 고칠 땐 지금처럼 `Card_Template` 의 `Clip/Image_Portrait` 에서 고친다. 저작 메뉴(`CharacterSelectPanelAuthoring`) 기본값도 같은 값.
   한계: 아래 카드(`nextSlot`)는 화면에 카드 로컬 y 12 위만 보여 머리 윗부분만 보인다(이름은 보임).
 - 이름판 `nameplatePortrait` 는 162 후속 사용자 결정대로 **연결 없음**을 유지(`CharacterSelectUiPolishTests` 가 확인). 다시 켜려면 `Content/Nameplate/PortraitSlot/Image_Portrait`(원형 Mask 160) 를 연결하고 크기 ≈ 330×330·위치 ≈ (-10, -70) 이면 얼굴이 원 안에 든다(오프라인 합성 미리보기 기준).
-- 같은 `Portrait` 를 쓰는 곳: 로비 플레이어 슬롯(`LobbyPlayerSlotView` — 100×100 preserveAspect, 로비 씬 `PlayerSlot_*/Portrait`)·결과 행(`ResultPlayerRowView` — `LobbyResultPlayerRow` 84×84). 둘 다 전신이 통째로 줄어 얼굴이 아주 작다 — 얼굴 확대(크롭 Mask) 또는 별도 아이콘 칸은 미정.
+- 같은 `Portrait` 를 쓰는 곳과 **작은 칸 얼굴 크롭(276 후속, 2026-11-13, '가'안)**:
+  - 로비 플레이어 슬롯 `LobbyPlayerSlotView` — 로비 씬 `PlayerSlot_*/PortraitMask`(원형 `Mask` 106×106·(0,-7), 그래픽 = `ResultGradeCircle.png` 어두운 색 바탕 — 링 `Frame` 120 의 안쪽을 채워 뒤 사람 아이콘이 안 비침)/`Portrait`.
+  - 로비 결과 행 `ResultPlayerRowView` — `LobbyResultPlayerRow.prefab` `Cell_Player/PortraitMask`(사각 `RectMask2D` 84×84)/`Image_Portrait`. 저작 메뉴(`LobbyResultPanelAuthoring`)도 같은 구조를 만든다.
+  - 크롭 값 = 로스터 칸 `faceCrop`(`PortraitFaceCrop`: `center` = 얼굴 가운데, 스프라이트 비율 좌표 · `size` = 칸 짧은 변에 꽉 찰 정사각 한 변 = 스프라이트 너비의 몇 배, 작을수록 확대). 팔라딘 (0.533, 0.713)·거너 (0.518, 0.761)·어쌔신 (0.518, 0.737), 셋 다 size 0.26.
+  - 동작: 뷰가 스프라이트를 넣은 뒤 `PortraitFaceCrop.Apply` 가 **초상화 Image 의 부모에 `RectMask2D` 나 `Mask` 가 있을 때만** Image 를 키우고 옮긴다(가운데 앵커·피벗, preserveAspect 끔). 원본 png 그대로 — 텍스처 생성·스프라이트 자르기 없음. 미접속(스프라이트 없음)이면 칸을 꽉 채운 회색.
+  - 안 건드린 곳: 캐릭터 선택 카드(760×760, 위 항목) · 이름판(연결 없음) · **5.ResultScene 행 `ResultPlayerRow.prefab`**(레이아웃 그룹 64 칸, 마스크 없음 → 크롭 안 됨, 같은 방식 적용 여부 미정).
+  - 미리보기: `C:\UnityProject\_lane-artifacts\Work1\276-portrait-face-crop\index.html`. 테스트 `Assets/Tests/EditMode/PortraitFaceCrop/Editor/PortraitFaceCropTests.cs`.
 
 ## 조작
 | 입력 | 동작 |

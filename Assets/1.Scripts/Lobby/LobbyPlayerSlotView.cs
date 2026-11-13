@@ -18,11 +18,12 @@ public class LobbyPlayerSlotView : MonoBehaviour
     [SerializeField] private Color readyColor = new Color(0.25f, 0.65f, 1f, 1f);
     [SerializeField] private Color notReadyColor = new Color(0.85f, 0.25f, 0.25f, 1f);
 
-    public void SetState(bool connected, bool ready, Sprite portrait, string label = null)
+    /// <param name="character">초상화·얼굴 크롭 출처. null 이면 빈 초상화.</param>
+    public void SetState(bool connected, bool ready, CharacterRoster.Entry character, string label = null)
     {
         SetConnected(connected);
         SetReady(connected && ready);
-        SetPortrait(connected, connected ? portrait : null);
+        SetPortrait(connected, connected ? character : null);
         SetLabel(connected ? label : null);
     }
 
@@ -61,15 +62,17 @@ public class LobbyPlayerSlotView : MonoBehaviour
     }
 
     // 미접속 슬롯은 숨기지 않고 회색 칸으로 둔다 — IsConnect 아이콘 대신 접속 여부를 보여준다.
-    private void SetPortrait(bool connected, Sprite portrait)
+    // 초상화 부모(PortraitMask)의 RectMask2D 안에서 캐릭터별 크롭으로 얼굴만 보인다(할 일 276 후속).
+    private void SetPortrait(bool connected, CharacterRoster.Entry character)
     {
         if (portraitImage == null)
         {
             return;
         }
 
-        portraitImage.sprite = portrait;
+        portraitImage.sprite = character != null ? character.Portrait : null;
         portraitImage.color = connected ? Color.white : disconnectedColor;
         portraitImage.enabled = true;
+        PortraitFaceCrop.Apply(portraitImage, character != null ? character.FaceCrop : PortraitFaceCrop.Full);
     }
 }
