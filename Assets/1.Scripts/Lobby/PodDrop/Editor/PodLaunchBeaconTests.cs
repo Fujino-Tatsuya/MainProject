@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -90,6 +91,7 @@ public sealed class PodLaunchBeaconTests
             Assert.That(l.lightmapBakeType, Is.EqualTo(LightmapBakeType.Realtime), l.name);
             Assert.That(l.shadows, Is.EqualTo(LightShadows.None), l.name);
             Assert.That(l.enabled, Is.False, l.name + " — 꺼진 채 저장(켜고 끔은 컴포넌트)");
+            Assert.That(l.cookie, Is.Not.Null, l.name + " — 바닥 4등분 무늬 쿠키(284 후속)");
         }
 
         foreach (Transform t in prefab.GetComponentsInChildren<Transform>(true))
@@ -134,5 +136,77 @@ public sealed class PodLaunchBeaconTests
             Assert.That(beacon.Yaw, Is.EqualTo(0f), "끄면 회전 각 처음으로");
         }
         finally { Object.DestroyImmediate(go); }
+    }
+}
+
+// 할 일 284 후속 — 경광등 켜진 동안 씬 라이트 끄기: 켜져 있던 것만 끄고 그것만 되돌린다, 경광등 Spot·태양은 건너뜀.
+public sealed class PodLaunchLightBlackoutTests
+{
+    static Light MakeLight(string name, bool enabled, LightType type = LightType.Point)
+    {
+        var go = EditorUtility.CreateGameObjectWithHideFlags(name, HideFlags.HideAndDontSave);
+        var l = go.AddComponent<Light>();
+        l.type = type;
+        l.enabled = enabled;
+        return l;
+    }
+
+    [Test]
+    public void BeginEnd_TurnsOffOnlyLitOthersAndRestoresThem()
+    {
+        Light lit = MakeLight("lit", true);
+        Light alreadyOff = MakeLight("off", false);
+        Light beaconSpot = MakeLight("beacon", false, LightType.Spot);
+        Light otherDirectional = MakeLight("dir2", true, LightType.Directional);
+        Light sun = MakeLight("sun", true, LightType.Directional);
+        var all = new[] { lit, alreadyOff, beaconSpot, otherDirectional, sun };
+        try
+        {
+            var blackout = new PodLaunchLightBlackout();
+            beaconSpot.enabled = true; // 켬 전이 순간 경광등이 먼저 켜져 있어도 남긴다
+            blackout.Begin(all, new HashSet<Light> { beaconSpot }, sun);
+
+            Assert.That(blackout.Active, Is.True);
+            Assert.That(blackout.TurnedOffCount, Is.EqualTo(2), "lit + 두 번째 Directional");
+            Assert.That(lit.enabled, Is.False);
+            Assert.That(otherDirectional.enabled, Is.False);
+            Assert.That(alreadyOff.enabled, Is.False);
+            Assert.That(beaconSpot.enabled, Is.True, "경광등 Spot 은 남김");
+            Assert.That(sun.enabled, Is.True, "태양은 SceneLightDim 몫");
+
+            blackout.Begin(all, null, null);
+            Assert.That(blackout.TurnedOffCount, Is.EqualTo(2), "켜짐 중 다시 Begin = 무시");
+
+            blackout.End();
+            Assert.That(blackout.Active, Is.False);
+            Assert.That(lit.enabled, Is.True);
+            Assert.That(otherDirectional.enabled, Is.True);
+            Assert.That(alreadyOff.enabled, Is.False, "원래 꺼져 있던 건 그대로");
+            Assert.That(beaconSpot.enabled, Is.True);
+
+            lit.enabled = false;
+            blackout.End();
+            Assert.That(lit.enabled, Is.False, "End 두 번 = 무시");
+        }
+        finally
+        {
+            foreach (Light l in all) Object.DestroyImmediate(l.gameObject);
+        }
+    }
+
+    [Test]
+    public void End_SkipsDestroyedLights()
+    {
+        Light a = MakeLight("a", true);
+        Light b = MakeLight("b", true);
+        var blackout = new PodLaunchLightBlackout();
+        blackout.Begin(new[] { a, b }, null, null);
+        Object.DestroyImmediate(a.gameObject);
+        try
+        {
+            Assert.DoesNotThrow(blackout.End);
+            Assert.That(b.enabled, Is.True);
+        }
+        finally { Object.DestroyImmediate(b.gameObject); }
     }
 }

@@ -97,11 +97,23 @@
 - **끄는 곳**: 매 프레임 판정 + `LobbyPodLaunch.ClearLocal`(연출 취소·재시작·디스폰·로비 씬 내려감). 경광등 자체도 `Awake` 에서 꺼진 채 시작하고 프리팹 Spot 은 꺼진 채 저장돼 있다 —
   회차 반복(로비 씬 새로 로드)·재접속(늦게 들어온 피어는 복제 시각으로 같은 상태 계산)·튜토리얼 재시작 때 꺼진 상태로 돌아온다. 끄면 회전 각도 0 으로.
 - **프리팹**: `Assets/2.Prefabs/Lobby/PodLaunchBeacon/PF_PodLaunchBeacon.prefab`(git — 기본 도형 Cylinder 받침 + Sphere 돔, 지름 약 0.3m, 콜라이더·그림자 없음, **Static 끔** — 회전하므로).
-  - `Rotor`(Y 회전) 아래 `Spot_A`·`Spot_B`(등 맞댄 2개, 아래로 28°) — Realtime·그림자 끔·세기 70·거리 12·각 34°(안쪽 12°). 세기·각도·거리는 Light 칸에서 고친다.
+  - **바닥 무늬(284 후속, 11-13 사용자)** — 위에서 보면 원을 4등분해 마주 보는 두 칸만 호박색, 나머지 두 칸은 어두운 충돌 시험 표식 모양이 경광등과 함께 돈다.
+    구조: `Aim`(로컬 X −30° — 프리팹 +Z 쪽으로 기울임) → `Rotor`(Y 회전, 코드) → `Spot`(X 90° = Rotor 의 −Y, 즉 빛 축) 하나. Rotor 의 Y 축이 빛 축이라 돌면 바닥 원은 제자리에서 무늬만 돈다.
+    Spot = Realtime·그림자 끔·세기 40·거리 6·각 64°(안쪽 60° — 가장자리는 쿠키 원이 정한다), 쿠키 `T_PodLaunchBeaconCookie.png`(256², 흰 두 칸·검은 두 칸·원 밖 검정, 경계 3~4px 부드럽게, Clamp·밉맵 없음·비압축·Alpha from Grayscale — PowerShell System.Drawing 으로 만든 고정 PNG, 런타임 생성 없음).
+    쿠키 원 반각 ≈ 30° = 기울기 30° 라 원의 가까운 끝이 경광등 바로 밑(벽 밑동)에 오고 바닥 쪽으로 약 3.5m 까지 비친다 — 벽 너머(락커룸)로는 원뿔이 넘어가지 않는다.
+    **URP Light Cookies**: `PC_RPAsset` 의 `m_SupportsLightCookies` 가 꺼져 있어 켰다(Mobile·INab 에셋은 원래 켜짐 — 셰이더 변형은 이미 빌드에 들어가던 것).
+    세기·각도·거리는 Spot Light 칸, 기울기는 `Aim` 회전, 방향은 씬 인스턴스 루트 Y 회전에서 고친다.
   - `PodLaunchBeacon` 칸: 색(Spot·돔 공용, 기본 호박색 1/0.55/0.08)·켜짐 돔 이미시브 배율(10)·꺼짐 배율(0)·단계별 한 바퀴 주기(1.2/0.8/0.5).
   - 돔 머티리얼 `M_PodLaunchBeacon_Dome`(URP Lit) — 이미시브는 `MaterialPropertyBlock` 으로만 바꾼다(277 `PropEmissiveAnimator` 와 같은 방식).
     머티리얼 `_EmissionColor` 를 아주 어두운 호박색, GI 플래그를 Realtime Emissive 로 둔 건 의도다 — 검정·None 이면 URP 검증이 `_EMISSION` 키워드를 꺼서 MPB 색이 안 먹는다.
 - **씬**: `3.LobbyScene` 루트 `PodLaunch/PodLaunchBeacons` 아래 `Beacon_1_NW`(−4.25, 2.05, 11.75)·`Beacon_2_NE`(7.0, 2.05, 11.75)·`Beacon_3_W`(−4.25, 2.05, 7.0), `LobbyPodLaunch.beacons` 칸에 연결. 비우면 경광등 없음.
+  루트 Y 회전(벽 반대쪽 = 프리팹 +Z): `Beacon_1_NW` 135°(남동)·`Beacon_2_NE` 180°(남)·`Beacon_3_W` 90°(동).
+- **씬 암전(284 후속, 11-13 사용자)**: 경광등이 켜진 동안 씬의 다른 라이트를 끄고 경광등 Spot 만 남긴다. `LobbyPodLaunch` 칸 `beaconBlackout`(기본 켬)·`beaconBlackoutAmbient`(환경광·반사 배율, 기본 0.03).
+  - 켬 전이 순간 1회 `FindObjectsByType<Light>` → 켜져 있던 것(경광등 Spot·태양 제외)을 끄고 목록 기억(`PodLaunchLightBlackout`), 끔 전이에 그것만 다시 켠다(원래 꺼져 있던 건 그대로, 사라진 건 건너뜀). 매 프레임 찾기 없음.
+  - 태양(Directional, `SceneLightDim.FindSceneSun` — `RenderSettings.sun` 또는 켜진 첫 Directional)은 `SceneLightDim.Shared.SetSun(this, 0)`, 환경광은 `SetAmbient(this, 배율)` — 23호 차징·간파 암순응과 같은 공용 배율 창구라 겹쳐도 원복이 꼬이지 않는다. 다른 Directional 은 일반 라이트처럼 끈다.
+  - 반사 세기 `RenderSettings.reflectionIntensity` 는 공용 창구가 없어 직접 × 배율, 끔 때 되돌린다(이미 활성 씬이 바뀌었으면 새 씬 값을 덮지 않는다).
+  - 끄는 곳 = 켬 구간이 끝나는 프레임(다 검어짐) + `ClearLocal`(연출 취소·디스폰·`OnDestroy`). 로비 씬 기준 라이트 컴포넌트 39개(대부분 Realtime 점광원, 스폿 몇 개, Directional 1개 — 프리팹 인스턴스 안 라이트 포함 실제 수는 켤 때 콘솔 `[LobbyPodLaunch] 경광등 암전 — 라이트 N개 끔` 로그).
+  - 모니터·LED 같은 **이미시브 머티리얼은 라이트가 아니라 그대로** 빛난다. 암전 중 다른 코드가 라이트를 다시 켜면 그 라이트는 켜진다(막지 않음). 각 피어 로컬, 새 복제 값·RPC 없음.
 - **소리**: 따로 없다 — 기존 출발음(`Direct_Pod_Start`)만(사용자 결정).
-- **알려진 한계**: Spot 그림자를 꺼서 빛줄기가 벽을 뚫고 옆방(락커룸) 바닥에도 조금 닿는다. 거슬리면 Spot 거리·각도를 줄이거나 그림자를 켠다(비용).
-- 테스트: `PodLaunchBeaconTests`(켜고 끄는 구간·가속 단계·주기·회전·프리팹 배선·켜고 끔).
+- **알려진 한계**: Spot 그림자는 끈 채다. 284 후속에서 원뿔을 벽 반대쪽으로 기울이고 거리를 12 → 6 으로 줄여 서쪽 경광등 빛이 락커룸에 새던 것을 막았다 — 그래도 보이면 `Aim` 기울기를 키우거나 거리를 줄인다.
+- 테스트: `PodLaunchBeaconTests`(켜고 끄는 구간·가속 단계·주기·회전·프리팹 배선(쿠키 포함)·켜고 끔), `PodLaunchLightBlackoutTests`(켜져 있던 것만 끄고 되돌림·Spot/태양 제외·멱등·사라진 라이트).
