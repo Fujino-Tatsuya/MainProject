@@ -118,3 +118,14 @@ URP 에는 실시간 튜브 라이트가 없어서 **바닥 빛 줄기(일자형
 - 로비 블룸 세기 0.35 → **0.8**(10-23 사용자 결정).
 - 비교(10-23, 홀 가운데): 막대 제거 후 라이트만이면 바닥 빛이 둥근 얼룩 → 일자형 느낌이 사라진다. 바닥 빛 줄기를 켜면 유지된다 → **C안(라이트 + 바닥 빛 줄기) 확정**.
 - 예전 막대용 `M_Fluorescent_Tube.mat`·`M_Fluorescent_Housing.mat` 은 참조가 0 이 된 뒤 10-23 삭제했다.
+
+## 프랍 이미시브·라이트·애니 (할 일 277, 2026-11-13)
+공유 아틀라스 머티리얼(`MA_generic_Lobby_BaseColor_v006`, `Generic_01_A`)은 그대로 두고, **대상 프리팹에만 복제 머티리얼**을 단다(머티리얼·텍스처는 `Assets/50.Art`(SVN)).
+- 마스크 `lobby_props_emissive_mask_v001.png` = 로비 아틀라스 UV 기준. RGB = 빛 색(화면 타일·빨강/초록 버튼 타일·프로젝터 렌즈 타일만), **A = 영역 코드**(1 화면 · 0.5 패널 버튼 · 0 정적).
+- **애니 원칙: 라이트가 달린 프랍 = 스크립트, 라이트 없는 프랍 = 셰이더.**
+  - 셰이더 `VeyTrace/Prop Emissive Lit`(`Assets/1.Scripts/Rendering/PropEmissive/Shaders/`, URP Lit 복제 + `PropEmissiveAnim.hlsl`) — 모니터(L14·L17)·관제 데스크(L07). `_Time` 기반이라 스크립트·MPB 없음 → SRP Batcher 유지. 인스턴스 시드 = 오브젝트 원점 위치 해시(**정적 배칭 켜면 시드·버튼 구분이 깨진다 — 이 프랍들은 Static 끄기 유지**).
+    - 모니터: 화면 UV 범위 `_ScreenRect`(뒤집힘·회전 없음, u→화면 오른쪽·v→위 확인) 안에 화면 종류 3가지(글자줄 스크롤 = `lobby_crt_screen_content_v001.png` R, 파형+막대 그래프 = G 격자 + 절차, 레이더 스윕) 중 인스턴스별 하나 + 스캔라인·롤링 띠·미세 깜빡임·가끔 지직(가로 찢김+노이즈 띠). 칸: 머티리얼 `MA_generic_Lobby_Emissive_Monitor_v001`.
+    - 데스크: 버튼 12개를 오브젝트 공간 격자(`_ButtonGrid` = |x| 0.766·z −0.019·간격 0.087)로 구분해 버튼마다 계속 켜짐/느린 점멸/빠른 점멸/무작위 중 하나. 칸: `MA_generic_Lobby_Emissive_Desk_v001`(`_ButtonOffLevel`·`_ButtonSpeed`).
+  - 스크립트 `PropEmissiveAnimator`(MPB, 이미시브 × 곡선 + 같은 프리팹 Light 세기 동기, 인스턴스 랜덤 위상, 화면 밖이면 이미시브 갱신 생략) — 알람(R06, 펄스 1.2s·0.15↔1)·프로젝터(L23, ±5% 노이즈 + 18s 평균 짧은 깜빡). MPB 때문에 이 렌더러들(로비 1·맵 3)은 SRP Batcher 에서 빠진다.
+- 라이트: `object_alarm/Light_AlarmPoint`(Point 빨강·Range 3.5·세기 2·그림자 없음), `PF_Operations_SlideProjector_01_v001/Light_ProjectorSpot`(Spot·30°·Range 7·세기 12·**Soft Shadows**, 세기 0.85·바이어스 0.05/노멀 0.4·near 0.1, 해상도 티어 High 1024). 모두 Realtime.
+- 테스트: `Assets/Tests/EditMode/PropEmissive/Editor/PropEmissiveAnimatorTests.cs`.

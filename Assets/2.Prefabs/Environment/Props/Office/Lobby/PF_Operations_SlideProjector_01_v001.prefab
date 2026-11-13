@@ -27,7 +27,7 @@ Transform:
   m_GameObject: {fileID: 588920736769362637}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.059, y: 0.203, z: 0.225}
+  m_LocalPosition: {x: -0.059, y: 0.203, z: 0.235}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -50,13 +50,13 @@ Light:
   m_InnerSpotAngle: 18
   m_CookieSize2D: {x: 0.5, y: 0.5}
   m_Shadows:
-    m_Type: 0
+    m_Type: 2
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 1
+    m_Strength: 0.85
     m_Bias: 0.05
     m_NormalBias: 0.4
-    m_NearPlane: 0.2
+    m_NearPlane: 0.1
     m_CullingMatrixOverride:
       e00: 1
       e01: 0
@@ -110,7 +110,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
-  m_UsePipelineSettings: 1
+  m_UsePipelineSettings: 0
   m_AdditionalLightsShadowResolutionTier: 2
   m_CustomShadowLayers: 0
   m_LightCookieSize: {x: 1, y: 1}
@@ -138,6 +138,7 @@ GameObject:
   - component: {fileID: 6371322800844165840}
   - component: {fileID: 4492436073916153415}
   - component: {fileID: 3055268976166831676}
+  - component: {fileID: 2175407666242904693}
   m_Layer: 0
   m_Name: PF_Operations_SlideProjector_01_v001
   m_TagString: Untagged
@@ -218,3 +219,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &2175407666242904693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8970311538062077086}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce367da19f176fa4bbf244da8ebeb103, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PropEmissiveAnimator
+  settings:
+    wave: 0
+    period: 1
+    min: 1
+    max: 1
+    pulseAttack: 0.15
+    noiseAmount: 0.05
+    noiseFrequency: 9
+    dipInterval: 18
+    dipDuration: 0.08
+    dipDepth: 0.25
+  lightsFollow: 1
+  useUnscaledTime: 0
