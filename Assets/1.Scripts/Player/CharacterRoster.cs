@@ -19,7 +19,7 @@ public class CharacterRoster : ScriptableObject
         [Tooltip("공용 캐릭터 색 — UI 틴트용. 지금은 특성 카드 기본 공격 슬롯 틴트만 쓴다.")]
         [DataTableIgnore]
         [SerializeField] private Color themeColor = Color.white;
-        [Tooltip("작은 초상화 칸(로비 플레이어 슬롯·로비 결과 행)에서 얼굴만 보이게 할 크롭 — 얼굴 가운데(스프라이트 비율 좌표)·보일 영역 크기(스프라이트 너비 배수). 캐릭터 선택 카드는 안 씀.")]
+        [Tooltip("작은 초상화 칸(로비 플레이어 슬롯·5.ResultScene 행)에서 얼굴만 보이게 할 크롭 — 얼굴 가운데(스프라이트 비율 좌표)·보일 영역 크기(스프라이트 너비 배수). 캐릭터 선택 카드는 안 씀.")]
         [DataTableIgnore]
         [SerializeField] private PortraitFaceCrop faceCrop = PortraitFaceCrop.Full;
 

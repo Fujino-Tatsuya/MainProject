@@ -72,7 +72,7 @@ public sealed class ResultPlayerRowView : MonoBehaviour
             Sprite portrait = character != null ? character.Portrait : null;
             portraitImage.sprite = portrait;
             portraitImage.enabled = portrait != null;
-            // 부모에 RectMask2D 가 있는 칸(로비 결과 행·5.ResultScene 행)만 얼굴 크롭 — 없으면 그대로(할 일 276 후속)
+            // 부모에 RectMask2D 가 있는 칸(5.ResultScene 행)만 얼굴 크롭 — 로비 결과 행은 초상화 없음 — 없으면 그대로(할 일 276 후속)
             PortraitFaceCrop.Apply(portraitImage, character != null ? character.FaceCrop : PortraitFaceCrop.Full);
         }
 

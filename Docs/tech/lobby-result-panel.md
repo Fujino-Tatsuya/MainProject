@@ -76,7 +76,7 @@
   | `counterBase` | 1.15 | 간파 1회마다 곱하는 밑 |
   | `counterMultiplierCap` | 4.0 | 간파 배수 상한 |
 
-- 행 프리팹 자식: `Cell_Rank`(`Text_Rank`·`Image_Crown`) · `Cell_Player`(`PortraitMask`(RectMask2D 84×84)/`Image_Portrait` — 얼굴 크롭, [character-select-panel.md](character-select-panel.md) "초상화 일러스트" · `Text_Character`) · `Text_Damage` · `Text_Healing` · `Text_Counters` · `Text_DamageTaken` · `Text_Deaths`.
+- 행 프리팹 자식: `Cell_Rank`(`Text_Rank`·`Image_Crown`) · `Cell_Player`(`Text_Character` 칸 가득 가운데 — 초상화 없음, 11-13 사용자 결정) · `Text_Damage` · `Text_Healing` · `Text_Counters` · `Text_DamageTaken` · `Text_Deaths`.
   `ResultPlayerRowView` 의 새 참조(`healingText`·`damageTakenText`·`rankText`·`crownImage`)는 비어 있으면 무시된다 — 5.ResultScene 행은 그대로.
 
 ## 레이아웃 (목업 `UI_Panel/Mockups~/05_BattleResults_with_text.png` 와 다른 점)

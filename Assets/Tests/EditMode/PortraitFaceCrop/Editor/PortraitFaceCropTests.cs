@@ -55,14 +55,26 @@ public sealed class PortraitFaceCropTests
         }
     }
 
+    // 로비 결과 행은 초상화 없음(11-13 사용자 프리팹 수정) — 참조가 비어도 Bind 가 오류 없이 이름을 채운다.
     [Test]
-    public void LobbyResultRow_PortraitIsInsideRectMask()
+    public void LobbyResultRow_HasNoPortrait_BindWorksWithoutIt()
     {
-        var go = AssetDatabase.LoadAssetAtPath<GameObject>(RowPrefab);
-        var img = go.transform.Find("Cell_Player/PortraitMask/Image_Portrait");
-        Assert.That(img, Is.Not.Null);
-        Assert.That(img.parent.GetComponent<RectMask2D>(), Is.Not.Null);
-        Assert.That(((RectTransform)img.parent).sizeDelta, Is.EqualTo(new Vector2(84f, 84f)));
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RowPrefab);
+        Assert.That(prefab.GetComponentsInChildren<Image>(true), Has.None.Matches<Image>(i => i.name == "Image_Portrait"));
+        Assert.That(new SerializedObject(prefab.GetComponent<ResultPlayerRowView>()).FindProperty("portraitImage").objectReferenceValue, Is.Null);
+
+        var go = Object.Instantiate(prefab);
+        try
+        {
+            var roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
+            var view = go.GetComponent<ResultPlayerRowView>();
+            Assert.DoesNotThrow(() => view.Bind(1, default, roster.Entries[0], true));
+            Assert.That(go.transform.Find("Cell_Player/Text_Character").GetComponent<TMPro.TMP_Text>().text, Is.EqualTo(roster.Entries[0].DisplayName));
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
     }
 
     // 5.ResultScene 행: 레이아웃 칸 안 고정 64×64 마스크(레이아웃이 마스크 크기를 정하지 않음 — Bind 순간에도 크기 확정).
