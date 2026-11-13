@@ -31,7 +31,8 @@ public enum LobbyTutorialAdvanceResult : byte
 /// <item>모든 기록(명단·라커 방문)은 clientId 기준 — 캐릭터 교체(PlayerObject 디스폰·재스폰)로 지워지지 않는다(PLAN §10.2). 연결 종료만 지운다.</item>
 /// <item>라커 방문: LockerVisit 단계 동안 참여자만, 1인 1회 누적(나갔다 와도 유지). 회차 = 모델 인스턴스 — 새 회차는 새 인스턴스.
 /// 완료 = 스폰 완료 참여자 전원 방문(<see cref="AllSpawnedParticipantsVisitedLocker"/>, 커밋 ③).
-/// 할 일 251: 방문 = 볼륨 안에 행 holdSeconds(기본 2초, 서버 시각) 연속 머묾(<see cref="ReportLockerPresence"/>) — 그 전에 나가면 그 사람 타이머만 리셋.</item>
+/// 할 일 251: 방문 = 볼륨 안에 행 holdSeconds(기본 2초, 서버 시각) 연속 머묾(<see cref="ReportLockerPresence"/>) — 그 전에 나가면 그 사람 타이머만 리셋.
+/// 할 일 281: 캐릭터 선택 패널을 열어도 바로 방문(<see cref="ReportCharacterPanelOpened"/>) — 둘 중 하나면 그 사람 통과.</item>
 /// <item>출격 확정: <see cref="TryCommitLaunch"/> 회차마다 1회. 확정 뒤엔 로딩 행으로만 전이한다(<see cref="LobbyTutorialAdvanceResult.LaunchLocked"/>).</item>
 /// <item>재접속(할 일 157 ⑩, Q-T2 A): 연결 종료 때 <see cref="RemoveClient"/> 에 사용자 키(playerId)를 넘기면 그 사람의 명단 소속·라커 방문을 회차 안에 보관하고,
 /// 같은 키로 새 clientId 가 접속하면 <see cref="TryRebind"/> 가 새 clientId 로 옮긴다(훈련 처음부터 재실행·다른 사람 기록 초기화 없음). 키가 없거나 보관 기록이 없으면 늦은 참가자.</item>
@@ -240,6 +241,19 @@ public sealed class LobbyTutorialFlow
 
         _lockerEnteredAt.Remove(clientId);
         return MarkLockerVisited(clientId);
+    }
+
+    /// <summary>
+    /// [서버] 캐릭터 선택 패널 열기 보고(할 일 281) — 머묾 시간 없이 바로 방문으로 센다(L00 통과 = 패널 열기 OR 볼륨 연속 머묾).
+    /// 보고 때의 (runId, revision) 이 지금과 같을 때만 — 지난 회차·지난 단계에 연 패널은 버린다. 확정한 호출만 true.
+    /// </summary>
+    public bool ReportCharacterPanelOpened(ulong clientId, int runId, int revision)
+    {
+        if (runId != _snapshot.RunId || revision != _snapshot.Revision || !MarkLockerVisited(clientId))
+            return false;
+
+        _lockerEnteredAt.Remove(clientId);
+        return true;
     }
 
     public bool HasVisitedLocker(ulong clientId) => _lockerVisited.Contains(clientId);
