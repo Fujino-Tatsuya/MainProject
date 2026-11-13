@@ -111,7 +111,19 @@
   - 판단은 순수 `CharacterSelectPanelRules` — `InfoPopup`(`CharacterSelectInfoTab` None/Basic/Core)·`OpenInfoPopup`·`CloseInfoPopup`·`Escape`(→ `CharacterSelectEscapeResult` Ignored/ClosedPopup/ClosedPanel).
     팝업이 열린 동안 `MoveFocus`·`FocusCard` 는 false, `Confirm` 은 `PopupOpen`(이벤트·닫힘 없음).
   - 다시 만들기 = 메뉴 `Tools/UI/Authoring/Character Select Info Tabs·Popup (추가·연결)`(`CharacterSelectPanelAuthoring.EnsureInfoTabsAndPopup`, 이미 있으면 연결만). `(재생성)` 메뉴도 같이 만든다.
-- 폰트 = `NotoSansKR-VariableFont_wght SDF`(목업 폰트 없음) — 목업보다 얇다. 초상화는 로스터 `Portrait`(지금 HUD 가로 초상화·어쌔신은 임시 jpg).
+- 폰트 = `NotoSansKR-VariableFont_wght SDF`(목업 폰트 없음) — 목업보다 얇다. 초상화는 로스터 `Portrait` = 상반신 일러스트(할 일 276, 아래 "초상화 일러스트").
+
+
+## 초상화 일러스트 (할 일 276)
+- 원본 = SVN `Assets/50.Art/UI/char_select/Portraits/Portraits/{Paladin,Gunner,Assassin}_Unmasked.png`(투명 배경 상반신, 1254px 정사각, r677).
+  임포트 = Sprite(Single)·알파 투명·Max 1024·고품질 압축(PC = BC7)·밉맵 켬(옆 카드·로비 슬롯처럼 줄여 보이는 곳 대비) → 장당 GPU 약 1.33MB(3장 4MB).
+  로스터 `CharacterRoster.asset` 세 칸 `portrait` 가 이 그림이다(예전 HUD `portrail_*`·카톡 jpg 는 연결 끊음, 파일은 그대로).
+- 카드 마스크 `Portraits/Masks/Card_Mask_1x.png` 는 기존 `card_selected_fill_tint.png`(카드 `Clip` Mask 그래픽)와 **알파가 픽셀 단위로 같다**(624×489, 차이 0) → `Clip` 은 그대로 두고 마스크 파일은 연결하지 않았다(2x 도 같은 실루엣의 두 배 해상도). 임포트만 Alpha8(1x 298KB·2x 1.2MB, 참조가 없어 빌드에 안 들어감).
+- 카드 초상화 자리 = 카드 프리팹 `Clip/Image_Portrait` **760×760·(-55, -255)**(preserveAspect) — 얼굴이 이름 글자 띠(`Text_Name` y 70~154) 아래·카드 가운데쯤, 머리~가슴이 보인다.
+  `Card_Template` 은 이 값을 그대로 물려받는다(덮어쓴 값 없음) — 더 고칠 땐 지금처럼 `Card_Template` 의 `Clip/Image_Portrait` 에서 고친다. 저작 메뉴(`CharacterSelectPanelAuthoring`) 기본값도 같은 값.
+  한계: 아래 카드(`nextSlot`)는 화면에 카드 로컬 y 12 위만 보여 머리 윗부분만 보인다(이름은 보임).
+- 이름판 `nameplatePortrait` 는 162 후속 사용자 결정대로 **연결 없음**을 유지(`CharacterSelectUiPolishTests` 가 확인). 다시 켜려면 `Content/Nameplate/PortraitSlot/Image_Portrait`(원형 Mask 160) 를 연결하고 크기 ≈ 330×330·위치 ≈ (-10, -70) 이면 얼굴이 원 안에 든다(오프라인 합성 미리보기 기준).
+- 같은 `Portrait` 를 쓰는 곳: 로비 플레이어 슬롯(`LobbyPlayerSlotView` — 100×100 preserveAspect, 로비 씬 `PlayerSlot_*/Portrait`)·결과 행(`ResultPlayerRowView` — `LobbyResultPlayerRow` 84×84). 둘 다 전신이 통째로 줄어 얼굴이 아주 작다 — 얼굴 확대(크롭 Mask) 또는 별도 아이콘 칸은 미정.
 
 ## 조작
 | 입력 | 동작 |
