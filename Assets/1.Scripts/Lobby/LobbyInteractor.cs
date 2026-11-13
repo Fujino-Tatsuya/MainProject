@@ -124,6 +124,10 @@ public sealed class LobbyInteractor : MonoBehaviour
                 var characterId = GetLocalCharacterId(session);
                 Debug.Log($"[SceneFlow] {Tag} F: 캐릭터 선택 패널 열기 (current={characterId} locked={locked})", this);
                 characterSelectPanel.Show(characterId, locked);
+                // L00 통과 조건(할 일 281) — 패널 열기도 라커 방문으로 센다. 판정은 서버.
+                var training = LobbyTrainingDirector.Active;
+                if (training != null && training.IsSpawned)
+                    training.ReportCharacterPanelOpened();
                 break;
         }
     }

@@ -23,7 +23,7 @@
 
 | # | StateId | Kind / Activity | 완료 조건(서버) | 지점·키 |
 |---|---|---|---|---|
-| 0 | L00_LockerVisit | LockerVisit | 스폰 완료 참여자 전원이 라커룸 `Area_Locker` 에 한 번씩(누적, 2초 연속 머묾 — 251) | 경로 `PATH_LOCKER` |
+| 0 | L00_LockerVisit | LockerVisit | 스폰 완료 참여자 전원이 각자 한 번씩(누적) — 라커룸 `Area_Locker` 에 2초 연속 머묾(251) **또는** 캐릭터 선택 패널 열기(281) | 경로 `PATH_LOCKER` |
 | 1 | L10_CentralGather | Gather | 중앙 전원 집결 0.3초 → **훈련 명단 고정** | `Brief`(`Gather_Brief`) |
 | 2 | L11_CentralIntro | Dialogue | 대사 끝 시각 | `LOBBY_DLG_INTRO` |
 | 3 | L20_TrainingGather | Gather | 입구 전원 집결 → 명단 전원 훈련장 안으로 텔레포트 → 바로 L21 | `Entrance`(`Gather_Entrance`) |
@@ -83,6 +83,7 @@
 - 라커룸 내부 박스 `Area_Locker`(`LobbyAreaVolume`)를 서버가 매 프레임 폴링 — 본체 기준점·높이 범위·쓰러짐 규칙은 집결 구역과 같다. 다른 층은 불인정.
 - 누적 방문 Set(clientId) — 시작 때 이미 안에 있으면 인정, 재진입은 1회. 스폰 완료 참여자 전원 방문 → L10. 볼륨 칸이 비면 오류 로그 1회 후 자동 통과(머묾 없이).
 - **방문 = 박스 안에 2초 연속 머묾**(할 일 251): 시간은 단계표 L00 행 `holdSeconds`(기본 2, 서버 시각). 2초 전에 나가거나 디스폰·연결 종료되면 그 사람 타이머만 리셋(다시 들어오면 처음부터). 서버 판정만 — 새 RPC·복제 값 없음. 모델 `LobbyTutorialFlow.ReportLockerPresence`, EditMode `LobbyTutorialFlowTests`(라커_머묾_*).
+- **패널 열기도 방문**(할 일 281): 캐릭터 선택 패널을 열면(F) 머묾 시간 없이 바로 그 사람 방문 — 통과 = 2초 머묾 OR 패널 열기, 사람마다 따로·전원 충족이면 L10(파티 규칙 그대로). 패널은 로컬 UI 라 오너가 연 순간 신호 1개 `LobbyTrainingDirector.ReportCharacterPanelOpenedServerRpc(runId, revision)`(L00 동안만 보냄, 새 복제 값 없음) — 서버가 단계·참여자·회차/revision 을 보고 `LobbyTutorialFlow.ReportCharacterPanelOpened` 로 방문 처리(지난 단계 보고는 버림). 영역 재검사는 안 한다(패널은 영역 안에서만 열린다). EditMode `LobbyTutorialFlowTests`(패널_*).
 - **캐릭터 선택도 같은 영역**이다(161): 라커룸 박스 안이면 F 프롬프트 → 선택 패널(표식 `CharacterSelectStation` 은 라커룸 가운데). EditMode `LobbyCharacterSelectAreaTests`·`LobbyLockerVisitTests`.
 
 ### 중앙 집결 (L10) → 소개 대사 (L11)
@@ -260,7 +261,7 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 
 `0.BootStrapScene` Play → START → 로비. 로그 태그 `[LobbyTraining]`. 회귀 기준 EditMode = Lobby 테스트 24파일(`Assets/Tests/EditMode/Lobby/Editor/`).
 
-- [ ] L00: 라커룸에 들어가 2초 머물면 방문(2초 전에 나가면 안 됨, 2인이면 둘 다 머물러야 L10). 라커 안에서 F → 캐릭터 교체 가능(이후 어느 단계든 가능)
+- [ ] L00: 라커룸에 들어가 2초 머물거나 F 로 캐릭터 선택 패널을 열면 방문(2초 전에 나가면 안 됨, 2인이면 둘 다 각자 충족해야 L10 — 281). 라커 안에서 F → 캐릭터 교체 가능(이후 어느 단계든 가능)
 - [ ] L10→L11: 중앙 집결 즉시(0.3초) 확정 → 감독관 소개 대사 → 끝나면 L20
 - [ ] L20→L21: 입구 집결 → 훈련장 안으로 텔레포트(재집결 없음) → 훈련 대사 동안 표적 없음
 - [ ] T10: 6항목(기본 공격·Q·E·R·우클릭·대시) 각자 체크, 둘 다 끝나야 다음

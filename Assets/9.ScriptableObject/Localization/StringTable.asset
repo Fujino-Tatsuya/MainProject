@@ -327,15 +327,11 @@ MonoBehaviour:
   - key: UI.TrainingDummy.Hp
     ko: '{hp} / {max}'
     en: '{hp} / {max}'
-  - key: UI.Loading.Tip1
-    ko: "\uC73C\uC544\u314F\u314F\u314F\u314F"
-    en: Waaaaaah
-  - key: UI.Loading.Tip2
-    ko: "\uCEE4\uD53C\u3163\u3163\u3163\u3163"
-    en: Coffeeeee
-  - key: UI.Loading.Tip3
-    ko: "\uBC25 \uBB50 \uBA39\uC9C0...."
-    en: What's for lunch....
+  - key: UI.Loading.TipDashInterrupt
+    ko: "Tip. \uAC04\uD30C\uB294 \uC900\uBE44 \uB3D9\uC791\uC774 \uC788\uC2B5\uB2C8\uB2E4...
+      \uB300\uC26C\uC640 \uAC04\uD30C\uB97C \uB3D9\uC2DC\uC5D0 \uC4F4\uB2E4\uBA74....?"
+    en: Tip. Interrupt has a wind-up... What if you dash and interrupt at the same
+      time....?
   - key: UI.Loading.Ready1
     ko: "\uC785\uC7A5 \uC911..."
     en: Enter...
