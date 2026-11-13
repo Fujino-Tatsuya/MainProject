@@ -244,7 +244,7 @@ public sealed class PlayerBasicAttackInputRulesTests
     private static bool SimulateMeleeStep(
         PlayerInputBuffer buffer, float stepStart, float windowOpen, float windowClose, float stepEnd,
         bool attackHeld, ref bool finishingChain, float skillPressAt = -1f,
-        PlayerBufferedInput skill = PlayerBufferedInput.None)
+        PlayerBufferedInput skill = PlayerBufferedInput.None, PlayerSkillReservation reservation = null)
     {
         const float frame = 1f / 60f;
         bool queued = false;
@@ -254,15 +254,27 @@ public sealed class PlayerBasicAttackInputRulesTests
                 buffer.Record(skill, t);
 
             bool skillAlive = false;
+            PlayerBufferedInput aliveKind = PlayerBufferedInput.None;
             foreach (PlayerBufferedInput kind in new[] {
                          PlayerBufferedInput.SkillMain, PlayerBufferedInput.SkillSub,
                          PlayerBufferedInput.SkillInterrupt, PlayerBufferedInput.SkillUltimate })
-                skillAlive |= buffer.ContainsAbove(kind, PlayerBufferedInput.Attack, t);
+            {
+                if (!buffer.ContainsAbove(kind, PlayerBufferedInput.Attack, t) || skillAlive)
+                    continue;
+                skillAlive = true;
+                aliveKind = kind;
+            }
 
             if (PlayerBasicAttackInputRules.ShouldFinishChainForBufferedSkill(false, skillAlive, true, false, false))
             {
                 finishingChain = true;
                 queued = false; // 오너 래치가 받은 예약도 지운다(FinishWithoutChaining — 할 일 256부터 체인은 오너 주도)
+                // 할 일 280 — 마무리를 건 스킬 입력은 공격 뒤 예약으로 옮긴다(TryFinishAttackForBufferedSkill, 만료 없음).
+                if (reservation != null)
+                {
+                    reservation.Reserve(aliveKind);
+                    buffer.Remove(aliveKind);
+                }
             }
 
             bool inWindow = t >= windowOpen && t <= windowClose;
@@ -306,6 +318,28 @@ public sealed class PlayerBasicAttackInputRulesTests
 
         // 이 타가 끝난 첫 틱(Idle) — 꺼낼 입력은 Q.
         Assert.That(buffer.Peek(1.10f), Is.EqualTo(PlayerBufferedInput.SkillMain), "현재 타가 끝난 첫 틱에 Q 시작");
+    }
+
+    // 할 일 280 제보 — 좌클릭 홀드 평타 중 타 초반에 스킬: 이 타 남은 시간(0.5초) > 버퍼 0.2초.
+    // 예전(버퍼만): 체인은 끊겼는데 Q 는 만료 → 평타도 멈추고 스킬도 안 나감(가붕이·어쌔신은 홀드 시작이 아님).
+    // 지금: 마무리를 건 입력을 공격 뒤 예약으로 옮겨 만료 없이 들고 있다가 Idle 첫 틱에 쓴다.
+    [Test]
+    public void MeleeHold_SkillPressedEarlyInSwing_OutlivesBuffer_ViaReservation()
+    {
+        var oldBuffer = CreatePrioritizedBuffer();
+        bool oldFinishing = false;
+        bool oldChained = SimulateMeleeStep(oldBuffer, 0.55f, 0.85f, 1.00f, 1.10f, true, ref oldFinishing,
+            skillPressAt: 0.60f, skill: PlayerBufferedInput.SkillMain);
+        Assert.That(oldChained, Is.False, "재현: 체인 종료");
+        Assert.That(oldBuffer.Peek(1.10f), Is.EqualTo(PlayerBufferedInput.None), "재현: 버퍼만이면 Q 가 만료돼 아무것도 안 나감");
+
+        var buffer = CreatePrioritizedBuffer();
+        var reservation = new PlayerSkillReservation();
+        bool finishing = false;
+        bool chained = SimulateMeleeStep(buffer, 0.55f, 0.85f, 1.00f, 1.10f, true, ref finishing,
+            skillPressAt: 0.60f, skill: PlayerBufferedInput.SkillMain, reservation: reservation);
+        Assert.That(chained, Is.False, "체인 종료(이 타로 마무리)");
+        Assert.That(reservation.Reserved, Is.EqualTo(PlayerBufferedInput.SkillMain), "이 타가 끝난 첫 틱에 예약한 Q 시작");
     }
 
     [Test]
