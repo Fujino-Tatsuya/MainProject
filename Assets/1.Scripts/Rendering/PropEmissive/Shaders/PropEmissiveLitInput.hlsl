@@ -45,9 +45,9 @@ half _FlickerFreq;
 half _GlitchInterval;
 half _GlitchDuration;
 half _GlitchStrength;
-float4 _ButtonGrid;
-half _ButtonOffLevel;
-half _ButtonSpeed;
+half _ButtonPeriod;
+half _ButtonMin;
+half _ButtonMax;
 UNITY_TEXTURE_STREAMING_DEBUG_VARS;
 CBUFFER_END
 

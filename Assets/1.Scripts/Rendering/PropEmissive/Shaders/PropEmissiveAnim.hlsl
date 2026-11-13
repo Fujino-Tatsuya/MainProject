@@ -1,5 +1,5 @@
 // 277 프랍 이미시브 애니(시간 기반) — PropEmissiveLitInput.hlsl 끝에서 include.
-// 마스크(_EmissionMap) A 채널로 영역을 고른다: >0.75 = CRT 화면, 0.25~0.75 = 패널 버튼, 그 외 = 기존 정적 이미시브.
+// 마스크(_EmissionMap) A 채널로 영역을 고른다: >0.75 = CRT 화면, 0.25~0.75 = 패널 버튼(공통 숨쉬기), 그 외 = 기존 정적 이미시브.
 // 인스턴스 시드 = 오브젝트 원점 위치 해시(MPB 없음 → SRP Batcher 유지). 각 피어 로컬 표시 전용.
 #ifndef PROP_EMISSIVE_ANIM_INCLUDED
 #define PROP_EMISSIVE_ANIM_INCLUDED
@@ -108,20 +108,18 @@ float PE_Screen(float2 s, float seed, float t)
     return max(c, 0.0);
 }
 
-float PE_Button(float id, float t)
+// 버튼 공통 숨쉬기 — 사인(0.5-0.5cos), t=0 위상에서 최소. 데스크마다 위상만 0~0.25주기 어긋남.
+float PE_ButtonBreathe(float t, float seed)
 {
-    t *= _ButtonSpeed;
-    float kind = PE_Hash11(id * 1.7 + 0.3);
-    float ph = PE_Hash11(id * 5.3 + 0.7);
-    float on;
-    if (kind < 0.22) on = 1.0;                                                          // 계속 켜짐
-    else if (kind < 0.5) { float per = lerp(1.6, 3.2, ph); on = step(frac(t / per + ph), 0.5); }   // 느린 점멸
-    else if (kind < 0.75) { float per = lerp(0.35, 0.7, ph); on = step(frac(t / per + ph), 0.5); } // 빠른 점멸
-    else { float hold = lerp(0.6, 2.2, ph); on = step(0.4, PE_Hash11(floor(t / hold + ph) * 1.31 + id)); } // 무작위 켜짐/꺼짐
-    return lerp(_ButtonOffLevel, 1.0, on);
+    float ph = frac(seed * 0.618034) * 0.25;
+    float w = 0.5 - 0.5 * cos(6.2831853 * (t / max(_ButtonPeriod, 0.05) + ph));
+    return lerp(_ButtonMin, _ButtonMax, w);
 }
 
-half3 PE_AnimatedEmission(float2 uv, float3 positionWS, half3 staticEmission)
+// 마스크 버튼 색(빨강·초록)의 휘도를 같게 맞춘다 — 색상은 유지, 세기만 통일.
+static const float PE_ButtonLuma = 0.6;
+
+half3 PE_AnimatedEmission(float2 uv, half3 staticEmission)
 {
     half4 m = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, uv);
     float t = fmod(_Time.y, 1800.0);
@@ -133,12 +131,8 @@ half3 PE_AnimatedEmission(float2 uv, float3 positionWS, half3 staticEmission)
     }
     if (m.a > 0.25)
     {
-        float3 pos = TransformWorldToObject(positionWS);
-        float side = pos.x > 0.0 ? 1.0 : 0.0;
-        float cx = round((abs(pos.x) - _ButtonGrid.x) / _ButtonGrid.z);
-        float cz = round((pos.z - _ButtonGrid.y) / _ButtonGrid.w);
-        float id = side * 31.0 + cx * 7.0 + cz * 3.0 + seed * 13.0;
-        return m.rgb * _EmissionColor.rgb * PE_Button(id, t);
+        half3 hue = m.rgb * (PE_ButtonLuma / max(dot(m.rgb, half3(0.2126, 0.7152, 0.0722)), 1e-3));
+        return hue * _EmissionColor.rgb * PE_ButtonBreathe(t, seed);
     }
     return staticEmission;
 }

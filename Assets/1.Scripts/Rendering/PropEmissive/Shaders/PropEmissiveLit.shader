@@ -50,9 +50,9 @@ Shader "VeyTrace/Prop Emissive Lit"
         _GlitchDuration("지직 길이 (초)", Range(0, 1)) = 0.18
         _GlitchStrength("지직 세기", Range(0, 2)) = 1
         [Header(Panel Buttons)]
-        _ButtonGrid("버튼 격자 (|x| 기준, z 기준, x 간격, z 간격) 오브젝트 공간", Vector) = (0.766, -0.019, 0.087, 0.087)
-        _ButtonOffLevel("버튼 꺼짐 밝기", Range(0, 1)) = 0.06
-        _ButtonSpeed("버튼 점멸 속도 배율", Range(0.1, 4)) = 1
+        _ButtonPeriod("버튼 숨쉬기 주기 (초)", Range(0.5, 10)) = 3
+        _ButtonMin("버튼 최소 밝기", Range(0, 1)) = 0.35
+        _ButtonMax("버튼 최대 밝기", Range(0, 2)) = 1
 
         _DetailMask("Detail Mask", 2D) = "white" {}
         _DetailAlbedoMapScale("Scale", Range(0.0, 2.0)) = 1.0

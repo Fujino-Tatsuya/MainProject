@@ -1,12 +1,8 @@
-// 277 — URP LitForwardPass.hlsl 복제. 바뀐 곳: 월드 위치 보간 항상 켬 + 프래그먼트에서 PE_AnimatedEmission 호출(두 줄).
+// 277 — URP LitForwardPass.hlsl 복제. 바뀐 곳: 프래그먼트에서 PE_AnimatedEmission 호출(한 줄).
 #ifndef UNIVERSAL_FORWARD_LIT_PASS_INCLUDED
 #define UNIVERSAL_FORWARD_LIT_PASS_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-
-#ifndef REQUIRES_WORLD_SPACE_POS_INTERPOLATOR
-#define REQUIRES_WORLD_SPACE_POS_INTERPOLATOR
-#endif
 
 #if defined(LOD_FADE_CROSSFADE)
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
@@ -248,7 +244,7 @@ void LitPassFragment(
 
     SurfaceData surfaceData;
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
-    surfaceData.emission = PE_AnimatedEmission(input.uv, input.positionWS, surfaceData.emission);
+    surfaceData.emission = PE_AnimatedEmission(input.uv, surfaceData.emission);
 
 #ifdef LOD_FADE_CROSSFADE
     LODFadeCrossFade(input.positionCS);

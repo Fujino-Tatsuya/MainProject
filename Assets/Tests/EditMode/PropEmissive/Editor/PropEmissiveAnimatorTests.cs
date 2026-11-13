@@ -107,6 +107,19 @@ public sealed class PropEmissiveAnimatorTests
         Assert.That(mat.GetTexture("_ScreenTex"), Is.Not.Null, path);
     }
 
+    // 데스크 버튼 = 12개 공통 숨쉬기(개별 패턴 칸 없음), 꺼지지 않게 최소 > 0.
+    [Test]
+    public void DeskButtons_CommonBreatheFields()
+    {
+        var go = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/2.Prefabs/Environment/Props/Furniture/Lobby/PF_ControlRoom_Desk_01_v003.prefab");
+        var mat = go.GetComponentInChildren<MeshRenderer>().sharedMaterial;
+        Assert.That(mat.GetFloat("_ButtonPeriod"), Is.EqualTo(3f).Within(1e-4f));
+        Assert.That(mat.GetFloat("_ButtonMin"), Is.EqualTo(0.35f).Within(1e-4f));
+        Assert.That(mat.GetFloat("_ButtonMax"), Is.EqualTo(1f).Within(1e-4f));
+        foreach (var old in new[] { "_ButtonGrid", "_ButtonOffLevel", "_ButtonSpeed" })
+            Assert.That(mat.shader.FindPropertyIndex(old), Is.EqualTo(-1), old);
+    }
+
     [Test]
     public void ProjectorSpot_IsRealtimeSoftShadow()
     {
