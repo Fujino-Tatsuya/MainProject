@@ -72,7 +72,7 @@
 |---|---|
 | 추가 | 루트 `LobbyTutorialUI` 인스턴스(바인더 포함, 오버라이드 = 루트 RectTransform·이름만) |
 | 추가 | 루트 `LobbyTutorialMarkers` 인스턴스 — `legacyGuideRoots` = 씬 `LobbyGuideSteps` 루트, `GatherBorders.lockerArea` = 씬 `Area_Locker` BoxCollider(173), 경로 7개 점 + 구운 조각 |
-| 비활성(삭제 아님) | `UI/Canvas/Panel_PlayerSlots`(상단 파티 슬롯) · `Slot_GatherStatus`(상단 집결 n/N) · `Slot_WeaponCheck`(왼쪽 무기 점검) · `Slot_Train02`(남은 상대) |
+| 비활성(삭제 아님) | ~~`UI/Canvas/Panel_PlayerSlots`(상단 파티 슬롯)~~ — 276 A안 저작 메뉴가 다시 켬([lobby-player-slots.md](lobby-player-slots.md)) · `Slot_GatherStatus`(상단 집결 n/N) · `Slot_WeaponCheck`(왼쪽 무기 점검) · `Slot_Train02`(남은 상대) |
 | 173 수정 | `Train03Arena/DesignatedWall_West_Marker` — 켬(렌더러는 `LobbyTutorialWallTarget` 이 끄고 켬)·x −19.67 → −19.855(실제 벽면 x −19.89 에 밀착)·아레나 `wallMarkers` 비움 |
 | 무수정 | `Gather_*`·`Area_Locker`·루트 `TutorialGuideUI`·`LobbyGuideSteps`·NavMesh |
 

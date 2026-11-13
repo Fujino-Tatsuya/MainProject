@@ -66,7 +66,9 @@
 ResultPlayerRow            RectTransform · ResultPlayerRowView · HorizontalLayoutGroup(권장) · LayoutElement(높이 고정)
 ├─ Marker_Local            Image(강조 배경) — 기본 비활성 · 레이아웃 무시(LayoutElement.ignoreLayout) 또는 맨 뒤 배경
 ├─ Text_Slot               TMP_Text
-├─ Image_Portrait          Image (preserveAspect)
+├─ Cell_Portrait           LayoutElement(폭 64) — 레이아웃 칸
+│  └─ PortraitMask         RectMask2D 64×64(가운데 고정) — 얼굴 크롭(276 후속, character-select-panel.md "초상화 일러스트")
+│     └─ Image_Portrait    Image — Bind 가 로스터 faceCrop 으로 키우고 옮김
 ├─ Text_Character          TMP_Text
 ├─ Text_Damage             TMP_Text
 ├─ Text_Kills              TMP_Text
