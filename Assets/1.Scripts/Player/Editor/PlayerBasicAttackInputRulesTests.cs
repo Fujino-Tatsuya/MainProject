@@ -54,6 +54,24 @@ public sealed class PlayerBasicAttackInputRulesTests
         Assert.That(assassin.GetComponent<AssassinBasicAttack>().StartsOnHold, Is.False, "어쌔신은 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
     }
 
+    // 할 일 280 — 가붕이 E(수호자의 의지)도 끝난 뒤 좌클릭 홀드로 평타를 잇는다. E 뗌·최대 유지 시간 종료 모두
+    // 해제 클립 End → Completed 로 끝나므로 같은 결과여야 한다. 대시·피격·사망 끊김은 안 잇는다.
+    [TestCase(SkillEndReason.Completed, true)]
+    [TestCase(SkillEndReason.Released, true)]
+    [TestCase(SkillEndReason.MaxDurationReached, false)]
+    [TestCase(SkillEndReason.Cancelled, false)]
+    [TestCase(SkillEndReason.CasterDied, false)]
+    [TestCase(SkillEndReason.DashCancelled, false)]
+    public void ResumeAfterSkill_PaladinE_ResumesOnNormalEnd(SkillEndReason reason, bool expected)
+    {
+        var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
+        var guard = paladin.GetComponentInChildren<FirstMeleeSubSkill>(true);
+        Assert.That(guard, Is.Not.Null, "가붕이 E 가 팔라딘 프리팹에 있다");
+        Assert.That(guard.ResumesBasicAttackOnHold, Is.True, "가붕이 E = 항상");
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(guard.ResumesBasicAttackOnHold, reason), Is.EqualTo(expected));
+        Assert.That(paladin.GetComponentInChildren<DefaultAttackController>(true).StartsOnHold, Is.False, "가붕이는 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
+    }
+
     // 변신 E(원형 5타)도 어쌔신 일반 E 와 같은 규칙 — 정상 종료(완료·홀드 해제)만 잇고 대시·피격·사망 끊김은 안 잇는다.
     [TestCase(SkillEndReason.Completed, true)]
     [TestCase(SkillEndReason.Released, true)]
