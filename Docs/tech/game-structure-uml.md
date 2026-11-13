@@ -1125,7 +1125,7 @@ sequenceDiagram
 - 배경 `Background` = `AspectRatioFitter` EnvelopeParent 1.7778(원본 `Loading_1110` 5760×3240 비율) — 꽉 채우고 비율 유지, 넘치는 쪽은 잘림.
 - 팁 `Text_Tooltip` = 위 가운데 앵커(0.5, 1) y −67. 진행 바 판 `progress fill`(1000×100) y 75 · 퍼센트 `Text_Percentage` y 90.63 · 상태 `Text_Status` y 50 = 아래 가운데 앵커(0.5, 0). 수치는 275 레이아웃(e89666e8)을 1920×1080 에서 그대로 옮긴 값이라 1080p 화면은 이전과 픽셀 단위로 같다.
 - 회귀 테스트 `Assets/Tests/EditMode/Loading/Editor/LoadingScreenLayoutTests.cs`. 새 요소를 넣을 땐 가까운 가장자리 앵커로 두고 1920×1080 기준 사각형 안에 둔다.
-- 알려진 점: `progress fill` 은 Image Type 이 Simple 이라 `fillAmount` 가 화면에 반영되지 않는다(지금은 퍼센트·상태 문구 뒤 어두운 판 역할).
+- 진행 바(283 후속, 사용자 결정 나안): `progress fill` = Image Type **Filled · Horizontal · Origin Left** — 퍼센트·상태 문구 뒤 어두운 판(색 20,22,28 α0.74) 자체가 `NetworkLoadingScreenView.ApplyProgress` 의 `fillAmount` 만큼 왼쪽부터 차오른다. 색·크기·위치·코드는 그대로. 씬 직렬화 fillAmount 1 은 편집 화면용(런타임 Awake 에서 0).
 
 ### 9.3 타이틀과 옵션
 

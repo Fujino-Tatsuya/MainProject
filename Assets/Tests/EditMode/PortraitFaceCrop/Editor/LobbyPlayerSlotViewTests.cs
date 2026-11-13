@@ -48,4 +48,49 @@ public sealed class LobbyPlayerSlotViewTests
         var dash = LobbyPlayerSlotView.StatusIconLayout(LobbySlotState.Disconnected);
         Assert.That(dash.size, Is.EqualTo(new Vector2(15f, 7f)));
     }
+
+    // 283 후속 — 슬롯 패널만 화면 크기에 맞춰 배율(Expand 규칙). 캔버스 크기는 캔버스 단위.
+    [TestCase(1920f, 1080f, 1f)]
+    [TestCase(1280f, 720f, 0.6666667f)]
+    [TestCase(3840f, 2160f, 2f)]
+    [TestCase(1920f, 1200f, 1f)]
+    [TestCase(2560f, 1080f, 1f)]
+    [TestCase(3440f, 1440f, 1.3333334f)]
+    [TestCase(1024f, 768f, 0.5333334f)]
+    public void ScreenFitScale_Factor_IsExpand(float w, float h, float expected)
+    {
+        Assert.That(ScreenFitScale.Factor(new Vector2(w, h), new Vector2(1920f, 1080f)), Is.EqualTo(expected).Within(1e-4f));
+    }
+
+    [Test]
+    public void ScreenFitScale_Factor_ZeroSizeIsOne()
+    {
+        Assert.That(ScreenFitScale.Factor(Vector2.zero, new Vector2(1920f, 1080f)), Is.EqualTo(1f));
+    }
+
+    [Test]
+    public void LobbyScene_SlotPanel_HasScreenFitScale()
+    {
+        const string path = "Assets/0.Scenes/MainFlow/3.LobbyScene.unity";
+        var scene = UnityEngine.SceneManagement.SceneManager.GetSceneByPath(path);
+        bool openedHere = !scene.isLoaded;
+        if (openedHere) scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(path, UnityEditor.SceneManagement.OpenSceneMode.Additive);
+        try
+        {
+            LobbyUIController controller = null;
+            foreach (var root in scene.GetRootGameObjects())
+                if ((controller = root.GetComponentInChildren<LobbyUIController>(true)) != null) break;
+            Assert.That(controller, Is.Not.Null);
+            var fit = controller.GetComponent<ScreenFitScale>();
+            Assert.That(fit, Is.Not.Null, "Panel_PlayerSlots 에 ScreenFitScale(저작 메뉴가 붙임)");
+            Assert.That(fit.ReferenceResolution, Is.EqualTo(new Vector2(1920f, 1080f)));
+            var rect = (RectTransform)controller.transform;
+            Assert.That(rect.localScale.x, Is.EqualTo(LobbyPlayerSlotsAuthoring.RootScale).Within(1e-5f), "씬 값 = 1920×1080 기준 스케일");
+            Assert.That(rect.anchorMin, Is.EqualTo(new Vector2(0.5f, 1f)));
+        }
+        finally
+        {
+            if (openedHere) UnityEditor.SceneManagement.EditorSceneManager.CloseScene(scene, true);
+        }
+    }
 }
