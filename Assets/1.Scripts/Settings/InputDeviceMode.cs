@@ -149,9 +149,17 @@ public sealed class InputDeviceModeDriver : MonoBehaviour
         s_instance = go.AddComponent<InputDeviceModeDriver>();
     }
 
-    private void OnEnable() => InputDeviceMode.Changed += ApplyCursor;
+    private void OnEnable()
+    {
+        InputDeviceMode.Changed += ApplyCursor;
+        InputDeviceMode.Changed += GamepadUiFocus.HandleModeChanged;
+    }
 
-    private void OnDisable() => InputDeviceMode.Changed -= ApplyCursor;
+    private void OnDisable()
+    {
+        InputDeviceMode.Changed -= ApplyCursor;
+        InputDeviceMode.Changed -= GamepadUiFocus.HandleModeChanged;
+    }
 
     private void OnDestroy()
     {
@@ -160,6 +168,9 @@ public sealed class InputDeviceModeDriver : MonoBehaviour
     }
 
     private void Update() => InputDeviceMode.Tick();
+
+    // 패널들이 Update 에서 열고 닫은 뒤에 첫 선택을 건다(할 일 278 2단계).
+    private void LateUpdate() => GamepadUiFocus.Tick();
 
     // 바뀔 때만 쓴다 — 다른 곳(설정창 등)이 정한 커서 상태를 매 프레임 덮지 않는다.
     private static void ApplyCursor(InputDeviceKind kind) => Cursor.visible = kind != InputDeviceKind.Gamepad;

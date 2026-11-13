@@ -64,6 +64,7 @@ public sealed class PauseMenuView : MonoBehaviour
     {
         SetActive(menuRoot, true);
         SetActive(exitRoot, false);
+        GamepadUiFocus.SelectNowIfGamepad(continueButton); // 패드 첫 선택 = 계속(할 일 278)
     }
 
     /// <summary>메뉴·팝업 둘 다 숨김 — 설정창이 떠 있는 동안.</summary>
@@ -83,6 +84,7 @@ public sealed class PauseMenuView : MonoBehaviour
         SetActive(confirmButton != null ? confirmButton.gameObject : null, false);
         SetActive(desktopSelectedRing, false);
         SetActive(lobbySelectedRing, false);
+        GamepadUiFocus.SelectNowIfGamepad(lobbyButton); // 패드 첫 선택 = 타이틀(바탕화면 종료보다 덜 되돌릴 수 없는 쪽, 할 일 278)
         ApplyTexts();   // 활성화 뒤 — LocalizedText.OnEnable 이 저작 글자로 덮은 다음에 넣는다
     }
 

@@ -131,6 +131,9 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     [SerializeField, Min(0f)] private float choiceFailNoticeSeconds = 2f;
     [SerializeField] private Color pendingTextColor = new Color(0.85f, 0.9f, 1f, 1f);
 
+    // 패드 왼쪽 스틱을 이만큼 기울이면 이동 키를 누른 것으로 본다(할 일 278).
+    private const float GamepadStickNavThreshold = 0.5f;
+
     private static int s_openCount;
     private static int s_escapeClaimedFrame = -1;
 
@@ -264,10 +267,11 @@ public sealed class CharacterSelectPanel : MonoBehaviour
         }
 
         Keyboard keyboard = Keyboard.current;
-        if (keyboard != null)
+        Gamepad pad = Gamepad.current;
+        if (keyboard != null || pad != null)
         {
-            // 팝업이 열려 있으면 ESC 는 팝업만 닫는다(closeWithEscape 와 무관 — 팝업 닫기 관례).
-            if ((closeWithEscape || Rules.IsPopupOpen) && keyboard.escapeKey.wasPressedThisFrame)
+            // 팝업이 열려 있으면 ESC 는 팝업만 닫는다(closeWithEscape 와 무관 — 팝업 닫기 관례). 패드 B 도 같다(할 일 278).
+            if ((closeWithEscape || Rules.IsPopupOpen) && GamepadButtons.BackPressedThisFrame)
             {
                 s_escapeClaimedFrame = Time.frameCount;
                 switch (Rules.Escape(false))
@@ -289,18 +293,31 @@ public sealed class CharacterSelectPanel : MonoBehaviour
                 return;
             }
 
-            if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame ||
-                keyboard.spaceKey.wasPressedThisFrame)
+            bool keyConfirm = keyboard != null &&
+                              (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame ||
+                               keyboard.spaceKey.wasPressedThisFrame);
+            if (keyConfirm || GamepadButtons.PadConfirmPressedThisFrame)
             {
                 Confirm();
                 return;
             }
 
             // 이동 키 — 누른 순간 1칸, 길게 누르면 대기 뒤 점점 짧아지는 간격마다 1칸(CharacterSelectKeyRepeat).
-            bool backHeld = keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ||
-                            keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
-            bool forwardHeld = keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed ||
-                               keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
+            // 패드 = 십자키·왼쪽 스틱(할 일 278, 위·왼 = 뒤 / 아래·오른 = 앞 — 키보드와 같은 방향).
+            bool backHeld = keyboard != null &&
+                            (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ||
+                             keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed);
+            bool forwardHeld = keyboard != null &&
+                               (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed ||
+                                keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed);
+            if (pad != null)
+            {
+                Vector2 stick = pad.leftStick.ReadValue();
+                backHeld |= pad.dpad.up.isPressed || pad.dpad.left.isPressed ||
+                            stick.y >= GamepadStickNavThreshold || stick.x <= -GamepadStickNavThreshold;
+                forwardHeld |= pad.dpad.down.isPressed || pad.dpad.right.isPressed ||
+                               stick.y <= -GamepadStickNavThreshold || stick.x >= GamepadStickNavThreshold;
+            }
             _keyRepeat.DelaySeconds = keyRepeatDelaySeconds;
             _keyRepeat.StartIntervalSeconds = keyRepeatStartIntervalSeconds;
             _keyRepeat.MinIntervalSeconds = keyRepeatMinIntervalSeconds;

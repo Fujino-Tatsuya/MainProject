@@ -55,6 +55,9 @@ public sealed class TraitCardView : MonoBehaviour
     [SerializeField, Min(0f)] private float tagChipPadding = 12f;
     [SerializeField, Min(0f)] private float tagSpacing = 6f;
 
+    /// <summary>카드 버튼 — 패드 내비게이션 연결용(할 일 278).</summary>
+    public Button Button => button;
+
     /// <summary>설명 태그 이름 색 표(<see cref="TraitSelectionView"/> 호버 툴팁이 카드 원본에서 빌린다).</summary>
     public SkillTooltipTagStyles TagStyles => tagStyles;
 

@@ -266,8 +266,43 @@ public sealed class TraitSelectionView : MonoBehaviour
             title.text = TextOf(TraitTexts.TitleId);
         if (helpText != null)
             helpText.text = TraitUiStrings.Help.Text;
+        LinkCardNavigation();
         nextRequestAt = 0f;
         ShowWindow();
+    }
+
+    // ── 패드 내비게이션(할 일 278 2단계) ─────────────────────────────────
+
+    private readonly List<Selectable> padRow = new List<Selectable>(4);
+
+    // 카드 한 줄 = 왼·오른쪽 명시 내비게이션(끝에서 돌아감), 첫 선택 = 첫 카드. 선택 자체는 패드 모드일 때만 GamepadUiFocus 가 건다.
+    private void LinkCardNavigation()
+    {
+        padRow.Clear();
+        for (int i = 0; i < cards.Count; i++)
+        {
+            if (cards[i] != null && cards[i].Button != null)
+                padRow.Add(cards[i].Button);
+        }
+
+        GamepadUiFocus.LinkHorizontal(padRow);
+        if (padRow.Count > 0)
+            GamepadUiFocus.Prefer(padRow[0]);
+        padRow.Clear();
+    }
+
+    // 확인창 [예]/[아니오] = 좌우 내비게이션, 패드 첫 선택은 [아니오](잘못 눌러도 되돌릴 수 있는 쪽).
+    private void PreparePromptNavigation(TMP_Text yesLabel, TMP_Text noLabel)
+    {
+        Button yes = yesLabel != null ? yesLabel.GetComponentInParent<Button>(true) : null;
+        Button no = noLabel != null ? noLabel.GetComponentInParent<Button>(true) : null;
+        padRow.Clear();
+        if (yes != null) padRow.Add(yes);
+        if (no != null) padRow.Add(no);
+        GamepadUiFocus.LinkHorizontal(padRow);
+        padRow.Clear();
+        if (no != null)
+            GamepadUiFocus.Prefer(no);
     }
 
     private void CloseWindow()
@@ -367,6 +402,7 @@ public sealed class TraitSelectionView : MonoBehaviour
             confirmNoText.text = TraitUiStrings.ConflictCancel.Text;
         if (confirmPrompt != null)
             confirmPrompt.transform.SetAsLastSibling(); // 특성 창 위
+        PreparePromptNavigation(confirmYesText, confirmNoText);
         SetActive(confirmPrompt, true);
     }
 
@@ -446,6 +482,7 @@ public sealed class TraitSelectionView : MonoBehaviour
             resetNoText.text = TextOf(TraitTexts.ResetPromptNoId);
         if (resetPrompt != null)
             resetPrompt.transform.SetAsLastSibling(); // 특성 창 위
+        PreparePromptNavigation(resetYesText, resetNoText);
         SetActive(resetPrompt, true);
     }
 
