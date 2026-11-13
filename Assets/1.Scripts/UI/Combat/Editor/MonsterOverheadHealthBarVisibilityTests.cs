@@ -256,6 +256,30 @@ public sealed class MonsterOverheadHealthBarVisibilityTests
             "이 규칙 재스폰 — 리셋만");
     }
 
+    [Test]
+    public void ResolveFootOffset_OverrideWinsElseRankValue()
+    {
+        Assert.That(MonsterOverheadHealthBarVisibility.ResolveFootOffset(false, 30f, 100f), Is.EqualTo(100f), "덮어쓰기 없음 = 등급별 공용 값(본편 그대로)");
+        Assert.That(MonsterOverheadHealthBarVisibility.ResolveFootOffset(true, 30f, 100f), Is.EqualTo(30f), "몬스터별 덮어쓰기");
+        Assert.That(MonsterOverheadHealthBarVisibility.ResolveFootOffset(true, 0f, 100f), Is.EqualTo(0f), "덮어쓰기 0 도 그대로(발 위치)");
+    }
+
+    [Test]
+    public void TrainingBots_HaveFootOffsetOverride_MatchingPreviousScreen()
+    {
+        AssertOverride("Assets/2.Prefabs/Lobby/WallBot_Tutorial.prefab", 50f);
+        AssertOverride("Assets/2.Prefabs/Lobby/TrainingSparringBot_WallBot.prefab", 100f);
+    }
+
+    static void AssertOverride(string path, float expected)
+    {
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        Assert.That(prefab, Is.Not.Null, path);
+        var o = prefab.GetComponent<MonsterOverheadHealthBarOffset>();
+        Assert.That(o, Is.Not.Null, path + " 루트에 MonsterOverheadHealthBarOffset");
+        Assert.That(o.FootScreenOffset, Is.EqualTo(expected), path + " — 처음 값 = 덮어쓰기 전 화면과 같게");
+    }
+
     static MonsterHealthBarInstall Decide(MonsterRank rank, bool bossHud = false, bool thisRule = false, bool bar = false, bool otherRule = false)
         => MonsterOverheadHealthBarVisibility.DecideInstall(rank, bossHud, thisRule, bar, otherRule);
 }

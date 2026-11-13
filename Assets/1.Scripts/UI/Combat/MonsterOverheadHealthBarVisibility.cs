@@ -49,6 +49,10 @@ public sealed class MonsterOverheadHealthBarVisibility
     public static T ForRank<T>(MonsterRank rank, T normal, T midBoss)
         => rank == MonsterRank.MidBoss ? midBoss : normal;
 
+    /// <summary>발밑 오프셋 고르기 — 몬스터별 덮어쓰기(<see cref="MonsterOverheadHealthBarOffset"/>)가 있으면 그 값, 없으면 등급별 공용 값.</summary>
+    public static float ResolveFootOffset(bool hasOverride, float overrideValue, float rankValue)
+        => hasOverride ? overrideValue : rankValue;
+
     /// <summary>발밑 오프셋(아래로 내릴 픽셀) → UnitOverheadHealthBar 화면 오프셋(위 = +y). 음수 입력은 0.</summary>
     public static Vector2 FootScreenOffset(float downPixels)
         => new Vector2(0f, -Mathf.Max(0f, downPixels));

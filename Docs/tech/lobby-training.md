@@ -134,6 +134,7 @@
   - 약화(274 후속 — "너무 셈"): 데이터 `Assets/2.Prefabs/Monster/Data/WallBotData_Tutorial.asset`(WallBotData 복사) — 체력 600→180 · 공격력 16→6 · 방어 8→0 · 등급 MidBoss→Normal(중간보스 상시 슈퍼아머·중간보스 바 꺼짐, 일반 몹 피격 경직) · 공격 중 슈퍼아머 끔 · 쿨 0.83→1.5 · 인지 9→7 · 첫 공격 지연 0→0.6 · 사거리 2→1.3(크기 배율에 맞춤).
     프리팹 칸 `shieldChance` 0.5→0 = 방패 3단(카운터 창·돌진·충격파) 끔, 단발 평타만. 6마리 동시 어그로는 코드가 없어 인지 반경으로만 줄였다.
   - 크기(274 후속 — "너무 큼"): 루트 스케일 **0.65** 한 칸. 몸·Hurtbox 캡슐·NavMeshAgent 반경·평타 판정(`ColliderInfo` = lossyScale 반영)이 같이 준다. 충격파 반경·돌진 거리(월드 m)는 안 따라가지만 방패 3단을 꺼서 무관. 피해 숫자 = 몸 콜라이더 중심(같이 줄어듦), 머리 위 체력 바 = 발 기준 화면 오프셋(크기 무관). 배율을 바꾸면 데이터 `attackRange` 도 2×배율로.
+  - 머리 위 체력바 위치: 루트 `MonsterOverheadHealthBarOffset.footScreenOffset`(발밑에서 화면 아래로 px, 처음 값 50 = 일반 몬스터 공용 값) — 있으면 공용 `Resources/MonsterOverheadHealthBarSettings` 등급별 값 대신 이 값(본편 몬스터엔 없음 = 그대로). 훈련 상대 `TrainingSparringBot_WallBot` 도 같은 칸(처음 값 100 = 중간보스 공용 값). 스폰 때 1회 읽는다.
   - 데이터 테이블: `Monster` 시트에 대상 열 `WallBotData_Tutorial`, `MidBoss` 시트에 대상 열 `WallBot_Tutorial` 이 없으면 경고만·인스펙터 값(열 이름 = 에셋/프리팹 파일 이름).
 - 완료 = 생성 집합 전원 사망 1회(`MonsterDeathEvents.ServerMonsterDied` → `LobbyCombatLedger`, 마지막 사망 중복 무시). 끼임 복구 = 0.5초마다 훈련실 경계 밖·오래 멈춤 → 초기 위치 Warp.
 - '남은 상대' 수는 계약에 없다(옛 `LobbyTrainingCombat` 남은 수 복제는 158 이 끄는 옛 뷰 전용).
