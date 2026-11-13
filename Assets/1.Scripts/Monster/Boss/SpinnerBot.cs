@@ -100,8 +100,9 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
     protected override bool FaceTargetWhileAttacking => false;
 
     // 회전 이펙트(StartEffect "Spin")는 클립 이벤트로 켜는 루프 — 카운터로 공격이 끊기면 끄는 이벤트에 못 닿는다.
-    // 공격을 벗어날 때 회수한다(GauntletBot·23호와 같은 방식). 소리 파트도 stopOnRelease 로 같이 꺼진다(11-09 경석 Play).
-    protected override bool StopClipLoopsOnAttackExit => true;
+    // 🔴 base 의 StopClipLoopsOnAttackExit(11-09)는 쓰지 않는다(할 일 282) — 끄기가 둘 다 "서서히"(Release)여서 간파 성공 뒤에도
+    //    입자가 남았고, 그 회수 뒤에 클립이 Spin 을 다시 켜는 길도 못 막았다. 대신 아래 두 곳이 맡는다:
+    //    상태 이탈 = StopSpinEffect(PlayStateAnimation) · 공격 밖에서 다시 켜짐 = OnClipEffectPlayed.
 
     // 채찍 좌/우 오프셋(+ = 오른쪽). 예고와 판정이 같은 값을 쓴다.
     float WhipSideShift => _whipUseR ? sideLateralOffset : -sideLateralOffset;
@@ -503,19 +504,46 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
         //    `safetyTimeout`(5초)이 강제 회수하긴 하지만 그동안 이펙트가 남고 경고가 쌓인다.
         //    ⚠️ `EndSpin()` 한 곳만 막으면 사망·리쉬·넉백 이탈에서 다시 샌다 —
         //       그래서 상태 이탈 지점에서 끈다(GauntletBot 의 smashTelegraph 와 같은 규약).
-        StopSpinEffect();
+        // 🔴 그로기(= 간파 성공으로 공격이 끊김)는 남김없이 바로 걷는다(할 일 282). 그 밖의 이탈(돌진 정상 종료·사망·리쉬)은
+        //    예전처럼 서서히 — 남은 입자가 제 수명대로 사라지고 종료 파트(FX_Mob_Spin_End)가 난다.
+        StopSpinEffect(SpinCutClearsImmediately(s));
     }
 
     /// <summary>
-    /// 스핀 이펙트를 끈다. 이미 꺼져 있으면 무해한 no-op 이다
-    /// (<c>EffectSocketPlayer.Stop</c> 이 <c>_handle.IsSet</c> 으로 가드한다).
-    /// 전 피어에서 불린다 — 이펙트는 로컬 연출이라 서버로 게이트하면 호스트에서만 꺼진다.
+    /// 이 상태로 들어가며 회전 이펙트를 끌 때 남김없이 바로 걷는가(할 일 282). 그로기 = 간파 성공으로 회전이 끊긴 것이라
+    /// "서서히 끄기"(새 입자만 멈춤)로는 이미 나온 입자가 그로기 자세 위에 남는다. 순수 함수 — EditMode 테스트용.
     /// </summary>
-    void StopSpinEffect()
+    public static bool SpinCutClearsImmediately(MonsterState next) => next == MonsterState.Groggy;
+
+    /// <summary>
+    /// 스핀 이펙트를 끈다. 이미 꺼져 있으면 무해한 no-op 이다
+    /// (<c>EffectSocketPlayer.Stop</c>·<c>StopImmediate</c> 가 <c>_handle.IsSet</c> 으로 가드한다).
+    /// 전 피어에서 불린다 — 이펙트는 로컬 연출이라 서버로 게이트하면 호스트에서만 꺼진다.
+    /// <paramref name="immediate"/> = 남김없이 바로(입자·종료 파트 없이). false = 서서히(새 입자만 멈춤 + 종료 파트).
+    /// </summary>
+    void StopSpinEffect(bool immediate)
     {
         StopSpinSound(0.1f);   // 소리는 VFX 배선과 무관하게 먼저 끈다(아래 조기 반환 앞)
-        if (_effects == null && !TryGetComponent(out _effects)) return;
-        _effects.StopEffect(spinEffectId);
+        if (Effects == null) return;
+        if (immediate) _effects.StopEffectImmediate(spinEffectId);
+        else _effects.StopEffect(spinEffectId);
+    }
+
+    EffectAnimEvents Effects => _effects != null || TryGetComponent(out _effects) ? _effects : null;
+
+    // 🔴 공격 밖에서 클립이 Spin 을 다시 켜면 그 자리에서 걷는다(할 일 282).
+    //    간파는 보통 예고가 거의 찼을 때(창 끝) 성공한다. 그 순간 시작 클립(A_Spinner_AttackStart)은 회전 이벤트(32.7%) 바로 앞인데,
+    //    공격을 벗어나면 늘여 재생하던 배율이 1 로 돌아와 Dizzy 로 넘어가는 0.1초 전이 동안 그 이벤트를 지나 Spin 이 **다시 켜진다**
+    //    (전이 중엔 나가는 클립의 이벤트도 난다). 상태 이탈 때 끈 뒤라 아무도 다시 끄지 않았다.
+    //    회전 이펙트는 공격 상태 안에서만 있다 — State 는 복제값이라 전 피어가 같은 판단을 한다.
+    void OnClipEffectPlayed(string id)
+    {
+        if (id == spinEffectId && State != MonsterState.Attack) _effects.StopEffectImmediate(id);
+    }
+
+    void OnEnable()
+    {
+        if (Effects != null) _effects.Played += OnClipEffectPlayed;
     }
 
     // 회전 공격 소리(사운드 명세 Spinner_Interrupt_Attack — 인터럽트 예고가 끝나고 실제 회전을 시작할 때 ~ 회전 공격 종료, 루프, 3.18).
@@ -536,7 +564,11 @@ public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget, IInterruptWin
     }
 
     // 디스폰 없이 꺼지는 경우(풀 반납·씬 정리) — 오디오 재생기는 이 오브젝트와 따로라 루프가 남는다.
-    void OnDisable() => StopSpinSound(0f);
+    void OnDisable()
+    {
+        StopSpinSound(0f);
+        if (_effects != null) _effects.Played -= OnClipEffectPlayed;
+    }
 
     // ─── 준비 동작 늘이기(팀장 10-16: 예고가 다 차야 그때부터 회전) ───
     // 시작 클립은 앞부분이 준비 동작이고 StartEffect(Spin) 이벤트 지점부터 회전한다(A_Spinner_AttackStart 32.7%).
