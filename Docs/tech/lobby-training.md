@@ -201,6 +201,7 @@
 
 - L40 = `Gather_Sortie` 0.3초, 참여자 = **접속자 전원**(늦은 참가자 포함). 출격 카운트다운 표시는 없다(Q8 A).
 - 확정 1회 = 출격 래치(`TryCommitLaunch`) → 스냅샷 `launchCommitted` true → 집결 구역 전부 끔, 이후 로딩 행 말고 전이·집결·대사·완료 보고 무시 → L41.
+- 로비 상단 슬롯 "준비 완료" = L40 동안 그 플레이어가 출격 구역 안(전 피어 계산, 새 복제 값 없음) · 확정 뒤 전원 — [lobby-player-slots.md](lobby-player-slots.md)(276).
 - L41 = 기존 흐름 그대로 — 같은 오브젝트에 `LobbyPodLaunch` 가 있으면 포드 연출(입력 잠금·페이드) 끝에, 없으면 바로 `NetworkSessionLauncher.StartGameLoading` 정확히 1회.
 - 접속 승인: 출격 집결 카운트다운 중·출격 확정 뒤엔 거절(`LobbyCountdownActiveProvider`). EditMode `LobbySortieRunTests`.
 - **시연 즉시 출격**: `LobbyRules.allowInstantSortie`(기본 **꺼짐**, Q2 B) — 켜면 명단 고정 전(L00·L10)에도 출격 구역이 켜지고 확정하면 훈련을 건너뛴다. DEV_HOTKEYS 와 별개.

@@ -24,7 +24,18 @@
 | StatusCapsule / StatusIcon · ReadyStatusTMP | (0.402, −131.4225) | 153×41 | 캡슐·아이콘 상태별 교체. 아이콘 자리 = `LobbyPlayerSlotView.StatusIconLayout`, 글자 Heavy 18 (9.6, 0.42) |
 
 ## 상태 (`LobbyPlayerSlotView.SetState`)
-`LobbyUIController` 가 접속 목록이 바뀔 때 슬롯마다 부른다. `StateOf(connected, ready)`:
+`LobbyUIController` 가 접속 목록이 바뀔 때(`LobbySession.StateChanged`)와 준비 결과가 바뀔 때 슬롯마다 부른다. `StateOf(connected, ready)`:
+
+### "준비 완료" 기준 (사용자 결정 11-13) — `LobbySlotReadyRules.IsReady`
+- **브리핑이 끝난 뒤 그 플레이어가 런치패드(출격 집결 구역) 안**일 때만 준비 완료. 브리핑 중·브리핑 끝났지만 구역 밖·쓰러짐 = 준비 중. 미접속은 그대로.
+  - 브리핑 끝 = 튜토리얼 파사드 `LobbyTutorialState.ActiveGatherPointId == LobbyGatherPoint.Sortie`(단계 L40_SortieGather, 복제 스냅샷 `stepIndex` 에서 계산).
+  - 구역 안 = `LobbyTutorialState.ActiveGatherZone.ContainsPoint(본체 위치)` + `!PartyGatherZone.IsIncapacitated(player)` — 서버 집결 판정과 **같은 함수**를 각 피어가 복제된 위치·체력·생명 상태로 돌린다.
+  - 출격 확정 뒤(`LaunchCommitted`, L41 로딩) = 접속자 전원 준비 완료(확정 = 전원 집결이었음, 이후 접속 거절).
+- **새 RPC·NetworkVariable 없음.** 서버 `PartyGatherZone` 은 인원 수(`gatheredCount`)만 복제하고 clientId 별 집결 여부는 복제하지 않는다 — 그래서 전 피어가 위 함수로 각자 계산한다.
+  원격 플레이어 위치는 NetworkTransform 복제라 왕복 지연만큼 늦게 바뀔 수 있다(서버 집결 n/N 과 한 순간 다를 수 있음).
+- 다시 계산 = `LobbyUIController.Update` 0.1초마다(출격 집결·확정 뒤에만 스폰 목록을 훑음), 결과 비트가 바뀔 때만 슬롯 갱신.
+- 옛 기준 `LobbyPlayerEntry.Ready`(LobbySession 준비 토글 — 씬에 Ready 오브젝트가 없어 qa/LobbyDemo 하네스만 켬)는 **슬롯 표시에 더 쓰지 않는다(대체).** 하네스의 카운트다운 동작은 그대로.
+- 튜토리얼 진행기가 없는 씬(`IsAvailable == false`)에선 늘 준비 중.
 
 | 상태 | 초상화 | 링 | 캡슐·아이콘 | 이름 줄 | 글자색(번호·이름 / 상태) |
 |---|---|---|---|---|---|
@@ -41,4 +52,4 @@
 - 이전 판(원형 `Mask` 106 + `ResultGradeCircle` 바탕 + `Frame`·`ReadyMark`·`Label`)은 메뉴 실행 시 지워진다.
 
 ## 테스트
-`Assets/Tests/EditMode/PortraitFaceCrop/Editor/LobbyPlayerSlotViewTests.cs` — 상태 매핑·문구 키·아이콘 자리(assembly.json 대조).
+`Assets/Tests/EditMode/PortraitFaceCrop/Editor/LobbyPlayerSlotViewTests.cs` — 상태 매핑·준비 기준(`SlotReadyRules` 6케이스)·문구 키·아이콘 자리(assembly.json 대조).

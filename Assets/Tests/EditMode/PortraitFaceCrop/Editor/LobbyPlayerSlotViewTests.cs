@@ -13,6 +13,18 @@ public sealed class LobbyPlayerSlotViewTests
         Assert.That(LobbyPlayerSlotView.StateOf(connected, ready), Is.EqualTo(expected));
     }
 
+    // 준비 완료 = 브리핑 끝(출격 집결) + 출격 구역 안 + 쓰러지지 않음. 출격 확정 뒤는 모두 준비 완료.
+    [TestCase(false, false, false, false, false, TestName = "브리핑 중 = 준비 중")]
+    [TestCase(false, false, true, false, false, TestName = "브리핑 중 구역 안이어도 준비 중")]
+    [TestCase(false, true, false, false, false, TestName = "출격 집결 중 구역 밖 = 준비 중")]
+    [TestCase(false, true, true, false, true, TestName = "출격 집결 중 구역 안 = 준비 완료")]
+    [TestCase(false, true, true, true, false, TestName = "구역 안이어도 쓰러짐 = 준비 중")]
+    [TestCase(true, false, false, true, true, TestName = "출격 확정 뒤 = 준비 완료")]
+    public void SlotReadyRules(bool launchCommitted, bool sortieGatherActive, bool inZone, bool incapacitated, bool expected)
+    {
+        Assert.That(LobbySlotReadyRules.IsReady(launchCommitted, sortieGatherActive, inZone, incapacitated), Is.EqualTo(expected));
+    }
+
     [Test]
     public void StatusString_KeysAndKoreanFallbacks()
     {
