@@ -166,21 +166,24 @@ public sealed class SceneLightDim
         return dim;
     }
 
+    /// <summary>실제 씬의 태양광 — <see cref="RenderSettings.sun"/>(Directional 일 때), 없으면 켜진 첫 Directional Light. 배율이 다루는 태양과 같은 규칙(284 경광등 암전이 이 태양만 빼고 다른 라이트를 끈다).</summary>
+    public static Light FindSceneSun()
+    {
+        if (RenderSettings.sun != null && RenderSettings.sun.type == LightType.Directional)
+            return RenderSettings.sun;
+        foreach (Light light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            if (light.type == LightType.Directional && light.isActiveAndEnabled)
+                return light;
+        return null;
+    }
+
     // 도메인 리로드를 끈 Play 진입에서도 이전 세션 값이 남지 않게.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetShared() => _shared = null;
 
     private sealed class RenderSettingsTarget : ISceneLightTarget
     {
-        public Light FindSun()
-        {
-            if (RenderSettings.sun != null && RenderSettings.sun.type == LightType.Directional)
-                return RenderSettings.sun;
-            foreach (Light light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
-                if (light.type == LightType.Directional && light.isActiveAndEnabled)
-                    return light;
-            return null;
-        }
+        public Light FindSun() => FindSceneSun();
 
         public SphericalHarmonicsL2 AmbientProbe
         {
