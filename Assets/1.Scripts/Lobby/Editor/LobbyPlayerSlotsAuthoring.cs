@@ -7,7 +7,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 로비 상단 플레이어 슬롯 3칸을 아트 A안(할 일 276)으로 다시 조립한다 — 3.LobbyScene 의 UI/Canvas/Panel_PlayerSlots.
 /// 원본 = SVN <c>Assets/50.Art/UI/Lobby/Unity/Lobby_A/assembly.json</c>(초상화 중심 (0,0) 기준 디자인 단위, 부품 피벗 가운데).
-/// 부품은 디자인 단위 그대로 놓고 부모 Panel_PlayerSlots 만 한 번 줄인다(README: 1920×1080 = 0.6788173913).
+/// 부품은 디자인 단위 그대로 놓고 부모 Panel_PlayerSlots 만 한 번 줄인다(README: 1920×1080 = 0.6788173913) — 다른 해상도는 ScreenFitScale(283 후속).
 /// 슬롯 자식은 지우고 새로 만든다(슬롯 GameObject·LobbyPlayerSlotView·LobbyUIController.slots 연결은 유지).
 /// 문서: Docs/tech/lobby-player-slots.md
 /// </summary>
@@ -53,6 +53,10 @@ public static class LobbyPlayerSlotsAuthoring
         panel.anchoredPosition = new Vector2(0f, -PortraitCenterFromTop);
         panel.sizeDelta = new Vector2(SlotSpacing * 2f + 160f, 230f);
         panel.localScale = Vector3.one * RootScale;
+        // 283 후속: 위 크기·위치 = 1920×1080 값. 다른 해상도에선 Play 중 ScreenFitScale 이 min(가로/1920, 세로/1080) 배로 맞춘다
+        // (로비 Canvas 는 ConstantPixelSize 그대로 — 같은 캔버스의 다른 UI 를 흔들지 않음).
+        if (!panel.TryGetComponent<ScreenFitScale>(out _))
+            panel.gameObject.AddComponent<ScreenFitScale>();
 
         var slots = new SerializedObject(controller).FindProperty("slots");
         for (int i = 0; i < slots.arraySize; i++)
