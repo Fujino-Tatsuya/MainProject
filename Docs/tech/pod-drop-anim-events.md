@@ -108,12 +108,6 @@
     머티리얼 `_EmissionColor` 를 아주 어두운 호박색, GI 플래그를 Realtime Emissive 로 둔 건 의도다 — 검정·None 이면 URP 검증이 `_EMISSION` 키워드를 꺼서 MPB 색이 안 먹는다.
 - **씬**: `3.LobbyScene` 루트 `PodLaunch/PodLaunchBeacons` 아래 `Beacon_1_NW`(−4.25, 2.05, 11.75)·`Beacon_2_NE`(7.0, 2.05, 11.75)·`Beacon_3_W`(−4.25, 2.05, 7.0), `LobbyPodLaunch.beacons` 칸에 연결. 비우면 경광등 없음.
   루트 Y 회전(벽 반대쪽 = 프리팹 +Z): `Beacon_1_NW` 135°(남동)·`Beacon_2_NE` 180°(남)·`Beacon_3_W` 90°(동).
-- **씬 암전(284 후속, 11-13 사용자)**: 경광등이 켜진 동안 씬의 다른 라이트를 끄고 경광등 Spot 만 남긴다. `LobbyPodLaunch` 칸 `beaconBlackout`(기본 켬)·`beaconBlackoutAmbient`(환경광·반사 배율, 기본 0.03).
-  - 켬 전이 순간 1회 `FindObjectsByType<Light>` → 켜져 있던 것(경광등 Spot·태양 제외)을 끄고 목록 기억(`PodLaunchLightBlackout`), 끔 전이에 그것만 다시 켠다(원래 꺼져 있던 건 그대로, 사라진 건 건너뜀). 매 프레임 찾기 없음.
-  - 태양(Directional, `SceneLightDim.FindSceneSun` — `RenderSettings.sun` 또는 켜진 첫 Directional)은 `SceneLightDim.Shared.SetSun(this, 0)`, 환경광은 `SetAmbient(this, 배율)` — 23호 차징·간파 암순응과 같은 공용 배율 창구라 겹쳐도 원복이 꼬이지 않는다. 다른 Directional 은 일반 라이트처럼 끈다.
-  - 반사 세기 `RenderSettings.reflectionIntensity` 는 공용 창구가 없어 직접 × 배율, 끔 때 되돌린다(이미 활성 씬이 바뀌었으면 새 씬 값을 덮지 않는다).
-  - 끄는 곳 = 켬 구간이 끝나는 프레임(다 검어짐) + `ClearLocal`(연출 취소·디스폰·`OnDestroy`). 로비 씬 기준 라이트 컴포넌트 39개(대부분 Realtime 점광원, 스폿 몇 개, Directional 1개 — 프리팹 인스턴스 안 라이트 포함 실제 수는 켤 때 콘솔 `[LobbyPodLaunch] 경광등 암전 — 라이트 N개 끔` 로그).
-  - 모니터·LED 같은 **이미시브 머티리얼은 라이트가 아니라 그대로** 빛난다. 암전 중 다른 코드가 라이트를 다시 켜면 그 라이트는 켜진다(막지 않음). 각 피어 로컬, 새 복제 값·RPC 없음.
 - **소리**: 따로 없다 — 기존 출발음(`Direct_Pod_Start`)만(사용자 결정).
 - **알려진 한계**: Spot 그림자는 끈 채다. 284 후속에서 원뿔을 벽 반대쪽으로 기울이고 거리를 12 → 6 으로 줄여 서쪽 경광등 빛이 락커룸에 새던 것을 막았다 — 그래도 보이면 `Aim` 기울기를 키우거나 거리를 줄인다.
-- 테스트: `PodLaunchBeaconTests`(켜고 끄는 구간·가속 단계·주기·회전·프리팹 배선(쿠키 포함)·켜고 끔), `PodLaunchLightBlackoutTests`(켜져 있던 것만 끄고 되돌림·Spot/태양 제외·멱등·사라진 라이트).
+- 테스트: `PodLaunchBeaconTests`(켜고 끄는 구간·가속 단계·주기·회전·프리팹 배선(쿠키 포함)·켜고 끔).

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.Serialization;
 
 /// <summary>
@@ -80,12 +79,6 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
              "표시 전용(새 복제 값 없음 — 모든 피어가 같은 시간표). 비우면 경광등 없음.")]
     [SerializeField] private PodLaunchBeacon[] beacons = Array.Empty<PodLaunchBeacon>();
 
-    [Tooltip("경광등이 켜진 동안 씬의 다른 라이트(점·스폿·태양광 전부)를 끄고 경광등만 남긴다(284 후속). 꺼질 때 원래 켜져 있던 것만 다시 켠다. 각 피어 로컬.")]
-    [SerializeField] private bool beaconBlackout = true;
-
-    [Tooltip("암전 동안 환경광·반사 배율(0 = 완전히 검게, 1 = 그대로). 환경광은 SceneLightDim 공용 배율(23호 차징·간파와 같은 창구)로 넣는다.")]
-    [Range(0f, 1f)] [SerializeField] private float beaconBlackoutAmbient = 0.03f;
-
     // 연출 시작 시각(서버시간). 0 = 연출 없음. 서버 write / 모두 read.
     private readonly NetworkVariable<double> _startAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -144,10 +137,6 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     private CameraTargetSwitcher _heldCamera;
     // 연출 동안 꺼 둔 플레이어 실루엣(할 일 230) — ClearLocal(로비 씬과 함께 사라질 때 포함)에서 되켠다.
     private readonly PlayerSilhouetteSuppression _silhouettes = new PlayerSilhouetteSuppression();
-    // 경광등 켜진 동안 씬 라이트 끄기(284 후속) — 켬·끔 전이 순간에만 움직인다.
-    private readonly PodLaunchLightBlackout _blackout = new PodLaunchLightBlackout();
-    private float _blackoutReflectionBase;
-    private Scene _blackoutScene;
     private PodAnimatorDriver _launcherDriver;
     private bool _hatchHeldOnBoard;
     private int _launchFastStage; // 지금 발사 클립 가속 단계(0 = 1배속, 1·2 = 가속 단계)
@@ -593,51 +582,15 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         bool on = PodLaunchBeaconRules.IsOn(elapsed, _timeline.EndBlackAt(descentAt));
         int stage = PodLaunchBeaconRules.Stage(elapsed, PodDropTimeline.EventElapsed(_launchFastAt.Value, start),
             PodDropTimeline.EventElapsed(_launchFast2At.Value, start), _launchFastStage);
-        if (on) BeginBlackout();
-        else EndBlackout();
         foreach (PodLaunchBeacon beacon in beacons)
             if (beacon != null) beacon.Apply(on, stage);
     }
 
     private void TurnOffBeacons()
     {
-        EndBlackout();
         if (beacons == null) return;
         foreach (PodLaunchBeacon beacon in beacons)
             if (beacon != null) beacon.TurnOff();
-    }
-
-    /// <summary>
-    /// [전 피어] 경광등 켬 전이 1회(284 후속) — 씬의 켜진 라이트를 모아(경광등 Spot·태양 제외) 끄고, 태양 0·환경광 배율은 <see cref="SceneLightDim"/> 로,
-    /// 반사 세기(<see cref="RenderSettings.reflectionIntensity"/>)는 직접 낮춘다. 이미 켜짐이면 아무것도 안 한다.
-    /// </summary>
-    private void BeginBlackout()
-    {
-        if (!beaconBlackout || _blackout.Active) return;
-
-        var keep = new HashSet<Light>();
-        foreach (PodLaunchBeacon beacon in beacons)
-            if (beacon != null) foreach (Light spot in beacon.Spots) if (spot != null) keep.Add(spot);
-
-        Light sun = SceneLightDim.FindSceneSun();
-        _blackout.Begin(FindObjectsByType<Light>(FindObjectsSortMode.None), keep, sun);
-        SceneLightDim.Shared.SetSun(this, 0f);
-        SceneLightDim.Shared.SetAmbient(this, beaconBlackoutAmbient);
-        _blackoutScene = SceneManager.GetActiveScene();
-        _blackoutReflectionBase = RenderSettings.reflectionIntensity;
-        RenderSettings.reflectionIntensity = _blackoutReflectionBase * beaconBlackoutAmbient;
-        Debug.Log($"[LobbyPodLaunch] 경광등 암전 — 라이트 {_blackout.TurnedOffCount}개 끔(+태양 {(sun != null ? sun.name : "없음")}), 환경광·반사 ×{beaconBlackoutAmbient:0.###}");
-    }
-
-    /// <summary>[전 피어] 경광등 끔 전이 — 끈 라이트만 다시 켜고 배율·반사 세기를 되돌린다. 멱등.</summary>
-    private void EndBlackout()
-    {
-        if (!_blackout.Active) return;
-        _blackout.End();
-        SceneLightDim.Shared.Release(this);
-        // 반사 세기는 활성 씬의 설정이다 — 씬이 이미 바뀌었으면 새 씬 값을 덮지 않는다.
-        if (SceneManager.GetActiveScene() == _blackoutScene)
-            RenderSettings.reflectionIntensity = _blackoutReflectionBase;
     }
 
     /// <summary>
