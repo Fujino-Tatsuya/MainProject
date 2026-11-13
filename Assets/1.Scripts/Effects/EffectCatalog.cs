@@ -37,6 +37,10 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Slash_Miss { get; private set; }
     [field: SerializeField] public EffectEntry DoubleSlash_Hit { get; private set; }
     [field: SerializeField] public EffectEntry DoubleSlash_Miss { get; private set; }
+    // 4타(막타) 단일 검기 + 궤적 연쇄 성광(2026-11-13 민경 — FX_FinalSlash_Chain). Player_Paladin slashHit[3]·slashMiss[3] 가 물고 있다.
+    // DoubleSlash 는 비교·되돌리기용으로 남겨 둔다(Paladin_VFX 보관 프리팹도 아직 쓴다).
+    [field: SerializeField] public EffectEntry FinalSlash_Hit { get; private set; }
+    [field: SerializeField] public EffectEntry FinalSlash_Miss { get; private set; }
 
     [Header("플레이어 — 불굴의 의지(패시브)")]
     // Heal 은 시전자에게 1회(실제로 회복했을 때만), BonusHit 은 처음 맞은 적 1명에게 1회. FirstMeleePassive 가 같은 RPC 로 함께 뿌린다.

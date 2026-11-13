@@ -17,6 +17,8 @@ MonoBehaviour:
   <Slash_Miss>k__BackingField: {fileID: 11400000, guid: c0e4ea1fc73b27347954718e92fc0610, type: 2}
   <DoubleSlash_Hit>k__BackingField: {fileID: 11400000, guid: d04749b5cf1348d4d919af930d9e24bb, type: 2}
   <DoubleSlash_Miss>k__BackingField: {fileID: 11400000, guid: 6312fd22ad8a12a42943869482bbca30, type: 2}
+  <FinalSlash_Hit>k__BackingField: {fileID: 11400000, guid: 9622a5b34cc244ec895213407bb72a02, type: 2}
+  <FinalSlash_Miss>k__BackingField: {fileID: 11400000, guid: cf59817c717949c6b11321431fe04fe1, type: 2}
   <Passive_Heal>k__BackingField: {fileID: 11400000, guid: 80e8dc1a2f6cf4a4a98e73f6d842d14b, type: 2}
   <Passive_BonusHit>k__BackingField: {fileID: 11400000, guid: ab44dc2c6c16fd64980960752a975905, type: 2}
   <ShareHeal_Swirl>k__BackingField: {fileID: 11400000, guid: ecbb8637477210245b42b141cad3c183, type: 2}

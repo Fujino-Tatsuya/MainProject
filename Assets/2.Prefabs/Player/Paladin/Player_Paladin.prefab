@@ -1264,7 +1264,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
   id: 
-  effect: {fileID: 11400000, guid: 6312fd22ad8a12a42943869482bbca30, type: 2}
+  effect: {fileID: 11400000, guid: cf59817c717949c6b11321431fe04fe1, type: 2}
   socket: {fileID: 1992480276934339905}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
@@ -1433,7 +1433,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
   id: 
-  effect: {fileID: 11400000, guid: d04749b5cf1348d4d919af930d9e24bb, type: 2}
+  effect: {fileID: 11400000, guid: 9622a5b34cc244ec895213407bb72a02, type: 2}
   socket: {fileID: 1992480276934339905}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
