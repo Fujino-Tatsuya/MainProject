@@ -34,6 +34,12 @@ public static class LobbyUiStrings
     public static readonly UiString Train03SuppressAttack = new UiString("UI.Lobby.Train03SuppressAttack", "제압된 상대를 공격하세요 {time}", Where + " › TRAIN_03 D 제압 중 훈련 상대 머리 위 바 이름 자리({time} = UI.Unit.Seconds 로 만든 남은 제압 초, 올림 정수, 할 일 86 T5b 임시)");
     public static readonly UiString Train03Finish = new UiString("UI.Lobby.Train03Finish", "마무리하세요", Where + " › TRAIN_03 D 제압 중 피해 뒤 제압이 끝나 마무리로 넘어간 훈련 상대 머리 위 바 이름 자리 — 칸 대신 표시(할 일 86 T5c 후속 임시)");
 
+    // 상단 플레이어 슬롯 A안 상태 캡슐·빈 칸 이름(할 일 276) — LobbyPlayerSlotView
+    public static readonly UiString SlotReady = new UiString("UI.Lobby.SlotReady", "준비 완료", Where + " › PlayerSlot_* 상태 캡슐 — 접속·준비 완료(코드, 할 일 276)");
+    public static readonly UiString SlotWaiting = new UiString("UI.Lobby.SlotWaiting", "준비 중", Where + " › PlayerSlot_* 상태 캡슐 — 접속·준비 안 함(코드, 할 일 276)");
+    public static readonly UiString SlotDisconnected = new UiString("UI.Lobby.SlotDisconnected", "미접속", Where + " › PlayerSlot_* 상태 캡슐 — 빈 자리(코드, 할 일 276)");
+    public static readonly UiString SlotEmptyName = new UiString("UI.Lobby.SlotEmptyName", "플레이어 대기", Where + " › PlayerSlot_* 이름 줄 — 빈 자리(코드, 할 일 276)");
+
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         InteractReady, InteractUnready, InteractCharacterSelect, ReadyCount, Countdown, CountdownStarting,
@@ -41,6 +47,7 @@ public static class LobbyUiStrings
         Train01Title, Train01BasicAttack, Train01SkillQ, Train01SkillE, Train01SkillR, Train01RightClick, Train01Dash, Train01PartyDone,
         Train02Title, Train02Remaining,
         Train03Segments, Train03SuppressAttack, Train03Finish,
+        SlotReady, SlotWaiting, SlotDisconnected, SlotEmptyName,
     };
 
     /// <summary>"남은 상대 n/m".</summary>

@@ -71,15 +71,12 @@ public class LobbyUIController : MonoBehaviour
             : null;
     }
 
-    // 이름 = 머리 위 이름과 같은 "P{clientId+1}"(UiStrings.OverheadPlayerLabel), 뒤에 캐릭터 이름.
-    private string BuildSlotLabel(LobbyPlayerEntry entry)
-    {
-        var playerLabel = UiStrings.OverheadPlayerLabel.Format(
-            new System.Collections.Generic.Dictionary<string, string> { ["n"] = (entry.ClientId + 1).ToString() });
-        return characterRoster != null && characterRoster.TryGetAvailableCharacter(entry.CharacterId, out var character)
-            ? $"{playerLabel} · {character.DisplayName}"
-            : playerLabel;
-    }
+    // 배지 = 머리 위 이름과 같은 "P{n}"(UiStrings.OverheadPlayerLabel). 접속 자리는 clientId+1, 빈 자리는 칸 번호.
+    private static string PlayerLabel(int number) =>
+        UiStrings.OverheadPlayerLabel.Format(new System.Collections.Generic.Dictionary<string, string> { ["n"] = number.ToString() });
+
+    // 이름 줄 = 캐릭터 이름(고르기 전이면 비움).
+    private static string CharacterName(CharacterRoster.Entry character) => character != null ? character.DisplayName : string.Empty;
 
     private void ApplyUi()
     {
@@ -98,12 +95,13 @@ public class LobbyUIController : MonoBehaviour
 
                 if (i >= count)
                 {
-                    slot.SetState(false, false, null);
+                    slot.SetState(false, false, null, PlayerLabel(i + 1), null);
                     continue;
                 }
 
                 var entry = session.GetEntry(i);
-                slot.SetState(true, entry.Ready, GetCharacter(entry.CharacterId), BuildSlotLabel(entry));
+                var character = GetCharacter(entry.CharacterId);
+                slot.SetState(true, entry.Ready, character, PlayerLabel((int)entry.ClientId + 1), CharacterName(character));
             }
         }
 

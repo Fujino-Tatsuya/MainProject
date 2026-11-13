@@ -124,7 +124,7 @@
   한계: 아래 카드(`nextSlot`)는 화면에 카드 로컬 y 12 위만 보여 머리 윗부분만 보인다(이름은 보임).
 - 이름판 `nameplatePortrait` 는 162 후속 사용자 결정대로 **연결 없음**을 유지(`CharacterSelectUiPolishTests` 가 확인). 다시 켜려면 `Content/Nameplate/PortraitSlot/Image_Portrait`(원형 Mask 160) 를 연결하고 크기 ≈ 330×330·위치 ≈ (-10, -70) 이면 얼굴이 원 안에 든다(오프라인 합성 미리보기 기준).
 - 같은 `Portrait` 를 쓰는 곳과 **작은 칸 얼굴 크롭(276 후속, 2026-11-13, '가'안)**:
-  - 로비 플레이어 슬롯 `LobbyPlayerSlotView` — 로비 씬 `PlayerSlot_*/PortraitMask`(원형 `Mask` 106×106·(0,-7), 그래픽 = `ResultGradeCircle.png` 어두운 색 바탕 — 링 `Frame` 120 의 안쪽을 채워 뒤 사람 아이콘이 안 비침)/`Portrait`.
+  - 로비 플레이어 슬롯 `LobbyPlayerSlotView` — 아트 A안 `PlayerSlot_*/PortraitMask`(원형 `Mask` 129, Lobby_A `lobby_portrait_circle_mask`)/`CharacterPortrait`. 계층·상태는 [lobby-player-slots.md](lobby-player-slots.md)(저작 메뉴 `Tools/UI/Authoring/Lobby Player Slots (A안)`). 옛 106 마스크·`ResultGradeCircle` 바탕은 메뉴 실행 시 교체.
   - 로비 결과 행 `LobbyResultPlayerRow.prefab` — **초상화 없음**(11-13 사용자가 프리팹에서 `PortraitMask`·`Image_Portrait` 를 지우고 이름 `Text_Character` 를 칸 가득 가운데로, bc665f17). 행 뷰 `portraitImage` 는 비어 있고 `Bind` 는 그냥 건너뛴다. 저작 메뉴(`LobbyResultPanelAuthoring`)도 초상화를 만들지 않는다.
   - 크롭 값 = 로스터 칸 `faceCrop`(`PortraitFaceCrop`: `center` = 얼굴 가운데, 스프라이트 비율 좌표 · `size` = 칸 짧은 변에 꽉 찰 정사각 한 변 = 스프라이트 너비의 몇 배, 작을수록 확대). 팔라딘 (0.533, 0.713)·거너 (0.518, 0.761)·어쌔신 (0.518, 0.737), 셋 다 size 0.26.
   - 동작: 뷰가 스프라이트를 넣은 뒤 `PortraitFaceCrop.Apply` 가 **초상화 Image 의 부모에 `RectMask2D` 나 `Mask` 가 있을 때만** Image 를 키우고 옮긴다(가운데 앵커·피벗, preserveAspect 끔). 원본 png 그대로 — 텍스처 생성·스프라이트 자르기 없음. 미접속(스프라이트 없음)이면 칸을 꽉 채운 회색.
