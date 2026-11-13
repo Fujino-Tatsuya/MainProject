@@ -99,6 +99,18 @@ PrefabInstance:
       value: 2134982783
       objectReference: {fileID: 0}
     - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.65
+      objectReference: {fileID: 0}
+    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -137,18 +149,6 @@ PrefabInstance:
     - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.65
-      objectReference: {fileID: 0}
-    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.65
-      objectReference: {fileID: 0}
-    - target: {fileID: 8561274492445170025, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 0.65
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 5419735519947956318, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
@@ -211,6 +211,19 @@ MonoBehaviour:
   freezePoseWhileGroggy: 1
   interruptFlash: {fileID: 5189378676128956984}
   barFillColor: {r: 0.9, g: 0.2, b: 0.2, a: 1}
+--- !u!114 &2741936650182739113
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4329531598611607449}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1b36f1d86b3d4e2b9caab399d5d37b65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterOverheadHealthBarOffset
+  footScreenOffset: 130
 --- !u!114 &4815490959051287160 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2437220740442388379, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
@@ -259,16 +272,3 @@ CapsuleCollider:
   m_CorrespondingSourceObject: {fileID: 138876035767613204, guid: 1da1955e67667cb4899e5fba021ca579, type: 3}
   m_PrefabInstance: {fileID: 7135585110905265635}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &2741936650182739113
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4329531598611607449}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1b36f1d86b3d4e2b9caab399d5d37b65, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MonsterOverheadHealthBarOffset
-  footScreenOffset: 100

@@ -265,19 +265,28 @@ public sealed class MonsterOverheadHealthBarVisibilityTests
     }
 
     [Test]
-    public void TrainingBots_HaveFootOffsetOverride_MatchingPreviousScreen()
+    public void PreviewConversion_ScreenPixelsToCanvasOffset()
     {
-        AssertOverride("Assets/2.Prefabs/Lobby/WallBot_Tutorial.prefab", 50f);
-        AssertOverride("Assets/2.Prefabs/Lobby/TrainingSparringBot_WallBot.prefab", 100f);
+        Assert.That(MonsterOverheadHealthBarVisibility.ScreenPixelsPerCanvasUnit(2160f, 1080f), Is.EqualTo(2f), "4K = 캔버스 1단위 2px");
+        Assert.That(MonsterOverheadHealthBarVisibility.ScreenPixelsPerCanvasUnit(0f, 1080f), Is.EqualTo(1f), "카메라 크기 0 = 1");
+        Assert.That(MonsterOverheadHealthBarVisibility.FootOffsetFromScreenDrop(100f, 2f), Is.EqualTo(50f), "화면 100px 아래 @4K = 50");
+        Assert.That(MonsterOverheadHealthBarVisibility.FootOffsetFromScreenDrop(-30f, 1f), Is.EqualTo(0f), "발보다 위로 끌면 0");
     }
 
-    static void AssertOverride(string path, float expected)
+    [Test]
+    public void TrainingBots_HaveFootOffsetOverride()
+    {
+        AssertOverride("Assets/2.Prefabs/Lobby/WallBot_Tutorial.prefab");
+        AssertOverride("Assets/2.Prefabs/Lobby/TrainingSparringBot_WallBot.prefab");
+    }
+
+    static void AssertOverride(string path)
     {
         var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
         Assert.That(prefab, Is.Not.Null, path);
         var o = prefab.GetComponent<MonsterOverheadHealthBarOffset>();
         Assert.That(o, Is.Not.Null, path + " 루트에 MonsterOverheadHealthBarOffset");
-        Assert.That(o.FootScreenOffset, Is.EqualTo(expected), path + " — 처음 값 = 덮어쓰기 전 화면과 같게");
+        Assert.That(o.FootScreenOffset, Is.GreaterThanOrEqualTo(0f), path + " — 값은 사용자 튜닝(정확한 값은 검사하지 않음)");
     }
 
     static MonsterHealthBarInstall Decide(MonsterRank rank, bool bossHud = false, bool thisRule = false, bool bar = false, bool otherRule = false)

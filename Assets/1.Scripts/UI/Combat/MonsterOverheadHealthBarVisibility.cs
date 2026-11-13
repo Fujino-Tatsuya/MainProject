@@ -53,6 +53,17 @@ public sealed class MonsterOverheadHealthBarVisibility
     public static float ResolveFootOffset(bool hasOverride, float overrideValue, float rankValue)
         => hasOverride ? overrideValue : rankValue;
 
+    /// <summary>
+    /// 캔버스 1단위(1080p 기준 px)가 실제 화면 몇 px 인가 — 체력바 캔버스는 높이 맞춤(<see cref="OverheadHealthBarCanvas.ReferenceResolution"/>)이다.
+    /// 미리보기 기즈모·끌기 핸들이 쓴다(274).
+    /// </summary>
+    public static float ScreenPixelsPerCanvasUnit(float screenHeightPixels, float referenceHeight)
+        => referenceHeight > 0f && screenHeightPixels > 0f ? screenHeightPixels / referenceHeight : 1f;
+
+    /// <summary>발 화면 y − 바 화면 y(실제 px, 아래 = +) → 발밑 오프셋(캔버스 px). 음수(발보다 위)는 0.</summary>
+    public static float FootOffsetFromScreenDrop(float dropScreenPixels, float pixelsPerCanvasUnit)
+        => Mathf.Max(0f, dropScreenPixels / Mathf.Max(0.0001f, pixelsPerCanvasUnit));
+
     /// <summary>발밑 오프셋(아래로 내릴 픽셀) → UnitOverheadHealthBar 화면 오프셋(위 = +y). 음수 입력은 0.</summary>
     public static Vector2 FootScreenOffset(float downPixels)
         => new Vector2(0f, -Mathf.Max(0f, downPixels));
