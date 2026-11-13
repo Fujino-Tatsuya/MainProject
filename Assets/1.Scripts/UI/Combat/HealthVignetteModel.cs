@@ -12,6 +12,15 @@ public static class HealthVignetteModel
     /// </summary>
     public static float Severity(float healthRatio, float threshold)
     {
+        return Severity(healthRatio, threshold, 0f);
+    }
+
+    /// <summary>
+    /// 시작 비율(threshold) 초과면 0, 최대 비율(fullRatio) 이하면 1, 그 사이는 선형.
+    /// 예: 시작 0.4·최대 0.1 → 40% 부터 켜져 10% 에서 최대(11-13 사용자). fullRatio 가 시작 이상이면 시작 바로 아래부터 1.
+    /// </summary>
+    public static float Severity(float healthRatio, float threshold, float fullRatio)
+    {
         if (threshold <= 0f)
             return 0f;
 
@@ -19,7 +28,11 @@ public static class HealthVignetteModel
         if (ratio > threshold)
             return 0f;
 
-        return Mathf.Clamp01(1f - ratio / threshold);
+        float full = Mathf.Clamp(fullRatio, 0f, threshold);
+        if (ratio <= full)
+            return 1f;
+
+        return Mathf.Clamp01((threshold - ratio) / (threshold - full));
     }
 
     /// <summary>체력 비율 → 0..1. 최대 체력이 0 이하면(스탯 미복제) 1 을 돌려 비네팅이 켜지지 않게 한다.</summary>
@@ -64,6 +77,12 @@ public static class HealthVignetteModel
     public static Color FlashColor(float healthRatio, float threshold, Color safeColor, Color dangerColor)
     {
         return Color.Lerp(safeColor, dangerColor, Severity(healthRatio, threshold));
+    }
+
+    /// <summary>피격 플래시 색 — 최대 비율(fullRatio) 이하에서 위험색 그대로.</summary>
+    public static Color FlashColor(float healthRatio, float threshold, float fullRatio, Color safeColor, Color dangerColor)
+    {
+        return Color.Lerp(safeColor, dangerColor, Severity(healthRatio, threshold, fullRatio));
     }
 
     /// <summary>피격 직후 최대(peak)에서 시작해 duration 동안 선형으로 0 까지 빠진다.</summary>
