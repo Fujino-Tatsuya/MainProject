@@ -19,7 +19,7 @@ MonoBehaviour:
   chaseSpeed: 3
   attackSpeed: 1
   attackCooldown: 1.5
-  maxHp: 180
+  maxHp: 1800
   defense: 0
   maxShield: 0
   detectionRadius: 7
