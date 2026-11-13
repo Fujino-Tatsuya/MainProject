@@ -1121,6 +1121,12 @@ sequenceDiagram
 
 현재 로딩은 Lobby, LoadingScene, MapScene을 모두 additive로 열지만 `SceneManager.SetActiveScene(MapScene)`을 호출하지 않는다. NGO도 additive load에서는 active scene을 자동 변경하지 않는다. `MapContentSpawner`는 로컬 `GeneratedMap`과 ZoneLayout을 active scene, 즉 Lobby에 만들기 때문에 v2 배선을 완성해도 source Lobby unload 때 함께 파괴될 수 있다. Player만 명시적으로 MapScene으로 이동한다.
 
+**로딩 화면 해상도 대응(할 일 283, 2026-11-13).** `2.LoadingScene` 의 `LoadingCanvas`(Screen Space Overlay, 정렬 1000)는 `CanvasScaler` = Scale With Screen Size · 기준 1920×1080 · **Expand**(배율 = min(가로/1920, 세로/1080)). Expand 를 고른 이유: 1920×1080 기준 사각형이 어떤 화면비에서도 통째로 들어와 잘리지 않는다(match 0.5 는 21:9 에서 캔버스 세로가 1080 보다 작아지고 4:3 에서 가로가 1920 보다 작아진다). 대가로 4:3·16:10 처럼 세로가 남는 화면은 UI 가 가로 기준으로 조금 작아진다.
+- 배경 `Background` = `AspectRatioFitter` EnvelopeParent 1.7778(원본 `Loading_1110` 5760×3240 비율) — 꽉 채우고 비율 유지, 넘치는 쪽은 잘림.
+- 팁 `Text_Tooltip` = 위 가운데 앵커(0.5, 1) y −67. 진행 바 판 `progress fill`(1000×100) y 75 · 퍼센트 `Text_Percentage` y 90.63 · 상태 `Text_Status` y 50 = 아래 가운데 앵커(0.5, 0). 수치는 275 레이아웃(e89666e8)을 1920×1080 에서 그대로 옮긴 값이라 1080p 화면은 이전과 픽셀 단위로 같다.
+- 회귀 테스트 `Assets/Tests/EditMode/Loading/Editor/LoadingScreenLayoutTests.cs`. 새 요소를 넣을 땐 가까운 가장자리 앵커로 두고 1920×1080 기준 사각형 안에 둔다.
+- 알려진 점: `progress fill` 은 Image Type 이 Simple 이라 `fillAmount` 가 화면에 반영되지 않는다(지금은 퍼센트·상태 문구 뒤 어두운 판 역할).
+
 ### 9.3 타이틀과 옵션
 
 `TitleSceneManager`는 시작 시 `Temp_LobbyScene`을 로드하며, `TitleOptionsPanel`은 옵션 패널 열기·닫기와 UI 포커스를 담당한다. 현재 이 흐름에는 Addressables가 사용되지 않고 `SceneManager` 기반이다.
