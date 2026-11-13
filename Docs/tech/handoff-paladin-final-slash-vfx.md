@@ -14,7 +14,19 @@
 | `Assets/1.Scripts/Effects/EffectCatalog.cs` + `9.ScriptableObject/Effects/EffectCatalog.asset` | 프리워밍 등록 `FinalSlash_Hit`·`FinalSlash_Miss` 추가(DoubleSlash 칸은 비교·되돌리기용으로 유지) |
 | `Assets/1.Scripts/Player/DefaultAttackController.cs` | `slashHit`/`slashMiss` 툴팁 문구만(동작 변경 없음 — 은희 영역이라 기록) |
 
-판정·네트워크·타이밍은 그대로다 — 재생 경로는 여전히 `DefaultAttackController.PlaySlashVfx`(4타 Hit 이벤트 0.267초, 전 피어 RPC).
+판정·네트워크 경로는 그대로다 — 재생 경로는 여전히 `DefaultAttackController.PlaySlashVfx`(Hit 이벤트, 전 피어 RPC).
+
+### 평타 Hit 이벤트 시각 당김 (11-13 민경 — 은희 확인 필요)
+`Garen_Default_Attack_1~4.anim` 애니 이벤트를 VFX 타이밍에 맞춰 앞당겼다. **Hit = 데미지 판정 시점도 겸하므로 데미지도 같이 빨라진다.**
+
+| 클립 | 변경 |
+|---|---|
+| 1타 | Hit 0.333 → 0.233 |
+| 2타 | ComboWindowOpen 0.146 → 0.133, Hit 0.3 → 0.146 |
+| 3타 | Hit 0.3 → 0.233 |
+| 4타 | Hit 0.267 → 0.15 |
+
+`BasicAttackVerify` 기대 간격·`DefaultAttackChainRulesTests` 가 클립 시각을 읽으므로 테스트·서버 2차 검증 경고를 확인할 것.
 
 ## 아트 (SVN) — `Assets/50.Art/VFX/Common/Players/Player1/LeftClickSkill/FinalSlash/`
 - `FX_FinalSlash_Chain_O/X.prefab` + `_Entry.asset`
