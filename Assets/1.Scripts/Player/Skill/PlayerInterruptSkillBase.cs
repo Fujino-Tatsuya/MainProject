@@ -104,6 +104,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Interrupt;
     public override bool CanMoveWhileActive => false;
+    // 간파가 끝난 뒤 좌클릭을 아직 누르고 있으면 기본 공격을 잇는다(할 일 146 장치, 할 일 280 — 모든 캐릭터).
+    // 일반·대쉬 간파(EndDeferred)·제압 간파·타이머 방식 모두 Completed 로 끝난다. 대시·피격·사망 끊김은 잇지 않는다.
+    public override bool ResumesBasicAttackOnHold => true;
 
     protected IPlayerInterruptSkillData InterruptData => Data as IPlayerInterruptSkillData;
 

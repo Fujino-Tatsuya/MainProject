@@ -45,12 +45,12 @@ public sealed class PlayerBasicAttackInputRulesTests
     }
 
     [Test]
-    public void ResumeAfterSkill_PrefabSkills_AssassinEAlways_PaladinQNeedsTrait_GunnerByHoldStart()
+    public void ResumeAfterSkill_PrefabSkills_AssassinEAlways_PaladinQAlways_GunnerByHoldStart()
     {
         var assassin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab");
         var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
         Assert.That(assassin.GetComponent<AssassinEnhanceSkill>().ResumesBasicAttackOnHold, Is.True, "어쌔신 일반 E = 항상");
-        Assert.That(paladin.GetComponent<FirstMeleeMainSkill>().ResumesBasicAttackOnHold, Is.False, "특성 없는 가붕이 Q = 원래 Q — 이어가기 없음");
+        Assert.That(paladin.GetComponent<FirstMeleeMainSkill>().ResumesBasicAttackOnHold, Is.True, "특성 없는 가붕이 Q(원래 Q)도 이어가기 — 할 일 280");
         Assert.That(assassin.GetComponent<AssassinBasicAttack>().StartsOnHold, Is.False, "어쌔신은 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
     }
 
@@ -70,6 +70,48 @@ public sealed class PlayerBasicAttackInputRulesTests
         Assert.That(guard.ResumesBasicAttackOnHold, Is.True, "가붕이 E = 항상");
         Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(guard.ResumesBasicAttackOnHold, reason), Is.EqualTo(expected));
         Assert.That(paladin.GetComponentInChildren<DefaultAttackController>(true).StartsOnHold, Is.False, "가붕이는 평소엔 홀드 시작이 아니다 — E 뒤 한 번만");
+    }
+
+    // 할 일 280 — 이어가기가 꺼져 있던 스킬 전부 켬: 가붕이 원래 Q·R, 어쌔신 Q(대시 타격)·R(변신), 모든 캐릭터 우클릭 간파.
+    // 거너 스킬은 평타가 홀드 시작이라 이 값과 무관하지만 간파는 공용 베이스라 같이 켜진다.
+    [Test]
+    public void ResumeAfterSkill_AllPlayerSkills_Resume()
+    {
+        string[] prefabs =
+        {
+            "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab",
+            "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab",
+        };
+        foreach (string path in prefabs)
+        {
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(path);
+            Assert.That(prefab, Is.Not.Null, path);
+            PlayerSkillBase[] skills = prefab.GetComponentsInChildren<PlayerSkillBase>(true);
+            Assert.That(skills, Is.Not.Empty, path);
+            foreach (PlayerSkillBase skill in skills)
+                Assert.That(skill.ResumesBasicAttackOnHold, Is.True, $"{path} — {skill.GetType().Name}");
+        }
+
+        var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
+        var assassin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab");
+        Assert.That(paladin.GetComponentInChildren<FirstMeleeUltimateSkill>(true), Is.Not.Null, "가붕이 R");
+        Assert.That(paladin.GetComponentInChildren<PlayerInterruptSkillBase>(true), Is.Not.Null, "가붕이 간파");
+        Assert.That(assassin.GetComponentInChildren<AssassinDashStrikeSkill>(true), Is.Not.Null, "어쌔신 Q");
+        Assert.That(assassin.GetComponentInChildren<AssassinTransformSkill>(true), Is.Not.Null, "어쌔신 R");
+        Assert.That(assassin.GetComponentInChildren<PlayerInterruptSkillBase>(true), Is.Not.Null, "어쌔신 간파");
+    }
+
+    // 원래 Q(홀드)는 홀드 해제(Released)로 끝난다 — 정상 종료로 보고 잇는다. 끊김은 안 잇는다.
+    [TestCase(SkillEndReason.Released, true)]
+    [TestCase(SkillEndReason.Completed, true)]
+    [TestCase(SkillEndReason.Cancelled, false)]
+    [TestCase(SkillEndReason.DashCancelled, false)]
+    [TestCase(SkillEndReason.CasterDied, false)]
+    public void ResumeAfterSkill_PaladinOriginalQ_ResumesOnRelease(SkillEndReason reason, bool expected)
+    {
+        var paladin = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>("Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab");
+        var q = paladin.GetComponent<FirstMeleeMainSkill>();
+        Assert.That(PlayerBasicAttackInputRules.ArmsResumeAfterSkill(q.ResumesBasicAttackOnHold, reason), Is.EqualTo(expected));
     }
 
     // 변신 E(원형 5타)도 어쌔신 일반 E 와 같은 규칙 — 정상 종료(완료·홀드 해제)만 잇고 대시·피격·사망 끊김은 안 잇는다.
