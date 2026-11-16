@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: FloatingDamageSettings
   m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageSettings
   displayFilter: 2
-  teammateScaleMultiplier: 0.75
+  teammateScaleMultiplier: 0.5
   teammateAlpha: 0.78431374
   outlineAlpha: 0.8
   referenceResolution: {x: 1920, y: 1080}
@@ -58,22 +58,22 @@ MonoBehaviour:
   tierLooks:
   - tier: 0
     fillColor: {r: 0.9132327, g: 1, b: 0.3150943, a: 1}
-    holdScale: 0.8
-    spawnScale: 1.1
+    holdScale: 0.4
+    spawnScale: 0.7
     spawnSettleDuration: 0.08
     shake: 1
     singleDuration: 0.65
   - tier: 1
     fillColor: {r: 1, g: 0.55, b: 0.1, a: 1}
-    holdScale: 0.9
-    spawnScale: 1.2
+    holdScale: 0.4
+    spawnScale: 0.7
     spawnSettleDuration: 0.08
     shake: 0
     singleDuration: 0.75
   - tier: 2
     fillColor: {r: 1, g: 0.2, b: 0.15, a: 1}
-    holdScale: 1
-    spawnScale: 1.75
+    holdScale: 0.5
+    spawnScale: 0.8
     spawnSettleDuration: 0.12
     shake: 1
     singleDuration: 0.85
