@@ -10,10 +10,10 @@
 | `Brand` | 왼쪽 위 Re:C / 시공간관리국 (2x 이미지를 약 0.53배) |
 | `TipCapsule` (+`Radio`·`Label`) | "Tip" 캡슐과 무전기 아이콘 |
 | `Text_Tooltip` | 팁 문구(뷰 `tooltipText`) — 서울알림 Medium Bold 28 |
-| `Text_Status` | 단계 문구(뷰 `statusText`) — 필름 릴 왼쪽, 작게(22, 알파 0.7) |
+| `Text_Status` | 단계 문구(뷰 `statusText`) — 진행 막대 아래 가운데, 작게(22, 알파 0.7) |
 | `ProgressTrack` → `FillArea` → `ProgressFill` → `Halftone` | 둥근 진행 막대. 채움은 Sliced 라 뷰가 **`anchorMax.x = 진행률`** 로 오른쪽 끝을 늘린다(Filled 로 자르면 둥근 끝이 잘림). 하프톤은 막대 전체 폭에 고정, 채움의 `RectMask2D` 로 채운 만큼만 보인다 |
 | `Reel` | 필름 릴 — `LoadingReelSpin` 이 로딩 중 계속 회전(기본 −180°/초, unscaled) |
-| `Text_Percentage` | 큰 숫자 + 작은 % (뷰 `percentSuffix` = `<size=50%> %</size>`) — 서울알림 Heavy 46 |
+| `Text_Percentage` | 큰 숫자 + 작은 % (뷰 `percentSuffix` = `<size=50%> %</size>`) — 서울알림 Heavy 54 |
 
 이미지 원본: `Assets/50.Art/UI/Loading/v02/Loading_*.png` (SVN). 9-slice 테두리(트랙 32·채움 12·캡슐 50)는 텍스처 임포트 설정.
 

@@ -24,8 +24,9 @@ public static class LoadingScreenLayoutAuthoring
     private const float SideMargin = 48f;
     private const float TrackCenterY = 60f;
     private const float TrackHeight = 32f;
-    private static readonly Vector2 FillInset = new Vector2(6f, 8f);   // 막대 안쪽 여백(가로, 세로)
-    private const float IconRowY = 144f;                               // 필름 릴·% 숫자 줄 중심 높이
+    private static readonly Vector2 FillInsetMin = new Vector2(8.79f, 8f);   // 막대 안쪽 여백 왼쪽·아래(사용자 조정)
+    private static readonly Vector2 FillInsetMax = new Vector2(6f, 8f);      // 막대 안쪽 여백 오른쪽·위
+    private const float IconRowY = 121f;                               // 필름 릴·% 숫자 줄 중심 높이(사용자 조정)
     private const float TipCapsuleY = 166f;
     private const float TipTextY = 109f;
 
@@ -79,7 +80,7 @@ public static class LoadingScreenLayoutAuthoring
         Place(capsule.rectTransform, Vector2.zero, Vector2.zero, new Vector2(0f, 0.5f), new Vector2(62f, TipCapsuleY), new Vector2(108f, 48f));
         Image radio = ImageChild(capsule.rectTransform, "Radio", Sprite("Loading_radio"));
         radio.preserveAspect = true;
-        Place(radio.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(24f, -1f), new Vector2(22f, 33f));
+        Place(radio.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(30.5f, 9.61f), new Vector2(66.88f, 67.22f));
         TMP_Text tipLabel = TextChild(capsule.rectTransform, "Label", heavy, 20f, TextAlignmentOptions.Center);
         Place(tipLabel.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         tipLabel.rectTransform.offsetMin = new Vector2(40f, 0f);
@@ -100,33 +101,33 @@ public static class LoadingScreenLayoutAuthoring
 
         RectTransform fillArea = RectChild(track.rectTransform, "FillArea");
         Place(fillArea, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        fillArea.offsetMin = FillInset;
-        fillArea.offsetMax = -FillInset;
+        fillArea.offsetMin = FillInsetMin;
+        fillArea.offsetMax = -FillInsetMax;
 
         Image fill = ImageChild(fillArea, "ProgressFill", Sprite("Loading_progress_fill"));
         fill.type = Image.Type.Sliced;
-        fill.pixelsPerUnitMultiplier = 24f / (TrackHeight - FillInset.y * 2f);
+        fill.pixelsPerUnitMultiplier = 24f / (TrackHeight - FillInsetMin.y - FillInsetMax.y);
         Place(fill.rectTransform, Vector2.zero, new Vector2(0.72f, 1f), new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
         if (fill.GetComponent<RectMask2D>() == null) fill.gameObject.AddComponent<RectMask2D>();
 
-        float fillWidth = 1920f - SideMargin * 2f - FillInset.x * 2f;
+        float fillWidth = 1920f - SideMargin * 2f - FillInsetMin.x - FillInsetMax.x;
         Image halftone = ImageChild(fill.rectTransform, "Halftone", Sprite("Loading_progress_fill_halftone"));
         Place(halftone.rectTransform, Vector2.zero, new Vector2(0f, 1f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(fillWidth, 0f));
 
         // 필름 릴(로딩 중 회전) + % 숫자(기존 Text_Percentage) + 상태 문구(기존 Text_Status, 릴 왼쪽 작게).
         Image reel = ImageChild(canvas, "Reel", Sprite("Loading_film_canister"));
         reel.preserveAspect = true;
-        Place(reel.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0.5f), new Vector2(-194f, IconRowY), new Vector2(56f, 56f));
+        Place(reel.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0.5f), new Vector2(-218f, IconRowY), new Vector2(84f, 84f));
         if (reel.GetComponent<LoadingReelSpin>() == null) reel.gameObject.AddComponent<LoadingReelSpin>();
 
         TMP_Text percent = Existing<TMP_Text>(canvas, "Text_Percentage");
-        StyleText(percent, heavy, 46f, TextAlignmentOptions.MidlineLeft, TextColor);
-        Place(percent.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0.5f), new Vector2(-150f, IconRowY), new Vector2(140f, 60f));
+        StyleText(percent, heavy, 54f, TextAlignmentOptions.MidlineLeft, TextColor);
+        Place(percent.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0.5f), new Vector2(-148f, IconRowY), new Vector2(140f, 60f));
         percent.text = "72<size=50%> %</size>";
 
         TMP_Text status = Existing<TMP_Text>(canvas, "Text_Status");
-        StyleText(status, medium, 22f, TextAlignmentOptions.MidlineRight, new Color(TextColor.r, TextColor.g, TextColor.b, 0.7f));
-        Place(status.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0.5f), new Vector2(-236f, IconRowY), new Vector2(800f, 40f));
+        StyleText(status, medium, 22f, TextAlignmentOptions.Midline, new Color(TextColor.r, TextColor.g, TextColor.b, 0.7f));
+        Place(status.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0.5f), new Vector2(-560f, 30f), new Vector2(800f, 40f));
 
         // 옛 진행 막대 제거 + 뷰 참조.
         Transform oldFill = canvas.Find("progress fill");
