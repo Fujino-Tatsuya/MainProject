@@ -95,3 +95,14 @@
 - 손 → 플레이어 선이 붙는 몸 높이 = 발밑 + `bodyHeight`(1m, 콜라이더 중심이 바닥 쪽이라 바닥에 붙어 보였다).
 - **예고용 `FX_No23Grab_MagneticLine` 은 쓰지 않는다** — 예고부터 `FX_No23Grab_PullTether` 하나가 나오고(예고 동안 0.12 → 0.85 로 진해짐) 끌어오기까지 끊김 없이 이어진다. 프리팹 칸 `magneticLine`·`lineWidth` 삭제, 굵기 = `tetherWidth` 0.1.
 - 전기 줄 3가닥: `No23GrabFxView.Segment` 가 가닥마다 [심, 번짐] 두 줄(가닥 = `lineCount / 2`), PullTether·MagneticLine 프리팹 `lineCount` 6. 휘는 정도·지글거림은 프리팹 인스펙터 칸(`centerBend` 0.05 · `outerBend` 0.14 · `jitterAmount` 0.07 · `jitterSpeed` 37).
+
+## 후속 조정(2026-11-16 민경 — MyProject 미리보기 확인 후 반영, Claude)
+- **끌림 궤적 끔** — `TwentyThree.prefab` 의 `No23GrabTelegraphVfx.pullTrail` 칸을 비웠다(엔트리 `FX_No23Grab_PullTrail_Entry` 는 남겨 둠).
+  칸이 비면 `SpawnBurst` 가 그 연출만 건너뛴다 — 바닥 긁힘·전기 테더·착지 스파크·판정·이동은 그대로. 코드 변경 없음, Raid 변형은 이 칸을 덮어쓰지 않는다.
+  끈 이유: 끌어오기 시작 프레임에 플레이어가 보스 앞으로 바로 옮겨져(PlayerRestrainedState Push) 원래 자리 → 도착점 줄이 "이동한 만큼 남는 잔상"처럼 보였다.
+- **내려찍기(`FX_Throw_Mini`)·놓기(`FX_Throw`) 색 = Pull 연출 색 계열**(SVN, 색 값만 — 알파·키 타이밍·크기·수명 그대로).
+  Pull 쪽 기준색: 테더 시안 (0.60, 0.94, 1.0) · 자기장 코어 파랑 h217 · 바닥 긁힘 먼지 (0.65, 0.72, 0.80).
+  - Mini: Glow 시안 (0.42, 0.90, 1.0) · Flash 거의 흰색 (0.86, 0.98, 1.0) · Sparks (0.36, 0.80, 1.0) · Smoke 먼지색.
+  - Throw: dust 먼지색 · electric 테더 시안 · sparks·circle 흰 → 시안 (0.45, 0.88, 1.0) · glow 흰 → 옅은 시안 · shadow 어두운 남색(0.14, 0.22, 0.36 → 0.08, 0.14, 0.26) · crack 흰 열기 → 파랑 (0.30, 0.62, 1.0).
+- 참고(미변경): 두 이펙트는 바닥면 높이 그대로(보정 0) 재생돼 원점 중심 빌보드 아래 절반이 바닥에 가린다 — `FX_Throw` = `GroundProbe` 맞은 점(BossFloorCollider 윗면 0.5),
+  `ThrowMini` = 내려찍기 클립 `PlayEffect("ThrowMini")`(소켓 `GrabThrowVFX_Socket` 높이 0 = 보스 발밑). 코드 주석과 달리 ThrowMini 는 1.4배속에서 0.434초에 터져 매 타 나온다(한 타 0.464초).
