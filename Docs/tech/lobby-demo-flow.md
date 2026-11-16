@@ -100,6 +100,10 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 - 무입력 리셋·스태프 키·코스 스킵·전멸 상한·관람객 디버그 키 차단은 범위 밖(별도 작업). 디버그 단축키(`DEV_HOTKEYS`)는 빌드에 들어 있다 — [debug-hotkeys.md](debug-hotkeys.md).
 - Unity Relay 는 쓰지 않는다. **유선 직접 IPv4 만.**
 
+## 7.1 부스 대기 영상 (할 일 289, 11-16)
+Alt+\\ 로 트레일러를 모든 창 위에 띄우고 입력이 오면 내린다 — 게임 밖 도구(팟플레이어 화면 보호기 + 단축키 스크립트).
+설정·자동 시작·문제 해결은 [DevTools/BoothAttractVideo/README.md](../../DevTools/BoothAttractVideo/README.md).
+
 ## 8. 화면 문구 키 (Strings)
 > 문구 원본 = `GameData.xlsx`(SVN) **Strings 시트** ko·en. 키·ko 폴백은 아래 코드 파일 한 곳이고 `UiStrings.All` 이 모은다 — 규칙 [localization.md](localization.md) §6·§8.
 > 시트에 행이 없으면 화면은 코드 ko 폴백이다(`#키` 가 안 나온다). 기준 2026-10-22(할 일 48 후속).
