@@ -80,8 +80,8 @@ public static class LoadingScreenLayoutAuthoring
         Place(capsule.rectTransform, Vector2.zero, Vector2.zero, new Vector2(0f, 0.5f), new Vector2(62f, TipCapsuleY), new Vector2(108f, 48f));
         Image radio = ImageChild(capsule.rectTransform, "Radio", Sprite("Loading_radio"));
         radio.preserveAspect = true;
-        Place(radio.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(30.5f, 9.61f), new Vector2(66.88f, 67.22f));
-        TMP_Text tipLabel = TextChild(capsule.rectTransform, "Label", heavy, 20f, TextAlignmentOptions.Center);
+        Place(radio.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(25f, 8f), new Vector2(50f, 50.25f));
+        TMP_Text tipLabel = TextChild(capsule.rectTransform, "Label", heavy, 24f, TextAlignmentOptions.Center);
         Place(tipLabel.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         tipLabel.rectTransform.offsetMin = new Vector2(40f, 0f);
         tipLabel.rectTransform.offsetMax = new Vector2(-10f, 2f);
