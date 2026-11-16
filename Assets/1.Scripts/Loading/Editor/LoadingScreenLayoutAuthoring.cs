@@ -110,9 +110,8 @@ public static class LoadingScreenLayoutAuthoring
         Place(fill.rectTransform, Vector2.zero, new Vector2(0.72f, 1f), new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
         if (fill.GetComponent<RectMask2D>() == null) fill.gameObject.AddComponent<RectMask2D>();
 
-        float fillWidth = 1920f - SideMargin * 2f - FillInsetMin.x - FillInsetMax.x;
         Image halftone = ImageChild(fill.rectTransform, "Halftone", Sprite("Loading_progress_fill_halftone"));
-        Place(halftone.rectTransform, Vector2.zero, new Vector2(0f, 1f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(fillWidth, 0f));
+        Place(halftone.rectTransform, Vector2.zero, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(-96.2f, 0f), new Vector2(456.73f, 0f));   // 채움 시작 쪽 고정 폭(사용자 조정)
 
         // 필름 릴(로딩 중 회전) + % 숫자(기존 Text_Percentage) + 상태 문구(기존 Text_Status, 릴 왼쪽 작게).
         Image reel = ImageChild(canvas, "Reel", Sprite("Loading_film_canister"));
