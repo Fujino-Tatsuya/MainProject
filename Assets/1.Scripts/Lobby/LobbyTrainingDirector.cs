@@ -567,11 +567,12 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
             Debug.Log($"[SceneFlow] {Tag} 라커 방문(캐릭터 선택 패널 열기) client {clientId} [{string.Join(",", _flow.LockerVisited)}]");
     }
 
-    // [서버] 대사 행(할 일 157 ③ — L11·L21, ⑨ — 브리핑 L31~L34) — 진입 revision 마다 길이를 정해 스냅샷 timerStart/timerEnd(서버 시각)로 싣고, 끝 시각에 다음 행으로 1회.
-    // 브리핑 4행도 한 행씩 같은 방식(L34 끝 → L40). 입력 잠금은 LobbyBriefing 이 묶음 단위로 건다.
+    // [서버] 대사 행(할 일 157 ③ — L11·L21, ⑨ — 브리핑) + 영상 행(할 일 292 — 브리핑 영상) — 진입 revision 마다 길이를 정해 스냅샷 timerStart/timerEnd(서버 시각)로 싣고,
+    // 끝 시각에 다음 행으로 1회. 영상 길이 = 클립 길이(없으면 행 dialogueSeconds), 전원 Esc 동의면 ServerSkipVideo 가 바로 끝낸다(영상 → L34 → L40).
+    // 입력 잠금은 LobbyBriefing 이 묶음 단위로 건다.
     private void TickDialogueServer()
     {
-        if (_flow.CurrentKind != LobbyTutorialStepKind.Dialogue || _flow.HasPendingAdvance)
+        if (!LobbyBriefingRules.IsTimed(_flow.CurrentKind) || _flow.HasPendingAdvance)
             return;
 
         var step = ServerStep();
@@ -580,22 +581,56 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
 
         var now = ServerNow();
         var revision = _flow.Revision;
+        var video = step.kind == LobbyTutorialStepKind.Video;
+        var label = video ? $"영상 {step.stateId}" : $"대사 {step.dialogueId}";
         switch (_dialogueClock.Tick(revision, now, _flow.Snapshot.TimerEndServerTime))
         {
             case LobbyTutorialDialogueAction.Start:
             {
-                var seconds = ServerDialogueSeconds(step, out var source);
+                string source;
+                double seconds;
+                if (video)
+                {
+                    var clipSeconds = step.videoClip != null ? step.videoClip.length : 0d;
+                    seconds = LobbyBriefingVideoRules.VideoSeconds(clipSeconds, step.dialogueSeconds);
+                    source = clipSeconds > 0d ? $"클립 {step.videoClip.name}" : "행 dialogueSeconds(클립 없음)";
+                }
+                else
+                {
+                    seconds = ServerDialogueSeconds(step, out source);
+                }
+
                 _flow.SetTimer(revision, now, now + seconds);
                 SyncReplicatedState();
-                Debug.Log($"[SceneFlow] {Tag} 대사 {step.dialogueId} 시작 {seconds:0.##}초({source}) — {ServerDescribe()}");
+                Debug.Log($"[SceneFlow] {Tag} {label} 시작 {seconds:0.##}초({source}) — {ServerDescribe()}");
                 break;
             }
             case LobbyTutorialDialogueAction.End:
-                if (ServerAdvance(_flow.StepIndex + 1, $"대사 {step.dialogueId} 끝"))
+                if (ServerAdvance(_flow.StepIndex + 1, $"{label} 끝"))
                     _dialogueClock.MarkEnded(revision);
                 break;
         }
     }
+
+    /// <summary>
+    /// [서버] 브리핑 영상 건너뛰기(할 일 292 — <see cref="LobbyBriefing"/> 가 접속자 전원 동의를 확인한 뒤 부른다). 지금 행이 그 (회차, revision) 의
+    /// 영상이면 다음 행으로 바로 넘긴다. 받아들였으면 true.
+    /// </summary>
+    public bool ServerSkipVideo(int runId, int revision)
+    {
+        if (!IsServer || _flow == null
+                      || !LobbyBriefingVideoRules.AcceptsSkipVote(_flow.CurrentKind, _flow.RunId, _flow.Revision, runId, revision, _flow.HasPendingAdvance))
+            return false;
+
+        if (!ServerAdvance(_flow.StepIndex + 1, "영상 건너뛰기(접속자 전원 동의)"))
+            return false;
+
+        _dialogueClock.MarkEnded(revision);
+        return true;
+    }
+
+    /// <summary>[서버] 진행 중 다음 행 전이가 대기 중인가(같은 프레임 미룸) — 건너뛰기 표 판정용.</summary>
+    public bool ServerHasPendingAdvance => _flow != null && _flow.HasPendingAdvance;
 
     // [서버] 대사 길이 — 행 dialogueSeconds → 문구 표 durationSeconds → 글자 수 규칙, + 끝 여유(LobbyRules 수치).
     private double ServerDialogueSeconds(LobbyTutorialStep step, out string source)

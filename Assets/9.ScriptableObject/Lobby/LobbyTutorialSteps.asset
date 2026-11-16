@@ -391,8 +391,8 @@ MonoBehaviour:
     locksInput: 0
     requiredSkillTags: 
     trainingProfile: 0
-  - stateId: L31_BriefIntro
-    kind: 2
+  - stateId: L31_BriefVideo
+    kind: 5
     activity: 0
     titleKey: LOBBY_TITLE_BRIEF
     objectiveKey: 
@@ -407,57 +407,12 @@ MonoBehaviour:
     holdSeconds: 0.3
     pathId: 
     targetWallId: 
-    dialogueId: LOBBY_BRIEF_EVAL
-    speakerKey: LOBBY_SPEAKER_SUPERVISOR
+    dialogueId: 
+    speakerKey: 
     backgroundId: 
-    dialogueSeconds: 0
+    dialogueSeconds: 57
     locksInput: 1
-    requiredSkillTags: 
-    trainingProfile: 0
-  - stateId: L32_BriefFactory
-    kind: 2
-    activity: 0
-    titleKey: LOBBY_TITLE_BRIEF
-    objectiveKey: 
-    bodyKeys: []
-    checklistKeys: []
-    progressMode: 0
-    progressKey: 
-    countdownStateId: 
-    countdownObjectiveKey: 
-    countdownProgressKey: 
-    gatherPoint: 0
-    holdSeconds: 0.3
-    pathId: 
-    targetWallId: 
-    dialogueId: LOBBY_BRIEF_FACTORY
-    speakerKey: LOBBY_SPEAKER_SUPERVISOR
-    backgroundId: BRIEF_BG_FACTORY
-    dialogueSeconds: 0
-    locksInput: 1
-    requiredSkillTags: 
-    trainingProfile: 0
-  - stateId: L33_BriefRebellion
-    kind: 2
-    activity: 0
-    titleKey: LOBBY_TITLE_BRIEF
-    objectiveKey: 
-    bodyKeys: []
-    checklistKeys: []
-    progressMode: 0
-    progressKey: 
-    countdownStateId: 
-    countdownObjectiveKey: 
-    countdownProgressKey: 
-    gatherPoint: 0
-    holdSeconds: 0.3
-    pathId: 
-    targetWallId: 
-    dialogueId: LOBBY_BRIEF_REBELLION
-    speakerKey: LOBBY_SPEAKER_SUPERVISOR
-    backgroundId: BRIEF_BG_REBELLION
-    dialogueSeconds: 0
-    locksInput: 1
+    videoClip: {fileID: 32900000, guid: 38160239708f43e8997ffe6c6328142f, type: 3}
     requiredSkillTags: 
     trainingProfile: 0
   - stateId: L34_SortieIntro

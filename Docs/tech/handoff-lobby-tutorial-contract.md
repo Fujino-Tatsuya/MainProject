@@ -14,7 +14,7 @@
   (커밋 ③에서 옛 훈련 명단 잠금 `TrainingLocked` 제거 완료 — 남은 교체 거부는 출격 집결 카운트다운·출격 확정 뒤뿐.)
 - **커밋 ②부터 진행기(`LobbyTrainingDirector`)가 `Publish`·`SetLiveSource` 한다** → 로비에 진행기가 있으면 `IsAvailable == true`. 옛 10단계 모델(`LobbyTrainingFlow`)은 삭제됐다.
 
-## 1. 단계표 (22행, 행 순서 = 진행 순서)
+## 1. 단계표 (20행, 행 순서 = 진행 순서 — 292 전 22행)
 
 명세 §2 상태 23개 중 `T21_CombatCountdown` 은 행이 아니라 **T20 의 표시 상태**(활성 구역 카운트다운 중).
 
@@ -36,13 +36,14 @@
 | 13 | T40_SuppressKill | Activity(SuppressKill) | — | 보조 설명 1줄 |
 | 14 | T50_FreePractice | Gather(+FreePractice) | `TrainEnd` | 출구 집결 + 자유 연습 병행 |
 | 15 | L30_BriefGather | Gather | `Brief`(중앙) | |
-| 16~19 | L31_BriefIntro · L32_BriefFactory · L33_BriefRebellion · L34_SortieIntro | Dialogue | — | 입력 잠금 묶음, 배경 `BRIEF_BG_FACTORY`·`BRIEF_BG_REBELLION`(L32·L33, L31·L34 = 빈 값 = 로비 화면). 대사 `LOBBY_BRIEF_EVAL`·`_FACTORY`·`_REBELLION`·`_SORTIE` — 서버 대사 스케줄러가 행마다 1회(⑨) |
-| 20 | L40_SortieGather | Gather | `Sortie` | 참여자 = 접속자 전원 |
-| 21 | L41_Loading | Loading | — | 기존 로딩 흐름 |
+| 16 | L31_BriefVideo | **Video**(292) | — | 입력 잠금 묶음. 브리핑 영상(행 `videoClip`, 57초) — 서버가 같은 대사 타이머로 끝(`timerStart`/`timerEnd`), 접속자 전원 Esc 동의면 바로 끝. 대사·배경 없음(옛 L31~L33 대사 3행·L32·L33 삽화는 292 에서 연결 끊음 — 문구 행·png 보존) |
+| 17 | L34_SortieIntro | Dialogue | — | 입력 잠금 묶음(영상과 한 묶음). 대사 `LOBBY_BRIEF_SORTIE`, 배경 빈 값 |
+| 18 | L40_SortieGather | Gather | `Sortie` | 참여자 = 접속자 전원 |
+| 19 | L41_Loading | Loading | — | 기존 로딩 흐름 |
 
 - 행 칸 `trainingProfile`(None/Training) = 서버 훈련 보정(체력 하한) 적용 행 — L21·T10~T50 = Training(T50 보정은 출구 집결 확정 → L30 때 풀림, ⑨). 158 은 읽지 않아도 된다.
 - 158 은 **StateId 문자열로 분기하지 말고** Kind·키 칸을 읽는다(행 추가·순서 조정에 안전). 꼭 필요하면 `DisplayStateId` 비교.
-- 경로 키 `PATH_*`·벽 키 `WALL_TRAIN_WEST`·삽화 키 `BRIEF_BG_*` 는 **157 이 정한 임시 이름**이다. 158 이 다른 이름을 원하면 단계표 SO 만 고치면 된다(코드 무관) — 브릿지로 알려 주면 157 이 반영.
+- 경로 키 `PATH_*`·벽 키 `WALL_TRAIN_WEST`·삽화 키 `BRIEF_BG_*`(292 부터 쓰는 행 없음) 는 **157 이 정한 임시 이름**이다. 158 이 다른 이름을 원하면 단계표 SO 만 고치면 된다(코드 무관) — 브릿지로 알려 주면 157 이 반영.
 
 ## 2. 상태 읽기 API (`LobbyTutorialState`)
 
@@ -50,10 +51,10 @@
 |---|---|---|
 | `IsAvailable` | bool | 진행기 Publish 있음·단계표 있음. false 면 158 은 아무것도 그리지 않는다 |
 | `RunId` / `Revision` | int | 바뀌면 표식·경로를 다시 맞춘다 |
-| `CurrentStep` | `LobbyTutorialStepView` | 행 사본: StateId·Kind·Activity·TitleKey·ObjectiveKey·BodyKeys·ChecklistKeys·ProgressMode·ProgressKey·GatherPointId·PathId·TargetWallId·DialogueId·SpeakerKey·BackgroundId·LocksInput |
+| `CurrentStep` | `LobbyTutorialStepView` | 행 사본: StateId·Kind·Activity·TitleKey·ObjectiveKey·BodyKeys·ChecklistKeys·ProgressMode·ProgressKey·GatherPointId·PathId·TargetWallId·DialogueId·SpeakerKey·BackgroundId·LocksInput·VideoClip(292) |
 | `DisplayStateId` | string | 보통 = StateId, T20 카운트다운 중 = `T21_CombatCountdown` |
 | `TitleKey` / `ObjectiveKey` / `BodyKeys` | string / string / IReadOnlyList<string> | 카운트다운 중엔 ObjectiveKey = `LOBBY_OBJ_COMBAT` |
-| `ObjectivePanelVisible` | bool | false = 진행기 없음·대사 단계·로딩·출격 확정 뒤·**내가 명단 밖 늦은 참가자** |
+| `ObjectivePanelVisible` | bool | false = 진행기 없음·대사 단계·영상 단계(292)·로딩·출격 확정 뒤·**내가 명단 밖 늦은 참가자** |
 | `ProgressMode` | `LobbyTutorialProgressMode` | None·Gather·PartyComplete·Countdown(T20 카운트다운 중) |
 | `TryGetProgress(out n, out total)` | bool | Gather = 활성 구역 모인 수/참여자, PartyComplete = 6항목 완료 인원/명단, Countdown = 남은 정수 초(올림). None·값 없음이면 false → 하단 줄 숨김 |
 | `ProgressKey` | string | `LOBBY_PROGRESS_GATHER`(`{n}/{total}`) · `LOBBY_PROGRESS_PARTY_DONE` · `LOBBY_PROGRESS_COUNTDOWN`(`{n}`) |
@@ -64,7 +65,8 @@
 | `ActiveTargetWallId` | string | T34 만 값. 완료(다음 revision) 즉시 빈 값 |
 | `CountdownRemainingSeconds` | double | T20 카운트다운 중만, 그 밖 0(유지 0.3초는 표시하지 않음) |
 | `Dialogue` / `IsDialogueActive` | `LobbyTutorialDialogueView` / bool | DialogueId·SpeakerKey·BackgroundId·StartServerTime·EndServerTime·Revision. 대사 중엔 목표 패널 숨김 |
-| `IsInputLockedForBriefing` | bool | L31~L34(표시 참고용 — 실제 잠금은 서버) |
+| `Video` / `IsVideoActive` | `LobbyTutorialVideoView` / bool | 292 — Clip·StartServerTime·EndServerTime·Revision. Kind=Video 이고 출격 확정 전일 때만. 시작 시각 0 = 서버가 아직 안 실음(다음 Publish 에서 같은 revision 으로 값만 바뀜, 이벤트 없음). 영상 단계는 `Dialogue*` 이벤트를 내지 않는다 |
+| `IsInputLockedForBriefing` | bool | L31 영상·L34(표시 참고용 — 실제 잠금은 서버) |
 | `LaunchCommitted` | bool | true 면 목표·경로·집결 표식 모두 정리 |
 | `TrainingTarget` | `TrainingSparringBot`(null 가능) | 취약·제압·칸 표시용(기존 복제값) |
 
@@ -78,7 +80,7 @@
 | `TargetWallCleared(wallId)` | 벽 키가 있던 단계를 떠날 때 | 벽 표식 즉시 끔 |
 
 - 한 번의 전이 안 호출 순서: `DialogueEnded`(이전이 대사면) → `StepChanged` → `DialogueStarted`(다음이 대사면) → `TargetWallCleared`.
-  연속 대사(L31→L34)는 Ended 직후 Started 가 같은 호출에서 온다 — **그 사이에 목표 패널을 켜지 말 것**(`ObjectivePanelVisible` 은 계속 false).
+  영상 → L34 는 `StepChanged` → `DialogueStarted` 가 같은 호출에서 온다(영상 단계엔 Ended 없음) — **그 사이에 목표 패널을 켜지 말 것**(`ObjectivePanelVisible` 은 영상·대사 내내 false).
 - 같은 revision 재Publish(대사 시각 갱신 등)는 이벤트 없이 값만 바뀐다 — 대사 끝 시각은 `Dialogue.EndServerTime` 을 매번 읽는다.
 - 진행기 디스폰 때 `Clear()` — 대사 중이면 `DialogueEnded` 가 오고 `IsAvailable` 이 false 가 된다.
 
@@ -93,7 +95,7 @@
 
 - 패널/대사 프리팹·좌상단 배치·상단 파티 UI 제거·경로/테두리/벽 표식 렌더링·`PartyGatherStatusView` 대체 = **158**.
 - 옛 왼쪽 안내 칸(`Slot_WeaponCheck`·`Slot_Train02` — `LobbyWeaponCheckView`·`LobbyTrainingCombatView`)은 158 이 이미 끈다. 157 은 이 뷰에 의존하지 않는다.
-- **과도기 어댑터 — 158 병합 시 삭제**: `Assets/1.Scripts/Lobby/LobbyTutorialGuideAdapter.cs` 파일 하나(커밋 ③, 씬·다른 코드 참조 없음 — 첫 씬 로드 때 숨은 DDOL 오브젝트로 스스로 생김). `LobbyTutorialState` 를 읽어 기존 상단 가이드 UI 에만 띄운다: 목표 = `TutorialGuideUI.SetObjective`(지시문 키·T10 체크·진행 n/N, T21 카운트다운 = '시작까지 {n}' 체크 줄 1개 — 커밋 ⑥), 대사(L11·L21·브리핑 L31~L34) = `ShowSubtitle` → 대사 단계 끝에 `ClearSubtitles`, 브리핑 배경 ID 는 무시(⑨). 158 병합 때 이 파일을 지우면 끝(158 패널과 상단 가이드가 겹치지 않게).
+- **과도기 어댑터 — 삭제됨(158 C10, 파일 없음 — 아래는 기록)**: `Assets/1.Scripts/Lobby/LobbyTutorialGuideAdapter.cs` 파일 하나(커밋 ③, 씬·다른 코드 참조 없음 — 첫 씬 로드 때 숨은 DDOL 오브젝트로 스스로 생김). `LobbyTutorialState` 를 읽어 기존 상단 가이드 UI 에만 띄운다: 목표 = `TutorialGuideUI.SetObjective`(지시문 키·T10 체크·진행 n/N, T21 카운트다운 = '시작까지 {n}' 체크 줄 1개 — 커밋 ⑥), 대사(L11·L21·브리핑 L31~L34) = `ShowSubtitle` → 대사 단계 끝에 `ClearSubtitles`, 브리핑 배경 ID 는 무시(⑨). 158 병합 때 이 파일을 지우면 끝(158 패널과 상단 가이드가 겹치지 않게).
 - 씬(`3.LobbyScene.unity`) 수정은 157·158 이 같은 날 겹치지 않게 브릿지로 순서를 맞춘다(157 은 커밋 ③에 라커 볼륨 1개만).
 
 ## 6. 캐릭터 교체와 158
@@ -103,6 +105,7 @@
 
 ## 7. 변경 이력
 
+- 2026-11-16 할 일 292 — 브리핑 L31~L33 대사 3행(+L32·L33 삽화) → **영상 1행 `L31_BriefVideo`(새 Kind `Video` = 5, 기존 번호 그대로)**. 행 칸 `videoClip` 추가. 파사드 `Video`/`IsVideoActive`(`LobbyTutorialVideoView`), `ObjectivePanelVisible` 이 Video 도 숨김, `CurrentStep.VideoClip`. 영상 단계는 `Dialogue*` 이벤트를 내지 않는다. 표시 = 바인더 `ApplyVideo` → `LobbyBriefingVideoScreen`(158 패널과 별도 전체 화면). 서버: 같은 대사 타이머(길이 = 클립 길이), 건너뛰기 = 새 RPC `LobbyBriefing.SkipVideoServerRpc` + NetworkVariable 2개(동의 수·투표자 수). L34 이하·다른 API 변화 없음. 상세 lobby-training.md §5.
 - 2026-10-30 커밋 ① — 최초. 파사드 골격·단계표 22행. 진행기 미연결(`IsAvailable == false`).
 - 2026-10-30 커밋 ③ — L00 = 라커 볼륨 `Area_Locker`(서버 폴링, 스폰 완료 참여자 전원 누적 방문). L11·L21 대사 = 서버 스케줄러: 스냅샷 `TimerStartServerTime`/`TimerEndServerTime` 이 실제 값(길이 = 행 dialogueSeconds → 문구 표 durationSeconds → 글자 수 규칙, + 끝 여유 — 수치 `LobbyRules`), 끝 시각에 다음 행 1회. 캐릭터 잠금 제거. 과도기 어댑터 추가(§5).
 - 2026-10-30 커밋 ⑥ — T20~T22. T20 = `Train02Start` 집결, 유지 3초 = 서버 카운트다운 → 그동안 표시 상태 T21(`DisplayStateId`·`ObjectiveKey`=`LOBBY_OBJ_COMBAT`·`ProgressMode` Countdown·`LOBBY_PROGRESS_COUNTDOWN` n = 남은 초 올림 3→2→1). 한 명이라도 이탈 = 구역이 카운트다운 취소 → 표시 T20 복귀, 다시 모이면 처음부터 3초. 판정은 순수 함수 `LobbyTutorialCountdownDisplay`(파사드가 씀, API 무변경). 카운트다운 동안 상대 없음, 확정 → T22 에서 스폰. T22 상대 = 로비 전용 `LobbyCombatSpawnSet.asset` **6마리**(Q9, `LobbyRules.combatSpawnSet` 로 연결 — 씬 무수정, 기준점은 기존 `Train02Spawns`). 완료 = 생성 상대 전원 사망 1회(마지막 사망 중복 수신 무시). **'남은 상대' 수는 계약에 없음**(옛 `LobbyTrainingCombat.Remaining/Total` 복제값은 158 이 끄는 옛 뷰 전용으로만 남김). 과도기 어댑터가 카운트다운 줄을 체크 줄 1개로 표시. 158 표시 계약 API 변화 없음.

@@ -10,6 +10,7 @@ public enum LobbyTutorialStepKind : byte
     Dialogue = 2,       // 감독관 대사 — 서버 시각으로 끝난다
     Activity = 3,       // 훈련 내용 컴포넌트가 완료를 보고한다
     Loading = 4,        // L41 — 기존 로딩 흐름
+    Video = 5,          // 브리핑 영상(할 일 292) — 대사처럼 서버 시각으로 끝난다(길이 = 영상 길이), 접속자 전원 Esc 동의면 바로 끝
 }
 
 /// <summary>지금 일하는 훈련 내용(PLAN §2.2). T50 은 Kind=Gather + FreePractice(출구 집결과 병행).</summary>
@@ -104,10 +105,14 @@ public sealed class LobbyTutorialStep
     public string speakerKey;
     [Tooltip("브리핑 삽화 키. 비면 로비 배경.")]
     public string backgroundId;
-    [Tooltip("0 이하 = TutorialGuideTexts 의 표시 시간 → 글자 수 규칙.")]
+    [Tooltip("0 이하 = TutorialGuideTexts 의 표시 시간 → 글자 수 규칙. Kind=Video 는 영상 클립이 없을 때 쓰는 길이(초).")]
     public float dialogueSeconds;
-    [Tooltip("브리핑 입력 잠금 묶음(L31~L34).")]
+    [Tooltip("브리핑 입력 잠금 묶음(영상 L31 + 출격 안내 L34).")]
     public bool locksInput;
+
+    [Header("영상(292)")]
+    [Tooltip("Kind=Video 일 때 재생할 영상. 단계 길이 = 이 클립 길이(없으면 dialogueSeconds). 모든 피어가 로컬로 전체 화면 재생한다.")]
+    public UnityEngine.Video.VideoClip videoClip;
 
     [Header("판정")]
     [Tooltip("T32·T34 — 인정할 스킬 툴팁 태그. 표의 enforceRequiredSkillTags 가 꺼져 있으면 검사하지 않는다(할 일 157 Q12a).")]
@@ -179,7 +184,7 @@ public sealed class LobbyTutorialStepTable : ScriptableObject
 
     /// <summary>
     /// 행 검증 규칙: 1행 이상·<see cref="MaxSteps"/> 이하, 상태 ID 비지 않고 유일, Gather → 집결 지점·유지 시간 ≥ 0,
-    /// Dialogue → 대사 ID, Activity → Activity ≠ None, LockerVisit 은 첫 행, 카운트다운 표시 상태는 Gather 행만·지시문 키 필요.
+    /// Dialogue → 대사 ID, Video → 영상 클립 또는 길이 &gt; 0, Activity → Activity ≠ None, LockerVisit 은 첫 행, 카운트다운 표시 상태는 Gather 행만·지시문 키 필요.
     /// </summary>
     public static bool Validate(IReadOnlyList<LobbyTutorialStep> rows, List<string> errors)
     {
@@ -220,6 +225,10 @@ public sealed class LobbyTutorialStepTable : ScriptableObject
                 case LobbyTutorialStepKind.Dialogue:
                     if (string.IsNullOrWhiteSpace(row.dialogueId))
                         errors.Add($"{label} Dialogue 인데 dialogueId 없음.");
+                    break;
+                case LobbyTutorialStepKind.Video:
+                    if (row.videoClip == null && row.dialogueSeconds <= 0f)
+                        errors.Add($"{label} Video 인데 videoClip·dialogueSeconds 둘 다 없음.");
                     break;
                 case LobbyTutorialStepKind.Activity:
                     if (row.activity == LobbyTutorialActivity.None)

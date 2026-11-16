@@ -15,7 +15,7 @@
 | `ShowObjective(LobbyObjectiveView)` | 목표 패널 내용 교체. 대사 중이면 내용만 바꾸고 대사·유예가 끝난 뒤 보인다 |
 | `HideObjective()` | 목표 패널 끔 |
 | `ShowDialogue(speakerKey, lineKey, background)` | 감독관 대사 한 줄(연속 대사는 다시 부른다). `background` = `None`/`Factory`/`Rebellion` |
-| `ShowDialogue(speakerKey, lineKey, backgroundId)` | 같음 — 157 단계표 `backgroundId` 글자(`BRIEF_BG_FACTORY`·`BRIEF_BG_REBELLION`, 빈 값 = 없음) 그대로 |
+| `ShowDialogue(speakerKey, lineKey, backgroundId)` | 같음 — 157 단계표 `backgroundId` 글자(`BRIEF_BG_FACTORY`·`BRIEF_BG_REBELLION`, 빈 값 = 없음) 그대로. 292 부터 `backgroundId` 를 가진 행이 없어 삽화는 안 뜬다(코드·png 는 보존) |
 | `EndDialogue()` | 대사·삽화 닫기. 목표 패널은 유예(기본 0.3초) 뒤 다시 보인다 |
 | `SetPath(pathId)` | 그 ID 의 바닥 경로만 켬. null·빈 값 = 전부 끔 |
 | `SetWallTarget(wallId, visible)` | 지정 벽 표식 켜고 끔 |
@@ -34,8 +34,8 @@
 |---|---|
 | 경로 `LobbyTutorialPathIds` | `PATH_LOCKER`(L00)·`PATH_CENTRAL`(L10·L30 공용)·`PATH_TRAINING_HALL`(L20 — 끝점 = 훈련장 문 앞 입구 `Gather_Entrance`, `Train01Start` 아님)·`PATH_COMBAT_AREA`(T20)·`PATH_COUNTER_AREA`(T30)·`PATH_TRAINING_EXIT`(T50)·`PATH_SORTIE`(L40) |
 | 벽 `LobbyTutorialWallIds` | `WALL_TRAIN_WEST`(T34) |
-| 삽화 `LobbyTutorialBackgroundIds` | `BRIEF_BG_FACTORY`(L32)·`BRIEF_BG_REBELLION`(L33) |
-| 대사 id | `LOBBY_DLG_INTRO`(L11)·`LOBBY_DLG_TRAINING`(L21)·`LOBBY_BRIEF_EVAL`·`LOBBY_BRIEF_FACTORY`·`LOBBY_BRIEF_REBELLION`·`LOBBY_BRIEF_SORTIE`(L31~L34), 화자 `LOBBY_SPEAKER_SUPERVISOR` |
+| 삽화 `LobbyTutorialBackgroundIds` | `BRIEF_BG_FACTORY`·`BRIEF_BG_REBELLION` — 옛 L32·L33(292 에서 행이 영상으로 바뀌어 지금은 쓰는 행 없음) |
+| 대사 id | `LOBBY_DLG_INTRO`(L11)·`LOBBY_DLG_TRAINING`(L21)·`LOBBY_BRIEF_SORTIE`(L34) — 옛 `LOBBY_BRIEF_EVAL`·`_FACTORY`·`_REBELLION` 은 292 에서 연결만 끊음(키·문구 보존), 화자 `LOBBY_SPEAKER_SUPERVISOR` |
 | 문구 id | `LOBBY_TITLE_*` 9·`LOBBY_OBJ_*` 12·`LOBBY_BODY_*` 4·`LOBBY_CHECK_*` 6·`LOBBY_PROGRESS_*` 3 |
 | 집결 | 입력 없음 — 테두리는 `PartyGatherZone` 복제값(활성 ∧ 확정 전)만 읽는다. `LobbyGatherPoint` 이름에 의존하지 않는다(L20 활성 구역 = `Entrance` — 확정 뒤 명단 전원 `Train01Start` 로 텔레포트, 내부 재집결 없음. 계약 198d483a) |
 
@@ -53,7 +53,8 @@
 | `IsAvailable` true 가 된 첫 프레임 | `SetTutorialActive(true)` — 진행 중 내내 옛 3스텝 안내 끔 |
 | `ObjectivePanelVisible` ∧ `ObjectiveKey` | `ShowObjective` — 챕터 `TitleKey`·지시문 `ObjectiveKey`(T21 카운트다운 중엔 파사드가 바꿔 줌)·설명 `BodyKeys`·T10 체크(`TryGetLocalChecklist`, 비트 = `LobbyWeaponCheckItem` 순서)·진행 줄(`ProgressMode` + `TryGetProgress`). 아니면 `HideObjective` |
 | 집결 n/N | 진행 줄 `집결 {n}/{total}` — 옛 상단 `PartyGatherStatusView`(`Slot_GatherStatus`, 씬에서 꺼 둠) 대체 |
-| `IsDialogueActive` + `Dialogue` | (runId, revision) 이 바뀔 때마다 `ShowDialogue(화자, 대사, BackgroundId)` — 연속 대사(L31→L34)는 끄지 않고 다시 부름. 대사 단계를 떠나면 `EndDialogue` |
+| `IsVideoActive` + `Video`(292) | 매 프레임 `LobbyBriefingVideoScreen.Show(클립, 시작 서버 시각, runId, revision)`(같은 revision 이면 시각만 갱신), 영상 단계를 떠나면 `Hide`. 이 패널(LobbyTutorialUI)과 별도 전체 화면 캔버스(정렬 460) — lobby-training.md §5 |
+| `IsDialogueActive` + `Dialogue` | (runId, revision) 이 바뀔 때마다 `ShowDialogue(화자, 대사, BackgroundId)` — 연속 대사는 끄지 않고 다시 부름. 대사 단계를 떠나면 `EndDialogue` |
 | `ActivePathId` | 바뀌면 `SetPath` (빈 값 = 전부 끔) |
 | `ActiveTargetWallId` | 바뀌면 이전 벽 `SetWallTarget(false)` → 새 벽 `SetWallTarget(true)` |
 | `CurrentStep.Kind == LockerVisit`(∧ 출격 확정 전) | 바뀌면 `SetLockerArea` — L00 동안 라커룸 테두리, 전원 방문 → L10 이면 꺼짐(`LobbyTutorialUiBinding.LockerAreaVisible`) |
@@ -167,6 +168,6 @@
 ## 검증
 
 - EditMode(맵씬 러너 `Tools/Tests/맵씬 EditMode 테스트 실행`, 픽스처 `^LobbyTutorialUi\w*Tests$`): `LobbyTutorialUiRulesTests`·`LobbyTutorialUiPathSetTests`·`LobbyTutorialUiGatherBorderTests`·`LobbyTutorialUiBinderTests`.
-- **사람이 Play 확인(바인더·씬)**: L00 부터 목표 패널 문구·T10 체크/훈련 완료 n/N·집결 n/N·T21 '시작까지 3·2·1'·대사 패널(L11·L21·L31~L34, L32/L33 삽화)·대사 중 목표 숨김·단계별 바닥 경로 하나만·옛 3스텝 화살표가 튜토리얼 중 안 보임·상단 파티 슬롯/집결/왼쪽 칸 안 보임·상단 `TutorialGuideUI` 에 튜토리얼 문구가 안 뜸·캐릭터 선택(라커) 정상·늦은 참가자 목표 숨김. 경로 점 위치는 임시.
+- **사람이 Play 확인(바인더·씬)**: L00 부터 목표 패널 문구·T10 체크/훈련 완료 n/N·집결 n/N·T21 '시작까지 3·2·1'·대사 패널(L11·L21·L34)·L31 브리핑 영상(전체 화면·Esc 건너뛰기 n/m, 292)·대사·영상 중 목표 숨김·단계별 바닥 경로 하나만·옛 3스텝 화살표가 튜토리얼 중 안 보임·상단 파티 슬롯/집결/왼쪽 칸 안 보임·상단 `TutorialGuideUI` 에 튜토리얼 문구가 안 뜸·캐릭터 선택(라커) 정상·늦은 참가자 목표 숨김. 경로 점 위치는 임시.
 - **사람이 Play 확인**: 1920×1080·1280×720·21:9·4:3 Game 뷰에서 목표 패널이 미니맵·특성·체력·스킬·키 가이드와 안 겹치는지, 대사 인물화가 키 가이드·스킬을 안 가리는지,
   디버그 구동으로 화면 01–27 대조(Scene_01/02 매핑 포함), 민트 테두리 = 트리거 박스(Scene 뷰 기즈모와 겹쳐 보기), 벽 표식 밝기·떠 보임, `□`/`■` 글리프 표시.

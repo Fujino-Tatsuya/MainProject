@@ -136,6 +136,7 @@ public static class LobbyTutorialUiBinding
 /// <list type="bullet">
 /// <item>목표 패널 = <see cref="LobbyTutorialState.ObjectivePanelVisible"/> + 키 칸·T10 체크·진행 n/N(집결 n/N 은 옛 상단 <c>PartyGatherStatusView</c> 대신 여기 진행 줄로).</item>
 /// <item>대사 = (runId, revision) 이 바뀔 때마다 <see cref="LobbyTutorialUI.ShowDialogue(string,string,string)"/>, 대사 단계를 떠나면 <see cref="LobbyTutorialUI.EndDialogue"/>.</item>
+/// <item>영상(할 일 292) = <see cref="LobbyTutorialState.Video"/> 동안 <see cref="LobbyBriefingVideoScreen.Show"/>(매 프레임 — 시작 시각이 늦게 실려도 받는다), 떠나면 Hide.</item>
 /// <item>경로 = <see cref="LobbyTutorialState.ActivePathId"/>, 벽 = <see cref="LobbyTutorialState.ActiveTargetWallId"/>(이전 벽 끔 → 새 벽 켬).</item>
 /// <item>라커룸 바닥 테두리 = L00 단계 동안(<see cref="LobbyTutorialUiBinding.LockerAreaVisible"/>).</item>
 /// <item><see cref="LobbyTutorialState.IsAvailable"/> false = 아무것도 그리지 않는다(그려 둔 게 있으면 <see cref="LobbyTutorialUI.ClearAll"/> 한 번).
@@ -162,6 +163,7 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
     private string _path;
     private string _wall;
     private bool _locker;
+    private bool _videoShown;
 
     private void Awake()
     {
@@ -202,6 +204,7 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
             _drawn = true;
         }
 
+        ApplyVideo();
         ApplyDialogue();
         ApplyObjective();
         ApplyPath();
@@ -289,8 +292,34 @@ public sealed class LobbyTutorialUiBinder : MonoBehaviour
         _locker = locker;
     }
 
+    // 영상(할 일 292) — 대사 패널과 따로 전체 화면(LobbyBriefingVideoScreen). 매 프레임 넘겨 서버가 늦게 실은 시작 시각도 받는다. 대사보다 먼저 —
+    // 영상 → L34 대사 전환 프레임에 영상 페이드 아웃과 대사 패널이 같이 시작한다.
+    private void ApplyVideo()
+    {
+        LobbyTutorialVideoView video = LobbyTutorialState.Video;
+        if (!video.Active)
+        {
+            if (_videoShown)
+            {
+                LobbyBriefingVideoScreen.Hide();
+                _videoShown = false;
+            }
+
+            return;
+        }
+
+        LobbyBriefingVideoScreen.Show(video.Clip, video.StartServerTime, LobbyTutorialState.RunId, video.Revision);
+        _videoShown = true;
+    }
+
     private void Forget()
     {
+        if (_videoShown)
+        {
+            LobbyBriefingVideoScreen.Hide();
+            _videoShown = false;
+        }
+
         _locker = false;
         _drawn = false;
         _objectiveShown = false;

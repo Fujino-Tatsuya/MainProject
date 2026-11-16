@@ -35,6 +35,26 @@ public readonly struct LobbyTutorialStepView
     public string SpeakerKey => _step?.speakerKey ?? string.Empty;
     public string BackgroundId => _step?.backgroundId ?? string.Empty;
     public bool LocksInput => _step != null && _step.locksInput;
+    public UnityEngine.Video.VideoClip VideoClip => _step?.videoClip;
+}
+
+/// <summary>영상 단계 보기(할 일 292) — 서버 시각으로 시작·끝. 시작 시각이 0 이면 서버가 아직 길이를 싣지 않았다(다음 Publish 를 기다린다).</summary>
+public readonly struct LobbyTutorialVideoView
+{
+    public LobbyTutorialVideoView(UnityEngine.Video.VideoClip clip, double startServerTime, double endServerTime, int revision)
+    {
+        Clip = clip;
+        StartServerTime = startServerTime;
+        EndServerTime = endServerTime;
+        Revision = revision;
+        Active = true;
+    }
+
+    public bool Active { get; }
+    public UnityEngine.Video.VideoClip Clip { get; }
+    public double StartServerTime { get; }
+    public double EndServerTime { get; }
+    public int Revision { get; }
 }
 
 /// <summary>대사 단계 보기 — 서버 시각으로 시작·끝(계약 §1).</summary>
@@ -146,14 +166,15 @@ public static class LobbyTutorialState
 
     public static string ProgressKey => IsCountdownDisplay ? _current.CountdownProgressKey : _current.ProgressKey;
 
-    /// <summary>false = 진행기 없음·대사·로딩·출격 확정 뒤·명단 밖 늦은 참가자(L10 확정 뒤 단계).</summary>
+    /// <summary>false = 진행기 없음·대사·영상·로딩·출격 확정 뒤·명단 밖 늦은 참가자(L10 확정 뒤 단계).</summary>
     public static bool ObjectivePanelVisible
     {
         get
         {
             if (!IsAvailable || _snapshot.LaunchCommitted)
                 return false;
-            if (_current.Kind == LobbyTutorialStepKind.Dialogue || _current.Kind == LobbyTutorialStepKind.Loading)
+            if (_current.Kind == LobbyTutorialStepKind.Dialogue || _current.Kind == LobbyTutorialStepKind.Video
+                                                               || _current.Kind == LobbyTutorialStepKind.Loading)
                 return false;
             return _live == null || !_live.IsLocalWaitingLateJoiner;
         }
@@ -179,6 +200,14 @@ public static class LobbyTutorialState
 
     public static LobbyTutorialDialogueView Dialogue => _dialogue;
     public static bool IsDialogueActive => _dialogue.Active;
+
+    /// <summary>영상 단계(할 일 292) — 진행기 있음 + 출격 확정 전 + 지금 행 Kind=Video. 시각은 스냅샷 타이머.</summary>
+    public static LobbyTutorialVideoView Video =>
+        IsAvailable && !_snapshot.LaunchCommitted && _current.Kind == LobbyTutorialStepKind.Video
+            ? new LobbyTutorialVideoView(_current.VideoClip, _snapshot.TimerStartServerTime, _snapshot.TimerEndServerTime, _snapshot.Revision)
+            : default;
+
+    public static bool IsVideoActive => Video.Active;
     public static bool IsInputLockedForBriefing => IsAvailable && _current.LocksInput;
     public static bool LaunchCommitted => _snapshot.LaunchCommitted;
     public static TrainingSparringBot TrainingTarget => _live?.TrainingTarget;
