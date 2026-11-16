@@ -2037,6 +2037,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.Amber:
                 DrawPaletteHint();
+                DrawPaletteSlots("노란 틴트 색(이 캐릭터 팔레트)", BossVictoryPaletteSlot.Amber);
                 DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberLumaLift),
                     nameof(BossVictoryGlitchSettings.skyAmberMinLuma));
                 DrawSettingsFields("처치 연출 전용 볼륨", nameof(BossVictoryGlitchSettings.victoryVolume), nameof(BossVictoryGlitchSettings.victoryVignetteIntensity),
@@ -2060,6 +2061,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseSpace),
                     nameof(BossVictoryGlitchSettings.bossNoiseTiling), nameof(BossVictoryGlitchSettings.bossNoiseCameraScale),
                     nameof(BossVictoryGlitchSettings.bossNoiseBrightIntensity));
+                DrawPaletteSlots("보스 노이즈·림 색(이 캐릭터 팔레트)", BossVictoryPaletteSlot.NoiseBright, BossVictoryPaletteSlot.NoiseDark,
+                    BossVictoryPaletteSlot.RimInside, BossVictoryPaletteSlot.RimEdge);
                 break;
             case BossVictoryTrack.Tear:
                 DrawSettingsFields("가로 찢김 모양(끌림과 같은 줄)",
@@ -2076,6 +2079,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.CrtOff:
                 DrawPaletteHint();
+                DrawPaletteSlots("TV 꺼짐 색(이 캐릭터 팔레트)", BossVictoryPaletteSlot.CrtGlow);
                 break;
             case BossVictoryTrack.NoiseScrollV:
                 EditorGUILayout.LabelField("보스 노이즈 텍스처 UV 를 수직으로 옮긴다(_NoiseST.w = 카메라 이동 누적 + 이 값). 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함. + = 위(카메라 위 이동과 같은 방향). 노이즈가 보이려면 '보스 노이즈' 세기 클립이 켜져 있어야 한다.", EditorStyles.wordWrappedMiniLabel);
@@ -2087,11 +2091,16 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawSettingsFields("배경 글자 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFont), nameof(BossVictoryGlitchSettings.rectifyText),
                     nameof(BossVictoryGlitchSettings.rectifyWidth), nameof(BossVictoryGlitchSettings.rectifyCenterY),
                     nameof(BossVictoryGlitchSettings.rectifyOutline));
+                DrawPaletteSlots("배경 글자 색(이 캐릭터 팔레트)", BossVictoryPaletteSlot.RectifyOutline);
                 break;
             case BossVictoryTrack.RectifyFill:
                 DrawPaletteHint();
                 EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원 3개 — ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각(클립 시작 기준)에 자기 중심에서 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. ③은 회색으로 페이드 → 회색에서 흰색으로 바뀐 순간부터 확장. 원 안 색 = 왼쪽 색 → 오른쪽 색. 나중 원이 위, 마지막 원으로 고정. 첫 원 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용(주황 채움·안쪽 주사선은 캐릭터별 프로필).", EditorStyles.wordWrappedMiniLabel);
                 DrawRectifyCircleFields();
+                DrawPaletteSlots("안쪽 원·회색·주황 채움·글로우 색(이 캐릭터 팔레트)",
+                    BossVictoryPaletteSlot.Circle1Left, BossVictoryPaletteSlot.Circle1Right, BossVictoryPaletteSlot.Circle2Left, BossVictoryPaletteSlot.Circle2Right,
+                    BossVictoryPaletteSlot.Circle3Left, BossVictoryPaletteSlot.Circle3Right, BossVictoryPaletteSlot.CircleGray,
+                    BossVictoryPaletteSlot.OrangeLeft, BossVictoryPaletteSlot.OrangeRight, BossVictoryPaletteSlot.Glow);
                 DrawSettingsFields("안쪽 색 공용", nameof(BossVictoryGlitchSettings.rectifyCircleGrayToWhite),
                     nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline));
                 DrawSettingsFields("RECTIFY 전용 글로우(맵 블룸과 무관)", nameof(BossVictoryGlitchSettings.rectifyGlowIntensity), nameof(BossVictoryGlitchSettings.rectifyGlowRadius),
@@ -2160,8 +2169,17 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             }
         }
 
+        DrawPaletteSlots(null, BossVictoryPalette.Slots);
+    }
+
+    // 팔레트 칸 색 편집 줄(271) — 팔레트 패널 전체 + 트랙 칸마다 그 트랙 색(11-16: 트랙에서 바로 조정). 프로필 없으면 안 그린다.
+    void DrawPaletteSlots(string title, params BossVictoryPaletteSlot[] slots)
+    {
+        if (_profile == null) return;
+        if (title != null) EditorGUILayout.Space(4f);
+        if (title != null) EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
         BossVictoryPalette palette = BossVictoryPalette.From(_profile);
-        foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots)
+        foreach (BossVictoryPaletteSlot slot in slots)
         {
             using (new EditorGUILayout.HorizontalScope())
             {
