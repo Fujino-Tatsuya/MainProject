@@ -78,7 +78,7 @@ public static class UiStrings
     public static readonly UiString LoadingReady3 = new UiString("UI.Loading.Ready3", "Starting...", "2.LoadingScene — 전원 준비 순환 문구 3(readyMessages[2])");
 
     // 275(11-12) — 임시 장난 팁 Tip1~3 삭제. 옛 키(UI.Loading.Tip1~3)는 시트에 옛 문구 행이 남아 있을 수 있어 재사용하지 않는다.
-    public static readonly UiString LoadingTipDashInterrupt = new UiString("UI.Loading.TipDashInterrupt", "Tip. 간파는 준비 동작이 있습니다... 대쉬와 간파를 동시에 쓴다면....?", "2.LoadingScene — 팁: 대쉬 간파 조작(tooltipTable[0])");
+    public static readonly UiString LoadingTipDashInterrupt = new UiString("UI.Loading.TipDashInterrupt", "간파는 준비 동작이 있습니다... 대쉬와 간파를 동시에 쓴다면....?", "2.LoadingScene — 팁: 대쉬 간파 조작(tooltipTable[0])");
 
     /// <summary>로딩 팁 — 순서 = 씬 <c>tooltipTable</c> 칸 순서. 새 팁은 씬 칸과 키를 같은 순서로 넣는다. 씬 표가 비면 팁 글자가 빈 채로 숨는다.</summary>
     public static readonly IReadOnlyList<UiString> LoadingTips = new[] { LoadingTipDashInterrupt };
