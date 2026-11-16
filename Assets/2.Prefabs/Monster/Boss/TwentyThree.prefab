@@ -4674,7 +4674,7 @@ MonoBehaviour:
   boss: {fileID: 3496395017441729605}
   handSocket: {fileID: 5812967423476021960}
   targetRing: {fileID: 11400000, guid: 24bcca9a432d3d6d69e453a1d136d65a, type: 2}
-  pullTrail: {fileID: 11400000, guid: 5e0685961a91693989e0ad9cf7f741f3, type: 2}
+  pullTrail: {fileID: 0}
   groundScuff: {fileID: 11400000, guid: aae281b3756cdd2bbbd1b5770e7d62a0, type: 2}
   pullTether: {fileID: 11400000, guid: 3d101b835b676f8ef30a9b5c5ceef9cd, type: 2}
   landingSpark: {fileID: 11400000, guid: 677ad200e857fc3102e6b8fc63d80da2, type: 2}

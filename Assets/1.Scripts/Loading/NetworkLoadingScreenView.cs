@@ -13,6 +13,8 @@ public class NetworkLoadingScreenView : MonoBehaviour
     [SerializeField] private TMP_Text tooltipText;
     [SerializeField] private TMP_Text statusText;
     [SerializeField] private TMP_Text percentText;
+    [Tooltip("진행률 숫자 뒤에 붙는 글자 — 리치 텍스트 가능(290 v02: 작은 %).")]
+    [SerializeField] private string percentSuffix = "%";
     [SerializeField] private string[] tooltipTable =
     {
         "Loading game data...",
@@ -202,12 +204,23 @@ public class NetworkLoadingScreenView : MonoBehaviour
     {
         if (progressFill != null)
         {
-            progressFill.fillAmount = progress;
+            // Sliced(290 v02 둥근 막대) = 오른쪽 끝을 진행률만큼 늘린다 — Filled 로 자르면 둥근 끝이 잘린다.
+            if (progressFill.type == Image.Type.Sliced)
+            {
+                RectTransform rect = progressFill.rectTransform;
+                Vector2 max = rect.anchorMax;
+                max.x = progress;
+                rect.anchorMax = max;
+            }
+            else
+            {
+                progressFill.fillAmount = progress;
+            }
         }
 
         if (percentText != null)
         {
-            percentText.text = Mathf.RoundToInt(progress * 100f) + "%";
+            percentText.text = Mathf.RoundToInt(progress * 100f) + percentSuffix;
         }
     }
 

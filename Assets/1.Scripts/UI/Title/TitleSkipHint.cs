@@ -16,6 +16,18 @@ public sealed class TitleSkipHint : MonoBehaviour
     [Tooltip("글꼴 — 보스 스킵 위젯과 같은 서울알림 Medium SDF.")]
     [SerializeField] private TMP_FontAsset font;
 
+    [Header("키캡·문구 크기 (288 — 기준 높이 72 일 때 값, 루트 높이에 비례해 커진다)")]
+    [Tooltip("Esc 키캡 크기(가로·세로). 처음 값 104×40 = 보스방 Space 키캡 그대로.")]
+    [SerializeField] private Vector2 keycapSize = new Vector2(CinematicOverlay.SkipKeycapWidth, CinematicOverlay.SkipKeycapHeight);
+    [Tooltip("키캡 위치 — 루트 왼쪽 가운데 기준 오프셋.")]
+    [SerializeField] private Vector2 keycapOffset = new Vector2(22f, 1f);
+    [Tooltip("키캡 안 'Esc' 글자 크기.")]
+    [SerializeField, Min(1f)] private float keyFontSize = 21f;
+    [Tooltip("'건너뛰기' 글자 크기.")]
+    [SerializeField, Min(1f)] private float labelFontSize = 28f;
+    [Tooltip("'건너뛰기' 오른쪽 여백.")]
+    [SerializeField] private float labelRightPadding = 30f;
+
     private TMP_Text _label;
     private bool _built;
     private float _builtHeight = -1f;
@@ -43,6 +55,25 @@ public sealed class TitleSkipHint : MonoBehaviour
     }
 
 #if UNITY_EDITOR
+    // 인스펙터에서 크기 칸을 바꾸면 미리보기(Play 중이면 실제 표시)를 바로 다시 만든다(288).
+    private void OnValidate()
+    {
+        UnityEditor.EditorApplication.delayCall += () =>
+        {
+            if (this == null || !isActiveAndEnabled) return;
+            if (!Application.isPlaying) { RebuildPreview(); return; }
+            string text = _label != null ? _label.text : null;
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = transform.GetChild(i);
+                if (child.name == "Keycap" || child.name == "Label") Destroy(child.gameObject);   // Build 가 만든 것만
+            }
+            _built = false;
+            Build();
+            if (text != null) _label.text = text;
+        };
+    }
+
     // 에디터에서 루트 크기를 바꾸면 미리보기를 새 배율로 다시 만든다(레이아웃 콜백 안에서 지우지 않게 한 박자 뒤).
     private void OnRectTransformDimensionsChange()
     {
@@ -87,24 +118,24 @@ public sealed class TitleSkipHint : MonoBehaviour
         float s = Mathf.Max(0.1f, root.rect.height / BossIntroPresentation.SkipPillHeight);
         _builtHeight = root.rect.height;
 
-        float kw = BossIntroPresentation.SkipKeycapWidth * s;
-        float kh = BossIntroPresentation.SkipKeycapHeight * s;
+        float kw = Mathf.Max(1f, keycapSize.x) * s;
+        float kh = Mathf.Max(1f, keycapSize.y) * s;
         Image keycap = NewImage(root, "Keycap",
             BossIntroPresentation.KeycapSprite(Mathf.RoundToInt(kw), Mathf.RoundToInt(kh)), Color.white);
         RectTransform k = keycap.rectTransform;
         k.anchorMin = k.anchorMax = k.pivot = new Vector2(0f, 0.5f);
         k.sizeDelta = new Vector2(kw, kh);
-        k.anchoredPosition = new Vector2(22f * s, 1f * s);
-        TMP_Text key = Label(keycap.transform, "Key", 21f * s, TextAlignmentOptions.Center);
+        k.anchoredPosition = keycapOffset * s;
+        TMP_Text key = Label(keycap.transform, "Key", keyFontSize * s, TextAlignmentOptions.Center);
         Stretch((RectTransform)key.transform);
         ((RectTransform)key.transform).offsetMin = new Vector2(0f, 3f * s);   // 키캡 아랫단(그림자) 위 가운데
         key.text = "Esc";
         key.color = BossIntroPresentation.KeycapTextColor;
         key.fontStyle = FontStyles.Bold;
 
-        _label = Label(root, "Label", 28f * s, TextAlignmentOptions.Right);
+        _label = Label(root, "Label", labelFontSize * s, TextAlignmentOptions.Right);
         Stretch((RectTransform)_label.transform);
-        ((RectTransform)_label.transform).offsetMax = new Vector2(-30f * s, 0f);
+        ((RectTransform)_label.transform).offsetMax = new Vector2(-labelRightPadding * s, 0f);
         _label.color = BossIntroPresentation.SkipTextColor;
     }
 

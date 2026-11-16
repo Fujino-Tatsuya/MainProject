@@ -328,9 +328,9 @@ MonoBehaviour:
     ko: '{hp} / {max}'
     en: '{hp} / {max}'
   - key: UI.Loading.TipDashInterrupt
-    ko: "Tip. \uAC04\uD30C\uB294 \uC900\uBE44 \uB3D9\uC791\uC774 \uC788\uC2B5\uB2C8\uB2E4...
+    ko: "\uAC04\uD30C\uB294 \uC900\uBE44 \uB3D9\uC791\uC774 \uC788\uC2B5\uB2C8\uB2E4...
       \uB300\uC26C\uC640 \uAC04\uD30C\uB97C \uB3D9\uC2DC\uC5D0 \uC4F4\uB2E4\uBA74....?"
-    en: Tip. Interrupt has a wind-up... What if you dash and interrupt at the same
+    en: Interrupt has a wind-up... What if you dash and interrupt at the same
       time....?
   - key: UI.Loading.Ready1
     ko: "\uC785\uC7A5 \uC911..."

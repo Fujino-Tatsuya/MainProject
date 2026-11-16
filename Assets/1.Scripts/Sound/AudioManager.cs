@@ -53,6 +53,7 @@ public class AudioManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        if (!TryGetComponent(out UiPointerSound _)) gameObject.AddComponent<UiPointerSound>();   // 전역 UI 호버·클릭 소리(11-16)
 
         InitVolumes();
         SoundConfig.ApplyTo(this);   // 저장된 설정 볼륨(없으면 원음 그대로) — PLAN-settings
