@@ -854,7 +854,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 9.700012, y: -5.700012}
+  m_AnchoredPosition: {x: -21, y: -5.700012}
   m_SizeDelta: {x: 221.5822, y: 58.835}
   m_Pivot: {x: 1, y: 0}
 --- !u!114 &694788605
@@ -870,6 +870,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TitleSkipHint
   font: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  keycapSize: {x: 48, y: 40}
+  keycapOffset: {x: 242, y: 1}
+  keyFontSize: 22
+  labelFontSize: 22
+  labelRightPadding: 30
 --- !u!1 &892366847
 GameObject:
   m_ObjectHideFlags: 0
