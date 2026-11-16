@@ -1,4 +1,4 @@
-# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198 · 230)
+# 포드 발사·착륙 연출 — 애니 이벤트 구간 (할 일 106 · 121 · 150 · 198 · 230 · 284)
 
 로비 포드 발사(`LobbyPodLaunch`)와 맵 포드 착륙(`MapPodArrival`)에서 **어느 구간을 클립 애니 이벤트가 정하고, 어느 구간을 SO 초가 정하는지** 한 곳에 모은다.
 수치 원본은 `GameData.xlsx` Lobby 시트(`PodDropSettings`), 이벤트 원본은 SVN FBX 임포트 설정이다.
@@ -84,3 +84,7 @@
 - 맵 착륙: 진입(로딩 화면 아래)부터 **연출 끝**(`EndAt` — UI·튜토리얼이 돌아오는 순간, `ClearLocal`)까지. 예전엔 디졸브 끝(조작 복귀)에 되켰다 — 조작은 그대로 디졸브 끝에 돌아오고, 실루엣만 UI 와 같이 돌아온다.
 - 방식: `PlayerSilhouetteSuppression`(`Rendering/Silhouette/`) — 스폰된 `PlayerSilhouetteTag` 마다 `SetSuppressed(true)`, 태그 수가 바뀌면 다시 찾아 늦게 스폰된 플레이어도 잡는다. 로컬 시각 값(복제 없음, 피어마다 자기 화면). 두 연출이 같은 묶음 클래스를 쓴다.
 - 보스 승리 연출의 `PlayerSilhouetteFeature.SuppressedByCinematic`(피처 전체 끔, 정적 bool 하나)은 쓰지 않는다 — 여러 연출이 한 bool 을 쓰면 먼저 끝난 쪽이 다른 연출의 끔을 풀 수 있다. 보스 엘리베이터(`BossTeleportManager`)도 태그별 경로다.
+
+## 7. 포드 베이 경광등 (할 일 284) — 제거됨
+
+경광등(284)은 11-13 사용자 결정으로 제거 — 스크립트·프리팹·씬 인스턴스를 지우고 `PC_RPAsset` Light Cookies 를 다시 껐다(성능 커밋 fa664433 의 끔 상태).

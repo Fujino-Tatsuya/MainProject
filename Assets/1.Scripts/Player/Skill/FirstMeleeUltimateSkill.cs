@@ -55,6 +55,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
     // 채널 중 이동/회전 잠금
     public override bool CanMoveWhileActive => false;
+    // R 이 완주(Completed)한 뒤 좌클릭을 아직 누르고 있으면 기본 공격을 잇는다(할 일 146 장치, 할 일 280). 대상 소실 취소(Cancelled)는 잇지 않는다.
+    public override bool ResumesBasicAttackOnHold => true;
 
     // 피해(Hit)·종료(End)·마무리 낙뢰(Custom0)를 클립 이벤트로 정한다 — End 가 있어 이벤트 방식(EndsOnClipEvent).
     public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => UltimateClipEvents;

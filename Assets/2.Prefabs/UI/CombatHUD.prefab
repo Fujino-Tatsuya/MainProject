@@ -5252,7 +5252,8 @@ MonoBehaviour:
   cornerSquareness: 1
   aspectCorrection: 0
   edgeStrength: 1
-  startRatio: 0.8
+  startRatio: 0.4
+  fullRatio: 0.1
   maxAlpha: 0.6
   vignetteColor: {r: 1, g: 0, b: 0, a: 1}
   minPulseSpeed: 1.6666666

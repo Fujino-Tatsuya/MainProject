@@ -226,6 +226,21 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
         _elapsed = 0f;
     }
 
+    /// <summary>
+    /// [코드] 재생 종료 — <b>남김없이 바로</b> 걷는다(<see cref="EffectManager.ReleaseImmediate"/>).
+    /// <see cref="Stop"/> 은 "자연스러운 해제"라 새 입자만 멈추고 이미 나온 입자는 제 수명까지 남기며 종료(outro) 파트를 튼다.
+    /// 공격이 <b>끊긴</b> 순간처럼 그 잔상이 남으면 안 되는 곳에서만 쓴다(할 일 282 — 스피너봇 간파 성공).
+    /// 재생 중이 아니면 조용한 no-op이다.
+    /// </summary>
+    public void StopImmediate()
+    {
+        if (!_handle.IsSet) return;
+
+        if (EffectManager.Instance != null) EffectManager.Instance.ReleaseImmediate(_handle);
+        _handle = EffectHandle.None;
+        _elapsed = 0f;
+    }
+
     void Update()
     {
         if (!_handle.IsSet || safetyTimeout <= 0f) return;

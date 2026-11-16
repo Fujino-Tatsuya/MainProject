@@ -35,7 +35,7 @@ public static class ResultStatsRowsAuthoring
     static readonly Column[] Columns =
     {
         new Column { RowName = "Text_Slot",      HeaderTitle = "",       Width = 80f,  Align = TextAlignmentOptions.Center },
-        new Column { RowName = "Image_Portrait", HeaderTitle = null,     Width = 64f,  IsImage = true },
+        new Column { RowName = "Cell_Portrait",  HeaderTitle = null,     Width = 64f,  IsImage = true },
         new Column { RowName = "Text_Character", HeaderTitle = "캐릭터", Width = 220f, Align = TextAlignmentOptions.Left },
         new Column { RowName = "Text_Damage",    HeaderTitle = "데미지", Width = 200f, Align = TextAlignmentOptions.Center },
         new Column { RowName = "Text_Kills",     HeaderTitle = "처치",   Width = 140f, Align = TextAlignmentOptions.Center },
@@ -142,11 +142,21 @@ public static class ResultStatsRowsAuthoring
 
                 if (column.IsImage)
                 {
-                    Image image = GetOrAdd<Image>(cell.gameObject);
+                    // 레이아웃 칸(Cell_Portrait) 안 고정 64×64 RectMask2D — 초상화는 그 안에서 캐릭터별 얼굴 크롭(할 일 276 후속, PortraitFaceCrop).
+                    // 마스크 크기를 레이아웃이 정하지 않아 Bind 순간(레이아웃 전)에도 칸 크기가 정해져 있다.
+                    RectTransform mask = GetOrCreateChild(cell, "PortraitMask");
+                    mask.anchorMin = mask.anchorMax = mask.pivot = new Vector2(0.5f, 0.5f);
+                    mask.anchoredPosition = Vector2.zero;
+                    mask.sizeDelta = new Vector2(column.Width, column.Width);
+                    GetOrAdd<RectMask2D>(mask.gameObject);
+                    RectTransform portrait = GetOrCreateChild(mask, "Image_Portrait");
+                    portrait.anchorMin = portrait.anchorMax = portrait.pivot = new Vector2(0.5f, 0.5f);
+                    portrait.sizeDelta = mask.sizeDelta;
+                    Image image = GetOrAdd<Image>(portrait.gameObject);
                     image.preserveAspect = true;
                     image.raycastTarget = false;
                     image.enabled = false; // 초상화가 있을 때만 Bind 가 켠다
-                    refs[column.RowName] = image;
+                    refs["Image_Portrait"] = image;
                 }
                 else
                 {

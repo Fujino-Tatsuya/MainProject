@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 /// <summary>
-/// [서버 권한] TRAIN_03 훈련 상대(할 일 86 T5b — PLAN-86 §3.5, 명세 v0.2 §6·§9). SpinnerBot 외형·애니로 23호 CC 규칙을 따른다.
+/// [서버 권한] TRAIN_03 훈련 상대(할 일 86 T5b — PLAN-86 §3.5, 명세 v0.2 §6·§9). 외형·애니는 프리팹(지금 WallBot Variant `TrainingSparringBot_WallBot` — 할 일 274, 옛 SpinnerBot Variant 보관)이고 23호 CC 규칙을 따른다.
 /// 단계 판정은 순수 <see cref="TrainingSparringModel"/>(서버 소유), 게이지·벽·처치 방지 판정은 <see cref="TrainingSparringRules"/>.
 /// <list type="bullet">
 /// <item>23호 규칙(TwentyThreeBoss 를 읽고 같은 규칙을 여기 구현 — 그 파일은 안 건드린다): 간파 창 중 정면 간파 = 성공 → 칸 감소 + 그로기 + 취약(그로기 시작부터).
@@ -44,6 +44,11 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     [Header("애니·연출")]
     [Tooltip("간파 창이 끝나면 재생할 채찍 상태(컨트롤러 일치). 히트·종료는 그 클립의 OnAttackHit·OnAttackEnd 이벤트.")]
     [SerializeField] string whipState = "Attack Whip R Start";
+    [Tooltip("채찍 상태가 루프 클립일 때 히트(OnAttackHit) 뒤 마무리 클립으로 넘기는 트리거(할 일 274 — 월봇 외형: AttackStart 루프 → 'AttackEnd' → OnAttackEnd).\n" +
+             "비우면 아무것도 안 친다(옛 SpinnerBot 외형 — 채찍 클립 자체가 끝에서 OnAttackEnd).")]
+    [SerializeField] string whipFinishTrigger = "";
+    [Tooltip("그로기 클립이 없는 외형(월봇 — 할 일 274)이면 켠다: 그로기 동안 대기 자세 첫 프레임에서 정지(GauntletBot 과 같은 표현). SpinnerBot 외형(IsDizzy 클립)은 끈다.")]
+    [SerializeField] bool freezePoseWhileGroggy;
     [Tooltip("간파 성공 섬광(SpinnerBot 프리팹의 InterruptFlashVFX). 비면 연출만 빠진다.")]
     [SerializeField] EffectSocketPlayer interruptFlash;
     [Tooltip("칸 UI(머리 위 중간보스 바) 체력 게이지 색.")]
@@ -77,6 +82,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     bool _environmentConsumed;         // 이번 취약에서 벽을 이미 썼나(23호 §6.1 최초 1회)
     bool _suppressed;
     bool _vulnerableStunGroggy;        // 지금 그로기가 취약 중 기절(경직)인가
+    bool _whipFinishSent;              // 이번 공격에 whipFinishTrigger 를 쳤는가(루프 채찍 — 공격당 1회)
     bool _kbActive, _kbRebound;
     Vector3 _kbDir;
     float _kbLeft, _kbSpeed;
@@ -339,6 +345,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     protected override void StartAttack()
     {
         base.StartAttack();   // StopAgent + FaceTarget + (데이터)슈퍼아머 + Attack
+        _whipFinishSent = false;
 
         float window = Counter != null ? Counter.WindowDuration : 0f;
         if (window <= 0f)
@@ -414,7 +421,28 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    void PlayWhipRpc() => SafeCrossFade(whipState);
+    void PlayWhipRpc()
+    {
+        // 지난 공격이 남긴 마무리 트리거 래치를 지운다(MonsterBase.PlayStateAnimation Attack 주석과 같은 이유).
+        if (!string.IsNullOrEmpty(whipFinishTrigger) && animator != null) animator.ResetTrigger(whipFinishTrigger);
+        SafeCrossFade(whipState);
+    }
+
+    // 루프 채찍(월봇 AttackStart)은 OnAttackHit 가 바퀴마다 다시 온다 — 히트는 base 가 1회로 막고, 마무리 트리거도 공격당 1회.
+    public override void NotifyAttackHit()
+    {
+        if (!IsServer || State != MonsterState.Attack) return;
+        base.NotifyAttackHit();
+        if (string.IsNullOrEmpty(whipFinishTrigger) || _whipFinishSent) return;
+        _whipFinishSent = true;
+        WhipFinishRpc();
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void WhipFinishRpc()
+    {
+        if (!string.IsNullOrEmpty(whipFinishTrigger) && animator != null) animator.SetTrigger(whipFinishTrigger);
+    }
     #endregion
 
     #region 피격 — 23호 간파·취약·제압 규칙
@@ -737,6 +765,10 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     {
         base.OnMonsterStateChanged(previous, next);
         if (!IsServer || _model == null) return;
+
+        // 그로기 클립 없는 외형(월봇)의 그로기 표현 — 해제는 base 가 Groggy 이탈마다 한다.
+        if (freezePoseWhileGroggy && next == MonsterState.Groggy && previous != MonsterState.Groggy)
+            ServerFreezeAtLocomotion();
 
         if (previous == MonsterState.Attack && next != MonsterState.Attack)
             CloseCounterWindow();

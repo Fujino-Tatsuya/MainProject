@@ -78,6 +78,11 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     // 방어 대기·반격 중 이동·회전 불가(결정 3). 평타·다른 스킬은 Skill 상태 규칙으로 이미 막힌다.
     public override bool CanMoveWhileActive => false;
 
+    // E 가 끝난 뒤 좌클릭을 아직 누르고 있으면 기본 공격을 잇는다(할 일 146 장치, 할 일 280).
+    // 홀드 E 의 두 종료(E 뗌·최대 유지 시간)와 탭 방식·반격 종료는 모두 해제/반격 클립 End → Completed 라 같이 잇는다.
+    // 대시·피격·사망·안전망 끊김은 규칙(ArmsResumeAfterSkill)대로 잇지 않는다.
+    public override bool ResumesBasicAttackOnHold => true;
+
     // 대시는 어느 단계든 E 를 끊는다(할 일 95) — 오너 FSM 의 대시 우선 경로(PlayerStateController.Tick)가 묻는다.
     // 끊기면 서버도 대시 승인 때 상태가 바뀌어 OnEnd(DashCancelled)이고 쿨타임은 그대로다. 반격 판정 전이면 보장 반격(CounterDueOnCancel).
     public override bool CanBeCanceledByDash(PlayerActionState phase) => FirstMeleeGuardRules.AllowsDashCancel(phase);

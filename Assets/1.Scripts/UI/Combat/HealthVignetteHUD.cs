@@ -34,8 +34,10 @@ public class HealthVignetteHUD : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float edgeStrength = 1f;
 
     [Header("체력 비네팅")]
-    [Tooltip("이 체력 비율 이하부터 비네팅이 켜진다. 0 에서 최대.")]
-    [SerializeField, Range(0f, 1f)] private float startRatio = 0.8f;
+    [Tooltip("이 체력 비율 이하부터 비네팅이 켜진다. 아래 '최대 비율'에서 최대.")]
+    [SerializeField, Range(0f, 1f)] private float startRatio = 0.4f;
+    [Tooltip("이 체력 비율 이하에서 비네팅이 최대(진하기 1 — 알파·맥동 속도·플래시 색 모두). 시작 비율과 이 값 사이는 선형. 0 = 체력 0 에서 최대(옛 동작).")]
+    [SerializeField, Range(0f, 1f)] private float fullRatio = 0.1f;
     [SerializeField, Range(0f, 1f)] private float maxAlpha = 0.6f;
     [SerializeField] private Color vignetteColor = Color.red;
 
@@ -226,7 +228,7 @@ public class HealthVignetteHUD : MonoBehaviour
 
         // 살아 있지 않으면 HUD 처럼 체력 0 으로 표현한다(Soul 의 실제 HP 복제값은 쓰지 않는다).
         float ratio = alive ? HealthVignetteModel.HealthRatio(player.CurrentHealth, player.FinalMaxHp) : 0f;
-        float severity = HealthVignetteModel.Severity(ratio, startRatio);
+        float severity = HealthVignetteModel.Severity(ratio, startRatio, fullRatio);
 
         pulsePhase = Mathf.Repeat(
             pulsePhase + HealthVignetteModel.PulseSpeed(severity, minPulseSpeed, maxPulseSpeed) * deltaTime, 1f);
@@ -237,7 +239,7 @@ public class HealthVignetteHUD : MonoBehaviour
             flashElapsed += deltaTime;
         float currentFlashAlpha = HealthVignetteModel.ActiveFlashAlpha(
             alive, HealthVignetteModel.FlashAlpha(flashElapsed, flashDuration, flashAlpha, flashCurve));
-        Color currentFlashColor = HealthVignetteModel.FlashColor(ratio, startRatio, flashSafeColor, flashDangerColor);
+        Color currentFlashColor = HealthVignetteModel.FlashColor(ratio, startRatio, fullRatio, flashSafeColor, flashDangerColor);
 
         Color color = HealthVignetteModel.Compose(vignetteColor, vignetteAlpha, currentFlashColor, currentFlashAlpha, darken);
 
@@ -287,10 +289,10 @@ public class HealthVignetteHUD : MonoBehaviour
         }
 
         float ratio = editorPreviewHealthRatio;
-        float severity = HealthVignetteModel.Severity(ratio, startRatio);
+        float severity = HealthVignetteModel.Severity(ratio, startRatio, fullRatio);
         float vignetteAlpha = HealthVignetteModel.VignetteAlpha(severity, maxAlpha, 0f, 0f);
         float previewFlashAlpha = HealthVignetteModel.FlashAlpha(editorPreviewFlashTime * flashDuration, flashDuration, flashAlpha, flashCurve);
-        Color previewFlashColor = HealthVignetteModel.FlashColor(ratio, startRatio, flashSafeColor, flashDangerColor);
+        Color previewFlashColor = HealthVignetteModel.FlashColor(ratio, startRatio, fullRatio, flashSafeColor, flashDangerColor);
 
         Image preview = VignetteEditorPreview.Ensure<Image>(transform, PreviewName);
         preview.sprite = null;

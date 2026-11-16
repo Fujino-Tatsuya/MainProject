@@ -13,27 +13,27 @@ MonoBehaviour:
   m_Name: LobbyCombatSpawnSet
   m_EditorClassIdentifier: Assembly-CSharp::LobbyCombatSpawnSet
   entries:
-  - pointName: Center_MortarBot
-    prefab: {fileID: 6303057502177232290, guid: 1f13e06cd8ea3c14eb063c61e7298d62, type: 3}
+  - pointName: Center
+    prefab: {fileID: 7375652213626121688, guid: 6b4bdbab9c2143bda0e3c5270842745f, type: 3}
     offset: {x: 0, y: 0, z: 0}
     yawDegrees: 0
-  - pointName: North_ChompBot
-    prefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+  - pointName: North_West
+    prefab: {fileID: 7375652213626121688, guid: 6b4bdbab9c2143bda0e3c5270842745f, type: 3}
     offset: {x: -1.4, y: 0, z: 7.2}
     yawDegrees: 169
-  - pointName: North_HumanoidBot
-    prefab: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+  - pointName: North_East
+    prefab: {fileID: 7375652213626121688, guid: 6b4bdbab9c2143bda0e3c5270842745f, type: 3}
     offset: {x: 1.4, y: 0, z: 7.2}
     yawDegrees: 191
-  - pointName: South_ChompBot
-    prefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+  - pointName: South_West
+    prefab: {fileID: 7375652213626121688, guid: 6b4bdbab9c2143bda0e3c5270842745f, type: 3}
     offset: {x: -1.4, y: 0, z: -7.2}
     yawDegrees: 11
-  - pointName: South_HumanoidBot
-    prefab: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+  - pointName: South_East
+    prefab: {fileID: 7375652213626121688, guid: 6b4bdbab9c2143bda0e3c5270842745f, type: 3}
     offset: {x: 1.4, y: 0, z: -7.2}
     yawDegrees: 349
-  - pointName: East_ChompBot
-    prefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+  - pointName: East
+    prefab: {fileID: 7375652213626121688, guid: 6b4bdbab9c2143bda0e3c5270842745f, type: 3}
     offset: {x: 7.2, y: 0, z: -1.4}
     yawDegrees: 281
