@@ -16,7 +16,7 @@
 - **매 회차 L00 부터**(Q3). 판 끝 로비 복귀 = 새 진행기 = runId +1. 훈련 완료 자동 클리어 플래그는 없앴다.
 - 훈련장 문은 막혀 있고 출입은 텔레포트(Q4 B — L20 입구 확정 → 안, T50 출구 확정 → 로비 중앙).
 
-## 1. 단계표 (22행)
+## 1. 단계표 (20행)
 
 명세 상태 23개 중 `T21_CombatCountdown` 은 행이 아니라 **T20 의 표시 상태**(활성 구역 카운트다운 중 — `DisplayStateId`).
 유지 = 집결 행 `holdSeconds`(기본 0.3초, 표시 안 함 / T20 만 3초 = 카운트다운). 집결 지점 이름은 `LobbyGatherPoint`(중앙 = `Brief` — `Central` 개명은 미룸).
@@ -39,12 +39,13 @@
 | 13 | T40_SuppressKill | Activity SuppressKill | 제압 중 처치 | 보조 1줄 |
 | 14 | T50_FreePractice | Gather + FreePractice | 출구 전원 집결 0.3초 → 종료 텔레포트(중앙) | `TrainEnd` |
 | 15 | L30_BriefGather | Gather | 중앙 전원 집결 0.3초 | `Brief` |
-| 16~19 | L31~L34 | Dialogue ×4 | 행마다 대사 끝 시각 | `LOBBY_BRIEF_EVAL`·`_FACTORY`·`_REBELLION`·`_SORTIE`, 배경 L32·L33 |
-| 20 | L40_SortieGather | Gather | **접속자 전원** 집결 0.3초 → 출격 확정 1회 | `Sortie` |
-| 21 | L41_Loading | Loading | 기존 로딩 흐름 | |
+| 16 | L31_BriefVideo | **Video**(292) | 영상 길이(57초) 끝 시각 **또는** 접속자 전원 Esc 동의 | 클립 `Assets/50.Art/Video/Briefing/ReC_Mission_Briefing_nonarration.mp4`(SVN), 대체 길이 `dialogueSeconds` 57 |
+| 17 | L34_SortieIntro | Dialogue | 대사 끝 시각 | `LOBBY_BRIEF_SORTIE`(배경 없음) |
+| 18 | L40_SortieGather | Gather | **접속자 전원** 집결 0.3초 → 출격 확정 1회 | `Sortie` |
+| 19 | L41_Loading | Loading | 기존 로딩 흐름 | |
 
 - 행 칸 `trainingProfile` = Training 인 행(L21·T10~T50) 동안 명단 체력 하한 1(§7). 칸 전체 목록은 계약 문서 §1·§2.
-- 표 검증 = EditMode `LobbyTutorialStepTableTests`(22행·StateId 유일·Kind 별 필수 칸).
+- 표 검증 = EditMode `LobbyTutorialStepTableTests`(20행·StateId 유일·Kind 별 필수 칸 — Video = 클립 또는 `dialogueSeconds` > 0). 292 전 22행(옛 L31~L33 대사 3행)은 영상 1행으로 바뀌었다.
 - `enforceRequiredSkillTags`(표 전체, 기본 **꺼짐**) — 스킬 `tooltip.tags` 가 지금 전부 비어 있어 T32·T34 태그 검사는 끔(Q12a). 태그 데이터가 채워지면 켠다.
 
 ## 2. 서버 구조
@@ -57,7 +58,7 @@
 | `LobbyTutorialSnapshot.cs` | 복제 구조체 { runId, revision, stepIndex, enteredAt, timerStart, timerEnd, launchCommitted } |
 | `LobbyTutorialState.cs` | 158 읽기 파사드(정적) — 계약 문서 §2·§3 |
 | `LobbyTrainingDirector.cs` (+`.Recovery.cs`) | NGO 진행기 — 스냅샷·명단·클리어 플래그 복제, 집결 구역 켜고 끄기, 대사 스케줄러, 텔레포트, 출격, 연결/재접속 |
-| 내용 컴포넌트(같은 오브젝트) | `LobbyTrainingWeaponCheck`(T10)·`LobbyTrainingCombat`(T22)·`LobbyTrainingSparring`(T31~T40·T50 허수아비)·`LobbyBriefing`(L31~L34 잠금·카메라) |
+| 내용 컴포넌트(같은 오브젝트) | `LobbyTrainingWeaponCheck`(T10)·`LobbyTrainingCombat`(T22)·`LobbyTrainingSparring`(T31~T40·T50 허수아비)·`LobbyBriefing`(L31 영상·L34 잠금·카메라·영상 건너뛰기 표) |
 | `PartyGatherZone` / `PartyGatherRules` | 집결 구역(서버 폴링·쓰러짐 제외·행동 상태 무관 — 공격 중이어도 집결(231)·확정 래치·카운트다운 서버 시각 복제) |
 | `LobbyAreaVolume` | 비네트워크 박스 볼륨 — 라커룸 `Area_Locker`(L00 + 캐릭터 선택 영역, 161) |
 
@@ -69,11 +70,13 @@
 - **집결 행**은 구역 확정(`PartyGatherZone.ServerConfirmed`)으로만, **대사 행**은 스케줄러로만 넘어간다.
 - 참여자: 명단 고정 전(L00·L10) = 스폰 완료(PlayerObject 있음)한 접속자 중 클리어 플래그 끈 사람, 고정 뒤 = 명단, L40 = 접속자 전원. N=0 이면 전이 금지.
 
-### 2.2 대사 스케줄러 (L11·L21·L31~L34)
+### 2.2 대사 스케줄러 (L11·L21·L31 영상·L34)
 
 - 진입 때 서버가 길이를 정해 스냅샷 `timerStart`/`timerEnd`(서버 시각)에 싣고, 끝 시각에 다음 행으로 1회. 클라 보고를 기다리지 않는다.
 - 길이 = 행 `dialogueSeconds` > 0 → 문구 표(`TutorialGuideTexts`) `durationSeconds` → 글자 수 규칙(2초 + 공백 제외 글자당 0.08초, 최소 3초) + 끝 여유 0.5초. 수치 = `LobbyRules`(`dialogue*`). 음성 없음.
-- L11·L21 은 이동 허용. L31~L34 는 묶음 입력 잠금(§5). 연속 대사(L31→L34)는 행이 바뀌어도 목표 패널이 다시 켜지지 않는다(계약 §3).
+- **영상 행(Kind Video, 292)** 도 같은 스케줄러·같은 타이머(새 NetworkVariable·RPC 없음): 길이 = 행 `videoClip.length`(없으면 행 `dialogueSeconds`), 끝 여유 없음. 규칙 `LobbyBriefingVideoRules.VideoSeconds`, 판정 `LobbyBriefingRules.IsTimed`(Dialogue·Video).
+  건너뛰기만 예외 — 접속자 전원 동의면 `LobbyTrainingDirector.ServerSkipVideo(runId, revision)` 가 끝 시각 전에 다음 행으로(§5).
+- L11·L21 은 이동 허용. L31 영상·L34 는 묶음 입력 잠금(§5). 영상 → L34 로 넘어가도 목표 패널이 다시 켜지지 않는다(계약 §3).
 - 옛 무전(`LobbyRadio`)의 단계 진입 대사·사건 무전(TRAIN_03_*)·BRIEF_01~04 는 **모두 재생하지 않는다**(Q6 — 감독관 대사와 중복 금지). 키·문구 행은 남겨 둠. 아래 "로비 무전" 절.
 
 ## 3. 로비 구간 — L00 ~ L21
@@ -188,14 +191,26 @@
 ## 5. 브리핑 — L30 ~ L34
 
 - L30 = 중앙 0.3초 전원 집결(종료 텔레포트로 이미 안이면 구역이 켜지자마자 센다).
-- L31 평가(`LOBBY_BRIEF_EVAL`) → L32 생산 시설(`_FACTORY`, 배경 `BRIEF_BG_FACTORY`) → L33 반란(`_REBELLION`, `BRIEF_BG_REBELLION`) → L34 출격 안내(`_SORTIE`, 배경 없음) — 대사 스케줄러가 행마다 1회, L34 끝 → L40.
-- **`LobbyBriefing` = 묶음 입력 잠금 + 카메라만** (시간은 재지 않는다):
-  - 잠금 = L31 진입 때 `LobbyRadio.ServerClear()` → **접속자 전원**(늦은 참가자 포함) `PlayerEncounterLock.BeginCinematicServer()`(보스 등장 연출 잠금 재사용 — FSM Cinematic·대시·입력·무적).
+- **L31 브리핑 영상(할 일 292)** → L34 출격 안내(`_SORTIE`, 배경 없음) — 대사 스케줄러가 행마다 1회, L34 끝 → L40.
+  옛 L31 평가·L32 생산 시설·L33 반란 대사 3행과 L32·L33 삽화(`Scene_01/02.png`)는 **연결만 끊었다** — 문구 행(`TutorialGuideTexts`·xlsx Strings)·png·삽화 코드(`LobbyTutorialBackground`·패널 디졸브)는 남아 있고 아무 행도 쓰지 않는다.
+- **브리핑 영상(292)**:
+  - 파일 = `Assets/50.Art/Video/Briefing/ReC_Mission_Briefing_nonarration.mp4`(SVN, 57.0초·1920×1080 30fps H.264·AAC 스테레오 55MB). `.meta` = **트랜스코드 끔(원본 그대로 빌드), 소리 임포트 켬** — 손으로 쓴 .meta(SVN).
+    폴더 전용 AssetPostprocessor 는 두지 않았다(`OnPreprocessAsset` 버전이 바뀌면 프로젝트 전체 재임포트라 — 254 `TitleWallVideoImport` 와 다름). 설정을 바꾸려면 .meta 를 고쳐 SVN 커밋.
+  - 단계표 행 `videoClip` 이 클립을 참조(빌드 포함 경로 = 단계표 SO 참조). 서버는 `clip.length` 로 타이머를 정한다 — 클립이 없으면(SVN 미갱신) 행 `dialogueSeconds` 57 로 진행하고 화면은 검은 바탕 + 건너뛰기만.
+  - 재생(전 피어, 표시 전용) = `Lobby/Tutorial/LobbyBriefingVideoScreen`(런타임 생성 — 씬·프리팹 무수정). 바인더가 `LobbyTutorialState.Video` 동안 `Show`, 떠나면 `Hide`(페이드 아웃 0.35초 → 정지·RT 해제).
+    Overlay 캔버스 정렬 460(HUD·튜토리얼 UI 50·연출 450 위, 포드 500·게임 메뉴 900 아래), 비율 유지(남는 칸 검정). 위치 = 서버 시각 − 스냅샷 `timerStart`(늦은 참가자 = 중간부터), 1.5초 넘게 벌어지면 다시 맞춤.
+  - 소리 = VideoPlayer → AudioSource(2D). 크기 = 마스터 × 음악 볼륨(설정값을 매 프레임 — 재생 중 슬라이더도 반영), 백그라운드 음소거는 `AudioListener.volume` 이라 그대로 적용.
+    영상 동안 로비 BGM 은 `AudioManager.BeginCinematicBgm`(포드 연출과 같은 연출 무음, 0.1초 아웃) → 끝나면 `EndCinematicBgm`(로비 곡 2초 인).
+  - **건너뛰기 = 접속자 전원 Esc 동의**: 화면 오른쪽 아래 키캡 `Esc` + `건너뛰기 n/m`(문구 = `UI.BossIntro.Skip`, 키캡·색 = 보스/타이틀 스킵 위젯). Esc 1회 = 1표, 취소 없음, 메뉴 대신 이 화면이 Esc 를 가져간다(`GameMenuController` 의 Esc 소유 목록에 `LobbyBriefingVideoScreen.IsEscapeClaimed`).
+    오너 → 서버 RPC `LobbyBriefing.SkipVideoServerRpc(runId, revision)`(새 RPC) — 서버가 `LobbyBriefingVideoRules.AcceptsSkipVote`(지금 영상·전이 대기 아님)로 거른 뒤 `BossIntroSkipVotes`(보스 등장 연출과 같은 집계)에 넣는다.
+    투표자 = 매 프레임 접속자 전원(이탈 = 표 빠짐, 늦은 참가 = 분모 증가). 동의 수·투표자 수 = `LobbyBriefing` NetworkVariable 2개(새 복제 값). 전원 동의 → `ServerSkipVideo` → L34(잠금은 그대로 유지).
+- **`LobbyBriefing` = 묶음 입력 잠금 + 카메라 + 영상 건너뛰기 표** (시간은 재지 않는다):
+  - 잠금 = L31(영상) 진입 때 `LobbyRadio.ServerClear()` → **접속자 전원**(늦은 참가자 포함) `PlayerEncounterLock.BeginCinematicServer()`(보스 등장 연출 잠금 재사용 — FSM Cinematic·대시·입력·무적).
     상호작용 F 도 막힌다(`LobbyInteractor.IsBlocked` 가 `PlayerLifeInputPolicy.BlocksForCinematic` 을 본다). 브리핑 중 새로 스폰된 플레이어도 0.25초 주기로 잠근다.
   - **내가 건 것만 푼다**: 장부 `LobbyBriefingLockLedger`(+`LobbyBriefingLockSession`). 다른 계통이 이미 잠근 사람은 건드리지 않는다.
   - 해제 경로: L34 끝(→ L40)·단계 이탈(회차 초기화)·디스폰(판 끝·씬 언로드·호스트 셧다운) 모두 장부 해제. 끊긴 사람은 장부에서만 뺀다. EditMode `LobbyBriefingTests`.
   - 카메라 = `CameraTargetSwitcher.SetTemporaryFollow(cameraFocus)`(= `Gather_Brief`) 묶음 동안, 떠나면 `ClearTemporaryFollow`. `cameraFocus` 가 비면 카메라 무변경.
-- 목표 패널은 대사 동안 숨는다(파사드). 옛 '작전 설명 중'(`LOBBY_OBJ_BRIEFING`)·`LOBBY_OBJ_SORTIE` 직접 표시는 없앴다(키 보존 — L40 목표 = `LOBBY_OBJ_SORTIE_GATHER`).
+- 목표 패널은 영상·대사 동안 숨는다(파사드 `ObjectivePanelVisible` — Video 포함). 옛 '작전 설명 중'(`LOBBY_OBJ_BRIEFING`)·`LOBBY_OBJ_SORTIE` 직접 표시는 없앴다(키 보존 — L40 목표 = `LOBBY_OBJ_SORTIE_GATHER`).
 - 실전 초기화(명세 §10)는 하지 않는다 — 로비 플레이어는 메인 진입 때 디스폰되고 MapScene 이 새로 스폰한다(새 오브젝트 기본값 = 실전 초기값).
 
 ## 6. 출격 — L40 · L41
@@ -251,7 +266,8 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 
 - **날아가던 투사체 castId**: T32·T34 진입 전에 쏜 투사체가 진입 뒤 맞으면 시전 ID 가 기준선 이하라 불인정 — 의도된 동작이지만 '맞혔는데 안 됨'으로 보일 수 있다. 같은 프레임 짝이 없는 지연 CC 도 불인정.
 - **로딩 타임아웃 정책은 기존 유지**: `NetworkLoadingFlowController` 는 NGO 씬 로드 타임아웃 뒤 시간초과 클라를 빼고 완료한 클라만으로 진행한다(그 사람은 판 도중 재합류로 들어옴). L41 은 이 흐름을 바꾸지 않았다.
-- **브리핑 삽화 리소스 없음**: 157 은 `BackgroundId`(`BRIEF_BG_FACTORY`·`BRIEF_BG_REBELLION`)만 낸다. 이미지 납품 전까지 빈 배경(Q14 A).
+- **브리핑 삽화는 쓰지 않는다**(292): 삽화 2장(`Scene_01/02.png`, 158 패널 칸 `factorySprite`·`rebellionSprite`)은 연결돼 있지만 단계표에 `backgroundId` 를 가진 행이 없다. 다시 쓰려면 행 칸만 채운다.
+- **브리핑 영상 한계(292)**: 각 피어 로컬 재생이라 디코딩·준비 지연만큼(보통 1초 미만) 피어끼리 어긋날 수 있다(1.5초 넘으면 다시 맞춤). 끝은 서버 타이머가 정해 준비가 늦은 피어는 마지막 장면이 잘릴 수 있다. 영상 동안 Esc 메뉴는 열 수 없다(이미 열려 있던 메뉴는 Esc 로 닫힘). `skipOnDrop` 끔(254 멈춤 기록) — 느린 PC 는 소리보다 그림이 늦을 수 있다.
 - **T32 기절 인정 범위 — 결정: 실제 기절(뇌진탕 포함)만 인정**(사용자 결정 A). 넉백 없이 경직(`staggerDuration`)만 있는 적중은 기절이 아니다 — 상대가 반응하지 않고 T32 도 인정하지 않는다. 판정 `TrainingSparringRules.VulnerableHitCrowdControl`·`StunsOnPushEnd`.
 - **xlsx 미반영**: Strings 시트 행이 들어가기 전엔 SO 폴백 ko 문구가 보인다(en 없음). `{tag:ID}` 3행은 158 목표 패널이 색 태그로 그린다.
 - 경로 키 `PATH_*`·벽 키·삽화 키는 157 이 정한 임시 이름(158 과 맞추면 SO 만 고친다). 중앙 지점 enum 이름은 아직 `Brief`.
@@ -272,7 +288,9 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - [ ] T33→T34: 상대만 C 위치 복귀(취약 유지) → 서쪽 지정 벽으로 넉백하면 완료, 빗나가면 위치 복구 후 재시도
 - [ ] T40: 칸 소진 → 제압이 끝나지 않고 유지, 제압 중 처치로 완료(제압 전엔 안 죽음)
 - [ ] T50: 허수아비 1개, 출구 집결 → 허수아비 사라지고 중앙으로 텔레포트
-- [ ] L30~L34: 바로 집결 → 브리핑 대사 4줄, 그동안 전원(늦은 참가자 포함) 이동·공격·F 잠김·카메라 중앙, 끝나면 풀림
+- [ ] L30→L31: 바로 집결 → 브리핑 영상 전체 화면(소리·HUD 위·목표 패널 숨김·로비 BGM 꺼짐), 그동안 전원(늦은 참가자 포함) 이동·공격·F 잠김·카메라 중앙
+- [ ] L31 건너뛰기: 오른쪽 아래 `Esc 건너뛰기 n/m`, 혼자면 Esc 1번에 L34, 2인이면 둘 다 눌러야(1/2 → 2/2), 한 명 이탈 시 남은 사람 기준. Esc 로 메뉴가 열리지 않음
+- [ ] L31 끝(57초 또는 건너뛰기) → L34 출격 안내 대사(잠금 유지) → L40 에서 풀림, 로비 BGM 복귀. 영상 중 접속한 사람은 중간부터 봄
 - [ ] L40→L41: 출격 구역 접속자 전원 0.3초(카운트다운 표시 없음) → 포드 연출 → 메인 1회
 - [ ] 판 끝 로비 복귀 = L00 부터 다시. 훈련 중 접속 = 로비 대기·출격엔 포함. 훈련 중 끊고 같은 playerId 로 재접속 = 명단·체크 유지
 - [ ] 단계마다 캐릭터 교체 뒤 진행 기록·집결 인원 유지

@@ -160,7 +160,7 @@ public sealed class LobbyTutorialRulesTests
     [Test]
     public void 브리핑_마지막_대사_L34_다음은_L40_출격_집결()
     {
-        // ⑨ — 브리핑 4행은 대사 스케줄러가 한 행씩 넘긴다(묶음 건너뛰기 없음). L34 끝의 다음 행 = L40.
+        // ⑨·292 — 브리핑 2행(영상 L31 → 대사 L34)은 대사 스케줄러가 한 행씩 넘긴다. L34 끝의 다음 행 = L40.
         var table = LoadAsset();
         var after = Index(table, "L34_SortieIntro") + 1;
 
@@ -194,7 +194,8 @@ public sealed class LobbyTutorialRulesTests
     [TestCase("T40_SuppressKill", 1)]
     [TestCase("T50_FreePractice", 1)]   // 명세 §5 T50 — 훈련 전용 보정은 출구 집결 확정(→ L30) 때 정리(⑨)
     [TestCase("L30_BriefGather", 0)]
-    [TestCase("L31_BriefIntro", 0)]
+    [TestCase("L31_BriefVideo", 0)]   // 할 일 292 — 옛 L31~L33 대사 3행 → 영상 1행
+    [TestCase("L34_SortieIntro", 0)]
     [TestCase("L40_SortieGather", 0)]
     public void 체력_하한은_훈련장_안_단계만_옛_Train01_부터_Train03D(string stateId, int expected)
     {
@@ -222,7 +223,8 @@ public sealed class LobbyTutorialRulesTests
     [TestCase("T40_SuppressKill", LobbyGatherPoint.Train03Area)]
     [TestCase("T50_FreePractice", LobbyGatherPoint.TrainEnd)]
     [TestCase("L30_BriefGather", LobbyGatherPoint.Brief)]
-    [TestCase("L32_BriefFactory", LobbyGatherPoint.Brief)]
+    [TestCase("L31_BriefVideo", LobbyGatherPoint.Brief)]   // 할 일 292 — 영상 행도 중앙(Brief)
+    [TestCase("L34_SortieIntro", LobbyGatherPoint.Brief)]
     [TestCase("L40_SortieGather", LobbyGatherPoint.None)]
     [TestCase("L41_Loading", LobbyGatherPoint.None)]
     public void 멈춤_탈출_지점_명단은_단계_구역(string stateId, LobbyGatherPoint expected)

@@ -110,7 +110,8 @@ public sealed class GameMenuController : MonoBehaviour
         if (keyboard == null || !keyboard.escapeKey.wasPressedThisFrame)
             return;
 
-        bool claimed = LobbyResultPanel.IsEscapeClaimed || CharacterSelectPanel.IsEscapeClaimed || PlayerSkillTargeting.IsEscapeClaimed;
+        bool claimed = LobbyResultPanel.IsEscapeClaimed || CharacterSelectPanel.IsEscapeClaimed || PlayerSkillTargeting.IsEscapeClaimed
+                       || LobbyBriefingVideoScreen.IsEscapeClaimed;   // 로비 브리핑 영상 = Esc 건너뛰기 동의(할 일 292)
         switch (GameMenuRules.ResolveEscape(Mode, Screen, claimed, KeyRebindRow.IsRebinding, _dropdownOpenAtFrameStart))
         {
             case GameMenuEscape.Open: OpenMenu(); break;

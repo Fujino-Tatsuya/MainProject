@@ -3,7 +3,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 
-/// <summary>로비 튜토리얼 단계표 — 할 일 157 PLAN §2.3(명세 상태 22행·상태 ID 유일·종류별 필수 칸·T20 카운트다운).</summary>
+/// <summary>로비 튜토리얼 단계표 — 할 일 157 PLAN §2.3(명세 상태 22행 → 292 영상으로 20행·상태 ID 유일·종류별 필수 칸·T20 카운트다운).</summary>
 public sealed class LobbyTutorialStepTableTests
 {
     const string AssetPath = "Assets/9.ScriptableObject/Lobby/LobbyTutorialSteps.asset";
@@ -13,7 +13,7 @@ public sealed class LobbyTutorialStepTableTests
         "L00_LockerVisit", "L10_CentralGather", "L11_CentralIntro", "L20_TrainingGather", "L21_TrainingIntro",
         "T10_Basic", "T20_CombatGather", "T22_Combat", "T30_CounterGather", "T31_Counter", "T32_VulnerableCC",
         "T33_ResetPosition", "T34_Wall", "T40_SuppressKill", "T50_FreePractice", "L30_BriefGather",
-        "L31_BriefIntro", "L32_BriefFactory", "L33_BriefRebellion", "L34_SortieIntro", "L40_SortieGather", "L41_Loading",
+        "L31_BriefVideo", "L34_SortieIntro", "L40_SortieGather", "L41_Loading",   // 할 일 292 — 옛 L31~L33 대사 3행 → 영상 1행
     };
 
     static LobbyTutorialStepTable LoadAsset()
@@ -26,13 +26,13 @@ public sealed class LobbyTutorialStepTableTests
     static LobbyTutorialStep Row(string id, LobbyTutorialStepKind kind) => new LobbyTutorialStep { stateId = id, kind = kind };
 
     [Test]
-    public void 에셋은_명세_22행이고_검증을_통과한다()
+    public void 에셋은_20행이고_검증을_통과한다()
     {
         var table = LoadAsset();
         var errors = new List<string>();
 
         Assert.That(table.Validate(errors), Is.True, string.Join("\n", errors));
-        Assert.That(table.Count, Is.EqualTo(ExpectedOrder.Length));   // 명세 §2 상태 23개 − T21(T20 의 표시 상태) = 22
+        Assert.That(table.Count, Is.EqualTo(ExpectedOrder.Length));   // 명세 §2 상태 23개 − T21(T20 의 표시 상태) = 22 → 292 브리핑 대사 3행 → 영상 1행 = 20
     }
 
     [Test]
@@ -86,7 +86,7 @@ public sealed class LobbyTutorialStepTableTests
     }
 
     [Test]
-    public void 브리핑_대사_4행만_입력_잠금()
+    public void 브리핑_영상과_L34_만_입력_잠금()
     {
         var table = LoadAsset();
         var locked = new List<string>();
@@ -96,7 +96,7 @@ public sealed class LobbyTutorialStepTableTests
                 locked.Add(step.stateId);
         }
 
-        Assert.That(locked, Is.EqualTo(new[] { "L31_BriefIntro", "L32_BriefFactory", "L33_BriefRebellion", "L34_SortieIntro" }));
+        Assert.That(locked, Is.EqualTo(new[] { "L31_BriefVideo", "L34_SortieIntro" }));
     }
 
     [Test]
@@ -163,10 +163,49 @@ public sealed class LobbyTutorialStepTableTests
             Row("D", LobbyTutorialStepKind.Dialogue),       // dialogueId 없음
             Row("A", LobbyTutorialStepKind.Activity),       // activity 없음
             Row("L2", LobbyTutorialStepKind.LockerVisit),   // 첫 행 아님
+            Row("V", LobbyTutorialStepKind.Video),          // 영상 클립·길이 둘 다 없음(292)
         };
 
         Assert.That(LobbyTutorialStepTable.Validate(rows, errors), Is.False);
-        Assert.That(errors.Count, Is.EqualTo(4), string.Join("\n", errors));
+        Assert.That(errors.Count, Is.EqualTo(5), string.Join("\n", errors));
+    }
+
+    [Test]
+    public void 검증기_영상_행은_클립이_없어도_길이가_있으면_통과()
+    {
+        var errors = new List<string>();
+        var video = Row("V", LobbyTutorialStepKind.Video);
+        video.dialogueSeconds = 57f;
+
+        Assert.That(LobbyTutorialStepTable.Validate(new[] { Row("L", LobbyTutorialStepKind.LockerVisit), video }, errors), Is.True,
+            string.Join("\n", errors));
+    }
+
+    [Test]
+    public void 영상_Kind_값은_끝에_추가돼_기존_번호_그대로()
+    {
+        // 단계표 에셋은 kind 를 숫자로 저장한다 — 기존 값이 바뀌면 모든 행이 다른 종류가 된다.
+        Assert.That((int)LobbyTutorialStepKind.LockerVisit, Is.EqualTo(0));
+        Assert.That((int)LobbyTutorialStepKind.Gather, Is.EqualTo(1));
+        Assert.That((int)LobbyTutorialStepKind.Dialogue, Is.EqualTo(2));
+        Assert.That((int)LobbyTutorialStepKind.Activity, Is.EqualTo(3));
+        Assert.That((int)LobbyTutorialStepKind.Loading, Is.EqualTo(4));
+        Assert.That((int)LobbyTutorialStepKind.Video, Is.EqualTo(5));
+    }
+
+    [Test]
+    public void 브리핑_영상_행은_57초_영상_클립과_대체_길이를_가진다()
+    {
+        var table = LoadAsset();
+        var row = table[table.IndexOf("L31_BriefVideo")];
+
+        Assert.That(row.kind, Is.EqualTo(LobbyTutorialStepKind.Video));
+        Assert.That(row.locksInput, Is.True);
+        Assert.That(row.dialogueId ?? "", Is.Empty, "옛 대사 연결 끊음");
+        Assert.That(row.backgroundId ?? "", Is.Empty, "옛 삽화 연결 끊음");
+        Assert.That(row.dialogueSeconds, Is.EqualTo(57f), "클립이 없을 때(SVN 미갱신) 쓰는 길이");
+        Assert.That(row.videoClip, Is.Not.Null, "SVN Assets/50.Art/Video/Briefing 을 업데이트했는지 확인");
+        Assert.That(row.videoClip.length, Is.EqualTo(57d).Within(0.5d));
     }
 
     [Test]
