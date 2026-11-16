@@ -24,7 +24,8 @@ using UnityEngine.SceneManagement;
 /// <item>T50 자유 연습(⑧): T50 동안 허수아비 1개(<see cref="LobbyRules"/> 의 TrainingDummy 계열 프리팹 — 사망 없음, 자리 = A/B 위치). 출구 집결 확정(→ L30)의
 /// 단계 변경에서 정리 — 진행기가 그 뒤에 종료 텔레포트한다. 체력 하한은 행 trainingProfile(T50 = Training — 출구 확정(→ L30) 때 풀림, ⑨)대로 진행기가 맞춘다.</item>
 /// </list>
-/// 제압 중 쿨타임 가속은 보류(할 일 91 GrantServer 로 나중 연결, Q13 A — 훈련이 임의 버프를 만들지 않는다) — 여기엔 없다.
+/// T40 제압 가속(할 일 293): 상대가 T40 에서 제압에 들어가는 순간(<see cref="TrainingSparringBot.ServerSuppressHasteDue"/>, 상대당 1회) 실전 제압 가속을
+/// <see cref="SuppressHaste.GrantServerFixedDuration"/>(<see cref="LobbyRules"/> trainingSuppressHasteSeconds, 기본 5초)로 건다 — 효과·연출·대상은 실전 그대로, 새 버프 없음.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbyTrainingSparring : NetworkBehaviour
@@ -421,6 +422,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         bot.ServerCrowdControlApplied += HandleBotCrowdControlApplied;
         bot.ServerWallImpact += HandleBotWallImpact;
         bot.ServerKnockbackEnded += HandleBotKnockbackEnded;
+        bot.ServerSuppressHasteDue += HandleBotSuppressHasteDue;
     }
 
     private void Unsubscribe(TrainingSparringBot bot)
@@ -430,6 +432,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         bot.ServerCrowdControlApplied -= HandleBotCrowdControlApplied;
         bot.ServerWallImpact -= HandleBotWallImpact;
         bot.ServerKnockbackEnded -= HandleBotKnockbackEnded;
+        bot.ServerSuppressHasteDue -= HandleBotSuppressHasteDue;
     }
 
     private void HandleBotStageCompleted(LobbyTutorialActivity completed) => _pendingReports.Enqueue(completed);
@@ -440,6 +443,24 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     private void HandleBotWallImpact(int episode, bool designated) => _castWindow.RecordWallImpact(Time.frameCount, episode, designated);
 
     private void HandleBotKnockbackEnded(int episode) => _castWindow.RecordKnockbackEnded(Time.frameCount, episode);
+
+    // T40 제압 진입(할 일 293) — 실전 제압 가속을 LobbyRules 초로 고정해 건다(시트 durationOverride 무시). 대상 = 살아 있는 플레이어 전원(실전과 같음).
+    // 상대가 죽거나 단계가 바뀌어도 끊지 않는다 — 버프는 자기 만료대로.
+    private void HandleBotSuppressHasteDue()
+    {
+        if (_bot == null || _director == null)
+            return;
+
+        var seconds = _director.TrainingSuppressHasteSeconds;
+        if (seconds <= 0f)
+        {
+            Debug.Log($"[SceneFlow] {Tag} T40 제압 가속 꺼짐(LobbyRules.trainingSuppressHasteSeconds = 0)");
+            return;
+        }
+
+        var granted = SuppressHaste.GrantServerFixedDuration(_bot.NetworkObjectId, seconds);
+        Debug.Log($"[SceneFlow] {Tag} T40 제압 가속 — {seconds:0.##}초 · {granted}명 (회차 {_link.Round})");
+    }
 
     // 상대가 T33 위치 복귀를 마쳤다(C 위치·체력, 취약·칸 보존) — 플레이어 쪽 체력·쿨타임·대시 1회(Q10 A). 분노 재지급 없음. T33 완료 보고는 상대 모델이 낸다.
     private void HandleBotResetExecuted()

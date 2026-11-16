@@ -15,7 +15,8 @@
 | HUD 아이콘 | 대표(`CooldownRateModifier`) 1개만, 나머지 둘 숨김(`SuppressHasteRules.IsHudHidden`) | — |
 | 데이터 | xlsx `SuppressHaste` 시트 → `Assets/Resources/Player/SuppressHasteData.asset` | [data-table.md](data-table.md) 시트 표 |
 | 연출 | 스피드 라인 비네팅(§2) · 피해 숫자 합산 · N타 줌인(기본 4타) · 보스 체력바 흰 칸 멈춤(§2.A, 할 일 174) | — |
-| 다른 출처 | `SuppressHaste.GrantServer(sourceId, suppressDuration)` — 보스 종류 무관 서버 API | handoff §2 |
+| 다른 출처 | `SuppressHaste.GrantServer(sourceId, suppressDuration)` — 보스 종류 무관 서버 API. 길이를 고정할 출처는 `GrantServerFixedDuration(sourceId, duration)`(시트 `durationOverride` 무시) | handoff §2 |
+| 출처 목록 | ① 23호 제압 진입(`TwentyThreeBoss.SuppressStarted` — 제압 길이, override 우선) ② **로비 튜토리얼 T40 훈련 상대 제압 진입**(할 일 293 — `LobbyTrainingSparring`, `LobbyRules.trainingSuppressHasteSeconds` 기본 5초 고정, 상대당 1회, 출처 = 상대 NetworkObjectId) | [lobby-training.md](lobby-training.md) §4 |
 
 - 쿨 속도 배율은 쿨 시계(§1.1)가 소비한다 — 스킬(우클릭·Q·E·궁극기)·대시 충전·가붕이 패시브 내부 쿨.
 

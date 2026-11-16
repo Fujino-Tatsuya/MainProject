@@ -163,6 +163,9 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     /// <summary>T50 자유 연습 허수아비 프리팹(할 일 157 ⑧). 없으면 null — 허수아비 없이 출구 집결만.</summary>
     public GameObject FreePracticeDummyPrefab => rules != null ? rules.FreePracticeDummyPrefab : null;
 
+    /// <summary>T40 제압 가속 길이(초, 할 일 293 — LobbyRules.trainingSuppressHasteSeconds). 규칙 에셋이 없으면 기본 5초.</summary>
+    public float TrainingSuppressHasteSeconds => rules != null ? rules.TrainingSuppressHasteSeconds : 5f;
+
     /// <summary>[전 피어] 복제 스냅샷. 스폰 전이면 default(RunId 0).</summary>
     public LobbyTutorialSnapshot Snapshot => IsSpawned ? snapshot.Value : default;
 

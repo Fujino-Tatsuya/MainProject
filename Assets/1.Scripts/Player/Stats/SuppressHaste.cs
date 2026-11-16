@@ -6,7 +6,7 @@ using UnityEngine;
 /// 이동속도·공격속도 최종 배율 + 쿨 속도 배율을 이번 제압 길이만큼 건다. 진입 순간 Q/E/우클릭 남은 쿨도 유효 전체 쿨의 50% 만큼 뺀다(특성 명세 §6).
 /// 규칙은 <see cref="SuppressHasteRules"/>.
 ///   · 23호: <see cref="TwentyThreeBoss.SuppressStarted"/> 를 받아 <see cref="GrantServer"/>.
-///   · 다른 출처(로비 훈련 상대 등)도 보스 종류와 무관하게 <see cref="GrantServer"/> 를 부르면 된다.
+///   · 다른 출처도 보스 종류와 무관하게 <see cref="GrantServer"/> 를 부르면 된다. 제압 길이가 없는 출처(로비 훈련 T40, 할 일 293)는 <see cref="GrantServerFixedDuration"/>.
 ///   · 버프 중 Alive 를 벗어나면(<see cref="PlayerLifeCycleController.ServerLifeStateChanged"/>) 그 출처 3개를 뺀다.
 /// 만료는 상태이상 스윕이 처리한다 — 제압 종료 이벤트는 쓰지 않는다. 프리팹·씬 배선 없음(정적).
 /// </summary>
@@ -36,14 +36,24 @@ public static class SuppressHaste
     /// <param name="sourceId">출처 — 보스 NetworkObjectId.</param>
     /// <param name="suppressDuration">이번 제압 길이(초). 시트 durationOverride &gt; 0 이면 그 값이 이긴다.</param>
     /// <returns>버프를 받은 플레이어 수.</returns>
-    public static int GrantServer(ulong sourceId, float suppressDuration)
+    public static int GrantServer(ulong sourceId, float suppressDuration) =>
+        Grant(sourceId, suppressDuration, LoadValues(), "제압");
+
+    /// <summary>
+    /// [서버] <see cref="GrantServer"/> 와 같되 길이를 <paramref name="duration"/> 로 고정한다 — 시트 durationOverride 를 보지 않는다.
+    /// 제압 길이가 없는 출처(로비 훈련 T40 — 무기한 제압, 할 일 293)용. 23호 경로는 쓰지 않는다.
+    /// </summary>
+    public static int GrantServerFixedDuration(ulong sourceId, float duration) =>
+        Grant(sourceId, duration, SuppressHasteRules.WithoutDurationOverride(LoadValues()), "고정");
+
+    private static int Grant(ulong sourceId, float duration, SuppressHasteValues values, string label)
     {
         List<ISuppressHasteTarget> targets = CollectServerTargets();
-        int granted = SuppressHasteRules.Grant(targets, LoadValues(), sourceId, suppressDuration);
+        int granted = SuppressHasteRules.Grant(targets, values, sourceId, duration);
         if (granted > 0)
             GrantedSources.Add(sourceId);
 
-        Debug.Log($"[SuppressHaste] 제압 가속 — 출처 {sourceId} · 제압 {suppressDuration:0.##}초 · {granted}/{targets.Count}명");
+        Debug.Log($"[SuppressHaste] 제압 가속 — 출처 {sourceId} · {label} {duration:0.##}초 · {granted}/{targets.Count}명");
         return granted;
     }
 
