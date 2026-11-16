@@ -22,5 +22,5 @@
 씬에서 직접 옮긴 위치는 이 메뉴를 다시 돌리면 메뉴 값으로 돌아간다. 배치 모드: `-executeMethod LoadingScreenLayoutAuthoring.ApplyBatch`.
 
 ## 알려진 점
-- 팁 문구 키 `UI.Loading.TipDashInterrupt` 의 ko/en 이 `Tip.` 으로 시작한다 — 이제 캡슐이 "Tip" 을 보여 주므로 시트 문구에서 `Tip.` 을 빼는 게 맞다(시트 수정 대기).
+- 팁 문구에는 `Tip.` 을 쓰지 않는다 — 캡슐이 "Tip" 을 보여 준다(290: `UI.Loading.TipDashInterrupt` ko/en·코드 기본값·씬 값에서 뺌, 시트 Strings C78·D78).
 - 팁 문구는 서울알림 Medium(정적 아틀라스)을 쓴다 — Heavy(451자 정적)는 임의 문구의 글자가 빠질 수 있어 숫자·"Tip" 에만 쓴다.
