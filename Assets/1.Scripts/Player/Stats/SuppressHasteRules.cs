@@ -92,6 +92,12 @@ public static class SuppressHasteRules
         return duration > 0f;
     }
 
+    /// <summary>
+    /// 시트 durationOverride 를 끈 같은 배율 — 호출측이 길이를 정해 주는 출처(로비 훈련 T40, 할 일 293)용. 23호 경로는 쓰지 않는다.
+    /// </summary>
+    public static SuppressHasteValues WithoutDurationOverride(SuppressHasteValues values) =>
+        new SuppressHasteValues(values.MoveSpeedMultiplier, values.AttackSpeedMultiplier, values.CooldownRateMultiplier, 0f);
+
     /// <summary>버프가 거는 (타입, 배율) 3개. 순서 = 대표(쿨) 먼저.</summary>
     public static IEnumerable<(StatusEffectType type, float magnitude)> Effects(SuppressHasteValues values)
     {

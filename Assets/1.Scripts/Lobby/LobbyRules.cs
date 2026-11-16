@@ -59,8 +59,15 @@ public sealed class LobbyRules : ScriptableObject
              "자리는 씬 Train03Arena 의 A/B 위치. 비면 허수아비 없이 출구 집결만 한다(경고).")]
     [SerializeField] private GameObject freePracticeDummyPrefab;
 
+    [Header("로비 튜토리얼 T40 제압 가속(할 일 293)")]
+    [Tooltip("T40 에서 훈련 상대가 제압에 들어가는 순간 실전 제압 가속(SuppressHaste, 할 일 91)을 이 초만큼 건다 — 대상 = 살아 있는 플레이어 전원, 상대당 1회. " +
+             "SuppressHaste 시트 durationOverride 보다 이 값이 이긴다(훈련 제압은 무기한이라 제압 길이가 없다). 0 = 주지 않음.")]
+    [Min(0f)]
+    [SerializeField] private float trainingSuppressHasteSeconds = 5f;
+
     public LobbyCombatSpawnSet CombatSpawnSet => combatSpawnSet;
     public GameObject FreePracticeDummyPrefab => freePracticeDummyPrefab;
+    public float TrainingSuppressHasteSeconds => trainingSuppressHasteSeconds;
     public TutorialGuideTextTable GuideTexts => guideTexts;
     public float DialogueBaseSeconds => dialogueBaseSeconds;
     public float DialoguePerCharSeconds => dialoguePerCharSeconds;

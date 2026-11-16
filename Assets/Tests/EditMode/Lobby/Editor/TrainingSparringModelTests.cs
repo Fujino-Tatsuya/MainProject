@@ -5,8 +5,8 @@ using NUnit.Framework;
 public sealed class TrainingSparringModelTests
 {
     // 게이지 최대 / 감소량 = 5칸(23호 기본값 100 / 20 과 같은 비) — 테스트 입력일 뿐 모델엔 수치가 없다.
-    static TrainingSparringModel Create(bool suppressAcceleration = false) =>
-        new TrainingSparringModel(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, 20f), suppressAcceleration);
+    static TrainingSparringModel Create() =>
+        new TrainingSparringModel(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, 20f));
 
     static List<LobbyTutorialActivity> DrainReports(TrainingSparringModel model)
     {
@@ -20,9 +20,9 @@ public sealed class TrainingSparringModelTests
         Assert.That(DrainReports(model), Is.EqualTo(expected));
 
     // 단계마다 프레임을 넘긴다(진행기 = 한 프레임 한 전이). 알림 프레임 = 10, 20, 30, 40, 50.
-    static TrainingSparringModel AtCounter(bool suppressAcceleration = false)
+    static TrainingSparringModel AtCounter()
     {
-        var model = Create(suppressAcceleration);
+        var model = Create();
         Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.Counter, 10), Is.True);
         return model;
     }
@@ -318,16 +318,74 @@ public sealed class TrainingSparringModelTests
         Assert.That(model.HoldsSuppress, Is.False);
     }
 
-    [Test]
-    public void SuppressAcceleration_OffByDefault_OnlyWhenEnabledAndSuppressed()
-    {
-        var off = AtSuppressKill();
-        off.OnSuppressStarted();
-        Assert.That(off.AppliesSuppressAcceleration, Is.False);
+    // ── T40 제압 가속(할 일 293) ──
 
-        var on = new TrainingSparringModel(TrainingSparringSegmentCheck.Evaluate(BossCounterProgress.GaugeMax, 20f), true);
-        on.OnFlowStageStarted(LobbyTutorialActivity.Counter, 1);
-        Assert.That(on.AppliesSuppressAcceleration, Is.False);
+    [Test]
+    public void SuppressHaste_T40SuppressStart_GrantedOnce()
+    {
+        var model = AtSuppressKill();
+        Assert.That(model.SuppressHasteDue, Is.False, "제압 전엔 주지 않는다");
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.False);
+
+        Assert.That(model.OnSuppressStarted(), Is.True);
+        Assert.That(model.SuppressHasteDue, Is.True);
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.True);
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.False, "상대당 1회");
+        Assert.That(model.SuppressHasteDue, Is.False);
+    }
+
+    [Test]
+    public void SuppressHaste_SuppressRestartedInT40_NotGrantedAgain()
+    {
+        // 외부 해제 뒤 다시 제압돼도 1회.
+        var model = AtSuppressKill();
+        model.OnSuppressStarted();
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.True);
+        model.OnSuppressEnded();
+        model.OnSuppressStarted();
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.False);
+    }
+
+    [Test]
+    public void SuppressHaste_T34Suppress_NotGrantedUntilT40()
+    {
+        // T34 지정 벽으로 칸 0 → 제압(이어받음). T34 에선 주지 않고 T40 진입 순간 1회.
+        var model = AtWall();
+        Assert.That(model.OnSuppressStarted(), Is.True);
+        Assert.That(model.SuppressHasteDue, Is.False, "T34 에선 주지 않는다");
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.False);
+
+        Assert.That(model.OnWallAccepted(41), Is.True);
+        Assert.That(model.OnFlowStageStarted(LobbyTutorialActivity.SuppressKill, 50), Is.True);
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.True);
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.False);
+    }
+
+    [Test]
+    public void SuppressHaste_NotGrantedOutsideT40()
+    {
+        var model = AtVulnerableCc();
+        model.OnSuppressStarted();   // T31~T33 은 거부
+        Assert.That(model.TryConsumeSuppressHasteGrant(), Is.False);
+
+        var killed = AtSuppressKill();
+        killed.OnSuppressStarted();
+        Assert.That(killed.OnDied(), Is.True);
+        Assert.That(killed.TryConsumeSuppressHasteGrant(), Is.False, "완료(처치) 뒤엔 주지 않는다");
+    }
+
+    [Test]
+    public void SuppressHaste_FixedDuration_IgnoresSheetOverride()
+    {
+        // 로비 훈련은 LobbyRules 초가 시트 durationOverride 를 이긴다 — 23호 경로(기존)는 그대로 override 우선.
+        var values = new SuppressHasteValues(2f, 2f, 2f, 8f);
+        Assert.That(SuppressHasteRules.WithoutDurationOverride(values).DurationOverride, Is.Zero);
+        Assert.That(SuppressHasteRules.WithoutDurationOverride(values).MoveSpeedMultiplier, Is.EqualTo(2f));
+
+        Assert.That(SuppressHasteRules.TryResolveDuration(SuppressHasteRules.WithoutDurationOverride(values).DurationOverride, 5f, out float lobby), Is.True);
+        Assert.That(lobby, Is.EqualTo(5f));
+        Assert.That(SuppressHasteRules.TryResolveDuration(values.DurationOverride, 5f, out float boss), Is.True);
+        Assert.That(boss, Is.EqualTo(8f));
     }
 
     // ── 칸 판정 ──

@@ -73,7 +73,8 @@ public readonly struct TrainingSparringSegmentCheck
 /// <item>T34 Wall: 걸러진 지정 벽 충돌 1회 = 완료. 칸 감소·제압은 실제 규칙(완료 조건 아님). 완료 전 빗나간 넉백은 <see cref="NeedsRetryAfterMiss"/> → 상대가 위치 복구.</item>
 /// <item>T40 SuppressKill(⑧): 칸(게이지) 보존. 진입 때 칸 0·제압 아님이면 즉시 제압(<see cref="ShouldSuppressOnEntry"/>), 남았으면 취약 무기한 보정 해제·자발 행동 재개 →
 /// 실제 규칙(간파·벽)으로 칸 소진 → 제압. 제압 전엔 처치 방지, 제압 중엔 공격 대기·사망 허용. 제압은 지속시간으로 끝나지 않는다(<see cref="HoldsSuppress"/> — 상대가 매 틱 연장, Q17 A).
-/// 사망 = 완료(마지막 타격 귀속 검사 없음). 옛 D 의 '제압 중 피해 → 제압 종료 → 마무리 체력' 단계는 없앴다.</item>
+/// 사망 = 완료(마지막 타격 귀속 검사 없음). 옛 D 의 '제압 중 피해 → 제압 종료 → 마무리 체력' 단계는 없앴다.
+/// T40 에서 제압 중이 되는 순간 실전 제압 가속 1회(<see cref="SuppressHasteDue"/>, 할 일 293 — 부여는 상대·진행기 연결 쪽).</item>
 /// </list>
 /// 이벤트 메서드는 상태가 바뀌었거나 기록했으면 true — 현재 단계에 맞지 않는 이벤트·중복·역순은 무시(false)라 호출측이 로그만 남긴다.
 /// </summary>
@@ -82,7 +83,6 @@ public sealed class TrainingSparringModel
     const int NoFrame = int.MinValue;
 
     readonly Queue<LobbyTutorialActivity> _pendingReports = new Queue<LobbyTutorialActivity>();
-    readonly bool _suppressAccelerationEnabled;
 
     int _stageFrame = NoFrame;
     bool _counterReported;
@@ -90,16 +90,12 @@ public sealed class TrainingSparringModel
     bool _resetRequested, _resetConsumed, _resetReported;
     bool _wallReported;
     bool _suppressActive;
+    bool _suppressHasteGranted;
 
     /// <param name="segments">총 칸 판정(<see cref="TrainingSparringSegmentCheck.Evaluate"/>). 오류여도 진행은 그대로 — 호출측이 <see cref="TrainingSparringSegmentCheck.Error"/> 를 로그한다.</param>
-    /// <param name="suppressAccelerationEnabled">
-    /// 제압 중 쿨타임 가속(명세 §9.5·§9.6). 🔴 보류 — 실전 코드에 없다. 지금은 false 로 만들고,
-    /// 실전 규칙이 생기면 그 데이터 값으로 켠다. 켜도 모델은 <see cref="AppliesSuppressAcceleration"/> 만 낸다(적용은 상대·플레이어 쪽).
-    /// </param>
-    public TrainingSparringModel(TrainingSparringSegmentCheck segments, bool suppressAccelerationEnabled = false)
+    public TrainingSparringModel(TrainingSparringSegmentCheck segments)
     {
         Segments = segments;
-        _suppressAccelerationEnabled = suppressAccelerationEnabled;
     }
 
     public TrainingSparringStage Stage { get; private set; } = TrainingSparringStage.Idle;
@@ -150,8 +146,12 @@ public sealed class TrainingSparringModel
     /// <summary>훈련 간파 창 연장(PLAN Q11 A) — T31 간파 성공 전에만. 신호(기존 간파 예고)를 보고 입력해도 성공할 길이를 상대가 보장한다.</summary>
     public bool ExtendsCounterWindow => Stage == TrainingSparringStage.Counter && !_counterReported;
 
-    /// <summary>제압 중 쿨타임 가속을 적용할지 — 🔴 보류 플래그. 생성자에서 켠 경우에만 T34·T40 제압 중 true.</summary>
-    public bool AppliesSuppressAcceleration => _suppressAccelerationEnabled && _suppressActive && AllowsGaugeTransition;
+    /// <summary>
+    /// T40 제압 가속(할 일 293) — 실전 제압 가속(<see cref="SuppressHaste"/>, 할 일 91)을 줄 차례인가. T40 에서 제압 중이고 아직 안 줬으면 true.
+    /// 사유 무관(간파·벽으로 칸 0, T40 진입 때 칸 0 즉시 제압, T34 에서 걸린 제압을 T40 이 이어받은 순간). T34 의 제압 자체는 주지 않는다.
+    /// 모델(= 상대 1개, 회차마다 새로 스폰)당 1회 — 확인은 <see cref="TryConsumeSuppressHasteGrant"/>.
+    /// </summary>
+    public bool SuppressHasteDue => Stage == TrainingSparringStage.SuppressKill && _suppressActive && !_suppressHasteGranted;
 
     /// <summary>T34 완료 전 넉백이 지정 벽을 못 맞히고 끝났으면 위치 복구 후 재시도(명세 T34).</summary>
     public bool NeedsRetryAfterMiss => Stage == TrainingSparringStage.Wall && !_wallReported;
@@ -178,6 +178,16 @@ public sealed class TrainingSparringModel
             return false;
 
         _resetConsumed = true;
+        return true;
+    }
+
+    /// <summary>T40 제압 가속을 지금 줄지 — <see cref="SuppressHasteDue"/> 면 기록하고 true(이후 false). 상대가 제압 진입·단계 알림 뒤에 부른다.</summary>
+    public bool TryConsumeSuppressHasteGrant()
+    {
+        if (!SuppressHasteDue)
+            return false;
+
+        _suppressHasteGranted = true;
         return true;
     }
 

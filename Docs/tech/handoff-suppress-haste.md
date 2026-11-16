@@ -19,7 +19,7 @@
 ## 2. 플레이어 쪽 (은희 영역 — 참고)
 
 - `SuppressHaste.GrantServer(ulong sourceId, float suppressDuration)` — 보스 종류와 무관한 서버 API. 23호는 위 이벤트로 자동 호출.
-  로비 훈련 상대(`TrainingSparringModel` "제압 중 쿨타임 가속" 보류 플래그)도 이것을 부르면 된다.
+  로비 훈련 상대(T40)는 `GrantServerFixedDuration(상대 id, LobbyRules 초)` 로 연결됐다(할 일 293 — 시트 `durationOverride` 를 보지 않음, [lobby-training.md](lobby-training.md) §4).
 - 대상 = 그 순간 Alive 플레이어. 상태이상 3개(`CooldownRateModifier`·`MoveSpeedFinalMultiplier`·`AttackSpeedFinalMultiplier`), 출처 = 보스 `NetworkObjectId`, 스택 1(재진입 = 지속 갱신).
 - 지속 = 시트 `durationOverride` > 0 이면 그 값, 0 이면 제압 길이. 만료는 상태이상 스윕 — 제압 종료 이벤트는 쓰지 않는다.
 - Alive 를 벗어나면(쓰러짐 연출·Soul·사망) 그 출처 3개 제거, 부활해도 다시 안 건다.

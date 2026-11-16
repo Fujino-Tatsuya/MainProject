@@ -103,6 +103,11 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public event Action<float> ServerGaugeReduced;
     public event Action ServerSuppressStarted;
     public event Action ServerSuppressEnded;
+    /// <summary>
+    /// [서버] T40 제압 가속을 줄 순간(할 일 293 — 모델 <see cref="TrainingSparringModel.SuppressHasteDue"/>, 상대당 1회).
+    /// T40 안에서 제압이 시작됐거나 T34 제압을 T40 이 이어받은 순간. 부여(<see cref="SuppressHaste.GrantServerFixedDuration"/>)는 <see cref="LobbyTrainingSparring"/>.
+    /// </summary>
+    public event Action ServerSuppressHasteDue;
     /// <summary>[서버] 상대 사망. 인자 = 모델이 완료로 인정했는가(false = 처치 방지 누락).</summary>
     public event Action<bool> ServerSparringDied;
     /// <summary>[서버] 모델 단계 완료(T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring.</summary>
@@ -213,6 +218,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         // T40: 벽 충돌로 남은 칸이 0 인데 제압이 아니면 바로 제압(보통은 T34 그 충돌이 이미 걸어 두었다 — 그 제압은 무기한으로 이어진다).
         if (_model.ShouldSuppressOnEntry(RemainingSegments) && State != MonsterState.Dead)
             EnterSuppress("T40 남은 칸 0");
+        RaiseSuppressHasteIfDue("T40 진입");   // T34 에서 걸린 제압을 이어받은 경우(위 즉시 제압이면 EnterSuppress 가 이미 냈다)
         TryRunReset();
         SyncModel();
         return accepted;
@@ -616,6 +622,15 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         ServerSuppressStarted?.Invoke();
         Debug.Log($"{Tag} 제압 진입({reason}) — {(indefinite ? "처치할 때까지" : $"{BreakSeconds:0.#}초")} · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##} · " +
                   $"처치 {(_model.IsKillable ? "허용" : "방지")} · 단계 {_model.Stage}", this);
+        RaiseSuppressHasteIfDue(reason);
+    }
+
+    // T40 제압 가속(할 일 293) — 모델이 줄 차례라 하면 1회 알린다(T34 의 제압·중복은 모델이 거른다).
+    void RaiseSuppressHasteIfDue(string reason)
+    {
+        if (_model == null || !_model.TryConsumeSuppressHasteGrant()) return;
+        Debug.Log($"{Tag} T40 제압 가속 차례({reason})", this);
+        ServerSuppressHasteDue?.Invoke();
     }
 
     // 그로기를 벗어나면 제압 종료 — 게이지 가득(사망이면 복원 없음). T34·T40 은 무기한이라 보통 오지 않는다.
