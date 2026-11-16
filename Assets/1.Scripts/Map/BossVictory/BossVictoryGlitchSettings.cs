@@ -43,8 +43,8 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
 
 
     [Header("글리치 색·모양")]
-    [Tooltip("배경 호박색(sRGB) = 팔레트 기준 색의 기준(271). 이 SO 의 색들은 이 색 기준 관계로 해석돼 처치자 프로필 baseColor 를 따라간다(TV 꺼짐 발광 = 대비 기준 색의 기준). 실제 색 = BossVictoryPaletteCalc.")]
-    public Color amberColor = new Color32(0xD2, 0xA6, 0x4E, 0xFF);
+    // 🔴 이 SO 의 색 칸(amberColor·보스 노이즈 두 색·rectifyColor·안쪽 원 좌우 색·회색·글로우 색·TV 꺼짐 색)은 화면에 안 쓴다(271 후속 11-16) — 화면 색 = 처치자 프로필 paletteColors(칸마다 독립). 옛 값 보관용이라 숨김.
+    [HideInInspector] public Color amberColor = new Color32(0xD2, 0xA6, 0x4E, 0xFF);
     [Min(1f)] public float scanlineCount = 360f;
     [Tooltip("CRT 주사선을 바닥에서 뺀다(267 후속) — 깊이로 복원한 표면 법선의 위쪽 성분(normal.y)이 이 값 이하 = 벽(주사선 그대로).")]
     [Range(0f, 1f)] public float scanlineFloorNormalMin = 0.55f;
@@ -94,10 +94,10 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("카메라 이동 → 노이즈 UV 배율(카메라 1m 당 UV, x = U · y = V). 시간 흐름은 없다 — 카메라가 움직일 때만 움직인다.\n" +
              "카메라 오른쪽 이동 → U 감소 · 왼쪽 → U 증가 · 위 → V 증가 · 아래 → V 감소(카메라 right/up 축 투영). 컷(텔레포트) 프레임은 뺀다.")]
     public Vector2 bossNoiseCameraScale = new Vector2(0.1f, 0.1f);
-    public Color bossNoiseBrightColor = new Color32(0xFF, 0xF6, 0xEA, 0xFF);
+    [HideInInspector] public Color bossNoiseBrightColor = new Color32(0xFF, 0xF6, 0xEA, 0xFF);
     [Tooltip("밝은 색 배율(과노출 느낌 — 블룸이 받는다).")]
     [Min(0f)] public float bossNoiseBrightIntensity = 1.6f;
-    public Color bossNoiseDarkColor = new Color32(0x3A, 0x17, 0x12, 0xFF);
+    [HideInInspector] public Color bossNoiseDarkColor = new Color32(0x3A, 0x17, 0x12, 0xFF);
 
     [Header("발밑 회색 원(246 복원 — 켜는 시각·커지는 시간 = 타임라인 '발밑 회색 원' 클립)")]
     [Tooltip("원 목표 반경(m, 수평 거리) — 클립 세기 1 일 때. 중심 = 카메라 바로 아래 바닥(매 프레임 따라감, 높이 = 처치자 발 — '카메라 처치자로' 마커 전엔 처치자 발밑). 위에서 봤을 때 원 안(높이 한도 없음 — 원기둥)의 배경은 " +
@@ -119,7 +119,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Range(0f, 1f)] public float rectifyCenterY = 0.55f;
     [Tooltip("외곽선 두께(대문자 높이 비율). 안쪽은 비운다.")]
     [Range(0.005f, 0.1f)] public float rectifyOutline = 0.04f;
-    public Color rectifyColor = Color.white;
+    [HideInInspector] public Color rectifyColor = Color.white;
 
     /// <summary>RECTIFY 안쪽 원 하나(267 후속 — 원 3개 통합). 시각은 'RECTIFY 안쪽 색' 클립 시작 기준 초.</summary>
     [Serializable]
@@ -136,9 +136,9 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
         [Tooltip("중심(단어 사각형 UV 0~1).")]
         public Vector2 center;
         [Tooltip("왼쪽 색(단어 사각형 UV x = 0).")]
-        public Color leftColor;
+        [HideInInspector] public Color leftColor;
         [Tooltip("오른쪽 색(UV x = 1) — 원 안 색은 왼쪽 → 오른쪽 보간.")]
-        public Color rightColor;
+        [HideInInspector] public Color rightColor;
 
         public static RectifyCircle Make(float start, float startRadius, float fade, float expand, Vector2 center, Color left, Color right) =>
             new RectifyCircle { start = start, startRadius = startRadius, fade = fade, expand = expand, center = center, leftColor = left, rightColor = right };
@@ -156,7 +156,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
              "③은 작게 생겨 불투명한 회색으로 페이드 → 회색에서 흰색으로 전환 → 흰색이 된 순간부터 확장. 3개만 쓴다.")]
     public RectifyCircle[] rectifyCircles = DefaultRectifyCircles();
     [Tooltip("③(흰 원)이 페이드되는 동안의 회색(불투명).")]
-    public Color rectifyCircleGrayColor = new Color32(0x8A, 0x8A, 0x8A, 0xFF);
+    [HideInInspector] public Color rectifyCircleGrayColor = new Color32(0x8A, 0x8A, 0x8A, 0xFF);
     [Tooltip("③ 회색 → 흰색 전환 시간(초) — 페이드가 끝난 뒤. 전환이 끝난 순간부터 확장.")]
     [Min(0f)] public float rectifyCircleGrayToWhite = 0.1f;
     [Tooltip("원 가장자리 부드러움(단어 높이 비율). 화면 픽셀보다 작으면 픽셀 기준 AA.")]
@@ -207,7 +207,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("빛 퍼짐 반경(실제 화면 픽셀). 절반 해상도 텍스처에서 9탭 가로·세로 블러 — 한 칸 간격 = 반경 ÷ 4.")]
     [Range(1f, 96f)] public float rectifyGlowRadius = 24f;
     [Tooltip("빛 색(채움 색에 곱하기). 흰색 = 채움 색 그대로.")]
-    public Color rectifyGlowColor = Color.white;
+    [HideInInspector] public Color rectifyGlowColor = Color.white;
     [Tooltip("어느 채움이 빛날지 — 흰 원 / 주황 채움 / 둘 다.")]
     public RectifyGlowTarget rectifyGlowTarget = RectifyGlowTarget.Both;
 
@@ -220,7 +220,7 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
 
     [Header("TV 꺼짐(시각·길이 = 타임라인 TV 꺼짐 클립)")]
     [Tooltip("CRT 꺼짐 발광 색(타이틀과 같은 파랑이 기본).")]
-    public Color crtOffGlowColor = new Color(0.25f, 0.62f, 1f, 1f);
+    [HideInInspector] public Color crtOffGlowColor = new Color(0.25f, 0.62f, 1f, 1f);
 
     [Header("셰이더(빌드 포함용 참조 — 비우면 Shader.Find)")]
     public Shader maskShader;

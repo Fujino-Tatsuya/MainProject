@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// RECTIFY 주황 채움 = 캐릭터별 프로필(11-12) — 세 프로필에 칸 존재·코드 기본값 = 옮기기 전 공용 값 · 렌더 값(<see cref="BossVictoryOrangeLook"/>)·팔레트 기준 색은 처치자 프로필에서.
+/// RECTIFY 주황 채움 = 캐릭터별 프로필(11-12) — 세 프로필에 칸 존재·코드 기본값 = 옮기기 전 공용 값 · 렌더 값(<see cref="BossVictoryOrangeLook"/>)은 처치자 프로필에서(색은 팔레트 칸, 11-16).
 /// </summary>
 public sealed class BossVictoryOrangeProfileTests
 {
@@ -15,8 +15,8 @@ public sealed class BossVictoryOrangeProfileTests
     static readonly string[] OrangeFields =
     {
         nameof(BossVictoryProfile.rectifyOrangeHold), nameof(BossVictoryProfile.rectifyOrangeWipe), nameof(BossVictoryProfile.rectifyOrangeRightToLeft),
-        nameof(BossVictoryProfile.rectifyOrangeJitter), nameof(BossVictoryProfile.rectifyOrangeRowPixels), nameof(BossVictoryProfile.rectifyOrangeLeft),
-        nameof(BossVictoryProfile.rectifyOrangeRight), nameof(BossVictoryProfile.rectifyOrangeGradient), nameof(BossVictoryProfile.rectifyScanlineSpacing),
+        nameof(BossVictoryProfile.rectifyOrangeJitter), nameof(BossVictoryProfile.rectifyOrangeRowPixels),
+        nameof(BossVictoryProfile.rectifyOrangeGradient), nameof(BossVictoryProfile.rectifyScanlineSpacing),
         nameof(BossVictoryProfile.rectifyScanlineDark),
     };
 
@@ -40,8 +40,6 @@ public sealed class BossVictoryOrangeProfileTests
             Assert.IsFalse(d.rectifyOrangeRightToLeft, "RightToLeft");
             Assert.AreEqual(0.2f, d.rectifyOrangeJitter, Tolerance, "Jitter");
             Assert.AreEqual(4f, d.rectifyOrangeRowPixels, Tolerance, "RowPixels");
-            AssertColor(new Color(1f, 0.2696447f, 0f, 1f), d.rectifyOrangeLeft, "Left");
-            AssertColor(new Color(1f, 0f, 0.455451f, 1f), d.rectifyOrangeRight, "Right");
             Assert.AreEqual(1f, d.rectifyOrangeGradient, Tolerance, "Gradient");
             Assert.AreEqual(0.003f, d.rectifyScanlineSpacing, Tolerance, "ScanlineSpacing");
             Assert.AreEqual(0f, d.rectifyScanlineDark, Tolerance, "ScanlineDark");
@@ -60,8 +58,6 @@ public sealed class BossVictoryOrangeProfileTests
             gunner.rectifyOrangeHold = 0.3f;
             gunner.rectifyOrangeRightToLeft = true;
             gunner.rectifyOrangeRowPixels = 0.2f;   // 하한 1 로 잘림
-            gunner.rectifyOrangeLeft = Color.green;
-            gunner.rectifyOrangeRight = Color.blue;
             gunner.rectifyScanlineDark = 0.4f;
             s.characterProfiles = new List<BossVictoryGlitchSettings.CharacterProfile>
             {
@@ -74,15 +70,12 @@ public sealed class BossVictoryOrangeProfileTests
             Assert.IsTrue(look.RightToLeft);
             Assert.AreEqual(1f, look.RowPixels, Tolerance);
             Assert.AreEqual(0.4f, look.ScanlineDark, Tolerance);
-            Color[] reference = BossVictoryPaletteCalc.ReferenceColors(s, gunner);
-            AssertColor(Color.green, reference[(int)BossVictoryPaletteSlot.OrangeLeft], "팔레트 기준 왼쪽 = 처치자 프로필");
-            AssertColor(Color.blue, reference[(int)BossVictoryPaletteSlot.OrangeRight], "팔레트 기준 오른쪽 = 처치자 프로필");
 
             BossVictoryOrangeLook pal = BossVictoryOrangeLook.From(s.ProfileFor(TutorialCharacter.Paladin));
             Assert.AreEqual(BossVictoryOrangeLook.DefaultHold, pal.Hold, Tolerance, "다른 캐릭터 값은 섞이지 않음");
             Assert.IsFalse(pal.RightToLeft);
             BossVictoryOrangeLook none = BossVictoryOrangeLook.From(null);
-            AssertColor(BossVictoryOrangeLook.DefaultLeft, none.Left, "프로필 없음 = 코드 기본값");
+            Assert.AreEqual(BossVictoryOrangeLook.DefaultHold, none.Hold, Tolerance, "프로필 없음 = 코드 기본값");
         }
         finally
         {

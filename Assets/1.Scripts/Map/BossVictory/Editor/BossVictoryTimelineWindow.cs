@@ -1922,7 +1922,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         SerializedProperty arr = so.FindProperty(nameof(BossVictoryGlitchSettings.rectifyCircles));
         if (arr == null) return;
         EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("안쪽 원(생성 시각·시작 반지름·페이드·확장·중심·좌우 색)", EditorStyles.miniBoldLabel);
+        EditorGUILayout.LabelField("안쪽 원(생성 시각·시작 반지름·페이드·확장·중심 — 색은 팔레트 칸)", EditorStyles.miniBoldLabel);
         if (arr.arraySize != BossVictoryRectifyFill.CircleCount)
         {
             EditorGUILayout.HelpBox($"원은 {BossVictoryRectifyFill.CircleCount}개만 쓴다(지금 {arr.arraySize}개).", MessageType.Warning);
@@ -2037,7 +2037,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.Amber:
                 DrawPaletteHint();
-                DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberColor), nameof(BossVictoryGlitchSettings.amberLumaLift),
+                DrawSettingsFields("노란 틴트 모양", nameof(BossVictoryGlitchSettings.amberLumaLift),
                     nameof(BossVictoryGlitchSettings.skyAmberMinLuma));
                 DrawSettingsFields("처치 연출 전용 볼륨", nameof(BossVictoryGlitchSettings.victoryVolume), nameof(BossVictoryGlitchSettings.victoryVignetteIntensity),
                     nameof(BossVictoryGlitchSettings.victoryOverrideExposure), nameof(BossVictoryGlitchSettings.victoryPostExposure));
@@ -2059,8 +2059,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawSettingsFields("보스 노이즈 모양",
                     nameof(BossVictoryGlitchSettings.bossNoiseTexture), nameof(BossVictoryGlitchSettings.bossNoiseSpace),
                     nameof(BossVictoryGlitchSettings.bossNoiseTiling), nameof(BossVictoryGlitchSettings.bossNoiseCameraScale),
-                    nameof(BossVictoryGlitchSettings.bossNoiseBrightColor), nameof(BossVictoryGlitchSettings.bossNoiseBrightIntensity),
-                    nameof(BossVictoryGlitchSettings.bossNoiseDarkColor));
+                    nameof(BossVictoryGlitchSettings.bossNoiseBrightIntensity));
                 break;
             case BossVictoryTrack.Tear:
                 DrawSettingsFields("가로 찢김 모양(끌림과 같은 줄)",
@@ -2077,7 +2076,6 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             case BossVictoryTrack.CrtOff:
                 DrawPaletteHint();
-                DrawSettingsFields("TV 꺼짐 모양", nameof(BossVictoryGlitchSettings.crtOffGlowColor));
                 break;
             case BossVictoryTrack.NoiseScrollV:
                 EditorGUILayout.LabelField("보스 노이즈 텍스처 UV 를 수직으로 옮긴다(_NoiseST.w = 카메라 이동 누적 + 이 값). 구간 동안 시작 → 끝 오프셋(이징), 끝난 뒤 끝 값 유지, 클립끼리 더함. + = 위(카메라 위 이동과 같은 방향). 노이즈가 보이려면 '보스 노이즈' 세기 클립이 켜져 있어야 한다.", EditorStyles.wordWrappedMiniLabel);
@@ -2088,23 +2086,22 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 EditorGUILayout.LabelField("배경 글자 — 외곽선만, 플레이어·보스 뒤·벽/바닥 앞, 찢긴 화면과 같이 찢긴다. 세기 = 알파: 들어오는 동안 가로줄이 그 비율만큼 무작위로 켜져 찢기듯 등장. 모양 값은 공용.", EditorStyles.wordWrappedMiniLabel);
                 DrawSettingsFields("배경 글자 모양(공용)", nameof(BossVictoryGlitchSettings.rectifyFont), nameof(BossVictoryGlitchSettings.rectifyText),
                     nameof(BossVictoryGlitchSettings.rectifyWidth), nameof(BossVictoryGlitchSettings.rectifyCenterY),
-                    nameof(BossVictoryGlitchSettings.rectifyOutline), nameof(BossVictoryGlitchSettings.rectifyColor));
+                    nameof(BossVictoryGlitchSettings.rectifyOutline));
                 break;
             case BossVictoryTrack.RectifyFill:
                 DrawPaletteHint();
                 EditorGUILayout.LabelField("RECTIFY 글자 안쪽 원 3개 — ① 마젠타 → ② 블루 → ③ 흰색. 원마다 생성 시각(클립 시작 기준)에 자기 중심에서 시작 반지름으로 생겨 페이드 → 불투명해진 뒤 easeOutCubic 으로 단어 전체까지 퍼진다. ③은 회색으로 페이드 → 회색에서 흰색으로 바뀐 순간부터 확장. 원 안 색 = 왼쪽 색 → 오른쪽 색. 나중 원이 위, 마지막 원으로 고정. 첫 원 전은 비어 있음(흰 외곽선만). 색이 지나간 자리는 외곽선도 그 색(덮기 칸, 끄면 안쪽만·외곽선 흰색). 세기 = 채움 불투명도. 모양 값은 공용(주황 채움·안쪽 주사선은 캐릭터별 프로필).", EditorStyles.wordWrappedMiniLabel);
                 DrawRectifyCircleFields();
-                DrawSettingsFields("안쪽 색 공용", nameof(BossVictoryGlitchSettings.rectifyCircleGrayColor), nameof(BossVictoryGlitchSettings.rectifyCircleGrayToWhite),
+                DrawSettingsFields("안쪽 색 공용", nameof(BossVictoryGlitchSettings.rectifyCircleGrayToWhite),
                     nameof(BossVictoryGlitchSettings.rectifyFillSoftness), nameof(BossVictoryGlitchSettings.rectifyFillCoversOutline));
                 DrawSettingsFields("RECTIFY 전용 글로우(맵 블룸과 무관)", nameof(BossVictoryGlitchSettings.rectifyGlowIntensity), nameof(BossVictoryGlitchSettings.rectifyGlowRadius),
-                    nameof(BossVictoryGlitchSettings.rectifyGlowColor), nameof(BossVictoryGlitchSettings.rectifyGlowTarget));
+                    nameof(BossVictoryGlitchSettings.rectifyGlowTarget));
                 if (_profile != null)
                     DrawProfileFields("RECTIFY 주황 채움(캐릭터별 — 이 캐릭터 프로필, 11-12)", nameof(BossVictoryProfile.rectifyOrangeHold), nameof(BossVictoryProfile.rectifyOrangeWipe),
                         nameof(BossVictoryProfile.rectifyOrangeRightToLeft), nameof(BossVictoryProfile.rectifyOrangeJitter),
-                        nameof(BossVictoryProfile.rectifyOrangeRowPixels), nameof(BossVictoryProfile.rectifyOrangeLeft),
-                        nameof(BossVictoryProfile.rectifyOrangeRight), nameof(BossVictoryProfile.rectifyOrangeGradient),
+                        nameof(BossVictoryProfile.rectifyOrangeRowPixels),
+                        nameof(BossVictoryProfile.rectifyOrangeGradient),
                         nameof(BossVictoryProfile.rectifyScanlineSpacing), nameof(BossVictoryProfile.rectifyScanlineDark));
-                if (_profile != null) DrawTextColorFields();
                 break;
             case BossVictoryTrack.CameraBob:
                 EditorGUILayout.LabelField("화면 세로 두둥실 = 세기(키) × 진폭 × e^(−감쇠·경과) × sin(2π(경과/주기 + 위상)). 투영만 옮겨 카메라 위치·컷은 그대로, 시각 t 로 정해져 스크럽·모든 피어 같음. 들어오고 나가는 건 세기 키로.", EditorStyles.wordWrappedMiniLabel);
@@ -2123,25 +2120,25 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
     }
 
-    // ── 팔레트(271) — 프로필 기준 색·대비 설정 + 계산된 색 견본(칸마다 자동/직접 지정) ──────────
+    // ── 팔레트(271) — 칸마다 독립 색(11-16 관계 끊음: 기준 색·대비·글자 기준 색 계산 없음) ──────────
 
     static readonly Dictionary<BossVictoryPaletteSlot, string> PaletteLabels = new Dictionary<BossVictoryPaletteSlot, string>
     {
-        { BossVictoryPaletteSlot.Amber, "배경 호박색(= 기준 색)" },
+        { BossVictoryPaletteSlot.Amber, "배경 호박색 틴트" },
         { BossVictoryPaletteSlot.NoiseBright, "보스 노이즈 밝은 색" },
         { BossVictoryPaletteSlot.NoiseDark, "보스 노이즈 어두운 색" },
         { BossVictoryPaletteSlot.RectifyOutline, "RECTIFY 외곽선" },
-        { BossVictoryPaletteSlot.Circle1Left, "① 원 왼쪽(대비)" },
-        { BossVictoryPaletteSlot.Circle1Right, "① 원 오른쪽(대비)" },
-        { BossVictoryPaletteSlot.Circle2Left, "② 원 왼쪽(대비)" },
-        { BossVictoryPaletteSlot.Circle2Right, "② 원 오른쪽(대비)" },
-        { BossVictoryPaletteSlot.Circle3Left, "③ 흰 원 왼쪽" },
-        { BossVictoryPaletteSlot.Circle3Right, "③ 흰 원 오른쪽" },
+        { BossVictoryPaletteSlot.Circle1Left, "① 원 왼쪽" },
+        { BossVictoryPaletteSlot.Circle1Right, "① 원 오른쪽" },
+        { BossVictoryPaletteSlot.Circle2Left, "② 원 왼쪽" },
+        { BossVictoryPaletteSlot.Circle2Right, "② 원 오른쪽" },
+        { BossVictoryPaletteSlot.Circle3Left, "③ 원 왼쪽" },
+        { BossVictoryPaletteSlot.Circle3Right, "③ 원 오른쪽" },
         { BossVictoryPaletteSlot.CircleGray, "③ 회색 단계" },
         { BossVictoryPaletteSlot.OrangeLeft, "주황 채움 왼쪽" },
         { BossVictoryPaletteSlot.OrangeRight, "주황 채움 오른쪽" },
         { BossVictoryPaletteSlot.Glow, "RECTIFY 글로우" },
-        { BossVictoryPaletteSlot.CrtGlow, "TV 꺼짐 발광(= 대비 기준 색)" },
+        { BossVictoryPaletteSlot.CrtGlow, "TV 꺼짐 발광" },
         { BossVictoryPaletteSlot.RimInside, "보스 림 안쪽(밝은 색, 림라이트)" },
         { BossVictoryPaletteSlot.RimEdge, "보스 림 테두리(어두운 색, 림라이트)" },
     };
@@ -2149,110 +2146,45 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void DrawPalette()
     {
         EditorGUILayout.LabelField("팔레트(271 — 이 캐릭터 프로필)", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("공용 설정 색 = 기준(팔라딘) 팔레트. 각 색은 공용 '배경 호박색'과의 관계(색조 차이 · 채도·밝기 비율)를 유지한 채 이 프로필 기준 색을 따라간다. 흰·회색(채도 0)은 그대로. " +
-                                   "대비 그룹(①·② 원·TV 꺼짐)은 대비 기준 색을 따라간다 — 자동 = 기준 색 색조 + 색조 차이(채도·밝기 하한 있음) / 직접 지정. 칸마다 '직접'을 켜면 그 색 그대로.", EditorStyles.wordWrappedMiniLabel);
-        DrawProfileFields("기준 색·대비", nameof(BossVictoryProfile.baseColor), nameof(BossVictoryProfile.contrastMode));
-        DrawProfileFields(null, _profile.contrastMode == BossVictoryContrastMode.Auto
-            ? new[] { nameof(BossVictoryProfile.contrastHueOffset), nameof(BossVictoryProfile.contrastMinSaturation), nameof(BossVictoryProfile.contrastMinValue) }
-            : new[] { nameof(BossVictoryProfile.contrastColor) });
-        DrawTextColorFields();
-        using (new EditorGUILayout.HorizontalScope())
+        EditorGUILayout.LabelField("칸마다 독립 색 — 한 칸을 바꿔도 다른 칸은 안 바뀐다(11-16 관계 끊음, 그때 화면 색을 구워 넣음). 화면 = 이 색 그대로.", EditorStyles.wordWrappedMiniLabel);
+        if (_profile.paletteColors == null || _profile.paletteColors.Length < BossVictoryPalette.Count)
         {
-            if (GUILayout.Button(new GUIContent("기준 색 = 공용 호박색", "프로필 기준 색을 공용 설정 amberColor 로 — 결과 = 공용 색 그대로(직접 지정 칸 제외)."), GUILayout.Width(140f)))
+            EditorGUILayout.HelpBox($"칸이 {BossVictoryPalette.Count}개보다 적다 — 모자란 칸은 코드 기본 색으로 그린다.", MessageType.Warning);
+            if (GUILayout.Button("모자란 칸 = 코드 기본 색으로 채우기", GUILayout.Width(220f)))
             {
-                Undo.RecordObject(_profile, "처치 연출 팔레트 기준 색");
-                _profile.baseColor = _settings.amberColor;
-                SavePalette();
-            }
-            if (GUILayout.Button(new GUIContent("색조 차이 = 공용에서 역산", "공용 TV 꺼짐 파랑 − 공용 호박색 색조 — 기준 색이 공용과 같을 때 대비 그룹이 공용 색 그대로."), GUILayout.Width(160f)))
-            {
-                Undo.RecordObject(_profile, "처치 연출 팔레트 색조 차이");
-                _profile.contrastHueOffset = BossVictoryPaletteCalc.ReferenceContrastHueOffset(_settings);
+                Undo.RecordObject(_profile, "처치 연출 팔레트 칸 채우기");
+                Color[] filled = BossVictoryPalette.CreateDefaultColors();
+                for (int i = 0; _profile.paletteColors != null && i < _profile.paletteColors.Length && i < filled.Length; i++) filled[i] = _profile.paletteColors[i];
+                _profile.paletteColors = filled;
                 SavePalette();
             }
         }
 
-        BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(_settings, _profile);
-        EditorGUILayout.Space(4f);
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            EditorGUILayout.LabelField("대비 기준 색(계산)", EditorStyles.miniBoldLabel, GUILayout.Width(160f));
-            using (new EditorGUI.DisabledScope(true))
-                EditorGUILayout.ColorField(GUIContent.none, palette.ContrastBase, false, false, true, GUILayout.Width(80f));
-        }
-        EditorGUILayout.LabelField("계산된 색(견본 · 직접 = 그 칸만 고정)", EditorStyles.miniBoldLabel);
+        BossVictoryPalette palette = BossVictoryPalette.From(_profile);
         foreach (BossVictoryPaletteSlot slot in BossVictoryPalette.Slots)
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                bool manual = palette.IsManual(slot);
                 string label = PaletteLabels.TryGetValue(slot, out string l) ? l : slot.ToString();
-                if (_profile.separateTextColor && BossVictoryPaletteCalc.IsText(slot)) label += " · 글자 기준";   // 11-13
-                EditorGUILayout.LabelField(label, GUILayout.Width(170f));
-                GUILayout.Label(manual ? "직접" : "자동", manual ? EditorStyles.miniBoldLabel : EditorStyles.miniLabel, GUILayout.Width(28f));
-                bool newManual = GUILayout.Toggle(manual, new GUIContent("", "켬 = 직접 지정(기준 색을 바꿔도 안 따라감) · 끔 = 자동"), GUILayout.Width(18f));
-                if (newManual != manual) SetPaletteManual(slot, newManual, palette[slot]);
-                using (new EditorGUI.DisabledScope(!manual))
-                {
-                    EditorGUI.BeginChangeCheck();
-                    Color c = EditorGUILayout.ColorField(GUIContent.none, palette[slot], true, true, true, GUILayout.Width(120f));
-                    if (EditorGUI.EndChangeCheck() && manual) SetPaletteColor(slot, c);
-                }
+                EditorGUILayout.LabelField(label, GUILayout.Width(200f));
+                EditorGUI.BeginChangeCheck();
+                Color c = EditorGUILayout.ColorField(GUIContent.none, palette[slot], true, true, true, GUILayout.Width(120f));
+                if (EditorGUI.EndChangeCheck()) SetPaletteColor(slot, c);
             }
         }
     }
 
-    // 글자 색 따로(11-13) — 켜면 RECTIFY 글자 칸만 글자 기준 색을 따라간다(배경 호박색 틴트 = 기준 색과 분리). 팔레트 패널·RECTIFY 안쪽 색 트랙 칸 공용.
-    void DrawTextColorFields()
-    {
-        DrawProfileFields("글자 색 따로(RECTIFY 글자 ↔ 배경 틴트 분리)", nameof(BossVictoryProfile.separateTextColor));
-        if (!_profile.separateTextColor)
-        {
-            EditorGUILayout.LabelField("끔 = 글자 색(주황 채움 등)도 기준 색을 따라가 배경 틴트와 같이 움직인다.", EditorStyles.wordWrappedMiniLabel);
-            return;
-        }
-        DrawProfileFields(null, nameof(BossVictoryProfile.textBaseColor));
-        if (GUILayout.Button(new GUIContent("글자 기준 색 = 공용 호박색", "글자 칸 = 프로필 주황 채움 좌우 색 원본 그대로(기준 색 변환 없음)."), GUILayout.Width(170f)))
-        {
-            Undo.RecordObject(_profile, "처치 연출 글자 기준 색");
-            _profile.textBaseColor = _settings.amberColor;
-            SavePalette();
-        }
-    }
-
-    int PaletteOverrideIndex(BossVictoryPaletteSlot slot)
-    {
-        List<BossVictoryPaletteOverride> list = _profile.paletteOverrides;
-        if (list == null) return -1;
-        for (int i = 0; i < list.Count; i++)
-            if (list[i].slot == slot) return i;
-        return -1;
-    }
-
-    // 직접 지정 켬 = 지금 보이는(자동 계산) 색에서 시작 — 이미 줄이 있으면 남겨 둔 색을 다시 쓴다. 끔 = 줄은 남기고 manual 만 끔.
-    void SetPaletteManual(BossVictoryPaletteSlot slot, bool manual, Color current)
-    {
-        Undo.RecordObject(_profile, "처치 연출 팔레트 직접 지정");
-        _profile.paletteOverrides ??= new List<BossVictoryPaletteOverride>();
-        int i = PaletteOverrideIndex(slot);
-        if (i < 0) _profile.paletteOverrides.Add(new BossVictoryPaletteOverride { slot = slot, manual = manual, color = current });
-        else
-        {
-            BossVictoryPaletteOverride o = _profile.paletteOverrides[i];
-            o.manual = manual;
-            _profile.paletteOverrides[i] = o;
-        }
-        SavePalette();
-    }
-
     void SetPaletteColor(BossVictoryPaletteSlot slot, Color color)
     {
-        int i = PaletteOverrideIndex(slot);
-        if (i < 0) return;
         Undo.RecordObject(_profile, "처치 연출 팔레트 색");
-        BossVictoryPaletteOverride o = _profile.paletteOverrides[i];
-        o.color = color;
-        _profile.paletteOverrides[i] = o;
+        int i = (int)slot;
+        if (_profile.paletteColors == null || _profile.paletteColors.Length <= i)
+        {
+            Color[] grown = BossVictoryPalette.CreateDefaultColors();
+            for (int k = 0; _profile.paletteColors != null && k < _profile.paletteColors.Length && k < grown.Length; k++) grown[k] = _profile.paletteColors[k];
+            _profile.paletteColors = grown;
+        }
+        _profile.paletteColors[i] = color;
         SavePalette();
     }
 
@@ -2268,12 +2200,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null) BossVictoryGlitchPresentation.Instance.RefreshLook();
     }
 
-    // 트랙 모양 칸의 색 = 기준(팔라딘) 팔레트라는 안내 + 팔레트 칸 열기.
+    // 이 트랙 색 = 프로필 팔레트 칸이라는 안내 + 팔레트 칸 열기.
     void DrawPaletteHint()
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            EditorGUILayout.LabelField("아래 색 = 공용 기준(팔라딘) 색 — 실제 색은 캐릭터 기준 색에서 계산(271).", EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.LabelField("이 트랙 색 = 이 캐릭터 프로필 팔레트 칸(271 — 칸마다 독립).", EditorStyles.wordWrappedMiniLabel);
             if (GUILayout.Button("팔레트", EditorStyles.miniButton, GUILayout.Width(52f)))
             {
                 Select(-1, -1, -1);

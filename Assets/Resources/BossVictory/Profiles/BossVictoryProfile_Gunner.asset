@@ -550,6 +550,7 @@ MonoBehaviour:
       hideWalls: 1
       blendSeconds: 0
       blendCurve: 1
+      weaponFollowSmoothing: 0
       startPosition: {x: 0, y: 0, z: 0}
       startRotation: {x: 0, y: 0, z: 0, w: 0}
       startFov: 0
@@ -569,6 +570,7 @@ MonoBehaviour:
       hideWalls: 1
       blendSeconds: 3.711
       blendCurve: 1
+      weaponFollowSmoothing: 0
       startPosition: {x: 0, y: 0, z: 0}
       startRotation: {x: 0, y: 0, z: 0, w: 0}
       startFov: 0
@@ -727,20 +729,33 @@ MonoBehaviour:
     bossSlowTime: 0.2
     chargeStartTime: -1
     killerActionEndTime: 0
-  baseColor: {r: 0.83396226, g: 0.35089353, b: 0.7660715, a: 1}
-  contrastMode: 0
-  contrastHueOffset: 174.0697
-  contrastColor: {r: 0.25, g: 0.62, b: 1, a: 1}
-  contrastMinSaturation: 0.45
-  contrastMinValue: 0.6
-  paletteOverrides: []
+  paletteColors:
+  - {r: 0.83396226, g: 0.35089353, b: 0.7660715, a: 1}
+  - {r: 0.99374, g: 0.9006717, b: 0.9838316, a: 1}
+  - {r: 0.16576076, g: 0.048754223, b: 0.22602715, a: 1}
+  - {r: 1, g: 1, b: 1, a: 1}
+  - {r: 0.8502333, g: 0.99374, b: 0.06305723, a: 1}
+  - {r: 0.99374, g: 0.14726189, b: 0.20371267, a: 1}
+  - {r: 0.61532056, g: 0.99374, b: 0.26248923, a: 1}
+  - {r: 0.06969869, g: 0.6546993, b: 0.6239003, a: 1}
+  - {r: 0, g: 0.40918708, b: 0.010445904, a: 1}
+  - {r: 0, g: 0.8830702, b: 0.90374094, a: 1}
+  - {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
+  - {r: 0.29999155, g: 0, b: 0.99374, a: 1}
+  - {r: 0.54843175, g: 0, b: 0.99374, a: 1}
+  - {r: 1, g: 1, b: 1, a: 1}
+  - {r: 0.14615384, g: 0.99374, b: 0.1815003, a: 1}
+  - {r: 0.99374, g: 0.9006717, b: 0.9838316, a: 1}
+  - {r: 0.16576076, g: 0.048754223, b: 0.22602715, a: 1}
   rectifyOrangeHold: 0.05
   rectifyOrangeWipe: 0.1
   rectifyOrangeRightToLeft: 0
   rectifyOrangeJitter: 0.2
   rectifyOrangeRowPixels: 4
-  rectifyOrangeLeft: {r: 1, g: 0, b: 0.2331543, a: 1}
-  rectifyOrangeRight: {r: 1, g: 0.01685079, b: 0, a: 1}
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0
+  bossLook: 0
+  bossRimWidth: 0.35
+  bossRimSoftness: 0.1
+  bossRimInsideIntensity: 2

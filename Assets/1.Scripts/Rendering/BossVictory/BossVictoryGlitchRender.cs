@@ -158,11 +158,11 @@ public static class BossVictoryGlitchRender
         _anyEffect = false;
     }
 
-    /// <summary>색·노이즈·모양 칸(설정 SO) — 켤 때 + 창에서 값을 바꿨을 때. 색 = <paramref name="palette"/>(271 — null 이면 공용 설정 색 그대로 = 기준 팔레트).</summary>
+    /// <summary>색·노이즈·모양 칸(설정 SO) — 켤 때 + 창에서 값을 바꿨을 때. 색 = <paramref name="palette"/>(271 — null 이면 코드 기본 팔레트).</summary>
     public static void ApplyLook(BossVictoryGlitchSettings s, BossVictoryPalette palette, BossVictoryOrangeLook orange, BossVictoryBossLook bossLook)
     {
         if (_composite == null || s == null) return;
-        palette ??= BossVictoryPaletteCalc.Compute(s, null);
+        palette ??= BossVictoryPalette.From(null);
         _composite.SetColor(IdAmberColor, palette[BossVictoryPaletteSlot.Amber].linear);
         _composite.SetTexture(IdNoiseTex, s.bossNoiseTexture != null ? s.bossNoiseTexture : Texture2D.grayTexture);
         _noiseTiling = s.bossNoiseTiling;

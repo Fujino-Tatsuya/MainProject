@@ -37,28 +37,19 @@ public sealed class BossVictoryBossLookTests
     }
 
     [Test]
-    public void 림_색_기본은_보스_노이즈_두_색이고_기준_색을_따라간다()
+    public void 림_색은_팔레트_칸_그대로_노이즈_칸과_독립()
     {
-        var s = ScriptableObject.CreateInstance<BossVictoryGlitchSettings>();
+        var p = ScriptableObject.CreateInstance<BossVictoryProfile>();
         try
         {
-            Color[] reference = BossVictoryPaletteCalc.ReferenceColors(s);
-            Assert.AreEqual(s.bossNoiseBrightColor, reference[(int)BossVictoryPaletteSlot.RimInside]);
-            Assert.AreEqual(s.bossNoiseDarkColor, reference[(int)BossVictoryPaletteSlot.RimEdge]);
-
-            var inputs = BossVictoryPaletteCalc.Inputs.Default;
-            inputs.BaseColor = new Color(0.3f, 0.6f, 0.9f, 1f);
-            BossVictoryPalette palette = BossVictoryPaletteCalc.Compute(reference, inputs);
-            Assert.AreEqual(palette[BossVictoryPaletteSlot.NoiseBright], palette[BossVictoryPaletteSlot.RimInside], "기준 색 따라감 = 노이즈 밝은 색과 같은 규칙");
-            Assert.AreEqual(palette[BossVictoryPaletteSlot.NoiseDark], palette[BossVictoryPaletteSlot.RimEdge]);
-
-            inputs.Overrides = new[] { new BossVictoryPaletteOverride { slot = BossVictoryPaletteSlot.RimEdge, manual = true, color = Color.black } };
-            palette = BossVictoryPaletteCalc.Compute(reference, inputs);
-            Assert.AreEqual(Color.black, palette[BossVictoryPaletteSlot.RimEdge], "직접 지정");
-            Assert.IsTrue(palette.IsManual(BossVictoryPaletteSlot.RimEdge));
             Assert.AreEqual(BossVictoryPalette.Count, BossVictoryPalette.Slots.Length, "칸 수 = enum 수");
+            p.paletteColors[(int)BossVictoryPaletteSlot.RimEdge] = Color.black;
+            p.paletteColors[(int)BossVictoryPaletteSlot.NoiseDark] = Color.red;
+            BossVictoryPalette palette = BossVictoryPalette.From(p);
+            Assert.AreEqual(Color.black, palette[BossVictoryPaletteSlot.RimEdge], "림 테두리 = 그 칸");
+            Assert.AreEqual(Color.red, palette[BossVictoryPaletteSlot.NoiseDark], "노이즈 어두운 색 = 그 칸(림과 관계 없음)");
         }
-        finally { Object.DestroyImmediate(s); }
+        finally { Object.DestroyImmediate(p); }
     }
 
     [Test]
