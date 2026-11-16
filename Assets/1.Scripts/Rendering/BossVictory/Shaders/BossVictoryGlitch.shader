@@ -39,6 +39,9 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
             float4 _NoiseST;      // xy 타일링, zw UV 오프셋(카메라 이동 누적 — 시간 흐름 없음)
             float4 _NoiseBright;
             float4 _NoiseDark;
+            float4 _BossRim;      // x 림라이트(1)/노이즈(0), y 프레넬 문턱(1 − 굵기), z 부드러움 — 보스 표현(11-12)
+            float4 _RimInside;    // 안쪽 밝은 색 × 세기(블룸 과노출)
+            float4 _RimEdge;      // 테두리 어두운 색
             TEXTURE2D(_RectifyTex);
             SAMPLER(sampler_RectifyTex);
             float4 _RectifyScreen[8];  // 글자마다 xy 최소 · zw 최대(뷰포트)
@@ -331,6 +334,12 @@ Shader "Hidden/Rendering/BossVictoryGlitch"
                 nUV = nUV * _NoiseST.xy + _NoiseST.zw;
                 half n = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, nUV).r;
                 half3 noiseCol = lerp(_NoiseDark.rgb, _NoiseBright.rgb, n);
+                // 보스 표현 림라이트(11-12) — 노이즈 대신 안쪽 밝은 색(× 세기, 과노출) · 프레넬(마스크 G) 테두리만 어두운 색. 방향 치우침 없음.
+                if (_BossRim.x > 0.5)
+                {
+                    half rim = (half)smoothstep(_BossRim.y - _BossRim.z, _BossRim.y + _BossRim.z + 1e-4, id.g);
+                    noiseCol = lerp(_RimInside.rgb, _RimEdge.rgb, rim);
+                }
                 graded = lerp(graded, noiseCol, boss * (half)_GlitchC.x);
 
                 // CRT 주사선 — 벽·하늘에만(바닥 뺌). 플레이어·보스 위는 늘 주사선, RECTIFY 글자 마스크 위는 뺀다.

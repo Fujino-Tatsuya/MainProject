@@ -509,6 +509,7 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
     // [서버] L00 라커 방문(할 일 157 ③) — 매 프레임 라커 볼륨 폴링. 스폰 완료 참여자만 판정·완료 조건(로딩 중 접속자는 세지 않는다).
     // 방문은 1인 1회 누적(나갔다 와도 유지, 캐릭터 교체해도 clientId 라 유지). 볼륨 칸이 비면 오류 1회 후 자동 통과.
     // 할 일 251: 볼륨 안에 L00 행 holdSeconds(기본 2초, 서버 시각) 연속 머물러야 방문 — 그 전에 나가거나 디스폰되면 그 사람 타이머 리셋.
+    // 할 일 281: 캐릭터 선택 패널을 열어도 바로 방문(ReportCharacterPanelOpenedServerRpc) — 전원 완료 검사는 여기 한 곳.
     private void TickLockerVisitServer()
     {
         if (_flow.CurrentKind != LobbyTutorialStepKind.LockerVisit || _flow.HasPendingAdvance)
@@ -539,6 +540,31 @@ public sealed partial class LobbyTrainingDirector : NetworkBehaviour, ILobbyTuto
 
         if (_flow.AllSpawnedParticipantsVisitedLocker(clientId => TryGetPlayer(clientId, out _)))
             ServerAdvance(_flow.StepIndex + 1, "스폰 완료 참여자 전원 라커 방문");
+    }
+
+    /// <summary>
+    /// [오너 피어] 캐릭터 선택 패널을 열었다(할 일 281 — L00 통과 = 패널 열기 OR 라커 볼륨 2초 머묾).
+    /// 패널은 로컬 UI 라 서버가 알 길이 없어 신호 1개를 보낸다. L00 동안만 보내고, 판정(단계·참여자·회차/revision)은 서버.
+    /// </summary>
+    public void ReportCharacterPanelOpened()
+    {
+        var step = CurrentStep;
+        if (step == null || step.kind != LobbyTutorialStepKind.LockerVisit)
+            return;
+
+        ReportCharacterPanelOpenedServerRpc(RunId, Revision);
+    }
+
+    // 씬 상주 오브젝트라 오너가 없다 — 누구나 호출하고 보낸 사람은 SenderClientId 로 가린다.
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    private void ReportCharacterPanelOpenedServerRpc(int runId, int revision, RpcParams p = default)
+    {
+        if (_flow == null || _flow.HasPendingAdvance)
+            return;
+
+        var clientId = p.Receive.SenderClientId;
+        if (_flow.ReportCharacterPanelOpened(clientId, runId, revision))
+            Debug.Log($"[SceneFlow] {Tag} 라커 방문(캐릭터 선택 패널 열기) client {clientId} [{string.Join(",", _flow.LockerVisited)}]");
     }
 
     // [서버] 대사 행(할 일 157 ③ — L11·L21, ⑨ — 브리핑 L31~L34) — 진입 revision 마다 길이를 정해 스냅샷 timerStart/timerEnd(서버 시각)로 싣고, 끝 시각에 다음 행으로 1회.

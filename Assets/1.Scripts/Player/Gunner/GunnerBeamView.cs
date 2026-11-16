@@ -487,6 +487,24 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <summary>Q 발사 애니 상태 이름(처치 연출 End 검사 — 267 후속).</summary>
     public string ChargeFireStateName => chargeFireStateName;
 
+    // 보스 처치 연출 차징 구체 크기(할 일 272) — 프로필 '시작 → 목표 크기 + 성장 곡선'. 켜져 있으면 chargeScaleRange 대신 이 값(레이저 폭은 그대로).
+    private bool presentationScaleSet;
+    private float presentationScaleFrom;
+    private float presentationScaleTo;
+    private AnimationCurve presentationScaleCurve;
+
+    /// <summary>[이 피어] 보스 처치 연출 Q 차징 구체 크기를 시작 → 목표(성장 곡선)로 — 다음 충전부터 발사까지. 끄기 = <see cref="ClearPresentationChargeScale"/>(연출 정리).</summary>
+    public void SetPresentationChargeScale(float from, float to, AnimationCurve growth)
+    {
+        presentationScaleSet = true;
+        presentationScaleFrom = from;
+        presentationScaleTo = to;
+        presentationScaleCurve = growth;
+    }
+
+    /// <summary>[이 피어] 처치 연출 차징 크기를 끄고 평소 chargeScaleRange 로.</summary>
+    public void ClearPresentationChargeScale() => presentationScaleSet = false;
+
     /// <summary>[이 피어] 보스 처치 연출 — 특성 없는 기본 충전(색 단계 0). RPC 아님.</summary>
     public void BeginPresentationCharge(float maxChargeTime)
     {
@@ -699,7 +717,9 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (chargeLoopPlayer == null)
             return;
 
-        float s = Mathf.Lerp(chargeScaleRange.x, chargeScaleRange.y, t);
+        float s = presentationScaleSet
+            ? BossVictoryKillerMoves.ChargeScale(presentationScaleFrom, presentationScaleTo, presentationScaleCurve, t)
+            : Mathf.Lerp(chargeScaleRange.x, chargeScaleRange.y, t);
         int count = chargeLoopPlayer.GetInstances(BeamInstances);
         for (int i = 0; i < count; i++)
         {

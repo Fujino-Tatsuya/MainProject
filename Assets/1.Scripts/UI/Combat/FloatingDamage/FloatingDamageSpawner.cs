@@ -44,6 +44,7 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
     public void Submit(FloatingPopupRequest request)
     {
         if (!isActiveAndEnabled || settings == null || popupPrefab == null ||
+            !AcceptsNewPopups(BossVictoryGlitchPresentation.HidesDamageNumbers) ||
             request.target == null || request.amount <= 0 || IsLocalPlayerTarget(request.target))
             return;
 
@@ -138,11 +139,35 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
     }
 
     // 간파 연출 동안 숨김(A5, 할 일 154·179 후속 2) — 캔버스만 끈다. 숫자 생성·수명은 그대로라 끝나면 살아 있는 숫자가 보인다.
+    // 보스 처치 연출 동안 제거 — 새 숫자(피해·힐)는 만들지 않고, 떠 있던 숫자(막타 포함)는 바로 지운다. 연출 상태에서 매 프레임 읽어 끝·취소·파괴면 저절로 풀린다.
     void LateUpdate()
     {
+        bool victory = BossVictoryGlitchPresentation.HidesDamageNumbers;
+        if (ShouldClearLive(victory, _livePopups.Count))
+            ClearAll();
         bool visible = !InterruptProductionDirector.CombatUiHidden;
         if (_canvas != null && _canvas.enabled != visible)
             _canvas.enabled = visible;
+    }
+
+    /// <summary>새 숫자를 만들어도 되는가 — 보스 처치 연출 중이면 아니다.</summary>
+    public static bool AcceptsNewPopups(bool victoryHides) => !victoryHides;
+
+    /// <summary>떠 있는 숫자를 지울 때인가 — 보스 처치 연출 중이고 하나라도 있으면.</summary>
+    public static bool ShouldClearLive(bool victoryHides, int liveCount) => victoryHides && liveCount > 0;
+
+    /// <summary>떠 있는 숫자를 모두 바로 회수한다(흐려짐 없이).</summary>
+    public void ClearAll()
+    {
+        for (int i = _livePopups.Count - 1; i >= 0; i--)
+        {
+            FloatingDamagePopup popup = _livePopups[i];
+            if (popup != null)
+                popup.ForceRelease();
+            else
+                _livePopups.RemoveAt(i);
+        }
+        _activeByKey.Clear();
     }
 
     // 위치는 Canvas 렌더 직전에 반영한다 — 카메라가 LateUpdate 에서 움직인 뒤라 숫자가 월드에서 밀리지 않는다.

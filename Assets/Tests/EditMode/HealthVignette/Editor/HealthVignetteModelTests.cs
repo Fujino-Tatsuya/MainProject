@@ -22,6 +22,34 @@ public sealed class HealthVignetteModelTests
     }
 
     [Test]
+    public void Severity_WithFullRatio_StartsAtThresholdAndMaxesAtFullRatio()
+    {
+        // 11-13 사용자: 40% 부터 켜져 10% 에서 최대.
+        Assert.That(HealthVignetteModel.Severity(0.5f, 0.4f, 0.1f), Is.EqualTo(0f));
+        Assert.That(HealthVignetteModel.Severity(0.4f, 0.4f, 0.1f), Is.EqualTo(0f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.Severity(0.25f, 0.4f, 0.1f), Is.EqualTo(0.5f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.Severity(0.1f, 0.4f, 0.1f), Is.EqualTo(1f).Within(Tolerance));
+        Assert.That(HealthVignetteModel.Severity(0.05f, 0.4f, 0.1f), Is.EqualTo(1f));
+        Assert.That(HealthVignetteModel.Severity(0f, 0.4f, 0.1f), Is.EqualTo(1f));
+    }
+
+    [Test]
+    public void Severity_FullRatioZeroMatchesOldBehaviour_AndAboveThresholdClamps()
+    {
+        Assert.That(HealthVignetteModel.Severity(0.4f, Threshold, 0f), Is.EqualTo(HealthVignetteModel.Severity(0.4f, Threshold)).Within(Tolerance));
+        Assert.That(HealthVignetteModel.Severity(0.3f, 0.4f, 0.9f), Is.EqualTo(1f), "최대 비율 ≥ 시작 → 시작 아래 전부 최대");
+        Assert.That(HealthVignetteModel.Severity(0.5f, 0.4f, 0.9f), Is.EqualTo(0f));
+    }
+
+    [Test]
+    public void FlashColor_WithFullRatio_FullDangerAtOrBelowFullRatio()
+    {
+        Color white = Color.white, red = Color.red;
+        Assert.That(HealthVignetteModel.FlashColor(0.5f, 0.4f, 0.1f, white, red), Is.EqualTo(white));
+        Assert.That(HealthVignetteModel.FlashColor(0.1f, 0.4f, 0.1f, white, red), Is.EqualTo(red));
+    }
+
+    [Test]
     public void Severity_NonPositiveThresholdDisables()
     {
         Assert.That(HealthVignetteModel.Severity(0f, 0f), Is.EqualTo(0f));

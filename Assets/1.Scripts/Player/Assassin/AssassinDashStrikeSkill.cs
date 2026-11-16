@@ -78,6 +78,8 @@ public class AssassinDashStrikeSkill : PlayerSkillBase, ISkillPreviewSource
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Main;
     public override bool CanMoveWhileActive => false;
+    // 대시 타격이 끝난 뒤 좌클릭을 아직 누르고 있으면 기본 공격을 잇는다(할 일 146 장치, 할 일 280). 대시·피격·사망 끊김은 잇지 않는다.
+    public override bool ResumesBasicAttackOnHold => true;
     public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
     // 돌진 거리·시간은 고정(할 일 91 D7) — 클립만 빨라지면 End 가 이동보다 먼저 와 돌진이 잘린다.
     public override bool ScalesWithAttackSpeed => false;

@@ -20,7 +20,7 @@
 
 | # | StateId | Kind | 집결 지점 | 비고 |
 |---|---|---|---|---|
-| 0 | L00_LockerVisit | LockerVisit | — | 라커 누적 방문(라커룸 내부 볼륨 `Area_Locker` = `LobbyAreaVolume`, 비네트워크 — 158 은 경로 끝점으로 참조 가능). 경로 `PATH_LOCKER` |
+| 0 | L00_LockerVisit | LockerVisit | — | 라커 누적 방문(2초 머묾 또는 캐릭터 선택 패널 열기 — 281, 라커룸 내부 볼륨 `Area_Locker` = `LobbyAreaVolume`, 비네트워크 — 158 은 경로 끝점으로 참조 가능). 경로 `PATH_LOCKER` |
 | 1 | L10_CentralGather | Gather | `Brief`(중앙 — 이름 유지. `Central` 개명은 미룸 — 158 코드 호환) | 확정 = 훈련 명단 고정 |
 | 2 | L11_CentralIntro | Dialogue | — | `LOBBY_DLG_INTRO` |
 | 3 | L20_TrainingGather | Gather | **`Entrance`**(문 앞 입구 영역) | **확정: A**(157 PLAN §10.3) — 입구 집결 확정 → 명단 전원 `Gather_Train01Start` 안으로 텔레포트 → 바로 L21(내부 재집결 없음). 활성 집결 테두리 = `Gather_Entrance`. **명세 §5 L20 의 '문 통과' 문구는 이 텔레포트로 대체**(`Door_Training` 막힘 유지 — Q4 B). `Train01Start` 는 도착지일 뿐 활성 구역이 되지 않는다 |

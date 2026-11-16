@@ -386,4 +386,59 @@ public sealed class LobbyTutorialFlowTests
         Assert.That(flow.ReportLockerPresence(9, true, 10d, 0d), Is.False);   // 접속자 아님
         Assert.That(flow.HasVisitedLocker(9), Is.False);
     }
+
+    // ── 할 일 281: 캐릭터 선택 패널 열기 OR 머묾 ──
+
+    [Test]
+    public void 패널_열기는_머묾_없이_바로_방문()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.ReportCharacterPanelOpened(0, Run, flow.Revision), Is.True);
+        Assert.That(flow.HasVisitedLocker(0), Is.True);
+        Assert.That(flow.AllSpawnedParticipantsVisitedLocker(_ => true), Is.True);
+        Assert.That(flow.ReportCharacterPanelOpened(0, Run, flow.Revision), Is.False);   // 이미 방문
+    }
+
+    [Test]
+    public void 한_명은_패널_한_명은_머묾이면_전원_완료()
+    {
+        var flow = Create(0, 1);
+
+        flow.ReportCharacterPanelOpened(0, Run, flow.Revision);
+        Assert.That(flow.AllSpawnedParticipantsVisitedLocker(_ => true), Is.False);   // 사람마다 따로
+        flow.ReportLockerPresence(1, true, 10d, 2d);
+        Assert.That(flow.ReportLockerPresence(1, true, 12d, 2d), Is.True);
+        Assert.That(flow.AllSpawnedParticipantsVisitedLocker(_ => true), Is.True);
+    }
+
+    [Test]
+    public void 머묾_도중_패널_열면_바로_방문_뒤_머묾은_무시()
+    {
+        var flow = Create(0);
+
+        flow.ReportLockerPresence(0, true, 10d, 2d);
+        Assert.That(flow.ReportCharacterPanelOpened(0, Run, flow.Revision), Is.True);
+        Assert.That(flow.ReportLockerPresence(0, true, 12d, 2d), Is.False);   // 이미 방문 — 중복 확정 없음
+    }
+
+    [Test]
+    public void 패널_열기는_지난_회차나_지난_revision_이면_버림()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.ReportCharacterPanelOpened(0, Run + 1, flow.Revision), Is.False);
+        Assert.That(flow.ReportCharacterPanelOpened(0, Run, flow.Revision - 1), Is.False);
+        Assert.That(flow.HasVisitedLocker(0), Is.False);
+    }
+
+    [Test]
+    public void 패널_열기는_참여자만_LockerVisit_단계에서만()
+    {
+        var flow = Create(0);
+
+        Assert.That(flow.ReportCharacterPanelOpened(9, Run, flow.Revision), Is.False);   // 접속자 아님
+        flow.TryAdvanceTo(Run, flow.Revision, 1, 10, 0);                               // L10 으로
+        Assert.That(flow.ReportCharacterPanelOpened(0, Run, flow.Revision), Is.False);
+    }
 }

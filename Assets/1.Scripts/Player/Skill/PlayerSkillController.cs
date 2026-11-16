@@ -962,6 +962,27 @@ public class PlayerSkillController : BaseNetworkBehaviour, IPlayerAttackSpeedAni
         return true;
     }
 
+    /// <summary>
+    /// [이 피어·표시 전용] 스킬 없이 애니 상태 하나만 0층에 재생하고 자세를 쥔다(보스 처치 연출 어쌔신 순간이동 Q — 할 일 272).
+    /// 쥔 동안 그 클립의 Skill 이벤트(Custom0·End·Hit)는 아무 스킬에도 가지 않는다 — End 가 '스킬 끝'(<see cref="PresentationSkillEnded"/>)이 되지 않는다.
+    /// 상태가 없으면 false. 놓기 = <see cref="StopPresentationOnly"/>.
+    /// </summary>
+    public bool PlayPresentationStateOnly(string stateName, Vector3 direction)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null || string.IsNullOrEmpty(stateName)) return false;
+        int hash = Animator.StringToHash(stateName);
+        if (!animator.HasState(0, hash)) return false;
+        PlayerSkillBase previous = presentationSkill;
+        presentationSkill = null;
+        presentationPoseHeld = true;
+        previous?.OnEnd(SkillEndReason.Cancelled);
+        if (movement != null && direction.sqrMagnitude > 0.0001f)
+            movement.RotateImmediately(direction);
+        player?.SetAnimatorMoving(false);
+        animator.CrossFadeInFixedTime(hash, 0.05f);
+        return true;
+    }
+
     /// <summary>[이 피어] 표시 전용 재생을 끝 이벤트 없이 접고 0층 자세를 놓는다(연출 정리 — End 뒤에도 부른다). End 알림은 올리지 않는다.</summary>
     public void StopPresentationOnly()
     {

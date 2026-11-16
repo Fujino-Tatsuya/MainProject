@@ -74,6 +74,11 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
     [Tooltip("발사대 Animator(PF_DropPod_LaunchStation_Combined_v001 루트). 연출 동안 해치·발사 클립을 1배속으로 재생하고 클립 이벤트로 단계를 넘긴다(포드 하강도 클립이 한다). 비우면 애니 없이 곧바로 넘어간다.")]
     [SerializeField] private Animator launcher;
 
+    [Header("경광등")]
+    [Tooltip("포드 베이 호박색 회전 경광등(할 일 284) — 포드 연출 시작(출격 확정)에 켜고 끝 페이드가 다 검어진 순간 끈다. 가속 1·2단계마다 회전이 빨라진다. " +
+             "표시 전용(새 복제 값 없음 — 모든 피어가 같은 시간표). 비우면 경광등 없음.")]
+    [SerializeField] private PodLaunchBeacon[] beacons = Array.Empty<PodLaunchBeacon>();
+
     // 연출 시작 시각(서버시간). 0 = 연출 없음. 서버 write / 모두 read.
     private readonly NetworkVariable<double> _startAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -563,6 +568,29 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
         double board = _timeline.BoardAt(PodDropTimeline.EventElapsed(_hatchOpenedAt.Value, start));
         double descentAt = DescentElapsed(_timeline, start, board);
         _overlay.Apply(_timeline.LetterboxAlphaAt(elapsed) * settings.LetterboxHeight, _timeline.ScreenFadeAlphaAt(elapsed, descentAt), true);
+        UpdateBeacons(elapsed, start, descentAt);
+    }
+
+    /// <summary>
+    /// [전 피어] 경광등(할 일 284) — 포드 연출 시작(경과 0) ~ 끝 페이드가 다 검어진 순간(<see cref="PodDropLobbyTimeline.EndBlackAt"/>) 켬.
+    /// 회전 단계 = 복제된 가속 1·2단계 시각과 이 피어 발사 클립의 가속 단계 중 큰 쪽. 새 복제 값 없음.
+    /// </summary>
+    private void UpdateBeacons(double elapsed, double start, double descentAt)
+    {
+        if (beacons == null || beacons.Length == 0) return;
+
+        bool on = PodLaunchBeaconRules.IsOn(elapsed, _timeline.EndBlackAt(descentAt));
+        int stage = PodLaunchBeaconRules.Stage(elapsed, PodDropTimeline.EventElapsed(_launchFastAt.Value, start),
+            PodDropTimeline.EventElapsed(_launchFast2At.Value, start), _launchFastStage);
+        foreach (PodLaunchBeacon beacon in beacons)
+            if (beacon != null) beacon.Apply(on, stage);
+    }
+
+    private void TurnOffBeacons()
+    {
+        if (beacons == null) return;
+        foreach (PodLaunchBeacon beacon in beacons)
+            if (beacon != null) beacon.TurnOff();
     }
 
     /// <summary>
@@ -701,6 +729,7 @@ public sealed class LobbyPodLaunch : NetworkBehaviour, ISerializationCallbackRec
 
         if (_overlay != null) _overlay.Clear();
         _silhouettes.RestoreAll();
+        TurnOffBeacons();
 
         if (_heldCamera != null)
         {

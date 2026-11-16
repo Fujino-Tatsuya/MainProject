@@ -220,22 +220,13 @@ public static class LobbyResultPanelAuthoring
 
                 if (column.Name == "Player")
                 {
-                    RectTransform portrait = NewRect("Image_Portrait", cell);
-                    portrait.anchorMin = portrait.anchorMax = new Vector2(0f, 0.5f);
-                    portrait.pivot = new Vector2(0f, 0.5f);
-                    portrait.anchoredPosition = new Vector2(Padding + 12f, 0f);
-                    portrait.sizeDelta = new Vector2(84f, 84f);
-                    Image portraitImage = AddImage(portrait.gameObject, null, false, Color.white);
-                    portraitImage.preserveAspect = true;
-                    portraitImage.enabled = false; // 초상화가 있을 때만 Bind 가 켠다
-                    refs["Image_Portrait"] = portraitImage;
-
+                    // 초상화 없음 — 이름만 칸 가득 가운데(11-13 사용자 프리팹 수정, 할 일 276). 행 뷰 portraitImage 는 비워 둔다.
                     RectTransform name = NewRect("Text_Character", cell);
                     name.anchorMin = Vector2.zero;
                     name.anchorMax = Vector2.one;
-                    name.offsetMin = new Vector2(Padding + 12f + 84f + 10f, 0f);
-                    name.offsetMax = new Vector2(-(Padding + 10f), 0f);
-                    refs["Text_Character"] = AddText(name, font, "-", 38f, TextAlignmentOptions.Left, Color.white, ellipsis: true);
+                    name.offsetMin = Vector2.zero;
+                    name.offsetMax = Vector2.zero;
+                    refs["Text_Character"] = AddText(name, font, "-", 38f, TextAlignmentOptions.Center, Color.white, ellipsis: true);
                     continue;
                 }
 
@@ -265,9 +256,8 @@ public static class LobbyResultPanelAuthoring
 
             ResultPlayerRowView view = root.AddComponent<ResultPlayerRowView>();
             var so = new SerializedObject(view);
-            // 슬롯(P1..)·처치 칸은 없다 — 비워 두면 ResultPlayerRowView 가 건너뛴다.
+            // 슬롯(P1..)·처치·초상화 칸은 없다 — 비워 두면 ResultPlayerRowView 가 건너뛴다.
             so.FindProperty("characterText").objectReferenceValue = refs["Text_Character"];
-            so.FindProperty("portraitImage").objectReferenceValue = refs["Image_Portrait"];
             so.FindProperty("damageText").objectReferenceValue = refs["Text_Damage"];
             so.FindProperty("countersText").objectReferenceValue = refs["Text_Counters"];
             so.FindProperty("deathsText").objectReferenceValue = refs["Text_Deaths"];

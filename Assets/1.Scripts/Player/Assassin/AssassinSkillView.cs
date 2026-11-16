@@ -202,7 +202,15 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
     /// 길이 = 돌진 방향으로 실제 나아간 거리(벽 조기 종료면 그만큼 짧다). 서버 종료가 돌진 끝 + 0.1초라
     /// "베인 자리가 한 박자 늦게 드러나는" 타이밍이 된다.
     /// </summary>
-    public void EndPierce()
+    public void EndPierce() => EndPierceAt(transform.position, DashTint);
+
+    /// <summary>
+    /// [이 피어] 보스 처치 연출 순간이동 Q(할 일 272) — 일반 Q 일섬·버스트를 정해진 끝점까지 긋는다. 기본 Q 연출 그대로(특성 색 DashTint 없음), RPC 아님.
+    /// 끝점 = 도착 지점(보스 기준 — 모든 피어 같은 값, 복제 위치 지연과 무관). 시작은 <see cref="BeginPierce"/>.
+    /// </summary>
+    public void EndPresentationPierce(Vector3 end) => EndPierceAt(end, EffectTint.None);
+
+    private void EndPierceAt(Vector3 end, EffectTint tint)
     {
         if (!pierceArmed)
             return;
@@ -210,7 +218,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
         if (!EffectManager.TryGet(out EffectManager effects, this))
             return;
 
-        Vector3 end = transform.position;
         float length = Mathf.Max(0f, Vector3.Dot(end - pierceStart, pierceDirection));
         Quaternion rotation = Quaternion.LookRotation(pierceDirection, Vector3.up);
         Vector3 endPoint = pierceStart + pierceDirection * length;
@@ -220,7 +227,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour, IInterruptSuccessR
         if (line == null || burst == null)
             Edit.LogWarning("[AssassinSkillView] EffectCatalog.Assassin_Q_PierceLine/PierceBurst 가 비어 일반 Q 연출 일부를 건너뛴다.", this);
 
-        EffectTint tint = DashTint;
         if (line != null && length >= pierceMinLength)
         {
             Vector3 lineScale = new Vector3(pierceScale, pierceScale, length);

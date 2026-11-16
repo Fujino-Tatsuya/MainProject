@@ -205,17 +205,26 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
 
     private EffectHandle _victorySwordFx;
     private float _victoryFallingScale = 1f;   // 처치 연출 동안만 1 이 아니다
+    private Vector3 _victoryFallingOffset;     // 처치 연출 낙하 자리 = 보스 기준 오프셋(0 = 보스 아래)
+    private float _victoryFallingLife;         // 처치 연출 낙하 검 수명(초, 0 = 엔트리 수명)
+    private Transform _victoryStrikeTarget;    // 처치 연출 낙하 검 기준(보스) — 오프셋을 끌면 떨어진 검을 옮길 때
     private EffectHandle _victoryStrikeHandle; // 배율을 바꾼 낙하 검(수명이 끝나면 Update 가 Local 파트 배율을 되돌린다)
+    private VictoryStrikeHold _victoryHold;     // 낙하 검 수명 — 꽂힌 채 멈췄다 풀기(VictoryStrikeHold 설명)
+    private EffectHandle _victoryHoldHandle;
+    private float _victoryHoldRate = 1f;
     private readonly List<Transform> _scaledStrikeParts = new List<Transform>();
     private readonly List<Vector3> _scaledStrikeBase = new List<Vector3>();
     private static readonly List<GameObject> s_strikeInstances = new List<GameObject>();
     private static readonly List<ParticleSystem> s_strikeSystems = new List<ParticleSystem>();
 
-    /// <summary>[이 피어] 보스 처치 연출 시작 — 손 검에 번개(<paramref name="handLightning"/>), 이 연출의 낙하 검 배율(<paramref name="fallingSwordScale"/>). 이미 켜져 있으면 걷고 다시.</summary>
-    public void BeginVictorySword(bool handLightning, float fallingSwordScale)
+    /// <summary>[이 피어] 보스 처치 연출 시작 — 손 검에 번개(<paramref name="handLightning"/>), 이 연출의 낙하 검 배율(<paramref name="fallingSwordScale"/>)·
+    /// 낙하 자리(보스 기준 <paramref name="fallingOffset"/>)·수명(<paramref name="fallingLife"/> 초, 0 = 엔트리). 이미 켜져 있으면 걷고 다시.</summary>
+    public void BeginVictorySword(bool handLightning, float fallingSwordScale, Vector3 fallingOffset = default, float fallingLife = 0f)
     {
         EndVictorySword();
         _victoryFallingScale = Mathf.Max(0.01f, fallingSwordScale);
+        _victoryFallingOffset = fallingOffset;
+        _victoryFallingLife = Mathf.Max(0f, fallingLife);
         if (!handLightning)
             return;
 
@@ -231,20 +240,65 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
         BossVictoryGlitchPresentation.KeepRealtime(_victorySwordFx);
     }
 
-    /// <summary>[이 피어] 처치 연출 끝·취소 — 손 검 번개 걷기, 낙하 검 배율 1(이미 떨어진 검은 수명대로 두고 끝나면 파트 배율 복구). 켜져 있지 않으면 no-op.</summary>
+    /// <summary>[이 피어] 처치 연출 끝·취소 — 손 검 번개 걷기, 낙하 검 배율 1(이미 떨어진 검은 수명대로 두고 끝나면 파트 배율 복구),
+    /// 수명(fallingSwordLife)으로 남겨 둔 낙하 검은 걷는다. 켜져 있지 않으면 no-op.</summary>
     public void EndVictorySword()
     {
         if (_victorySwordFx.IsSet && EffectManager.Instance != null)
             EffectManager.Instance.Release(_victorySwordFx);
         _victorySwordFx = EffectHandle.None;
+        if (_victoryHoldHandle.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.ReleaseImmediate(_victoryHoldHandle);   // 이미 반납됐으면(세대 바뀜) no-op
+        _victoryHold = default;
+        _victoryHoldHandle = EffectHandle.None;
         _victoryFallingScale = 1f;
+        _victoryFallingOffset = Vector3.zero;
+        _victoryFallingLife = 0f;
+        _victoryStrikeTarget = null;
     }
 
     private void Update()
     {
+        TickVictoryHold();
         // 배율을 바꾼 낙하 검이 풀로 돌아갔으면(원샷 수명 끝·걷힘) Local 파트 배율을 되돌린다 — 다음 R 에 남지 않게.
         if (_scaledStrikeParts.Count > 0 && (EffectManager.Instance == null || EffectManager.Instance.GetInstances(_victoryStrikeHandle, s_strikeInstances) == 0))
             RestoreStrikeParts();
+    }
+
+    // 낙하 검 수명 — 꽂힌 순간 재생 배율 0(파티클·매니저 수명 함께 멈춤) → 수명 초 뒤 원래 배율로 풀어 원래 끝 연출로 사라짐.
+    private void TickVictoryHold()
+    {
+        if (_victoryHold.State == VictoryStrikeHold.Phase.Off)
+            return;
+        EffectManager effects = EffectManager.Instance;
+        if (effects == null || effects.GetInstances(_victoryHoldHandle, s_strikeInstances) == 0)
+        {
+            _victoryHold = default;   // 걷혔다(정리·새 시전)
+            _victoryHoldHandle = EffectHandle.None;
+            return;
+        }
+        switch (_victoryHold.Step(Time.deltaTime * _victoryHoldRate, Time.unscaledDeltaTime))
+        {
+            case VictoryStrikeHold.Action.Freeze: effects.SetPlayRate(_victoryHoldHandle, 0f); break;
+            case VictoryStrikeHold.Action.Resume: effects.SetPlayRate(_victoryHoldHandle, _victoryHoldRate); break;
+        }
+    }
+
+    /// <summary>
+    /// [이 피어] 처치 연출 중 낙하 자리 오프셋을 바꾼다(처치 연출이 매 프레임 프로필 값을 넘김) — 타임라인 창 Scene 핸들로 끌면
+    /// 이미 떨어진 낙하 검도 바로 그 자리로 옮긴다(보면서 세팅). 값이 같으면 아무것도 안 한다.
+    /// </summary>
+    public void SetVictoryFallingOffset(Vector3 offset)
+    {
+        if (offset == _victoryFallingOffset)
+            return;
+        _victoryFallingOffset = offset;
+        if (_victoryStrikeTarget == null || EffectManager.Instance == null ||
+            EffectManager.Instance.GetInstances(_targetStrikeHandle, s_strikeInstances) == 0)
+            return;
+        LockTargetPosition(null, BossVictoryKillerMoves.BossPoint(_victoryStrikeTarget.position, _victoryStrikeTarget.rotation, offset));
+        foreach (GameObject instance in s_strikeInstances)
+            if (instance != null) instance.transform.position = _targetPosition;
     }
 
     // 표시 전용 낙하 검 — 루트 배율은 매니저가, Local 파트는 여기서(위 설명).
@@ -450,9 +504,16 @@ public class PaladinSkillView : BaseNetworkBehaviour, IInterruptCueSink
     /// </summary>
     public void PlayTargetStrikeAtLocal(Transform target, float playRate)
     {
-        LockTargetPosition(target, target != null ? target.position : transform.position);
+        // 낙하 자리 = 보스 기준 오프셋(처치 연출 프로필 칸 — 0 이면 보스 아래), 그 아래 바닥. 보스 위치·회전은 복제라 모든 피어 같다.
+        _victoryStrikeTarget = target;
+        Vector3 point = target != null ? BossVictoryKillerMoves.BossPoint(target.position, target.rotation, _victoryFallingOffset) : transform.position;
+        LockTargetPosition(null, point);
         PlayTargetStrikeLocal(playRate, _victoryFallingScale);   // 처치 연출 낙하 검 배율(269) — 평소 R 경로는 1
         ScaleStrikeLocalParts(_victoryFallingScale);
+        // 수명 = 꽂힌 채 멈춰 두는 시간(반납만 늦추던 durationOverride 는 그림을 못 남겼다 — VictoryStrikeHold). 0 = 엔트리 그대로.
+        _victoryHold = VictoryStrikeHold.Create(targetStrike != null ? targetStrike.ResolvedDuration : 0f, _victoryFallingLife);
+        _victoryHoldHandle = _victoryHold.State != VictoryStrikeHold.Phase.Off ? _targetStrikeHandle : EffectHandle.None;
+        _victoryHoldRate = playRate > 0f ? playRate : 1f;
     }
 
     private void PlayTargetStrikeLocal(float playRate, float scaleMultiplier = 1f)

@@ -58,8 +58,8 @@ public sealed class UiStringsL4bTests
     [Test]
     public void LoadingLists_MatchSceneSlotOrder()
     {
-        Assert.That(UiStrings.LoadingTips.Select(s => s.Key),
-            Is.EqualTo(new[] { "UI.Loading.Tip1", "UI.Loading.Tip2", "UI.Loading.Tip3" }));
+        // 275 — 임시 팁 Tip1~3 삭제, 대쉬 간파 팁 1개(씬 tooltipTable[0])
+        Assert.That(UiStrings.LoadingTips.Select(s => s.Key), Is.EqualTo(new[] { "UI.Loading.TipDashInterrupt" }));
         Assert.That(UiStrings.LoadingReadyMessages.Select(s => s.Key),
             Is.EqualTo(new[] { "UI.Loading.Ready1", "UI.Loading.Ready2", "UI.Loading.Ready3" }));
         foreach (UiString s in UiStrings.LoadingTips.Concat(UiStrings.LoadingReadyMessages))
@@ -214,17 +214,20 @@ public sealed class UiStringsL4bFormatTests
     [Test]
     public void Loading_NoRow_ShowsSceneValues_RowWins_ExtraSlotsStayAuthored()
     {
-        string[] scene = { "으아ㅏㅏㅏㅏ", "커피ㅣㅣㅣㅣ", "밥 뭐 먹지....", "네 번째 팁" };
+        // 275 — 임시 팁 삭제로 팁 키가 1개라 칸 순서 검사는 준비 문구 표(키 3개)로 한다.
+        string[] scene = { "씬 준비 1", "씬 준비 2", "씬 준비 3", "네 번째 칸" };
+        string[] tips = { "씬 팁" };
 
-        Assert.That(NetworkLoadingScreenView.TableText(UiStrings.LoadingTips, scene, 0), Is.EqualTo("으아ㅏㅏㅏㅏ"));
-        Assert.That(NetworkLoadingScreenView.TableText(UiStrings.LoadingTips, scene, 3), Is.EqualTo("네 번째 팁"));
+        Assert.That(NetworkLoadingScreenView.TableText(UiStrings.LoadingReadyMessages, scene, 0), Is.EqualTo("씬 준비 1"));
+        Assert.That(NetworkLoadingScreenView.TableText(UiStrings.LoadingReadyMessages, scene, 3), Is.EqualTo("네 번째 칸"));
+        Assert.That(NetworkLoadingScreenView.TableText(UiStrings.LoadingTips, tips, 0), Is.EqualTo("씬 팁"));
         Assert.That(NetworkLoadingScreenView.PhaseText(NetworkLoadingPhase.WaitingForPlayers), Is.EqualTo("Waiting for players..."));
         Assert.That(NetworkLoadingScreenView.PhaseText(NetworkLoadingPhase.Idle), Is.EqualTo("Stand by..."));
         Assert.That(NetworkLoadingScreenView.PhaseText(NetworkLoadingPhase.Completed), Is.Empty);
 
-        UseRows(new StringTable.Entry("UI.Loading.Tip2", "커피 한 잔 하세요", "Grab a coffee"),
+        UseRows(new StringTable.Entry("UI.Loading.Ready2", "모두 준비됐습니다.", "All players are ready."),
             new StringTable.Entry("UI.Loading.Loading", "불러오는 중...", "Loading..."));
-        Assert.That(NetworkLoadingScreenView.TableText(UiStrings.LoadingTips, scene, 1), Is.EqualTo("커피 한 잔 하세요"));
+        Assert.That(NetworkLoadingScreenView.TableText(UiStrings.LoadingReadyMessages, scene, 1), Is.EqualTo("모두 준비됐습니다."));
         Assert.That(NetworkLoadingScreenView.PhaseText(NetworkLoadingPhase.LoadingGame), Is.EqualTo("불러오는 중..."));
     }
 }

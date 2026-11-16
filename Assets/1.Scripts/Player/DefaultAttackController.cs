@@ -105,10 +105,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack,
     //    플레이어 루트 아래 `Slash01~04` 를 두고 **공격 단계로 인덱싱**한다.
     //    배열 첨자 = Default_Attack{N} 의 N 이다 — 순서를 섞지 말 것.
     [Header("연출 — 평타 (첨자 = 공격 단계)")]
-    [Tooltip("각 타 명중 시. [0~2]=FX_SingleSlash_O · [3]=FX_DoubleSlash_O.\n" +
+    [Tooltip("각 타 명중 시. [0~2]=FX_SingleSlash_O · [3]=FX_FinalSlash_Chain_O(막타 — 단일 검기 + 궤적 연쇄 성광, 11-13).\n" +
              "비워두면 그 타의 연출만 빠진다")]
     [SerializeField] private EffectSocketPlayer[] slashHit = new EffectSocketPlayer[4];
-    [Tooltip("각 타 헛스윙 시. [0~2]=FX_SingleSlash_X · [3]=FX_DoubleSlash_X")]
+    [Tooltip("각 타 헛스윙 시. [0~2]=FX_SingleSlash_X · [3]=FX_FinalSlash_Chain_X")]
     [SerializeField] private EffectSocketPlayer[] slashMiss = new EffectSocketPlayer[4];
 
     private bool warnedNoSlashVfx;

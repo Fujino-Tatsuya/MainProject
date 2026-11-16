@@ -170,7 +170,7 @@ public static class CharacterSelectPanelAuthoring
             RectTransform clip = Child("Clip", root.transform, Vector2.zero, NativeSize(sprites.CardFill));
             AddImage(clip.gameObject, sprites.CardFill, Color.white);
             clip.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-            RectTransform portrait = Child("Image_Portrait", clip, new Vector2(-27f, -70f), new Vector2(340f, 230f));
+            RectTransform portrait = Child("Image_Portrait", clip, new Vector2(-55f, -255f), new Vector2(760f, 760f)); // 상반신 일러스트(정사각, 할 일 276) — 얼굴이 이름 띠 아래·카드 가운데
             Image portraitImage = AddImage(portrait.gameObject, null, Color.white);
             portraitImage.preserveAspect = true;
             portraitImage.enabled = false;

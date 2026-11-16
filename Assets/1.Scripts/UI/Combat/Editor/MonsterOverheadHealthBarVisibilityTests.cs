@@ -256,6 +256,58 @@ public sealed class MonsterOverheadHealthBarVisibilityTests
             "이 규칙 재스폰 — 리셋만");
     }
 
+    [Test]
+    public void ResolveFootOffset_OverrideWinsElseRankValue()
+    {
+        Assert.That(MonsterOverheadHealthBarVisibility.ResolveFootOffset(false, 30f, 100f), Is.EqualTo(100f), "덮어쓰기 없음 = 등급별 공용 값(본편 그대로)");
+        Assert.That(MonsterOverheadHealthBarVisibility.ResolveFootOffset(true, 30f, 100f), Is.EqualTo(30f), "몬스터별 덮어쓰기");
+        Assert.That(MonsterOverheadHealthBarVisibility.ResolveFootOffset(true, 0f, 100f), Is.EqualTo(0f), "덮어쓰기 0 도 그대로(발 위치)");
+    }
+
+    [Test]
+    public void PreviewConversion_ScreenPixelsToCanvasOffset()
+    {
+        Assert.That(MonsterOverheadHealthBarVisibility.ScreenPixelsPerCanvasUnit(2160f, 1080f), Is.EqualTo(2f), "4K = 캔버스 1단위 2px");
+        Assert.That(MonsterOverheadHealthBarVisibility.ScreenPixelsPerCanvasUnit(0f, 1080f), Is.EqualTo(1f), "카메라 크기 0 = 1");
+        Assert.That(MonsterOverheadHealthBarVisibility.FootOffsetFromScreenDrop(100f, 2f), Is.EqualTo(50f), "화면 100px 아래 @4K = 50");
+        Assert.That(MonsterOverheadHealthBarVisibility.FootOffsetFromScreenDrop(-30f, 1f), Is.EqualTo(0f), "발보다 위로 끌면 0");
+    }
+
+    [Test]
+    public void TrainingBots_HaveFootOffsetOverride()
+    {
+        AssertOverride("Assets/2.Prefabs/Lobby/WallBot_Tutorial.prefab");
+        AssertOverride("Assets/2.Prefabs/Lobby/TrainingSparringBot_WallBot.prefab");
+    }
+
+    // 허수아비 월봇(T10·T50)은 월봇과 같은 화면 발밑 바 — Variant 만 켜고 본편 허수아비는 월드 캔버스 그대로.
+    [Test]
+    public void TutorialWallBotDummy_UsesScreenFootBar_BaseDummyUnchanged()
+    {
+        AssertOverride("Assets/2.Prefabs/TrainingDummy_TutorialWallBot.prefab");
+        Assert.That(DummyBar("Assets/2.Prefabs/TrainingDummy_TutorialWallBot.prefab").ScreenFootBar, Is.True);
+        Assert.That(DummyBar("Assets/2.Prefabs/TrainingDummy.prefab").ScreenFootBar, Is.False);
+        Assert.That(DummyBar("Assets/2.Prefabs/TrainingDummy_Tutorial.prefab").ScreenFootBar, Is.False);
+    }
+
+    static TrainingDummyHealthBar DummyBar(string path)
+    {
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        Assert.That(prefab, Is.Not.Null, path);
+        var bar = prefab.GetComponentInChildren<TrainingDummyHealthBar>(true);
+        Assert.That(bar, Is.Not.Null, path);
+        return bar;
+    }
+
+    static void AssertOverride(string path)
+    {
+        var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        Assert.That(prefab, Is.Not.Null, path);
+        var o = prefab.GetComponent<MonsterOverheadHealthBarOffset>();
+        Assert.That(o, Is.Not.Null, path + " 루트에 MonsterOverheadHealthBarOffset");
+        Assert.That(o.FootScreenOffset, Is.GreaterThanOrEqualTo(0f), path + " — 값은 사용자 튜닝(정확한 값은 검사하지 않음)");
+    }
+
     static MonsterHealthBarInstall Decide(MonsterRank rank, bool bossHud = false, bool thisRule = false, bool bar = false, bool otherRule = false)
         => MonsterOverheadHealthBarVisibility.DecideInstall(rank, bossHud, thisRule, bar, otherRule);
 }

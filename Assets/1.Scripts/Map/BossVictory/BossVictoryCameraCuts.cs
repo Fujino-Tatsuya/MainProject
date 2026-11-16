@@ -16,7 +16,11 @@ public static class BossVictoryCameraCuts
         Middle,  // 처치자·보스 발밑 가운데
         Killer,  // 처치자 발밑
         Boss,    // 보스 발밑(트랜스폼 위치)
+        KillerWeapon,   // 처치자 무기(BossVictoryWeaponMarker → WeaponTransformRelay 첫 무기, 없으면 처치자 발밑) — 이 기준만 매 프레임 따라간다
     }
+
+    /// <summary>이 기준점은 컷 동안 매 프레임 따라가는가(나머지는 컷 시작 1회 고정).</summary>
+    public static bool FollowsEveryFrame(Anchor anchor) => anchor == Anchor.KillerWeapon;
 
     /// <summary>이동 곡선(백대쉬 곡선 · 옛 컷 시작→끝 곡선). 컷 화면 키 구간은 <see cref="BossVictoryKeyCurve"/>(같은 순서 + 계단).</summary>
     public enum Ease
@@ -64,6 +68,8 @@ public static class BossVictoryCameraCuts
         [Min(0f)] public float blendSeconds;
         [Tooltip("블렌드 곡선(선형·ease in/out·ease in·ease out).")]
         public BossVictoryKeyCurve blendCurve;
+        [Tooltip("기준 '처치자 무기' 일 때만 — 무기 위치를 따라가는 부드러움(초, 지수 감쇠 시간 상수). 0 = 딱 붙음(애니 흔들림 그대로).")]
+        [Min(0f)] public float weaponFollowSmoothing;
 
         // 옛 2점 형식(255 후속 2) — 읽기만 해서 키로 옮긴다(MigrateToKeys). 키가 있으면 쓰지 않는다.
         [HideInInspector] public Vector3 startPosition;
@@ -124,6 +130,32 @@ public static class BossVictoryCameraCuts
         public Vector3 Killer;
         /// <summary>보스 발밑(트랜스폼 위치).</summary>
         public Vector3 BossBase;
+        /// <summary>처치자 무기 위치(기준 '처치자 무기' — 매 프레임 갱신, 부드러움 적용 뒤). <see cref="HasWeapon"/> 이 false 면 처치자 발밑으로.</summary>
+        public Vector3 Weapon;
+        public bool HasWeapon;
+    }
+
+    /// <summary>
+    /// 기준 '처치자 무기' 추종(부드러움) — 지수 감쇠: <paramref name="smoothing"/> 초 시간 상수로 <paramref name="current"/> → <paramref name="target"/>.
+    /// 0 이하 = 바로 target. 프레임 속도와 무관(dt 를 나눠 여러 번 불러도 같은 결과).
+    /// </summary>
+    public static Vector3 SmoothFollow(Vector3 current, Vector3 target, float smoothing, float deltaTime)
+    {
+        if (smoothing <= 0f) return target;
+        float k = 1f - Mathf.Exp(-Mathf.Max(0f, deltaTime) / smoothing);
+        return Vector3.LerpUnclamped(current, target, k);
+    }
+
+    /// <summary>
+    /// 기준 '처치자 무기' 한 프레임 — 처치자·보스는 지금 위치(<paramref name="live"/>, 축도 매 프레임), 무기는 지난 값에서 부드럽게.
+    /// 무기가 없다가 생기거나(또는 그 반대) 하면 바로 맞춘다.
+    /// </summary>
+    public static Subjects FollowWeapon(in Subjects previous, in Subjects live, float smoothing, float deltaTime)
+    {
+        Subjects s = live;
+        if (previous.HasWeapon && live.HasWeapon)
+            s.Weapon = SmoothFollow(previous.Weapon, live.Weapon, smoothing, deltaTime);
+        return s;
     }
 
     /// <summary>시각 <paramref name="t"/> 에 켜진 컷 번호 — 클립 시작이 t 이하인 것 중 가장 늦은 것(클립 길이와 무관 — 다음 컷 시작까지 유지). 없으면 -1(게임 카메라). 목록 순서와 무관.</summary>
@@ -151,6 +183,7 @@ public static class BossVictoryCameraCuts
     {
         Anchor.Killer => s.Killer,
         Anchor.Boss => s.BossBase,
+        Anchor.KillerWeapon => s.HasWeapon ? s.Weapon : s.Killer,
         _ => Vector3.Lerp(s.Killer, s.BossBase, 0.5f),
     };
 

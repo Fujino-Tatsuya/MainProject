@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4746dfe25f278299b295f57c9881699, type: 3}
   m_Name: BossVictoryGlitchSettings
   m_EditorClassIdentifier: Assembly-CSharp::BossVictoryGlitchSettings
-  defaultProfile: {fileID: 11400000, guid: 3cd2425b4ee2c595e772d8d5d21e0dff, type: 2}
+  defaultProfile: {fileID: 0}
   characterProfiles:
   - character: 1
     profile: {fileID: 11400000, guid: 1fd77fcfa89fedfa1e26ef33d7101c6b, type: 2}
@@ -64,22 +64,22 @@ MonoBehaviour:
     fade: 0.15
     expand: 0.5
     center: {x: 0.46, y: 0.5}
-    leftColor: {r: 1, g: 0.1764706, b: 0.7058824, a: 1}
-    rightColor: {r: 0.627451, g: 0.2509804, b: 1, a: 1}
+    leftColor: {r: 0.17647058, g: 1, b: 0.6863666, a: 1}
+    rightColor: {r: 0.701684, g: 1, b: 0.25098038, a: 1}
   - start: 0.1
     startRadius: 0.15
     fade: 0.15
     expand: 0.5
     center: {x: 0.46, y: 0.5}
-    leftColor: {r: 0.3529412, g: 0.78431374, b: 1, a: 1}
-    rightColor: {r: 0.14117648, g: 0.21960784, b: 0.65882355, a: 1}
+    leftColor: {r: 0.35294116, g: 1, b: 0.98865074, a: 1}
+    rightColor: {r: 0.3546108, g: 0.14117645, b: 0.65882355, a: 1}
   - start: 0.25
     startRadius: 0.15
     fade: 0.15
     expand: 0.1
     center: {x: 0.46, y: 0.5}
-    leftColor: {r: 1, g: 1, b: 1, a: 1}
-    rightColor: {r: 1, g: 0.9647059, b: 0.8784314, a: 1}
+    leftColor: {r: 0, g: 0.20979707, b: 0.4117647, a: 1}
+    rightColor: {r: 0.47441348, g: 0.06005683, b: 0.90943396, a: 1}
   rectifyCircleGrayColor: {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
   rectifyCircleGrayToWhite: 0.1
   rectifyFillSoftness: 0.01
@@ -97,16 +97,6 @@ MonoBehaviour:
   rectifyWhiteStartRadius: 0.15
   rectifyWhiteFade: 0.15
   rectifyWhiteExpand: 0.1
-  rectifyOrangeHold: 0.05
-  rectifyOrangeWipe: 0.1
-  rectifyOrangeRightToLeft: 1
-  rectifyOrangeJitter: 0.2
-  rectifyOrangeRowPixels: 4
-  rectifyOrangeLeft: {r: 1, g: 0.64705884, b: 0.22745098, a: 1}
-  rectifyOrangeRight: {r: 0.972549, g: 0.9098039, b: 0.38431373, a: 1}
-  rectifyOrangeGradient: 1
-  rectifyScanlineSpacing: 0.003
-  rectifyScanlineDark: 0
   rectifyGlowIntensity: 1
   rectifyGlowRadius: 24
   rectifyGlowColor: {r: 1, g: 1, b: 1, a: 1}

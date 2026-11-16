@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 반영 (2026-11-13 · 은희(Claude) [Work3] · **할 일 282 스피너봇 간파 뒤 회전 이펙트 잔상**, 브랜치 `fix/SpinnerSpinFxResidue`) — ✅ 구현·커밋 · batchmode 컴파일 0 · EditMode 새 9 + 이펙트 재생 배율 8 통과(Spinner·Monster·Effect 364/363 — 실패 1 = `MonsterInspectorCatalogTests` 기존 `pushNorthSuppressFxCounterNumber`, 무관) · ⏳ Play·MPPM
+- 원인: ① 끄기가 전부 "서서히"(`EffectManager.Release` = 루프 입자 **방출만** 멈춤, 이미 나온 glow 입자는 수명 0.5초까지 + 종료 파트 `FX_Mob_Spin_End`) ② 간파가 예고 끝 무렵 성공하면 시작 클립(32.7% `StartEffect Spin` 직전)이 늘이기 배율 1 복귀 → Dizzy 로 가는 0.1초 전이 중 이벤트를 지나 Spin 을 **다시 켬** — 상태 이탈 정지(11-09 `StopClipLoopsOnAttackExit`) 뒤라 재정지도 "서서히"였다.
+- 수정: `EffectSocketPlayer.StopImmediate`·`EffectAnimEvents.StopEffectImmediate`(신설, `ReleaseImmediate` — 기존 `Stop` 동작 불변) · `SpinnerBot` — 그로기 진입(간파 성공) = 바로 걷기, 그 밖 이탈(돌진 정상 종료·사망·리쉬) = 예전처럼 서서히 · 공격 밖에서 클립이 Spin 을 켜면(`EffectAnimEvents.Played`) 그 자리에서 바로 걷기 · 스피너의 `StopClipLoopsOnAttackExit` 오버라이드 제거(위 둘로 대체, 23호·건틀릿은 그대로). 프리팹·아트 무변경.
+
 ## ▶▶ 반영 (2026-11-12 · 경석(Claude) · **몬스터·보스 사운드 Codex 교차검증 후속 + 23호 취약 Q 경직만·바람 루프 잔존**, 브랜치 `feature/SettingsDdol`) — ✅ 구현(미커밋) · 컴파일 0 · ⏳ EditMode · ✅ 경석 Play 솔로(취약 Q 벽까지 밀림·바람 잔존 0·BGM 흐름 타이틀→로딩 1초 아웃→맵→보스 연출 무음→전투→사망 아웃→로비 OK) · ⏳ MPPM 재합류 · ✅ 커밋 82d51ec9(development 미병합) · BGM 흐름 규칙 변경(로딩씬=로비 곡·연출 중 BGM 없음 0.1초 아웃·타이틀 모니터 꺼짐) ✅ development d4f1fe00 · **11-12 기획 확정(미커밋 ✅ 컴파일): BGM 은 보스 등장 연출만 0.1초 끊고 보스 곡 즉시 · 포드·엘리베이터 무음 제거 · 포드 출발음 3.95초에서 나눠 인원별 발사 시각 맞춤** · 존4 소개 연출은 BGM 안 끊김으로 정정 · **연출 사운드 5종(SVN r670 Direct: 포드 출발·도착·엘리베이터 시작/끝 3D 가상 거리·보스 등장) 미커밋** — xlsx Sound entries[66~70](잠금 중, SVN 미커밋) ⏳ 사운드 동기화·Play · 체크리스트·근거 [handoff-sound-spec-apply.md](Docs/tech/handoff-sound-spec-apply.md) 「11-12 교차검증 후속」
 - 수정: `TwentyThreeBoss`(취약 시작 = 공격별 슈퍼아머 해제 · 밀림 거부 경고 로그 · 디스폰 공격음 로컬 정지 · BGM owner) · `MonsterBase`(공격 이탈 전환 뒤 클립 루프 재정지) · `AudioManager`(보스 BGM 상태를 낸 씬이 떠 있으면 `PlayBGM` 이 안 지움 — 재합류) · `BossEncounterDirector`(owner 전달) · `DemoSessionDirector.CleanupAfterDrop`(**은희 영역 한 줄** — 대기 씬 BGM 1초 아웃)
 
