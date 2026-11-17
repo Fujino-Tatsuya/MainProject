@@ -69,8 +69,13 @@ public struct BossVictoryClip
     /// <summary>[어쌔신 순간이동·Q 이동 트랙만] 시작·도착 지점 = 보스 기준 오프셋(m, +Z = 보스 정면 — <see cref="BossVictoryKillerMoves.BossPoint"/>, 272 후속).</summary>
     public Vector3 dashFrom;
     public Vector3 dashTo;
+    /// <summary>[가로 찢김 트랙만] 클립 강도 배율(11-17) — 세기 키 × 이 값(밀림 거리·켜지는 줄 수 둘 다, 1 넘으면 공용 최대보다 세게). 0 이하 = 1(옛 데이터·새 클립).</summary>
+    [Min(0f)] public float pulseStrength;
 
     public float End => start + length;
+
+    /// <summary>실제 강도 배율 — <see cref="pulseStrength"/> 0 이하면 1.</summary>
+    public float PulseStrength => pulseStrength > 0f ? pulseStrength : 1f;
 
     public bool HasKeys => keys != null && keys.Count > 0;
 
@@ -292,6 +297,9 @@ public sealed class BossVictoryTimeline
     public static bool HasFades(BossVictoryTrack track) =>
         track != BossVictoryTrack.CrtOff && track != BossVictoryTrack.CameraCut && track != BossVictoryTrack.KillerAction && track != BossVictoryTrack.NoiseScrollV && track != BossVictoryTrack.AssassinDash;
 
+    /// <summary>클립마다 강도 배율(<see cref="BossVictoryClip.pulseStrength"/>)을 쓰는 트랙인가 — 가로 찢김만(11-17).</summary>
+    public static bool HasPulseStrength(BossVictoryTrack track) => track == BossVictoryTrack.Tear;
+
     /// <summary>카메라 두둥실 트랙인가(세기 키 + 진폭·주기·위상·감쇠 칸 — 267 후속).</summary>
     public static bool IsBob(BossVictoryTrack track) => track == BossVictoryTrack.CameraBob;
 
@@ -352,7 +360,8 @@ public sealed class BossVictoryTimeline
     {
         List<BossVictoryClip> clips = Clips(track);
         float v = 0f;
-        for (int i = 0; i < clips.Count; i++) v = Mathf.Max(v, clips[i].Evaluate(t));
+        bool strength = HasPulseStrength(track);
+        for (int i = 0; i < clips.Count; i++) v = Mathf.Max(v, clips[i].Evaluate(t) * (strength ? clips[i].PulseStrength : 1f));
         return v;
     }
 

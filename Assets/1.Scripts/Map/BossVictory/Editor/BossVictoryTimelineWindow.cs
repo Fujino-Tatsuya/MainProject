@@ -410,6 +410,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (BossVictoryTimeline.IsBob(track))
             GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
                 $"±{clip.bobAmplitude:0.##}% · {clip.bobPeriod:0.##}s", EditorStyles.miniLabel);
+        if (BossVictoryTimeline.HasPulseStrength(track) && !Mathf.Approximately(clip.PulseStrength, 1f))   // 클립 강도 배율(11-17) — 1 이 아니면 표시
+            GUI.Label(new Rect(r.x + 2f, r.y + 1f, Mathf.Max(0f, r.width - 2f), r.height - 1f), $"×{clip.PulseStrength:0.#}", EditorStyles.miniBoldLabel);
         if (BossVictoryTimeline.IsAssassinDash(track))
             GUI.Label(new Rect(r.x + 4f, r.y + 2f, Mathf.Max(0f, r.width - 6f), r.height - 2f),
                 $"#{BossVictoryAssassinDash.Number(Timeline.assassinDash, index)}", EditorStyles.miniBoldLabel);
@@ -1674,6 +1676,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             c.dashFrom = FlatOffset(EditorGUILayout.Vector3Field(new GUIContent("시작 지점(보스 기준)", "클립 시작에 이 점으로 순간이동. +Z = 보스 정면, 높이는 무시(처치자 발 높이)."), c.dashFrom));
             c.dashTo = FlatOffset(EditorGUILayout.Vector3Field(new GUIContent("도착 지점(보스 기준)", "클립 길이 동안 여기까지 Q 이동(곡선 = 프로필 teleportMoveEase). 끝에 일섬."), c.dashTo));
         }
+        if (BossVictoryTimeline.HasPulseStrength(track))
+            c.pulseStrength = Mathf.Max(0f, EditorGUILayout.Slider(new GUIContent("강도 배율", "이 클립만 — 세기 키 × 배율(밀림 거리·켜지는 줄 수). 1 = 공용 모양 값 그대로, 1 넘으면 더 세게. 모양(최대 밀림·줄 비율·굵기·갱신)은 아래 공용."), c.PulseStrength, 0.05f, 5f));
         if (BossVictoryTimeline.IsBob(track))
         {
             c.bobAmplitude = EditorGUILayout.FloatField(new GUIContent("진폭(화면 높이 %)", "+ = 화면 내용이 위로. 레퍼런스 0.22."), c.bobAmplitude);
