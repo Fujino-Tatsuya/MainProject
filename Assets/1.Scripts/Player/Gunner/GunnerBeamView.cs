@@ -854,7 +854,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
             chargeVentPlayer.PlayOnce();
         }
         // 레이저 색(295) — 덮어쓰기 켜면 프로필 색, 아니면 한계 돌파 색 그대로. 밝기·페이드아웃 = TickVictory(ApplyUniform).
-        Tint(chargeBeamPlayer, victoryLook.beamColorOverride ? EffectTint.FromColor(victoryLook.beamColor) : tint);
+        EffectTint beamTint = victoryLook.beamColorOverride ? EffectTint.FromColor(victoryLook.beamColor) : tint;
+        Tint(chargeBeamPlayer, beamTint);
         if (victoryLook.fireShakeIntensity > 0f && CameraFeedback.Instance != null)
             CameraFeedback.Instance.PlayImpactShake(victoryLook.fireShakeIntensity, BossVictoryGunnerQ.ShakeSeconds(victoryLook.fireShakeDuration));
         Vector3 start = VictoryBeamStart();
@@ -870,6 +871,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             victoryRigOn = true;
             victoryLaser = true;
             chargeBeamEnd = end;
+            victoryRig.SetTint(beamTint);   // 302 — 새 레이저도 색상(hue)만: 덮어쓰기 색 또는 한계 돌파 단계 색
             victoryRig.SetLayerScales(victoryLook.victoryBeamInnerScale, victoryLook.victoryBeamAirScale);
             victoryRig.Drive(start, end, 1f, victoryLook.beamBrightness, false, victoryLook.beamWidthScale);
         }

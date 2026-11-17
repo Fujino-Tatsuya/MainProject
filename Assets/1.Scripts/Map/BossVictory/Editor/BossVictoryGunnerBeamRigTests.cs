@@ -186,4 +186,63 @@ public class BossVictoryGunnerBeamRigTests
         }
         finally { Object.DestroyImmediate(m); }
     }
+
+    [Test]
+    public void 새_레이저_페이드_0이면_기본_0_15초_기존_레이저와_칸값은_그대로()
+    {
+        var q = new BossVictoryGunnerQ();
+        Assert.AreEqual(0f, BossVictoryGunnerCharge.EffectiveBeamFadeSeconds(q), Tolerance, "기존 레이저 = 0 그대로(원래 소멸 꼬리)");
+        var prefab = new GameObject("beam");
+        try
+        {
+            q.victoryBeamPrefab = prefab;
+            Assert.AreEqual(BossVictoryGunnerCharge.VictoryBeamDefaultFadeSeconds, BossVictoryGunnerCharge.EffectiveBeamFadeSeconds(q), Tolerance);
+            q.beamFadeSeconds = 0.4f;
+            Assert.AreEqual(0.4f, BossVictoryGunnerCharge.EffectiveBeamFadeSeconds(q), Tolerance, "칸 값이 있으면 그 값");
+            q.beamFadeSeconds = 0f;
+            var times = new BossVictoryGunnerCharge.Times { Fire = 1f };
+            q.beamHoldSeconds = 0.5f;
+            Assert.IsTrue(BossVictoryGunnerCharge.Evaluate(times, q, 1.55f).LaserOn, "유지 끝 뒤 기본 페이드 동안 켜져 있다");
+            Assert.IsFalse(BossVictoryGunnerCharge.Evaluate(times, q, 1.7f).LaserOn);
+        }
+        finally { Object.DestroyImmediate(prefab); }
+    }
+
+    [Test]
+    public void 리그_색상은_hue만_바꾸고_흰_심과_밝기는_그대로()
+    {
+        var root = new GameObject("rig");
+        var shader = Shader.Find("BeaverLobby/VFX/BossVictoryGunnerBeam");
+        Assume.That(shader, Is.Not.Null);
+        var mat = new Material(shader);
+        try
+        {
+            mat.SetColor("_Color", Color.white);
+            mat.SetColor("_GlowColor", new Color(1f, 2.5f, 6f, 1f));
+            mat.SetColor("_CoreColor", new Color(8f, 8f, 8f, 1f));
+            var body = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Object.DestroyImmediate(body.GetComponent<Collider>());
+            body.transform.SetParent(root.transform, false);
+            var r = body.GetComponent<MeshRenderer>();
+            r.sharedMaterial = mat;
+            root.SetActive(false);
+            var rig = root.AddComponent<BossVictoryBeamRig>();
+            rig.SetTint(EffectTint.FromColor(Color.red));
+            rig.Drive(Vector3.zero, Vector3.forward * 5f, 1f, 1f, false);
+            var block = new MaterialPropertyBlock();
+            r.GetPropertyBlock(block);
+            Color glow = block.GetColor("_GlowColor");
+            Color.RGBToHSV(glow, out float h, out _, out float v);
+            Assert.AreEqual(0f, Mathf.Min(h, 1f - h), 1e-3f, "파랑 둘레 → 빨강");
+            Assert.AreEqual(6f, v, 1e-3f, "밝기(HDR) 그대로");
+            Color core = block.GetColor("_CoreColor");
+            Assert.AreEqual(8f, core.r, 1e-3f, "흰 심(채도 0)은 흰 채로");
+            Assert.AreEqual(8f, core.b, 1e-3f);
+            rig.SetTint(EffectTint.None);
+            rig.Drive(Vector3.zero, Vector3.forward * 5f, 1f, 1f, false);
+            r.GetPropertyBlock(block);
+            Assert.AreEqual(6f, block.GetColor("_GlowColor").b, 1e-3f, "색상 없음 = 저작 색");
+        }
+        finally { Object.DestroyImmediate(root); Object.DestroyImmediate(mat); }
+    }
 }

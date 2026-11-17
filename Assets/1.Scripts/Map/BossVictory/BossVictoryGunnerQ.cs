@@ -49,13 +49,13 @@ public sealed class BossVictoryGunnerQ
     [Tooltip("레이저 굵기 배율(보이는 것만) — 기존 레이저 = 몸통 입자 폭, 302 새 레이저 = 프리팹 Body 굵기(X·Y)·총구·끝 플레어 크기(저작 크기 × 이 값).")]
     [Min(0.01f)] public float beamWidthScale = 1f;
     [Tooltip("레이저 몸통을 3D 원통으로(300) — 몸통 빌보드 입자를 처치 연출 동안만 원통 메시 렌더로 바꿔, 낮은 앵글·레이저 축 방향 컷에서도 두께가 보인다. " +
-             "끄면 예전 빌보드(위에서 볼 때만 두께가 보임). 번개·불꽃·섬광은 그대로.")]
+             "끄면 예전 빌보드(위에서 볼 때만 두께가 보임). 번개·불꽃·섬광은 그대로. 302 새 레이저(victoryBeamPrefab)를 쓰면 안 먹는다(새 레이저는 원래 3D 캡슐).")]
     public bool beamMesh3D = true;
     [Tooltip("처치 연출 전용 레이저 이펙트 프리팹(302) — 루트에 BossVictoryBeamRig(Body = +Z 1m 몸통 · Muzzle = 총구 고정 · End = 끝점). " +
-             "넣으면 기존 레이저(FX_GunnerQBeam)를 안 쓰고 이걸 띄운다 — 3D 원통·흐름·색 덮어쓰기는 안 먹고(모양·색은 프리팹·머티리얼), 굵기 배율·길이·유지·페이드·밝기·광원·진동·반동·통과 지점은 그대로. " +
+             "넣으면 기존 레이저(FX_GunnerQBeam)를 안 쓰고 이걸 띄운다 — 3D 원통·흐름 속도는 안 먹고(모양·흐름은 프리팹·머티리얼), 색은 색상(hue)만(덮어쓰기 색 또는 한계 돌파 단계 색), 굵기 배율·길이·유지·페이드(0 이면 기본 0.15초)·밝기·광원·진동·반동·통과 지점은 그대로. " +
              "비우면 기존 레이저. 저작 메뉴 'Tools/Boss Victory/거너 레이저 뼈대 이펙트 만들기 (302)'.")]
     public GameObject victoryBeamPrefab;
-    [Tooltip("302 새 레이저도 '레이저 멈춤 시점'에 멈출지(파티클 Pause·셰이더 시계 정지). 끄면 유지 동안 계속 움직인다(루프). 기존 레이저는 늘 멈춤.")]
+    [Tooltip("302 새 레이저도 '레이저 멈춤 시점'(beamFreezeAt)에 멈출지(파티클 Pause·셰이더 시계 정지). 끄면 유지 동안 계속 움직인다(루프) — 멈춤 시점 값은 안 먹는다. 기존 레이저는 늘 멈춤.")]
     public bool victoryBeamFreeze;
     [Tooltip("302 새 레이저 — 안쪽 파란 몸통(프리팹 리그 innerBody: Glow·흰 심 Core) 굵기 배율. 1 = 저작 크기. 레이저 굵기 배율(beamWidthScale)과 곱해진다.")]
     [Min(0f)] public float victoryBeamInnerScale = 1f;
@@ -74,7 +74,8 @@ public sealed class BossVictoryGunnerQ
     [Tooltip("레이저 유지 시간(타임라인 초) — 발사 마커부터.")]
     [Min(0.01f)] public float beamHoldSeconds = 0.5f;
     [Tooltip("레이저 멈춤 시점(발사 뒤 타임라인 초, 299) — 빔이 다 뻗은 순간 레이저 입자를 그대로 멈췄다가(정지 화면) 유지 시간 끝에 다시 재생해 원래 소멸 꼬리를 튼다. " +
-             "레이저 이펙트가 1초 남짓 원샷이라 멈추지 않으면 유지 시간이 길어도 화면엔 안 남는다. 유지 시간 ≤ 이 값이면 멈추지 않음(예전 그대로).")]
+             "레이저 이펙트가 1초 남짓 원샷이라 멈추지 않으면 유지 시간이 길어도 화면엔 안 남는다. 유지 시간 ≤ 이 값이면 멈추지 않음(예전 그대로). " +
+             "302 새 레이저는 '새 레이저 멈춤'(victoryBeamFreeze)을 켰을 때만 이 시점에 멈춘다.")]
     [Min(0f)] public float beamFreezeAt = 0.12f;
 
     // ── 차징 이펙트 세부(할 일 295) — 마커마다(차징 시작·1·2·3단계) 파트별 배율·포인트 라이트, 마커 사이 = 그 단계 곡선(ease)으로 보간.
@@ -112,17 +113,18 @@ public sealed class BossVictoryGunnerQ
 
     [Tooltip("레이저 색 밝기(HDR 배율, 295).")]
     [Min(0f)] public float beamBrightness = 1f;
-    [Tooltip("켬 = 레이저 색상을 아래 색으로(색상만 — 밝기·채도는 이펙트 것). 끔 = 한계 돌파 단계 색(지금).")]
+    [Tooltip("켬 = 레이저 색상을 아래 색으로(색상만 — 밝기·채도는 이펙트 것). 끔 = 한계 돌파 단계 색(지금). 302 새 레이저도 같은 색상으로 바뀐다(흰 심·어두운 선은 밝기 그대로).")]
     public bool beamColorOverride;
     [Tooltip("레이저 색(켰을 때 — 색상만 쓴다).")]
     public Color beamColor = Color.white;
-    [Tooltip("레이저 페이드아웃(타임라인 초) — 유지 시간 뒤 이 길이 동안 알파 1 → 0 후 끔. 0 = 바로 끔(지금).")]
+    [Tooltip("레이저 페이드아웃(타임라인 초) — 유지 시간 뒤 이 길이 동안 알파 1 → 0 후 끔. 0 = 바로 끔(기존 레이저는 원래 소멸 꼬리가 있음). " +
+             "302 새 레이저는 꼬리가 없어 0 이면 기본 0.15초(EffectiveBeamFadeSeconds).")]
     [Min(0f)] public float beamFadeSeconds;
 
     // ── 301 — 레이저 흐름·진동·통과 지점·광원·반동(기본 0 = 꺼짐, 거너 프로필에만 시작값) ──
-    [Tooltip("레이저 흐름(301) — 몸통 텍스처가 총구 → 끝으로 흐르는 속도(UV/초, 셰이더 _SpeedMainTexUVNoiseZW.x). 0 = 재질 값 그대로.")]
+    [Tooltip("레이저 흐름(301) — 몸통 텍스처가 총구 → 끝으로 흐르는 속도(UV/초, 셰이더 _SpeedMainTexUVNoiseZW.x). 0 = 재질 값 그대로. 기존 레이저 전용 — 302 새 레이저는 머티리얼 흐름 속도(_StreakFlow·_LineFlow).")]
     public float beamFlowSpeed;
-    [Tooltip("레이저 노이즈 흐름(301) — 왜곡 노이즈(_Flow)가 흐르는 속도(UV/초, 셰이더 _DistortionSpeedXYPowerZ.x). 0 = 재질 값 그대로.")]
+    [Tooltip("레이저 노이즈 흐름(301) — 왜곡 노이즈(_Flow)가 흐르는 속도(UV/초, 셰이더 _DistortionSpeedXYPowerZ.x). 0 = 재질 값 그대로. 기존 레이저 전용 — 302 새 레이저는 머티리얼 흐름 속도.")]
     public float beamNoiseFlowSpeed;
 
     [Tooltip("레이저 진동 — 땅울림 카메라 흔들림 세기(301). 발사부터 진동 길이 동안 계속(짧은 흔들림을 주파수만큼 반복). 0 = 없음. 발사 한 번 흔들림(295)은 따로.")]
@@ -325,7 +327,7 @@ public static class BossVictoryGunnerCharge
         f.Charging = t >= o.ChargeStart && !f.Fired;
         f.SphereVisible = f.Charging && t >= o.ChargeStart + Mathf.Max(0f, q.sphereDelay);
         float sinceFire = t - o.Fire;
-        float hold = Mathf.Max(0.01f, q.beamHoldSeconds), fade = Mathf.Max(0f, q.beamFadeSeconds);
+        float hold = Mathf.Max(0.01f, q.beamHoldSeconds), fade = EffectiveBeamFadeSeconds(q);
         f.LaserOn = f.Fired && sinceFire < hold + fade;
         f.LaserFade = f.LaserOn ? LaserFade(sinceFire, hold, fade) : 0f;
         f.FlashIntensity = FireFlash(q.fireFlashIntensity, q.fireFlashDuration, sinceFire);
@@ -374,6 +376,13 @@ public static class BossVictoryGunnerCharge
     /// <summary>레이저 위 포인트 라이트 자리(301) — 시작~끝을 count 등분한 칸의 가운데(i = 0..count-1).</summary>
     public static Vector3 BeamLightPoint(Vector3 start, Vector3 end, int i, int count) =>
         count <= 0 ? start : Vector3.Lerp(start, end, (i + 0.5f) / count);
+
+    /// <summary>302 새 레이저 기본 페이드(초) — 페이드 칸이 0 일 때. 새 레이저는 원샷 소멸 꼬리가 없어 0 이면 뚝 끊긴다.</summary>
+    public const float VictoryBeamDefaultFadeSeconds = 0.15f;
+
+    /// <summary>실제 페이드 길이 — 302 새 레이저(victoryBeamPrefab)이고 페이드 칸 ≤ 0 이면 기본 0.15초, 아니면 칸 값(기존 레이저 = 그대로, 0 = 원래 소멸 꼬리).</summary>
+    public static float EffectiveBeamFadeSeconds(BossVictoryGunnerQ q) =>
+        q.victoryBeamPrefab != null && q.beamFadeSeconds <= 0f ? VictoryBeamDefaultFadeSeconds : Mathf.Max(0f, q.beamFadeSeconds);
 
     /// <summary>레이저 알파(295) — 발사 뒤 <paramref name="hold"/> 동안 1, 그 뒤 <paramref name="fade"/> 동안 1 → 0(선형), 넘으면 0. 페이드 0 = 유지 끝에 바로 0.</summary>
     public static float LaserFade(float sinceFire, float hold, float fade)

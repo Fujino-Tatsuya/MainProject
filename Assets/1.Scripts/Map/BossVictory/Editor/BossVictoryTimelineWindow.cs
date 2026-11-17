@@ -2172,7 +2172,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             }
             case BossVictoryMarker.GunnerFire:
                 DrawProfileFields("처치 연출 전용 레이저 이펙트(302) — 프리팹(루트 BossVictoryBeamRig: Body +Z 1m · Muzzle · End, 폴더 5.VFX/BossVictory/Gunner) · 멈춤 시점에 같이 멈추기(끄면 루프). " +
-                                  "넣으면 아래 3D 원통·흐름·색 덮어쓰기는 안 먹는다(모양·색 = 프리팹·머티리얼, 굵기 배율은 프리팹 Body 굵기·플레어 크기에 곱해짐). 비우면 기존 레이저",
+                                  "넣으면 아래 3D 원통·흐름 속도는 안 먹는다(회색 — 모양·흐름 = 프리팹·머티리얼). 색 덮어쓰기·한계 돌파 색은 색상(hue)만 먹고, 굵기 배율은 프리팹 Body 굵기·플레어 크기에 곱해짐, 페이드 0 = 기본 0.15초. 비우면 기존 레이저",
                     GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamPrefab)), GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamFreeze)));
                 DrawProfileFields("302 새 레이저 층별 굵기 — 안쪽 파란 몸통(Glow·흰 심) · 바깥 흰 공기막(Wisp). 1 = 저작 크기, 레이저 굵기 배율과 곱해짐",
                     GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamInnerScale)), GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamAirScale)));
@@ -2182,8 +2182,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     GUIUtility.ExitGUI();
                 }
                 DrawProfileFields("거너 Q 발사(294 · 이 캐릭터 프로필) — 방출 섬광 크기 · 레이저 굵기 배율(보이는 것만) · 3D 원통(300 — 몸통을 원통 메시로, 낮은 앵글에서도 두께) · 길이(m, 벽 무시·보스 관통) · 유지 시간(타임라인 초) · 레이저 멈춤 시점(발사 뒤 초, 299 — 이때 정지 화면 → 유지 끝에 재개, 유지 ≤ 이 값이면 안 멈춤) · 발사 오프셋(총구 기준 x 옆·y 위·z 앞, 섬광·레이저 시작점)",
-                    GunnerQField(nameof(BossVictoryGunnerQ.ventScale)), GunnerQField(nameof(BossVictoryGunnerQ.beamWidthScale)),
-                    GunnerQField(nameof(BossVictoryGunnerQ.beamMesh3D)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.ventScale)), GunnerQField(nameof(BossVictoryGunnerQ.beamWidthScale)));
+                using (new EditorGUI.DisabledScope(RigBeamSet))   // 302 — 새 레이저면 기존 레이저 전용 칸은 회색
+                    DrawProfileFields(null, GunnerQField(nameof(BossVictoryGunnerQ.beamMesh3D)));
+                DrawProfileFields(null,
                     GunnerQField(nameof(BossVictoryGunnerQ.beamLength)), GunnerQField(nameof(BossVictoryGunnerQ.beamHoldSeconds)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamFreezeAt)),
                     GunnerQField(nameof(BossVictoryGunnerQ.fireOffset)));
@@ -2193,8 +2195,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     GunnerQField(nameof(BossVictoryGunnerQ.fireFlashRange)), GunnerQField(nameof(BossVictoryGunnerQ.fireFlashColor)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamBrightness)), GunnerQField(nameof(BossVictoryGunnerQ.beamColorOverride)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamColor)), GunnerQField(nameof(BossVictoryGunnerQ.beamFadeSeconds)));
-                DrawProfileFields("레이저 흐름·진동(301) — 흐름 = 몸통 텍스처·노이즈가 총구 → 끝으로 흐르는 속도(UV/초, 0 = 재질 값, 음수 = 반대로) · 땅울림 카메라 세기·주파수 · 몸·총 떨림(m) · 진동 길이(발사 뒤 초, 레이저 유지와 별개)·올림·내림(초) — 세기 0 = 없음",
-                    GunnerQField(nameof(BossVictoryGunnerQ.beamFlowSpeed)), GunnerQField(nameof(BossVictoryGunnerQ.beamNoiseFlowSpeed)),
+                DrawProfileFields("레이저 흐름·진동(301) — 흐름 = 몸통 텍스처·노이즈가 총구 → 끝으로 흐르는 속도(UV/초, 0 = 재질 값, 음수 = 반대로) · 땅울림 카메라 세기·주파수 · 몸·총 떨림(m) · 진동 길이(발사 뒤 초, 레이저 유지와 별개)·올림·내림(초) — 세기 0 = 없음");
+                using (new EditorGUI.DisabledScope(RigBeamSet))
+                    DrawProfileFields(null, GunnerQField(nameof(BossVictoryGunnerQ.beamFlowSpeed)), GunnerQField(nameof(BossVictoryGunnerQ.beamNoiseFlowSpeed)));
+                DrawProfileFields(null,
                     GunnerQField(nameof(BossVictoryGunnerQ.vibrationCameraIntensity)), GunnerQField(nameof(BossVictoryGunnerQ.vibrationFrequency)),
                     GunnerQField(nameof(BossVictoryGunnerQ.vibrationBodyIntensity)), GunnerQField(nameof(BossVictoryGunnerQ.vibrationSeconds)),
                     GunnerQField(nameof(BossVictoryGunnerQ.vibrationRampIn)), GunnerQField(nameof(BossVictoryGunnerQ.vibrationRampOut)));
@@ -2229,6 +2233,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     }
 
     // 거너 Q 칸(294) — 프로필 gunnerQ 안 칸 경로.
+    // 302 — 처치 연출 전용 레이저 프리팹이 들어 있으면 기존 레이저 전용 칸(3D 원통·흐름 속도)을 회색으로.
+    bool RigBeamSet => _profile != null && _profile.gunnerQ != null && _profile.gunnerQ.victoryBeamPrefab != null;
+
     static string GunnerQField(string name) => $"{nameof(BossVictoryProfile.gunnerQ)}.{name}";
 
     // 차징 이펙트 마커 값(295) 제목 — 앞 마커 → 이 마커 사이를 구체 크기와 같은 곡선으로 보간.

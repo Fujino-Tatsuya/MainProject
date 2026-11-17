@@ -9,8 +9,10 @@ using UnityEngine;
 ///  · <b>Body</b> = +Z 방향 1m 로 만든다 — 코드가 Body 의 Z 스케일 = 저작 Z × 길이(m), 굵기(X·Y) = 저작 × 프로필 굵기 배율(beamWidthScale).
 ///  · <b>Muzzle</b> = 총구 고정(늘이지 않음) — 총구 섬광·플레어. Muzzle·End 크기도 저작 × 굵기 배율.
 ///  · <b>End</b> = 코드가 레이저 끝점으로 옮김 — 끝 플레어·착탄·관통 이펙트.
-///  · 색·흐름은 머티리얼 값 그대로. 코드는 <b>밝기·페이드</b>만 덮는다 — 렌더러 머티리얼의 첫 색 칸(_Color → _BaseColor → _TintColor)에
+///  · 색·흐름은 머티리얼 값 그대로. 코드는 <b>밝기·페이드·색상(hue)</b>만 덮는다 — 렌더러 머티리얼의 첫 색 칸(_Color → _BaseColor → _TintColor)에
 ///    저작 색 × 밝기(rgb), 알파 × 페이드(셰이더가 알파로 사라지게 — 뼈대 셰이더는 rgb × 알파). 색 칸이 없는 렌더러는 건너뛴다.
+///  · 색상(<see cref="SetTint"/> — 프로필 '레이저 색 덮어쓰기' 또는 한계 돌파 단계 색)은 첫 색 칸과 _CoreColor·_GlowColor·_LineColor 의 hue 만 바꾼다
+///    (밝기·채도 = 저작 그대로 — 흰 심은 흰 채로, 어두운 먹선은 어두운 채로). 색상 없음 = 저작 색.
 ///  · 셰이더가 <c>_BeamLength</c>(m)·<c>_BeamTime</c>(초, 멈춤 동안 멈춤) 칸을 가지면 코드가 매 프레임 넣는다(뼈대 셰이더 BossVictoryGunnerBeam 이 씀).
 ///    셰이더가 _Time 을 쓰면 멈춤 화면에서도 계속 흐른다.
 ///  · 파티클은 루프로 만들어도 된다 — 발사 때 처음부터 재생, 레이저 끝에 오브젝트를 끈다. 멈춤(<c>victoryBeamFreeze</c>)이면 Pause.
@@ -40,6 +42,8 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
     static readonly int TintColorId = Shader.PropertyToID("_TintColor");
     static readonly int BeamLengthId = Shader.PropertyToID("_BeamLength");
     static readonly int BeamTimeId = Shader.PropertyToID("_BeamTime");
+    // 색상(hue)만 바꾸는 추가 색 칸(뼈대 셰이더 — 밝기·페이드는 첫 색 칸만).
+    static readonly int[] HueIds = { Shader.PropertyToID("_CoreColor"), Shader.PropertyToID("_GlowColor"), Shader.PropertyToID("_LineColor") };
 
     struct Slot
     {
@@ -47,6 +51,8 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
         public int colorId;      // 0 = 색 칸 없음
         public Color home;
         public bool hasLength, hasTime;
+        public Color[] hueHome;  // HueIds 순 저작 색(hasHue 가 거짓인 칸은 안 씀)
+        public bool[] hasHue;
     }
 
     Slot[] _slots;
@@ -54,6 +60,7 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
     Vector3 _bodyHome = Vector3.one, _muzzleHome = Vector3.one, _endHome = Vector3.one;
     Vector3[] _innerHome = System.Array.Empty<Vector3>(), _airHome = System.Array.Empty<Vector3>();
     float _innerScale = 1f, _airScale = 1f;
+    EffectTint _tint;
     MaterialPropertyBlock _block;
     float _clock;
     bool _frozen;
@@ -82,6 +89,13 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
                 if (s.colorId != 0) s.home = m.GetColor(s.colorId);
                 s.hasLength = m.HasProperty(BeamLengthId);
                 s.hasTime = m.HasProperty(BeamTimeId);
+                s.hueHome = new Color[HueIds.Length];
+                s.hasHue = new bool[HueIds.Length];
+                for (int k = 0; k < HueIds.Length; k++)
+                {
+                    s.hasHue[k] = m.HasProperty(HueIds[k]);
+                    if (s.hasHue[k]) s.hueHome[k] = m.GetColor(HueIds[k]);
+                }
             }
             _slots[i] = s;
         }
@@ -129,14 +143,20 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
         for (int i = 0; i < _slots.Length; i++)
         {
             Slot s = _slots[i];
-            if (s.renderer == null || (s.colorId == 0 && !s.hasLength && !s.hasTime)) continue;
+            if (s.renderer == null || (s.colorId == 0 && !s.hasLength && !s.hasTime && s.hasHue == null)) continue;
             s.renderer.GetPropertyBlock(_block);
-            if (s.colorId != 0) _block.SetColor(s.colorId, Look(s.home, brightness, fade));
+            if (s.colorId != 0) _block.SetColor(s.colorId, Look(_tint.Apply(s.home), brightness, fade));
+            if (s.hasHue != null)
+                for (int k = 0; k < HueIds.Length; k++)
+                    if (s.hasHue[k]) _block.SetColor(HueIds[k], _tint.Apply(s.hueHome[k]));
             if (s.hasLength) _block.SetFloat(BeamLengthId, length);
             if (s.hasTime) _block.SetFloat(BeamTimeId, _clock);
             s.renderer.SetPropertyBlock(_block);
         }
     }
+
+    /// <summary>색상(hue) — 다음 Drive 부터 첫 색 칸·_CoreColor·_GlowColor·_LineColor 의 hue 를 바꾼다(밝기·채도·알파 = 저작). <see cref="EffectTint.None"/> = 저작 색.</summary>
+    public void SetTint(in EffectTint tint) => _tint = tint;
 
     /// <summary>층별 굵기 배율(안쪽 몸통·바깥 공기막) — 다음 Drive 부터 저작 X·Y × 배율. 몸통 전체 굵기 배율(Drive width)과 곱해진다.</summary>
     public void SetLayerScales(float inner, float air)
