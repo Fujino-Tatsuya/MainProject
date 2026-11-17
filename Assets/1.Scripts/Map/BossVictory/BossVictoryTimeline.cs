@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>보스 처치 연출 타임라인 트랙(PLAN-boss-victory-glitch "타임라인 에디터 창"). 순서 = 창 위→아래.</summary>
 public enum BossVictoryTrack
@@ -33,7 +34,7 @@ public enum BossVictoryMarker
     FinisherStart,    // 스킬 연출 시작 — 처치 연출 스킬을 표시용으로 바로(백대쉬가 덜 끝났으면 끊음, 이전 스킬을 기다리지 않음). 창은 '처치 연출 스킬' 클립(시작 = 이 값, 끝 = 클립 끝·자르기 finisherTrimSeconds — 255 후속 7)
     SlowStart,        // 느려짐 시작 — 처치자 End 후 배율(0 = 끔, 스킬 End 이벤트). 보스는 보스 슬로우가 꺼졌을 때만 따른다(255 후속 5)
     BossHitAnim,      // 보스 피격 애니 시작 — 설정 SO 상태(23호 getowned = Boss_23_ParryHit_InPlace)를 처음부터, 보스 ×1(상태 이름이 비면 없음 — 255 후속 5)
-    BossDashPrepAnim, // 보스 돌진 준비 애니 시작(11-17) — 설정 SO 상태(23호 DashPrep)를 처음부터, 보스 ×1. 0 = 끔. 끝 자르기면 그 프레임에서 정지. 피격 애니와 겹치면 나중에 시작한 쪽 애니
+    BossReachAnim, // 보스 손 뻗기·걷기 시작(11-17) — 상체 = 설정 SO 상체 상태(23호 VictoryReach = magneticgrab, 상체 레이어), 하체 = 걷기(VictoryWalk), 보스 ×1. 0 = 끔. 끝 자르기 = 손만 그 프레임에서 멈추고 다리는 계속 걷는다. 피격 애니와 겹치면 나중에 시작한 쪽
     BossFreeze,       // 보스 정지 — 보스 배율 0(그 자세로). 0 = 끔
     BossSlow,         // 보스 슬로우 — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End)
     ChargeStart,      // 거너 Q 차징 시작(처치자 이동 '후퇴 차징' — 가깝든 멀든 이 시각에 Q 차징, 272·294). 기본(-1) = 백대쉬 시작 + 0.2초. 창 '거너 Q' 줄
@@ -194,10 +195,16 @@ public sealed class BossVictoryTimeline
     [Min(0f)] public float bossHitAnimTime;
     [Tooltip("보스 피격 애니 끝 자르기(클립 시간 초 — 프레임 단위). 0 = 안 자름(클립 끝까지). 그 프레임에서 보스 배율 0 — 뒤에 슬로우 노드가 오면 다시 움직임(255 후속 10).")]
     [Min(0f)] public float bossHitTrimSeconds;
-    [Tooltip("보스 돌진 준비 애니 시작(초, 11-17) — 설정 SO bossDashPrepStateName(23호 DashPrep)을 처음부터, 보스 ×1. 0 = 끔. 피격 애니와 겹치면 나중에 시작한 쪽이 이긴다.")]
-    [Min(0f)] public float bossDashPrepTime;
-    [Tooltip("보스 돌진 준비 애니 끝 자르기(클립 시간 초 — 프레임 단위). 0 = 안 자름(컨트롤러 흐름대로). 그 프레임에서 보스 배율 0 — 뒤에 피격·슬로우 노드가 오면 다시 움직임.")]
-    [Min(0f)] public float bossDashPrepTrimSeconds;
+    [Tooltip("보스 손 뻗기·걷기 시작(초, 11-17) — 상체 = 설정 SO bossReachUpperState(23호 magneticgrab, 상체 레이어), 하체 = bossReachLowerState(걷기)를 처음부터, 보스 ×1. 0 = 끔. 피격 애니와 겹치면 나중에 시작한 쪽이 이긴다.")]
+    [FormerlySerializedAs("bossDashPrepTime")]
+    [Min(0f)] public float bossReachTime;
+    [Tooltip("보스 손 뻗기 끝 자르기(상체 클립 시간 초 — 프레임 단위). 0 = 안 자름(클립 끝 자세 유지). 그 프레임에서 손(상체 레이어)만 멈추고 다리는 계속 걷는다 — 보스 배율은 안 건드림.")]
+    [FormerlySerializedAs("bossDashPrepTrimSeconds")]
+    [Min(0f)] public float bossReachTrimSeconds;
+    [Tooltip("보스 손 뻗기(상체) 애니 속도 배율(11-17). 1 = 그대로. 0 이하 = 1.")]
+    public float bossReachUpperAnimSpeed = 1f;
+    [Tooltip("보스 걷기(하체) 애니 속도 배율(11-17). 1 = 그대로 — 앞으로 가는 속도도 같이(발 맞춤 = 설정 SO 걷기 발 속도 × 이 값). 0 이하 = 1.")]
+    public float bossReachWalkAnimSpeed = 1f;
     [Tooltip("보스 정지(초) — 보스 배율 0. 0 = 끔.")]
     [Min(0f)] public float bossFreezeTime;
     [Tooltip("보스 슬로우(초) — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End).")]
@@ -258,7 +265,7 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.FinisherStart => finisherStartTime,
         BossVictoryMarker.SlowStart => slowStartTime,
         BossVictoryMarker.BossHitAnim => bossHitAnimTime,
-        BossVictoryMarker.BossDashPrepAnim => bossDashPrepTime,
+        BossVictoryMarker.BossReachAnim => bossReachTime,
         BossVictoryMarker.BossFreeze => bossFreezeTime,
         BossVictoryMarker.BossSlow => bossSlowTime,
         BossVictoryMarker.ChargeStart => ChargeStartTime,
@@ -281,7 +288,7 @@ public sealed class BossVictoryTimeline
             case BossVictoryMarker.FinisherStart: finisherStartTime = time; break;
             case BossVictoryMarker.SlowStart: slowStartTime = time; break;
             case BossVictoryMarker.BossHitAnim: bossHitAnimTime = time; break;
-            case BossVictoryMarker.BossDashPrepAnim: bossDashPrepTime = time; break;
+            case BossVictoryMarker.BossReachAnim: bossReachTime = time; break;
             case BossVictoryMarker.BossFreeze: bossFreezeTime = time; break;
             case BossVictoryMarker.BossSlow: bossSlowTime = time; break;
             case BossVictoryMarker.ChargeStart: chargeStartTime = time; break;
@@ -352,7 +359,7 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.FinisherStart => "스킬 연출 시작",
         BossVictoryMarker.SlowStart => "느려짐 시작",
         BossVictoryMarker.BossHitAnim => "보스 피격 애니 시작",
-        BossVictoryMarker.BossDashPrepAnim => "보스 돌진 준비 애니 시작",
+        BossVictoryMarker.BossReachAnim => "보스 손 뻗기·걷기 시작",
         BossVictoryMarker.BossFreeze => "보스 정지",
         BossVictoryMarker.BossSlow => "보스 슬로우",
         BossVictoryMarker.ChargeStart => "거너 Q 차징 시작",
@@ -521,19 +528,22 @@ public sealed class BossVictoryTimeline
         marker is BossVictoryMarker.ChargeStart or BossVictoryMarker.GunnerStage1 or BossVictoryMarker.GunnerStage2
             or BossVictoryMarker.GunnerStage3 or BossVictoryMarker.GunnerFire;
 
-    /// <summary>0 이 '끔'인 마커인가(느려짐 시작·보스 정지·보스 슬로우·보스 돌진 준비 애니). 나머지는 0 = 처치 순간.</summary>
+    /// <summary>0 이 '끔'인 마커인가(느려짐 시작·보스 정지·보스 슬로우·보스 손 뻗기·걷기). 나머지는 0 = 처치 순간.</summary>
     public static bool ZeroMeansOff(BossVictoryMarker marker) =>
-        marker is BossVictoryMarker.SlowStart or BossVictoryMarker.BossFreeze or BossVictoryMarker.BossSlow or BossVictoryMarker.BossDashPrepAnim;
+        marker is BossVictoryMarker.SlowStart or BossVictoryMarker.BossFreeze or BossVictoryMarker.BossSlow or BossVictoryMarker.BossReachAnim;
 
     /// <summary>보스 노드 시각(<see cref="BossVictoryBossTimeScale.Scale"/> 입력). <paramref name="hasHitAnim"/> = 설정 SO 피격 애니 상태 이름이 있다.</summary>
     /// <summary>보스 노드. <paramref name="trimAt"/> = 피격 애니가 자른 끝에 닿은 글리치 시각(아직·안 자름이면 음수, 255 후속 10).</summary>
-    /// <summary><paramref name="hasDashPrep"/> = 설정 SO 돌진 준비 상태 이름이 있다 · <paramref name="dashTrimAt"/> = 돌진 준비 애니가 자른 끝에 닿은 시각(아직·안 자름이면 음수, 11-17).</summary>
-    public BossVictoryBossTimeScale.Nodes BossNodes(bool hasHitAnim, float trimAt = -1f, bool hasDashPrep = false, float dashTrimAt = -1f) => new BossVictoryBossTimeScale.Nodes
+    /// <summary><paramref name="hasReach"/> = 설정 SO 손 뻗기 상체 상태 이름이 있다(11-17). 손 뻗기 끝 자르기는 상체 레이어만 멈춰 보스 배율 노드가 아니다.</summary>
+    /// <summary>손 뻗기(상체) 애니 속도 배율 — 0 이하 = 1(옛 데이터).</summary>
+    public float ReachUpperAnimSpeed => bossReachUpperAnimSpeed > 0f ? bossReachUpperAnimSpeed : 1f;
+    /// <summary>걷기(하체) 애니 속도 배율 — 0 이하 = 1(옛 데이터).</summary>
+    public float ReachWalkAnimSpeed => bossReachWalkAnimSpeed > 0f ? bossReachWalkAnimSpeed : 1f;
+
+    public BossVictoryBossTimeScale.Nodes BossNodes(bool hasHitAnim, float trimAt = -1f, bool hasReach = false) => new BossVictoryBossTimeScale.Nodes
     {
-        HasDashPrep = hasDashPrep && bossDashPrepTime > 0f,
-        DashPrepAt = bossDashPrepTime,
-        DashTrimmed = dashTrimAt >= 0f,
-        DashTrimAt = dashTrimAt,
+        HasReach = hasReach && bossReachTime > 0f,
+        ReachAt = bossReachTime,
         HasHitAnim = hasHitAnim,
         Trimmed = trimAt >= 0f,
         TrimAt = trimAt,
@@ -611,7 +621,12 @@ public sealed class BossVictoryTimeline
         SetMarkerTime(marker, src.MarkerTime(marker));
         if (marker == BossVictoryMarker.FinisherStart) finisherTrimSeconds = src.finisherTrimSeconds;
         else if (marker == BossVictoryMarker.BossHitAnim) bossHitTrimSeconds = src.bossHitTrimSeconds;
-        else if (marker == BossVictoryMarker.BossDashPrepAnim) bossDashPrepTrimSeconds = src.bossDashPrepTrimSeconds;
+        else if (marker == BossVictoryMarker.BossReachAnim)
+        {
+            bossReachTrimSeconds = src.bossReachTrimSeconds;
+            bossReachUpperAnimSpeed = src.bossReachUpperAnimSpeed;
+            bossReachWalkAnimSpeed = src.bossReachWalkAnimSpeed;
+        }
     }
 
     /// <summary>

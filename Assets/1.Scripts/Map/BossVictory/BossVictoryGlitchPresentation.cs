@@ -134,7 +134,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     public static bool TimelineClockLog;
     double _realStartAt;     // 처치 순간의 실제 시각(realtimeSinceStartup) — 시작 경과만큼 앞으로 당김
     float _clockLogPrevT = -1f;
-    string _finisherTimingKey, _bossTimingKey, _bossDashTimingKey;
+    string _finisherTimingKey, _bossTimingKey, _bossReachTimingKey;
 
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
     void ClockLog(string what)
@@ -192,24 +192,24 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (_bossTimingKey == null) { _bossTimingKey = BossVictoryClipTiming.Key(true, bc.name); BossVictoryClipTiming.BeginRun(_bossTimingKey); }
             BossVictoryClipTiming.Record(_bossTimingKey, _glitchTime - tl.bossHitAnimTime, bt);
         }
-        if (_bossDashPlayed && _bossDashAnimators.Count > 0 && SampleState(_bossDashAnimators[0], Animator.StringToHash(_settings.bossDashPrepStateName), out AnimationClip dc, out float dt))
+        if (_bossReachPlayed && _bossReachAnimators.Count > 0 && SampleState(_bossReachAnimators[0], Animator.StringToHash(_settings.bossReachUpperState), out AnimationClip dc, out float dt, _bossReachLayers[0]))
         {
-            if (_bossDashTimingKey == null) { _bossDashTimingKey = BossVictoryClipTiming.Key(true, dc.name); BossVictoryClipTiming.BeginRun(_bossDashTimingKey); }
-            BossVictoryClipTiming.Record(_bossDashTimingKey, _glitchTime - tl.bossDashPrepTime, dt);
+            if (_bossReachTimingKey == null) { _bossReachTimingKey = BossVictoryClipTiming.Key(true, dc.name); BossVictoryClipTiming.BeginRun(_bossReachTimingKey); }
+            BossVictoryClipTiming.Record(_bossReachTimingKey, _glitchTime - tl.bossReachTime, dt);
         }
 #endif
     }
 
     static readonly List<AnimatorClipInfo> s_sampleClips = new List<AnimatorClipInfo>(2);
 
-    static bool SampleState(Animator a, int stateHash, out AnimationClip clip, out float clipTime)
+    static bool SampleState(Animator a, int stateHash, out AnimationClip clip, out float clipTime, int layer = 0)
     {
         clip = null;
         clipTime = 0f;
-        if (a == null || !a.isActiveAndEnabled || a.IsInTransition(0)) return false;
-        AnimatorStateInfo info = a.GetCurrentAnimatorStateInfo(0);
+        if (a == null || !a.isActiveAndEnabled || a.IsInTransition(layer)) return false;
+        AnimatorStateInfo info = a.GetCurrentAnimatorStateInfo(layer);
         if (info.shortNameHash != stateHash) return false;
-        a.GetCurrentAnimatorClipInfo(0, s_sampleClips);
+        a.GetCurrentAnimatorClipInfo(layer, s_sampleClips);
         if (s_sampleClips.Count == 0 || s_sampleClips[0].clip == null) return false;
         clip = s_sampleClips[0].clip;
         clipTime = Mathf.Min(info.normalizedTime, 1f) * clip.length;
@@ -228,10 +228,18 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     readonly List<Animator> _bossHitAnimators = new List<Animator>();   // 피격 애니를 튼 보스 Animator 중 사망 트리거 파라미터가 있는 것
     readonly List<Animator> _bossPlayedAnimators = new List<Animator>();   // 피격 애니를 튼 보스 Animator 전부(끝 자르기 판정, 255 후속 10)
     float _bossTrimAt = -1f;   // 피격 애니가 자른 끝에 닿은 글리치 시각(아직이면 -1) — 보스 배율 규칙의 한 노드
-    // 돌진 준비 애니(11-17) — 피격 애니와 같은 방식의 독립 노드.
-    bool _bossDashPlayed;
-    readonly List<Animator> _bossDashAnimators = new List<Animator>();   // 돌진 준비 애니를 튼 보스 Animator 전부(끝 자르기 판정)
-    float _bossDashTrimAt = -1f;
+    // 손 뻗기·걷기(11-17) — 상체 레이어 손 뻗기 + 0층 걷기, 피격 애니와 같은 방식의 독립 노드.
+    bool _bossReachPlayed;
+    readonly List<Animator> _bossReachAnimators = new List<Animator>();   // 상체 손 뻗기를 튼 보스 Animator(끝 자르기·가중치)
+    readonly List<int> _bossReachLayers = new List<int>();                // 그 Animator 의 상체 레이어 번호(같은 순서)
+    readonly List<Animator> _bossWalkAnimators = new List<Animator>();    // 하체 걷기를 튼 보스 Animator
+    Transform _bossWalkModel;          // 앞으로 미는 보스 모델(걷기 Animator 의 오브젝트 — 루트 직속 자식, 23호 점프 상승과 같은 방식)
+    Vector3 _bossWalkModelHome;        // 그 localPosition 원래 값
+    Vector3 _bossWalkOffset;           // 걸은 거리(월드) — 보스 위치를 읽는 연출(컷 기준·레이저 통과점 등)이 BossPos 로 따라간다
+
+    /// <summary>[이 피어] 연출이 쓰는 보스 위치 — 복제된 루트 + 손 뻗기·걷기로 걸은 거리(11-17, 모든 피어 같은 시계라 같은 값).</summary>
+    Vector3 BossPos => _boss != null ? _boss.transform.position + _bossWalkOffset : _bossWalkOffset;
+    float _bossReachTrimAt = -1f;
 
     /// <summary>[이 피어] 지금 보스(연출 중이 아니면 null) — 타임라인 창이 실제 보스의 피격 애니 클립 길이를 보여 준다.</summary>
     public GameObject BossObject => _running ? _boss : null;
@@ -332,11 +340,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     /// <summary>[이 피어] 보스 시간 배율 — 서버(호스트)의 사망 표현 대기도 이 값으로 흐른다(<see cref="BossEncounterDirector.VictoryDeathTimeScaleFor"/>).</summary>
     public float BossTimeScale => _running && _profile != null
-        ? BossVictoryBossTimeScale.Scale(_profile.timeline.BossNodes(HasBossHitAnim, _bossTrimAt, HasBossDashPrep, _bossDashTrimAt), _killerSlowAt, _profile.bossAfterFinisherScale, _glitchTime)
+        ? BossVictoryBossTimeScale.Scale(_profile.timeline.BossNodes(HasBossHitAnim, _bossTrimAt, HasBossReach), _killerSlowAt, _profile.bossAfterFinisherScale, _glitchTime)
         : 1f;
 
     bool HasBossHitAnim => !string.IsNullOrEmpty(_settings.bossHitStateName);
-    bool HasBossDashPrep => !string.IsNullOrEmpty(_settings.bossDashPrepStateName);
+    bool HasBossReach => !string.IsNullOrEmpty(_settings.bossReachUpperState);
 
     void Awake()
     {
@@ -389,9 +397,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _bossHitPlayed = false;
         _bossTrimAt = -1f;
         _bossPlayedAnimators.Clear();
-        _bossDashPlayed = false;
-        _bossDashTrimAt = -1f;
-        _bossDashAnimators.Clear();
+        ReleaseBossReach();
+        _bossReachPlayed = false;
+        _bossReachTrimAt = -1f;
         _bossEffectRate = -1f;
         _bossHitAnimators.Clear();
         _finisherWarned = false;
@@ -408,7 +416,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _dashAnimScale = -1f;
         _dashMoveMotor = null;
         _dashPierce = null;
-        _finisherTimingKey = _bossTimingKey = _bossDashTimingKey = null;
+        _finisherTimingKey = _bossTimingKey = _bossReachTimingKey = null;
         _clockLogPrevT = -1f;
 
         PlayerLifeInputPolicy.SetVictoryInputHeld(true);
@@ -440,7 +448,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         // 처치자 이동(272) — 후퇴 차징의 가까움 판정은 처치 순간 이 피어 화면 위치로 한 번(새 복제 값 없음 — 문턱 근처면 피어마다 갈릴 수 있다, 문서 §272 한계).
         _move = _profile.killerMove;
         _tooClose = _move == BossVictoryKillerMove.RetreatCharge && _killer != null && _boss != null &&
-                    BossVictoryKillerMoves.IsTooClose(_killer.transform.position, _boss.transform.position, _profile.retreatDistance);
+                    BossVictoryKillerMoves.IsTooClose(_killer.transform.position, BossPos, _profile.retreatDistance);
 
         int cleared = ClearEffectsLocal();
         BeginKillerSword();   // 소거 뒤 — 처치자 검 번개·크기(269, 팔라딘만)
@@ -634,7 +642,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             Edit.LogWarning($"[BossVictory] 후퇴 스킬이 없다 — {_killer.name} 칸 {_profile.retreatSkillSlot}. 백대쉬만 한다.", this);
             return;
         }
-        Vector3 dir = _boss != null ? _boss.transform.position - _killer.transform.position : _killer.transform.forward;
+        Vector3 dir = _boss != null ? BossPos - _killer.transform.position : _killer.transform.forward;
         dir.y = 0f;
         _killerSkills.PlayPresentationOnly(skill, dir);   // 냉기는 정면(보스 쪽), 몸은 백대쉬로 반대쪽
         Edit.Log($"[BossVictory] 후퇴 스킬 — {_killer.name} {_profile.retreatSkillSlot} {skill.Data.AnimatorStateName} + 백대쉬 (글리치 t {_glitchTime:0.00})", this);
@@ -646,16 +654,16 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         BossVictoryGunnerCharge.Times times = BossVictoryGunnerCharge.From(_profile.timeline);
         BossVictoryGunnerCharge.Frame f = BossVictoryGunnerCharge.Evaluate(times, _profile.gunnerQ, _glitchTime);
-        Vector3 dir = _boss != null ? _boss.transform.position - _killer.transform.position : _killer.transform.forward;
+        Vector3 dir = _boss != null ? BossPos - _killer.transform.position : _killer.transform.forward;
         // 301 — 통과 지점(보스 기준 오프셋 → 월드, 보스 위치·회전 = 복제값 → 모든 피어 같음). 끄면 null = 수평(지금).
         Vector3? pass = null;
         if (_profile.gunnerQ.useBeamPassPoint && _boss != null)
-            pass = BossVictoryKillerMoves.BossPoint(_boss.transform.position, _boss.transform.rotation, _profile.gunnerQ.beamPassPoint);
+            pass = BossVictoryKillerMoves.BossPoint(BossPos, _boss.transform.rotation, _profile.gunnerQ.beamPassPoint);
         _gunnerBeam.SetVictoryFrame(f, dir, pass);
         // 301 — 반동 밀림(등속): 발사 순간 레이저 반대쪽(수평)을 정하고, 진행 비율만 넘겨 FixedUpdate 가 오너를 옮긴다(다른 피어 = 위치 복제).
         if (f.Fired && !_gunnerRecoilDirSet)
         {
-            Vector3 aim = (pass ?? (_boss != null ? _boss.transform.position : _killer.transform.position + _killer.transform.forward)) - _killer.transform.position;
+            Vector3 aim = (pass ?? (_boss != null ? BossPos : _killer.transform.position + _killer.transform.forward)) - _killer.transform.position;
             aim.y = 0f;
             _gunnerRecoilDir = aim.sqrMagnitude > 1e-6f ? -aim.normalized : -_killer.transform.forward;
             _gunnerRecoilDirSet = true;
@@ -913,7 +921,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _dashStarted = true;
         _dashMotionOnly = motionOnly;
         Vector3 killerPos = _killer.transform.position;
-        _dashDir = BossVictoryBackDash.Direction(killerPos, _boss != null ? _boss.transform.position : killerPos, _killer.transform.forward, _profile.backDashAngle);
+        _dashDir = BossVictoryBackDash.Direction(killerPos, _boss != null ? BossPos : killerPos, _killer.transform.forward, _profile.backDashAngle);
         _dashEase ??= u => BossVictoryCameraCuts.Evaluate(_profile.backDashEase, u);
         _dashStartAt = Time.timeAsDouble;
         _dashDone = 0f;
@@ -967,7 +975,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
         WarnIfNoEndEvent(skill);
 
-        Vector3 dir = _boss != null ? _boss.transform.position - _killer.transform.position : _killer.transform.forward;
+        Vector3 dir = _boss != null ? BossPos - _killer.transform.position : _killer.transform.forward;
         dir.y = 0f;
         // 후퇴 차징(272·294) — 거너 Q 3단계 차징·큰 레이저를 타임라인 '거너 Q' 마커로(TickGunnerQ 가 매 프레임). 표시 재생(OnClientPlay 평소 충전)보다 먼저. 정리 때 끈다.
         _gunnerBeam = null;
@@ -1067,14 +1075,17 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void TickBoss()
     {
         if (_boss == null) return;
-        BossVictoryBossTimeScale.Nodes playNodes = _profile.timeline.BossNodes(HasBossHitAnim, -1f, HasBossDashPrep);
-        // 돌진 준비(11-17)를 먼저 — 같은 프레임에 둘 다 지나면 피격 애니가 뒤에 틀어 이긴다(배율 규칙과 같음).
-        if (!_bossDashPlayed && BossVictoryBossTimeScale.ShouldPlayDashPrep(playNodes, _glitchTime))
-            PlayBossDashPrep();
+        BossVictoryBossTimeScale.Nodes playNodes = _profile.timeline.BossNodes(HasBossHitAnim, -1f, HasBossReach);
+        // 손 뻗기·걷기(11-17)를 먼저 — 같은 프레임에 둘 다 지나면 피격 애니가 뒤에 틀어 이긴다(배율 규칙과 같음).
+        if (!_bossReachPlayed && BossVictoryBossTimeScale.ShouldPlayReach(playNodes, _glitchTime))
+            PlayBossReach();
         if (!_bossHitPlayed && BossVictoryBossTimeScale.ShouldPlayHitAnim(playNodes, _glitchTime))
             PlayBossHitAnim();
-        if (_bossHitPlayed && _bossTrimAt < 0f) TickBossHitTrim();
-        if (_bossDashPlayed && _bossDashTrimAt < 0f) TickBossDashTrim();
+        // 손 뻗기가 피격 애니보다 늦게 시작했으면(이김) 피격 애니 끝 자르기는 안 본다 — 걷기 크로스페이드 중 피격 상태로 되돌리고 보스를 멈추는 것 방지.
+        bool reachWins = _bossReachPlayed && _profile.timeline.bossReachTime > _profile.timeline.bossHitAnimTime;
+        if (_bossHitPlayed && _bossTrimAt < 0f && !reachWins) TickBossHitTrim();
+        if (_bossReachPlayed && _bossReachTrimAt < 0f) TickBossReachTrim();
+        TickBossReachWeight();
         // 처치 순간 서버 사망 상태가 건 사망 트리거(AnyState→Death)가 피격 애니를 빼앗지 않게 — 사망 상태 복제가 늦게 와도 매 프레임 비운다.
         for (int i = 0; i < _bossHitAnimators.Count; i++)
             if (_bossHitAnimators[i] != null) _bossHitAnimators[i].ResetTrigger(_bossDeathTrigger);
@@ -1093,18 +1104,124 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         PlayBossState(_settings.bossHitStateName, _settings.bossHitFadeSeconds, _bossPlayedAnimators, "피격 애니", "bossHitStateName");
     }
 
-    // 돌진 준비 애니(11-17) — 설정 SO 상태(23호 DashPrep)를 처음부터. 피격 애니와 같은 방식(사망 트리거 비우기 목록도 공유).
-    void PlayBossDashPrep()
+    // 손 뻗기·걷기(11-17) — 하체 = 0층 걷기(피격 애니와 같은 길, 사망 트리거 비우기 목록 공유), 상체 = 상체 레이어 손 뻗기(가중치는 TickBossReachWeight).
+    void PlayBossReach()
     {
-        _bossDashPlayed = true;
-        ClockLog($"보스 돌진 준비 애니 시작 {_profile.timeline.bossDashPrepTime:0.000}s '{_settings.bossDashPrepStateName}'");
-        PlayBossState(_settings.bossDashPrepStateName, _settings.bossDashPrepFadeSeconds, _bossDashAnimators, "돌진 준비 애니", "bossDashPrepStateName");
+        _bossReachPlayed = true;
+        ClockLog($"보스 손 뻗기·걷기 시작 {_profile.timeline.bossReachTime:0.000}s 상체 '{_settings.bossReachUpperState}' · 하체 '{_settings.bossReachLowerState}'");
+        if (!string.IsNullOrEmpty(_settings.bossReachLowerState))
+            PlayBossState(_settings.bossReachLowerState, _settings.bossReachFadeSeconds, _bossWalkAnimators, "손 뻗기 하체(걷기)", "bossReachLowerState");
+        for (int i = 0; i < _bossWalkAnimators.Count; i++)
+            SetFloatIfAny(_bossWalkAnimators[i], _settings.bossReachWalkSpeedParam, _profile.timeline.ReachWalkAnimSpeed);
+        BeginBossWalkMove();
+        _bossDeathTrigger = DeathTriggerOf(_boss);
+        int hash = Animator.StringToHash(_settings.bossReachUpperState);
+        for (int i = 0; i < _animators.Count; i++)
+        {
+            Animator a = _animators[i];
+            if (_animatorRoles[i] != Role.Boss || a == null || !a.isActiveAndEnabled || a.runtimeAnimatorController == null) continue;
+            int layer = a.GetLayerIndex(_settings.bossReachUpperLayer);
+            if (layer <= 0 || !a.HasState(layer, hash)) continue;
+            SetReachUpperSpeed(a, _profile.timeline.ReachUpperAnimSpeed);
+            a.Play(hash, layer, 0f);
+            a.SetLayerWeight(layer, 0f);   // 0→1 은 TickBossReachWeight
+            _bossReachAnimators.Add(a);
+            _bossReachLayers.Add(layer);
+            if (!string.IsNullOrEmpty(_bossDeathTrigger) && HasTrigger(a, _bossDeathTrigger) && !_bossHitAnimators.Contains(a)) _bossHitAnimators.Add(a);
+        }
+        if (_bossReachAnimators.Count == 0)
+            Edit.LogWarning($"[BossVictory] 보스 손 뻗기 상체 레이어 '{_settings.bossReachUpperLayer}'·상태 '{_settings.bossReachUpperState}' 가 보스 Animator 에 없다 — 상체는 안 튼다(저작 메뉴 'Tools/Boss Victory/보스 손 뻗기·걷기 레이어 만들기').", this);
+        else
+            Edit.Log($"[BossVictory] 보스 손 뻗기 상체 '{_settings.bossReachUpperState}' (글리치 t {_glitchTime:0.00})", this);
     }
+
+    // 상체 레이어 가중치 — 손 뻗기 시작부터 0→1, 뒤(같은 시각 포함)에 피격 애니가 오면 1→0(BossVictoryReachRig.UpperWeight).
+    void TickBossReachWeight()
+    {
+        if (_bossReachAnimators.Count == 0) return;
+        BossVictoryTimeline tl = _profile.timeline;
+        float w = BossVictoryReachRig.UpperWeight(_glitchTime, _bossReachPlayed, tl.bossReachTime, _settings.bossReachFadeSeconds, _bossHitPlayed, tl.bossHitAnimTime, _settings.bossHitFadeSeconds);
+        for (int i = 0; i < _bossReachAnimators.Count; i++)
+            if (_bossReachAnimators[i] != null) _bossReachAnimators[i].SetLayerWeight(_bossReachLayers[i], w);
+    }
+
+    // 연출 끝·다시 시작 — 상체 레이어 가중치 0·속도 1(게임 중 팔을 덮지 않게).
+    void ReleaseBossReach()
+    {
+        for (int i = 0; i < _bossReachAnimators.Count; i++)
+        {
+            Animator a = _bossReachAnimators[i];
+            if (a == null) continue;
+            a.SetLayerWeight(_bossReachLayers[i], 0f);
+            SetReachUpperSpeed(a, 1f);
+        }
+        for (int i = 0; i < _bossWalkAnimators.Count; i++)
+            if (_bossWalkAnimators[i] != null && _settings != null) SetFloatIfAny(_bossWalkAnimators[i], _settings.bossReachWalkSpeedParam, 1f);
+        if (_bossWalkModel != null) _bossWalkModel.localPosition = _bossWalkModelHome;
+        _bossWalkModel = null;
+        _bossWalkOffset = Vector3.zero;
+        _bossReachAnimators.Clear();
+        _bossReachLayers.Clear();
+        _bossWalkAnimators.Clear();
+    }
+
+    void SetReachUpperSpeed(Animator a, float speed) => SetFloatIfAny(a, _settings != null ? _settings.bossReachUpperSpeedParam : null, speed);
+
+    static void SetFloatIfAny(Animator a, string param, float value)
+    {
+        if (a == null || string.IsNullOrEmpty(param)) return;
+        foreach (AnimatorControllerParameter p in a.parameters)
+            if (p.type == AnimatorControllerParameterType.Float && p.name == param) { a.SetFloat(param, value); return; }
+    }
+
+    // 걷기 앞으로(11-17) — 보스 루트는 서버 권한 NetworkTransform 이라 건드리지 않고, 각 피어가 걷기 Animator 의 오브젝트(모델)를 자기 Animator 시계로 민다(새 RPC 없음).
+    void BeginBossWalkMove()
+    {
+        if (_bossWalkModel != null || _bossWalkAnimators.Count == 0 || _bossWalkAnimators[0] == null) return;
+        Transform model = _bossWalkAnimators[0].transform;
+        if (model == _boss.transform || model.parent == null) return;   // Animator 가 루트에 있으면 못 민다
+        _bossWalkModel = model;
+        _bossWalkModelHome = model.localPosition;
+        _bossWalkOffset = Vector3.zero;
+    }
+
+    // 애니 평가 뒤(LateUpdate) — 이동 = 발 속도 × 걷기 상태 속도 × Animator.speed(보스 배율) × 크기 × 걷기 상태 가중치(크로스페이드) × dt. 앞 = 모델 수평 정면.
+    void TickBossWalkMove()
+    {
+        if (_bossWalkModel == null || _bossWalkAnimators.Count == 0) return;
+        Animator a = _bossWalkAnimators[0];
+        if (a == null || !a.isActiveAndEnabled) return;
+        float weight = StateWeight(a, Animator.StringToHash(_settings.bossReachLowerState));
+        if (weight > 0f)
+        {
+            Vector3 fwd = _bossWalkModel.forward;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude > 1e-6f)
+            {
+                float speed = _settings.bossReachWalkGroundSpeed * _profile.timeline.ReachWalkAnimSpeed * a.speed * _bossWalkModel.lossyScale.z;
+                _bossWalkOffset += fwd.normalized * (speed * weight * Time.deltaTime);
+            }
+        }
+        _bossWalkModel.localPosition = _bossWalkModelHome + _bossWalkModel.parent.InverseTransformVector(_bossWalkOffset);
+    }
+
+    // 0층에서 그 상태의 비중 — 지금 상태 1 · 들어가는 전이 = 전이 비율 · 나가는 전이 = 1 - 비율 · 아니면 0.
+    static float StateWeight(Animator a, int hash)
+    {
+        if (!a.IsInTransition(0)) return a.GetCurrentAnimatorStateInfo(0).shortNameHash == hash ? 1f : 0f;
+        float t = Mathf.Clamp01(a.GetAnimatorTransitionInfo(0).normalizedTime);
+        if (a.GetNextAnimatorStateInfo(0).shortNameHash == hash) return t;
+        if (a.GetCurrentAnimatorStateInfo(0).shortNameHash == hash) return 1f - t;
+        return 0f;
+    }
+
+    static string DeathTriggerOf(GameObject boss) =>
+        boss != null && boss.TryGetComponent(out MonsterBase monster) && monster.MonsterData != null ? monster.MonsterData.deathTrigger : null;
 
     void PlayBossState(string state, float fade, List<Animator> playedInto, string what, string settingName)
     {
         int hash = Animator.StringToHash(state);
-        _bossDeathTrigger = _boss.TryGetComponent(out MonsterBase monster) && monster.MonsterData != null ? monster.MonsterData.deathTrigger : null;
+        _bossDeathTrigger = DeathTriggerOf(_boss);
         int played = 0;
         for (int i = 0; i < _animators.Count; i++)
         {
@@ -1138,19 +1255,21 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
     }
 
-    // 돌진 준비 애니 끝 자르기(11-17) — 피격 애니 끝 자르기와 같은 규칙.
-    void TickBossDashTrim()
+    // 손 뻗기 끝 자르기(11-17) — 상체 클립이 자른 프레임에 닿으면 상체 상태 속도 0(손만 그 자세), 다리는 계속 걷는다. 보스 배율은 안 건드림.
+    void TickBossReachTrim()
     {
-        float trim = _profile.timeline.bossDashPrepTrimSeconds;
+        float trim = _profile.timeline.bossReachTrimSeconds;
         if (trim <= 0f) return;
-        int hash = Animator.StringToHash(_settings.bossDashPrepStateName);
-        for (int i = 0; i < _bossDashAnimators.Count; i++)
+        int hash = Animator.StringToHash(_settings.bossReachUpperState);
+        for (int i = 0; i < _bossReachAnimators.Count; i++)
         {
-            if (!BossVictoryAnimTrim.TryReachTrim(_bossDashAnimators[i], hash, trim, out AnimationClip clip)) continue;
-            _bossDashTrimAt = _glitchTime;
-            ClockLog($"보스 돌진 준비 애니 끝 자르기 도달(클립 {trim:0.000}s)");
-            Edit.Log($"[BossVictory] 보스 돌진 준비 애니 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, clip.frameRate)}({clip.name}) 에서 정지 (글리치 t {_glitchTime:0.00})", this);
-            return;
+            Animator a = _bossReachAnimators[i];
+            if (!BossVictoryAnimTrim.TryReachTrim(a, hash, trim, out AnimationClip clip, _bossReachLayers[i])) continue;
+            SetReachUpperSpeed(a, 0f);
+            if (_bossReachTrimAt >= 0f) continue;
+            _bossReachTrimAt = _glitchTime;
+            ClockLog($"보스 손 뻗기 끝 자르기 도달(클립 {trim:0.000}s)");
+            Edit.Log($"[BossVictory] 보스 손 뻗기 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, clip.frameRate)}({clip.name}) 에서 손만 정지 (글리치 t {_glitchTime:0.00})", this);
         }
     }
 
@@ -1336,6 +1455,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     // 매 프레임 렌더러를 켜는 표시(오너 조준 쿼드 — PlayerAimIndicator.LateUpdate)가 있어 기본 순서 LateUpdate 뒤(10001)에 다시 끈다.
     void LateUpdate()
     {
+        if (_running) TickBossWalkMove();
         for (int i = 0; i < _hiddenOtherRenderers.Count; i++)
         {
             Renderer r = _hiddenOtherRenderers[i];
@@ -1567,7 +1687,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         var s = new BossVictoryCameraCuts.Subjects();
         s.Killer = _killer != null ? _killer.transform.position : _state.HitPoint;
-        s.BossBase = _boss != null ? _boss.transform.position : _state.HitPoint;
+        s.BossBase = _boss != null ? BossPos : _state.HitPoint;
         s.BossForward = _boss != null ? _boss.transform.forward : Vector3.forward;   // 기준 '보스 정면'(297) — 순간이동 두 점과 같은 보스 회전(복제값)
         Transform weapon = KillerWeapon();
         s.HasWeapon = weapon != null;
@@ -1726,7 +1846,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         height = 1f;
         Camera cam = Camera.main;
         if (cam == null || _boss == null) return;
-        Bounds b = new Bounds(_boss.transform.position, Vector3.zero);
+        Bounds b = new Bounds(BossPos, Vector3.zero);
         foreach (Renderer r in _boss.GetComponentsInChildren<Renderer>())
             if (r != null && !(r is ParticleSystemRenderer)) b.Encapsulate(r.bounds);
         Vector3 top = cam.WorldToViewportPoint(b.center + Vector3.up * b.extents.y);
@@ -1833,7 +1953,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerFrozen = false;
         _bossHitAnimators.Clear();
         _bossPlayedAnimators.Clear();
-        _bossDashAnimators.Clear();
+        ReleaseBossReach();
         EndDash();
         ReleaseDashMotor();
         _dashOn = false;

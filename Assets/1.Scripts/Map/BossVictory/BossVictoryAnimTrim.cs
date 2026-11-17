@@ -56,22 +56,22 @@ public static class BossVictoryAnimTrim
     static readonly List<AnimatorClipInfo> s_clips = new List<AnimatorClipInfo>(2);
 
     /// <summary>
-    /// [이 피어] 0층이 <paramref name="stateHash"/>(짧은 이름 해시) 상태를 재생 중이고 클립 시간이 <paramref name="trim"/> 에 닿았으면 그 프레임으로 맞추고 true —
+    /// [이 피어] <paramref name="layer"/>층(기본 0)이 <paramref name="stateHash"/>(짧은 이름 해시) 상태를 재생 중이고 클립 시간이 <paramref name="trim"/> 에 닿았으면 그 프레임으로 맞추고 true —
     /// 멈춤(배율 0)은 부른 쪽이 건다. 그 상태로 넘어가는 전이 중이면 다음 상태를 본다. <paramref name="clip"/> = 그 상태 클립(못 찾으면 null).
     /// </summary>
-    public static bool TryReachTrim(Animator animator, int stateHash, float trim, out AnimationClip clip)
+    public static bool TryReachTrim(Animator animator, int stateHash, float trim, out AnimationClip clip, int layer = 0)
     {
         clip = null;
         if (animator == null || !animator.isActiveAndEnabled || trim <= 0f || stateHash == 0) return false;
-        bool next = animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).shortNameHash == stateHash;
-        AnimatorStateInfo info = next ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
+        bool next = animator.IsInTransition(layer) && animator.GetNextAnimatorStateInfo(layer).shortNameHash == stateHash;
+        AnimatorStateInfo info = next ? animator.GetNextAnimatorStateInfo(layer) : animator.GetCurrentAnimatorStateInfo(layer);
         if (info.shortNameHash != stateHash) return false;
-        if (next) animator.GetNextAnimatorClipInfo(0, s_clips);
-        else animator.GetCurrentAnimatorClipInfo(0, s_clips);
+        if (next) animator.GetNextAnimatorClipInfo(layer, s_clips);
+        else animator.GetCurrentAnimatorClipInfo(layer, s_clips);
         if (s_clips.Count == 0 || s_clips[0].clip == null || s_clips[0].clip.length <= 0f) return false;
         clip = s_clips[0].clip;
         if (!ShouldFreeze(trim, info.normalizedTime * clip.length)) return false;
-        animator.Play(stateHash, 0, Mathf.Clamp01(trim / clip.length));   // 넘친 1프레임 안쪽을 자른 프레임으로 되돌림(뒤로 건너뛰기라 이벤트 없음)
+        animator.Play(stateHash, layer, Mathf.Clamp01(trim / clip.length));   // 넘친 1프레임 안쪽을 자른 프레임으로 되돌림(뒤로 건너뛰기라 이벤트 없음)
         return true;
     }
 }

@@ -33,11 +33,21 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("보스 피격 애니로 넘어가는 CrossFade(초). 0 = 바로.")]
     [Min(0f)] public float bossHitFadeSeconds = 0.05f;
 
-    [Header("보스 돌진 준비 애니(처치 연출 — 타임라인 '보스 돌진 준비 애니 시작' 마커, 11-17)")]
-    [Tooltip("보스 Animator 상태 이름 — 처치 연출에서 처음부터 튼다. 23호 기본 DashPrep. 비우면 노드가 있어도 안 튼다.")]
-    public string bossDashPrepStateName = "DashPrep";
-    [Tooltip("보스 돌진 준비 애니로 넘어가는 CrossFade(초). 0 = 바로.")]
-    [Min(0f)] public float bossDashPrepFadeSeconds = 0.05f;
+    [Header("보스 손 뻗기·걷기(처치 연출 — 타임라인 '보스 손 뻗기·걷기 시작' 마커, 11-17)")]
+    [Tooltip("상체 레이어 이름 — 보스 Animator 의 손 뻗기 전용 레이어(23호 VictoryUpper, 상체 마스크·기본 가중치 0). 연출 동안만 가중치를 올리고 끝나면 0. 저작 메뉴 'Tools/Boss Victory/보스 손 뻗기·걷기 레이어 만들기'.")]
+    public string bossReachUpperLayer = BossVictoryReachRig.UpperLayer;
+    [Tooltip("상체 상태 이름(상체 레이어 안) — 23호 기본 VictoryReach(클립 Boss_23_magneticgrab). 비우면 노드가 있어도 안 튼다.")]
+    public string bossReachUpperState = BossVictoryReachRig.UpperState;
+    [Tooltip("상체 상태 속도 배율 파라미터 — 끝 자르기에서 0 으로 손만 멈춘다(다리는 계속 걷기).")]
+    public string bossReachUpperSpeedParam = BossVictoryReachRig.UpperSpeedParam;
+    [Tooltip("하체 상태 이름(0층) — 23호 기본 VictoryWalk(클립 Boss_23_walk, 반복·제자리). 비우면 하체는 그대로(마지막 자세).")]
+    public string bossReachLowerState = BossVictoryReachRig.LowerState;
+    [Tooltip("하체 상태 속도 배율 파라미터 — 타임라인 걷기 애니 속도(bossReachWalkAnimSpeed)를 넣는다.")]
+    public string bossReachWalkSpeedParam = BossVictoryReachRig.WalkSpeedParam;
+    [Tooltip("걷기 발 속도(m/s, 애니 배율 1) — 디딘 발이 몸 기준 뒤로 가는 속도 = 앞으로 가야 하는 속도(발 미끄럼 없음). 보스 모델을 이 속도 × 걷기 애니 속도 × 보스 배율로 앞으로 민다. 0 = 제자리. 재기 = 저작 메뉴 'Tools/Boss Victory/보스 걷기 발 속도 재기'.")]
+    [Min(0f)] public float bossReachWalkGroundSpeed = BossVictoryReachRig.MeasuredWalkGroundSpeed;
+    [Tooltip("손 뻗기·걷기로 넘어가는 시간(초) — 하체 CrossFade·상체 레이어 가중치 0→1. 0 = 바로.")]
+    [Min(0f)] public float bossReachFadeSeconds = 0.15f;
 
     public enum HideOthersTarget { Teammates, TeammatesAndAttachedEffects }
 

@@ -3,7 +3,7 @@
 /// 처치 순간 0(마지막 피격 자세) → 노드들이 시각 순으로 상태를 바꾸고 <b>시각이 가장 늦은(지난) 노드가 이긴다</b>(같은 시각이면 피격 애니 &lt; 정지 &lt; 슬로우):
 /// '보스 피격 애니 시작'(상태가 있으면) = 1 · 피격 애니 자른 끝에 닿은 순간(255 후속 10) = 0 · '보스 정지'(켜짐) = 0 · '보스 슬로우'(켜짐, 꺼짐이면 처치자 느려짐 순간) = End 후 배율.
 /// 같은 시각이면 피격 애니 &lt; 자른 끝 &lt; 정지 &lt; 슬로우. 자른 끝 뒤에 슬로우가 오면 다시 움직인다(자른 프레임 뒤로).
-/// '보스 돌진 준비 애니 시작'(11-17) = 1 · 그 자른 끝 = 0 — 같은 시각이면 다른 노드보다 먼저(진다). 피격 애니와 겹치면 늦게 시작한 쪽이 이긴다.
+/// '보스 손 뻗기·걷기 시작'(11-17) = 1 — 같은 시각이면 다른 노드보다 먼저(진다). 피격 애니와 겹치면 늦게 시작한 쪽이 이긴다. 그 끝 자르기는 상체 레이어만 멈춰 배율과 무관.
 /// </summary>
 public static class BossVictoryBossTimeScale
 {
@@ -16,10 +16,8 @@ public static class BossVictoryBossTimeScale
         public float SlowAt;
         public bool Trimmed;      // 피격 애니가 자른 끝 프레임에 닿았다(255 후속 10 — 애니 시간이라 런타임이 닿은 순간을 알려 준다)
         public float TrimAt;      // 그 글리치 시각
-        public bool HasDashPrep;  // 돌진 준비 애니(11-17) — 상태 이름이 있고 시각 > 0
-        public float DashPrepAt;
-        public bool DashTrimmed;  // 돌진 준비 애니가 자른 끝 프레임에 닿았다
-        public float DashTrimAt;
+        public bool HasReach;     // 손 뻗기·걷기(11-17) — 상체 상태 이름이 있고 시각 > 0
+        public float ReachAt;
     }
 
     /// <summary>
@@ -29,8 +27,7 @@ public static class BossVictoryBossTimeScale
     {
         float scale = 0f;
         float at = float.NegativeInfinity;
-        if (nodes.HasDashPrep) Apply(nodes.DashPrepAt, 1f, t, ref at, ref scale);   // 같은 시각이면 피격 애니가 이긴다(뒤에 부름)
-        if (nodes.HasDashPrep && nodes.DashTrimmed) Apply(nodes.DashTrimAt, 0f, t, ref at, ref scale);
+        if (nodes.HasReach) Apply(nodes.ReachAt, 1f, t, ref at, ref scale);   // 같은 시각이면 피격 애니가 이긴다(뒤에 부름)
         if (nodes.HasHitAnim) Apply(nodes.HitAt, 1f, t, ref at, ref scale);
         if (nodes.HasHitAnim && nodes.Trimmed) Apply(nodes.TrimAt, 0f, t, ref at, ref scale);
         if (nodes.FreezeAt > 0f) Apply(nodes.FreezeAt, 0f, t, ref at, ref scale);
@@ -42,8 +39,8 @@ public static class BossVictoryBossTimeScale
     /// <summary>피격 애니를 지금 틀 때인가(아직 안 틀었고 상태가 있고 시각이 지났다).</summary>
     public static bool ShouldPlayHitAnim(in Nodes nodes, float t) => nodes.HasHitAnim && t >= nodes.HitAt;
 
-    /// <summary>돌진 준비 애니를 지금 틀 때인가(11-17).</summary>
-    public static bool ShouldPlayDashPrep(in Nodes nodes, float t) => nodes.HasDashPrep && t >= nodes.DashPrepAt;
+    /// <summary>손 뻗기·걷기를 지금 틀 때인가(11-17).</summary>
+    public static bool ShouldPlayReach(in Nodes nodes, float t) => nodes.HasReach && t >= nodes.ReachAt;
 
     // 지난 노드 중 시각이 늦은 쪽(같으면 뒤에 부른 쪽)이 이긴다.
     static void Apply(float nodeAt, float nodeScale, float t, ref float at, ref float scale)
