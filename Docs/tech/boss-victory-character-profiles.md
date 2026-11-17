@@ -250,6 +250,12 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
     - 광원(`BossVictoryBeamLight`): 비율 = 발사부터 `lightInSeconds` 차오름 → 레이저 유지 끝까지 → `lightRecoverSeconds` 돌아옴. ① 씬 조명 `SceneLightDim.Shared` 태양·환경광 × (1 − `lightSceneDim`×비율)(간파 암순응과 곱) ② 런타임 전역 Volume(우선순위 125) ColorAdjustments.contrast = `lightContrast`, 가중치 = 비율 ③ 레이저를 `beamLightCount` 등분한 칸 가운데 포인트 라이트(레이저 색 = 덮어쓰기 색 또는 한계 돌파 색). 정리 때 배율 반납·Volume·라이트 파괴.
     - 반동: 발사부터 `recoilSeconds` 동안 등속으로 `recoilDistance` m, 방향 = 발사 순간 레이저 반대쪽(수평). 오너만 `PlayerMotor.AddGroundedDisplacement`(FixedUpdate, 벽에서 멈춤 — 백대쉬와 같은 길, 겹치면 더해짐), 다른 피어는 위치 복제.
     - 테스트 `BossVictoryGunnerBeamFxTests`.
+  - **처치 연출 전용 레이저 이펙트(302)** — 프로필 `gunnerQ.victoryBeamPrefab`(기본 비움 = 기존 `FX_GunnerQBeam` 경로 그대로)·`victoryBeamFreeze`(기본 꺼짐 = 루프). 이펙트 모양은 은희가 저작, 폴더 = `Assets/5.VFX/BossVictory/Gunner/`(git — 다른 캐릭터도 `5.VFX/BossVictory/<캐릭터>/`). 일반 Q·`Player_Gunner.prefab` 은 안 건드린다.
+    - 저작 규칙: 루트 `BossVictoryBeamRig`(루트 = 총구, +Z = 레이저 방향) · `Body` = +Z 1m 로 만들면 Z 스케일 = 길이(m), 굵기 = 저작 그대로 · `Muzzle` = 총구 고정 · `End` = 끝점으로 옮김(끝 플레어·착탄). 파티클은 루프 OK — 발사 때 처음부터, 레이저 끝에 오브젝트 끔.
+    - 코드가 덮는 것 = 위치·길이·**밝기·페이드**(렌더러 첫 색 칸 `_Color`→`_BaseColor`→`_TintColor` 에 rgb = 저작 색 × `beamBrightness`, 알파 = 저작 알파 × 페이드 — 페이드는 알파에만(뼈대 셰이더는 rgb × 알파, 둘 다 곱하면 페이드²)) + 셰이더에 칸이 있으면 `_BeamLength`(m)·`_BeamTime`(초, 멈춤 동안 정지). 색·흐름은 머티리얼 값 — 굵기 배율·3D 원통(300)·흐름(301)·색 덮어쓰기는 이 경로에서 안 먹는다. 길이·유지·페이드·광원·진동·반동·통과 지점(301)은 그대로(끝점 좌표만 씀).
+    - 인스턴스 = `GunnerBeamView` 가 프리팹당 하나 만들어 재사용(월드, 부모 없음), 프리팹이 바뀌면 새로, 파괴 = `OnDestroy`. 루트에 `BossVictoryBeamRig` 가 없으면 경고 후 기존 레이저.
+    - 뼈대(메뉴 `Tools/Boss Victory/거너 레이저 뼈대 이펙트 만들기 (302)` · 타임라인 창 발사 마커 버튼 — 없는 파일만 만들고 거너 프로필 칸이 비었으면 연결): 셰이더 `BossVictoryGunnerBeam`(가산 언릿, 절차 노이즈) — 원통은 밝기를 텍스처 V 대신 **시선·표면 각도(N·V)** 로 정해 어느 방향에서 봐도 화면상 가운데가 가장 밝다(300 원통에 판용 `Trail100` 을 감아 가운데가 비던 원인: 밝은 V 0.5 가 원통 양옆 두 줄로 가고 정면엔 어두운 V 0 이 왔다) · 빌보드 모드 = 총구·끝 플레어. 메시 원통(+Z 0~1, 32분할)·판, 머티리얼 Core·Glow·Flare, 프리팹 `FX_BossVictoryGunnerBeam`(Body/Core·Glow, Muzzle/Flare, End/Flare).
+    - 테스트 `BossVictoryGunnerBeamRigTests`.
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
 

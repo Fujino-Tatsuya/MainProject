@@ -2171,6 +2171,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             }
             case BossVictoryMarker.GunnerFire:
+                DrawProfileFields("처치 연출 전용 레이저 이펙트(302) — 프리팹(루트 BossVictoryBeamRig: Body +Z 1m · Muzzle · End, 폴더 5.VFX/BossVictory/Gunner) · 멈춤 시점에 같이 멈추기(끄면 루프). " +
+                                  "넣으면 아래 굵기 배율·3D 원통·흐름·색 덮어쓰기는 안 먹는다(모양·색 = 프리팹·머티리얼). 비우면 기존 레이저",
+                    GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamPrefab)), GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamFreeze)));
+                if (GUILayout.Button("뼈대 이펙트 만들기 (302 — 없는 파일만, 비어 있으면 거너 프로필에 연결)", GUILayout.Width(420f)))
+                {
+                    BossVictoryGunnerBeamAuthoring.Create();
+                    GUIUtility.ExitGUI();
+                }
                 DrawProfileFields("거너 Q 발사(294 · 이 캐릭터 프로필) — 방출 섬광 크기 · 레이저 굵기 배율(보이는 것만) · 3D 원통(300 — 몸통을 원통 메시로, 낮은 앵글에서도 두께) · 길이(m, 벽 무시·보스 관통) · 유지 시간(타임라인 초) · 레이저 멈춤 시점(발사 뒤 초, 299 — 이때 정지 화면 → 유지 끝에 재개, 유지 ≤ 이 값이면 안 멈춤) · 발사 오프셋(총구 기준 x 옆·y 위·z 앞, 섬광·레이저 시작점)",
                     GunnerQField(nameof(BossVictoryGunnerQ.ventScale)), GunnerQField(nameof(BossVictoryGunnerQ.beamWidthScale)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamMesh3D)),

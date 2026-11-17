@@ -353,6 +353,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         echoBombVisuals?.Clear();
         EndVictoryCharge();   // 처치 연출 거너 Q(295) — 풀 인스턴스 덮은 값 되돌림·런타임 라이트 파괴
         victoryBeamMesh.RestoreNow();   // 300 — 풀 인스턴스는 남는다 → 원통 렌더를 바로 빌보드로
+        DestroyVictoryRig();            // 302
         base.OnDestroy();
     }
 
@@ -515,6 +516,10 @@ public class GunnerBeamView : BaseNetworkBehaviour
     // 299 — 레이저 정지 화면: 멈춘 레이저 입자(유지 시간 끝·정리 때 다시 재생)
     private readonly List<ParticleSystem> victoryBeamPaused = new List<ParticleSystem>();
     private readonly GunnerBeamMeshSwap victoryBeamMesh = new GunnerBeamMeshSwap();   // 300 — 몸통 원통 렌더
+    // 302 — 처치 연출 전용 레이저 이펙트(프로필 victoryBeamPrefab). 비면 기존 레이저(chargeBeamPlayer). 인스턴스는 이 뷰가 들고 재사용(파괴 = OnDestroy).
+    private BossVictoryBeamRig victoryRig;
+    private GameObject victoryRigSource;
+    private bool victoryRigOn;
     // 301 — 통과 지점(보스 기준 → 월드, 처치 연출이 매 프레임)·발사 때 정한 레이저 방향(3D, 반동·떨림 중에도 평행 유지)
     private bool victoryHasPass;
     private Vector3 victoryPassPoint;
@@ -619,7 +624,18 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (f.Fired && !victoryFired)
             FireVictoryLaser(Mathf.Max(victoryStage, f.Stage));
 
-        if (victoryLaser)
+        if (victoryLaser && victoryRigOn)
+        {
+            // 302 — 새 레이저: 끝점 = 지금 총구 + 발사 때 방향 × 길이, 페이드·밝기·멈춤(켰을 때만)
+            if (!f.LaserOn) EndVictoryLaser();
+            else
+            {
+                Vector3 s = VictoryBeamStart();
+                chargeBeamEnd = s + victoryBeamDir3 * Mathf.Max(0f, victoryLook.beamLength);
+                victoryRig.Drive(s, chargeBeamEnd, f.LaserFade, victoryLook.beamBrightness, victoryLook.victoryBeamFreeze && f.BeamFrozen);
+            }
+        }
+        else if (victoryLaser)
         {
             // 정지 화면(299) — 레이저 이펙트는 1초 남짓 원샷이라 유지 시간 동안 입자를 멈춰 둔다. 유지 끝에 다시 재생 = 원래 소멸 꼬리.
             if (f.BeamFrozen && victoryBeamPaused.Count == 0) FreezeVictoryBeam();
@@ -637,7 +653,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
         TickVictoryLight(f);
         TickVictoryRumble(f);
-        Vector3 beamStart = chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
+        Vector3 beamStart = VictoryBeamStart();
         victoryBeamLight.Tick(victoryLook, f.Fired ? f.LightAmount : 0f, beamStart, chargeBeamEnd, victoryBeamColor);
     }
 
@@ -840,13 +856,23 @@ public class GunnerBeamView : BaseNetworkBehaviour
         Tint(chargeBeamPlayer, victoryLook.beamColorOverride ? EffectTint.FromColor(victoryLook.beamColor) : tint);
         if (victoryLook.fireShakeIntensity > 0f && CameraFeedback.Instance != null)
             CameraFeedback.Instance.PlayImpactShake(victoryLook.fireShakeIntensity, BossVictoryGunnerQ.ShakeSeconds(victoryLook.fireShakeDuration));
-        Vector3 start = chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
+        Vector3 start = VictoryBeamStart();
         // 301 — 통과 지점을 켜면 총구 → 그 점(위아래로 기울 수 있음), 아니면 보스 쪽 수평(지금). 방향은 레이저 끝까지 고정.
         victoryBeamDir3 = BossVictoryGunnerCharge.BeamDirection(start, victoryDir, victoryHasPass && victoryLook.useBeamPassPoint, victoryPassPoint);
         Vector3 end = start + victoryBeamDir3 * Mathf.Max(0f, victoryLook.beamLength);
         victoryBeamColor = victoryLook.beamColorOverride ? victoryLook.beamColor
                          : tint.IsSet ? Color.HSVToRGB(tint.Hue, 0.8f, 1f) : victoryLook.fireFlashColor;
         victoryNextRumble = 0f;
+        // 302 — 처치 연출 전용 레이저 프리팹이 있으면 기존 레이저(FX_GunnerQBeam·폭·원통·흐름 덮기) 대신 그걸 띄운다.
+        if (TryBeginVictoryRig())
+        {
+            victoryRigOn = true;
+            victoryLaser = true;
+            chargeBeamEnd = end;
+            victoryRig.Drive(start, end, 1f, victoryLook.beamBrightness, false);
+        }
+        else
+        {
         // 298 — 레이저 유지 = 프로필 beamHoldSeconds(타임라인). 저작 안전 회수 1초가 그보다 짧으면 1초에 강제 회수돼 안 보였다 → 처치 연출 동안 끔, 정리 때 원래대로.
         victorySafety.Suspend(chargeBeamPlayer);
         PlayChargeBeam(start, end, VictoryBeamWidth(), false, null);
@@ -859,6 +885,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             ApplyVictoryFlow();
             chargeBeamStopAt = float.MaxValue;   // 유지 시간 = 타임라인(EndVictoryLaser)
             victoryLaser = true;
+        }
         }
         if (animator != null && animator.runtimeAnimatorController != null && !string.IsNullOrEmpty(chargeFireStateName))
         {
@@ -896,8 +923,49 @@ public class GunnerBeamView : BaseNetworkBehaviour
         victoryBeamPaused.Clear();
     }
 
+    // 레이저 시작점 = 발사 소켓(오프셋 적용), 없으면 몸 위.
+    private Vector3 VictoryBeamStart() => chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
+
+    // 302 — 프로필 프리팹 인스턴스(바뀌면 새로) 를 켠다. 프리팹이 없거나 BossVictoryBeamRig 가 없으면 false(기존 레이저).
+    private bool TryBeginVictoryRig()
+    {
+        GameObject prefab = victoryLook != null ? victoryLook.victoryBeamPrefab : null;
+        if (prefab == null) return false;
+        if (victoryRig != null && victoryRigSource != prefab) DestroyVictoryRig();
+        if (victoryRig == null)
+        {
+            if (!prefab.TryGetComponent(out BossVictoryBeamRig _))
+            {
+                Debug.LogWarning($"[BossVictory] 처치 연출 레이저 프리팹 '{prefab.name}' 루트에 BossVictoryBeamRig 가 없어 기존 레이저로 그립니다(302).", prefab);
+                return false;
+            }
+            GameObject go = Instantiate(prefab);
+            go.name = prefab.name;
+            victoryRig = go.GetComponent<BossVictoryBeamRig>();
+            victoryRigSource = prefab;
+        }
+        victoryRig.Begin();
+        return true;
+    }
+
+    private void DestroyVictoryRig()
+    {
+        if (victoryRig != null) Destroy(victoryRig.gameObject);
+        victoryRig = null;
+        victoryRigSource = null;
+        victoryRigOn = false;
+    }
+
     private void EndVictoryLaser()
     {
+        if (victoryRigOn)
+        {
+            // 302 — 새 레이저는 끄기만(페이드는 유지 끝까지 Drive 가 이미 0 으로 내렸다). 기존 레이저 소켓은 안 건드림.
+            victoryRigOn = false;
+            victoryLaser = false;
+            if (victoryRig != null) victoryRig.Stop();
+            return;
+        }
         victoryLaser = false;
         ResumeVictoryBeam();   // 299 — 멈춘 채 회수·반납되지 않게 먼저 재개
         RestoreVictoryFlow();  // 301

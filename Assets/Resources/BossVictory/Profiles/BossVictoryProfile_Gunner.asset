@@ -80,11 +80,13 @@ MonoBehaviour:
       shakeDuration: 0
     overchargeScale: 1
     ventScale: 1
-    beamWidthScale: 1
+    beamWidthScale: 5.13
     beamMesh3D: 1
+    victoryBeamPrefab: {fileID: 6906094837324665058, guid: f03d9a63a6c2ac542a326fa4b67c61df, type: 3}
+    victoryBeamFreeze: 0
     beamLength: 10
     chargeOffset: {x: 0, y: 0, z: 0.1}
-    fireOffset: {x: 0, y: 0, z: 0}
+    fireOffset: {x: 0, y: 1.22, z: 2.78}
     sphereDelay: 0
     beamHoldSeconds: 5
     beamFreezeAt: 0.12
@@ -243,7 +245,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   timeline:
     desaturate:
-    - start: 2.73
+    - start: 0.39
       length: 7.095
       fadeIn: 0.09
       fadeOut: 0
@@ -723,7 +725,7 @@ MonoBehaviour:
     backDashStartTime: 0.2
     finisherStartTime: 0.65
     finisherTrimSeconds: 4.9333334
-    slowStartTime: 2.4
+    slowStartTime: 3.13
     bossHitAnimTime: 0.2
     bossHitTrimSeconds: 0
     bossFreezeTime: 0
