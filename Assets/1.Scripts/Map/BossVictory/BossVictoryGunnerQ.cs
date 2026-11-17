@@ -138,7 +138,7 @@ public static class BossVictoryGunnerCharge
     public static float SphereScale(Times ordered, BossVictoryGunnerQ q, float t)
     {
         float prevTime = ordered.ChargeStart, prevScale = q.startScale;
-        if (t <= prevTime) return prevScale;
+        if (t < prevTime) return prevScale;
         for (int k = 1; k <= 3; k++)
         {
             BossVictoryGunnerQ.Stage s = q.StageAt(k);
