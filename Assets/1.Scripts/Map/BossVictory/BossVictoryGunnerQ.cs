@@ -57,6 +57,10 @@ public sealed class BossVictoryGunnerQ
     public GameObject victoryBeamPrefab;
     [Tooltip("302 새 레이저도 '레이저 멈춤 시점'에 멈출지(파티클 Pause·셰이더 시계 정지). 끄면 유지 동안 계속 움직인다(루프). 기존 레이저는 늘 멈춤.")]
     public bool victoryBeamFreeze;
+    [Tooltip("302 새 레이저 — 안쪽 파란 몸통(프리팹 리그 innerBody: Glow·흰 심 Core) 굵기 배율. 1 = 저작 크기. 레이저 굵기 배율(beamWidthScale)과 곱해진다.")]
+    [Min(0f)] public float victoryBeamInnerScale = 1f;
+    [Tooltip("302 새 레이저 — 바깥 흰 공기막(프리팹 리그 outerAir: Wisp) 굵기 배율. 1 = 저작 크기. 레이저 굵기 배율(beamWidthScale)과 곱해진다.")]
+    [Min(0f)] public float victoryBeamAirScale = 1f;
     [Tooltip("레이저 길이(m) — 처치 연출에서는 벽을 무시하고 보스를 관통한다(착탄 이펙트 없음).")]
     [Min(0.1f)] public float beamLength = 30f;
 

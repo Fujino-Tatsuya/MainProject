@@ -39,7 +39,7 @@ public static class BossVictoryGunnerBeamAuthoring
         Material core = LoadOrCreate(CoreMatPath, () => MakeMaterial(shader, "M_BossVictoryGunnerBeam_Core", false,
             new Color(6f, 6f, 6f, 1f), new Color(1.5f, 3.5f, 7f, 1f), corePower: 3f, glowPower: 1.5f, noise: 0.25f, opacity: 1f, startFade: 0f, endFade: 0f).Streak(0.35f, 0.5f, 2f, 0.4f, 0.2f, 0.8f));
         Material glow = LoadOrCreate(GlowMatPath, () => MakeMaterial(shader, "M_BossVictoryGunnerBeam_Glow", false,
-            Color.black, new Color(0.6f, 1.6f, 4f, 1f), corePower: 8f, glowPower: 1f, noise: 0.6f, opacity: 0.5f, startFade: 0f, endFade: 0f).Streak(0.8f, 0.35f, 2.5f, 0.5f, 0.15f, 0.55f));
+            Color.black, new Color(0.6f, 1.6f, 4f, 1f), corePower: 8f, glowPower: 1f, noise: 0.6f, opacity: 0.5f, startFade: 0f, endFade: 0f).Streak(0.8f, 0.35f, 2.5f, 0.5f, 0.15f, 0.55f).Lines(1f, new Color(0.02f, 0.12f, 0.7f, 1f)));
         Material flare = LoadOrCreate(FlareMatPath, () => MakeMaterial(shader, "M_BossVictoryGunnerBeam_Flare", true,
             new Color(1.5f, 1.5f, 1.5f, 1f), new Color(0.3f, 0.7f, 1.6f, 1f), corePower: 10f, glowPower: 3f, noise: 0f, opacity: 0f, startFade: 0f, endFade: 0f));
         Mesh bolts = LoadOrCreate(BoltsPath, () => BuildBolts(4, 65));
@@ -70,6 +70,7 @@ public static class BossVictoryGunnerBeamAuthoring
                 so.FindProperty("muzzle").objectReferenceValue = muzzle;
                 so.FindProperty("end").objectReferenceValue = end;
                 so.ApplyModifiedPropertiesWithoutUndo();
+                WireLayers(rig, body);
 
                 prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
                 Debug.Log($"[302] 프리팹 생성: {PrefabPath}", prefab);
@@ -82,15 +83,17 @@ public static class BossVictoryGunnerBeamAuthoring
         }
         else
         {
-            // 이미 있는 프리팹 — Body 에 결(Wisp)·번개(Lightning) 층이 없을 때만 덧붙인다(나머지는 그대로).
+            // 이미 있는 프리팹 — Body 에 결(Wisp)·번개(Lightning) 층이 없을 때만 덧붙이고, 리그 층별 굵기 칸이 비었을 때만 연결(나머지는 그대로).
             GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
             try
             {
                 Transform body = contents.transform.Find("Body");
-                if (body != null && AddLayers(body, capsule, wisp, bolts, lightning))
+                bool added = body != null && AddLayers(body, capsule, wisp, bolts, lightning);
+                bool wired = body != null && WireLayers(contents.GetComponent<BossVictoryBeamRig>(), body);
+                if (added || wired)
                 {
                     PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
-                    Debug.Log($"[302] 프리팹에 결·번개 층 추가: {PrefabPath}", prefab);
+                    Debug.Log($"[302] 프리팹 갱신(결·번개 층 추가 {added} · 층별 굵기 연결 {wired}): {PrefabPath}", prefab);
                 }
                 else Debug.Log($"[302] 프리팹이 이미 있어 그대로 둡니다: {PrefabPath}", prefab);
             }
@@ -146,6 +149,20 @@ public static class BossVictoryGunnerBeamAuthoring
         return m;
     }
 
+    /// <summary>만화 선 칸(캡슐 모드) — 세기·색 + 진한 먹선 기본(가림 0.9·둘레 9칸·굵기 0.35·거칠기 1·획 3m). 흰 몸통 위 흰 선은 안 보여 진한 파란 선으로 둔다.</summary>
+    static Material Lines(this Material m, float amount, Color color)
+    {
+        m.SetFloat("_LineAmount", amount);
+        m.SetColor("_LineColor", color);
+        m.SetFloat("_LineCover", 0.9f);
+        m.SetFloat("_LineCount", 9f);
+        m.SetFloat("_LineWidth", 0.35f);
+        m.SetFloat("_LineRough", 1f);
+        m.SetFloat("_LineFill", 0.55f);
+        m.SetFloat("_LineLength", 3f);
+        return m;
+    }
+
     /// <summary>바깥 연기 결 — 캡슐, 길게 늘인 결 노이즈로 가장자리를 깎는다(흰빛 연기).</summary>
     static Material MakeWisp()
     {
@@ -185,6 +202,30 @@ public static class BossVictoryGunnerBeamAuthoring
             added = true;
         }
         return added;
+    }
+
+    /// <summary>리그 층별 굵기 칸 — 안쪽 몸통 = Body/Core·Glow, 바깥 공기막 = Body/Wisp. 칸이 비었을 때만 채운다. 채웠으면 true.</summary>
+    static bool WireLayers(BossVictoryBeamRig rig, Transform body)
+    {
+        if (rig == null) return false;
+        var so = new SerializedObject(rig);
+        bool changed = Fill(so.FindProperty("innerBody"), body, "Core", "Glow") | Fill(so.FindProperty("outerAir"), body, "Wisp");
+        if (changed) so.ApplyModifiedPropertiesWithoutUndo();
+        return changed;
+    }
+
+    static bool Fill(SerializedProperty list, Transform body, params string[] names)
+    {
+        if (list == null || list.arraySize > 0) return false;
+        int n = 0;
+        foreach (string name in names)
+        {
+            Transform t = body.Find(name);
+            if (t == null) continue;
+            list.InsertArrayElementAtIndex(n);
+            list.GetArrayElementAtIndex(n++).objectReferenceValue = t;
+        }
+        return n > 0;
     }
 
     static Transform Child(Transform parent, string name, Vector3 localPos, Vector3 localScale)

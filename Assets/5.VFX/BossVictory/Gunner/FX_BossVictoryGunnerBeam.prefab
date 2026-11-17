@@ -478,6 +478,11 @@ MonoBehaviour:
   muzzle: {fileID: 1841398718339933072}
   end: {fileID: 3073160349234585091}
   unscaledTime: 0
+  innerBody:
+  - {fileID: 1434455673592896524}
+  - {fileID: 4546266370722530064}
+  outerAir:
+  - {fileID: 5585485416099989417}
 --- !u!1 &7069369500729821764
 GameObject:
   m_ObjectHideFlags: 0

@@ -27,6 +27,52 @@ public class BossVictoryGunnerBeamRigTests
     }
 
     [Test]
+    public void 층_굵기는_XY만_곱하고_Z는_저작_그대로()
+    {
+        Vector3 s = BossVictoryBeamRig.LayerScale(new Vector3(1.7f, 1.7f, 1f), 0.5f);
+        Assert.AreEqual(0.85f, s.x, Tolerance);
+        Assert.AreEqual(0.85f, s.y, Tolerance);
+        Assert.AreEqual(1f, s.z, Tolerance, "길이 방향은 부모 Body 가 늘인다");
+        Assert.AreEqual(0f, BossVictoryBeamRig.LayerScale(Vector3.one, -2f).x, Tolerance, "음수 배율 = 0");
+    }
+
+    [Test]
+    public void 리그_층별_굵기는_안쪽과_바깥을_따로_저작_기준으로()
+    {
+        var root = new GameObject("rig");
+        try
+        {
+            var body = new GameObject("Body").transform; body.SetParent(root.transform, false);
+            var glow = new GameObject("Glow").transform; glow.SetParent(body, false); glow.localScale = new Vector3(1.1f, 1.1f, 1f);
+            var wisp = new GameObject("Wisp").transform; wisp.SetParent(body, false); wisp.localScale = new Vector3(1.7f, 1.7f, 1f);
+            root.SetActive(false);
+            var rig = root.AddComponent<BossVictoryBeamRig>();
+            var so = new UnityEditor.SerializedObject(rig);
+            so.FindProperty("body").objectReferenceValue = body;
+            var inner = so.FindProperty("innerBody"); inner.arraySize = 1; inner.GetArrayElementAtIndex(0).objectReferenceValue = glow;
+            var air = so.FindProperty("outerAir"); air.arraySize = 1; air.GetArrayElementAtIndex(0).objectReferenceValue = wisp;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            rig.SetLayerScales(0.5f, 2f);
+            rig.Drive(Vector3.zero, new Vector3(0f, 0f, 10f), 1f, 1f, false, 1f);
+            Assert.AreEqual(0.55f, glow.localScale.x, Tolerance, "안쪽 몸통 = 저작 × 0.5");
+            Assert.AreEqual(3.4f, wisp.localScale.x, Tolerance, "바깥 공기막 = 저작 × 2");
+            rig.SetLayerScales(1f, 1f);
+            rig.Drive(Vector3.zero, new Vector3(0f, 0f, 10f), 1f, 1f, false, 1f);
+            Assert.AreEqual(1.1f, glow.localScale.x, Tolerance, "되돌리면 저작 크기(누적 아님)");
+            Assert.AreEqual(1.7f, wisp.localScale.x, Tolerance);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    [Test]
+    public void 층별_굵기_기본값은_1()
+    {
+        var q = new BossVictoryGunnerQ();
+        Assert.AreEqual(1f, q.victoryBeamInnerScale, Tolerance);
+        Assert.AreEqual(1f, q.victoryBeamAirScale, Tolerance);
+    }
+
+    [Test]
     public void 리그_Drive_는_굵기_배율을_몸통과_총구_끝_플레어에_곱한다()
     {
         var root = new GameObject("rig");

@@ -7,6 +7,7 @@
 //     밝기를 텍스처 V 가 아니라 **시선과 표면의 각도(N·V)** 로 정한다 → 어느 방향에서 봐도 화면상 가운데가 가장 밝다
 //     (300 원통에 판용 Trail 텍스처를 감았을 때 가운데가 비던 문제를 없앰). 앞면만 그린다(Cull Back — 앞뒤 겹침 없음).
 //     결 노이즈(_Streak*) = 길이 방향으로 길게 늘인 노이즈로 가장자리를 깎아 연기 같은 결을 만든다(가운데는 _StreakKeep 만큼 남김).
+//     만화 선(_Line*) = 둘레 칸마다 길이 방향 붓 획(끝 뾰족·가장자리 흔들림·경계 날카로움)을 흘린다. 밝은 색 = 빛줄기, 어두운 색 + 가림도 = 먹선.
 //   · 빌보드(_BILLBOARD) — 메시 = Mesh_BossVictoryGunnerBeam_Quad, 오브젝트 원점에서 카메라를 향하는 판. 총구·끝 플레어.
 //   · 번개(_LIGHTNING) — 메시 = Mesh_BossVictoryGunnerBeam_Bolts(줄기 4개 × 축 따라 점 65개 띠, UV2.x = 줄기 번호). 정점마다 축 둘레 3D 꺾은선 위로
 //     옮기고 그 선의 진행 방향·시선에 수직으로 번짐 폭만큼만 편다(평면 없음). _BoltRate 번/초 마다 모양이 새로 뽑힌다(멈춤 화면이면 멈춤). 오프셋 단위 = 오브젝트 X 스케일의 반.
@@ -43,6 +44,18 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
         _StreakSoft ("깎인 가장자리 부드러움", Range(0.01, 1)) = 0.15
         _StreakKeep ("가운데 남김 (클수록 화면 가운데는 안 깎임)", Range(0, 2)) = 0.6
         _StreakFlow ("결 흐름 배율 (흐름 속도 × 이 값)", Range(0, 3)) = 0.6
+
+        [Header(Comic Lines)]
+        _LineAmount ("만화 선 세기 (캡슐 — 길이 방향 거친 붓선 · 0 = 끔)", Range(0, 1)) = 0
+        [HDR] _LineColor ("만화 선 색 (밝게 = 빛줄기 · 어둡게 = 먹선, 어두운 선은 선 가림도 올림)", Color) = (3, 3, 3, 1)
+        _LineCover ("선 가림도 (어두운 선이 배경·안쪽을 가리게)", Range(0, 1)) = 0
+        _LineCount ("선 둘레 칸 수 (둘레 한 바퀴에 들어가는 선 줄 수)", Range(1, 48)) = 12
+        _LineWidth ("선 굵기 (칸 폭 비율)", Range(0.01, 1)) = 0.12
+        _LineLength ("선 한 획 길이 (m)", Range(0.1, 20)) = 2.5
+        _LineFill ("획이 그려질 확률 (클수록 빽빽)", Range(0, 1)) = 0.5
+        _LineTaper ("획 끝 뾰족함 (클수록 붓처럼 끝이 가늘다)", Range(0, 4)) = 0.7
+        _LineRough ("선 가장자리 거칠기 (흔들림)", Range(0, 2)) = 0.6
+        _LineFlow ("선 흐름 배율 (흐름 속도 × 이 값)", Range(0, 3)) = 1.3
 
         [Header(Lightning)]
         _BoltCount ("번개 줄기 수 (0~4)", Range(0, 4)) = 3
@@ -109,6 +122,16 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
                 half _StreakSoft;
                 half _StreakKeep;
                 half _StreakFlow;
+                half4 _LineColor;
+                half _LineAmount;
+                half _LineCover;
+                half _LineCount;
+                half _LineWidth;
+                half _LineLength;
+                half _LineFill;
+                half _LineTaper;
+                half _LineRough;
+                half _LineFlow;
                 half _BoltCount;
                 half _BoltRate;
                 half _BoltChance;
@@ -258,6 +281,7 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
 
             half4 Frag(Varyings input) : SV_Target
             {
+                half extraCover = 0;   // 만화 선 가림도(캡슐만)
                 float pulse = 1.0 - _PulseAmount * (0.5 + 0.5 * sin(_BeamTime * _PulseFreq * 6.2831853));
             #if defined(_BILLBOARD)
                 float r = saturate(length(input.uv - 0.5) * 2.0);
@@ -297,10 +321,36 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
                            * (_EndFade > 1e-4 ? smoothstep(0.0, _EndFade, _BeamLength - meters) : 1.0);
                 half3 col = _CoreColor.rgb * pow(ndv, _CorePower) + _GlowColor.rgb * pow(ndv, _GlowPower) * noise;
                 col *= ends * pulse * erode;
+                // 만화 선 — 둘레를 _LineCount 칸으로 나눠 칸마다 길이 방향 붓 획(끝이 뾰족, 가장자리가 흔들리는 딱 끊긴 선)을 흘린다.
+                // 결 노이즈(부드러운 연기)와 달리 경계가 날카롭다(화면 1픽셀 안티에일리어싱만).
+                if (_LineAmount > 1e-4)
+                {
+                    float count = max(1.0, round(_LineCount));
+                    float a = input.uv.y * count;
+                    float cell = floor(a);
+                    float fa = frac(a);
+                    float flowM = meters - _BeamTime * _FlowSpeed * _LineFlow;
+                    float sL = flowM / _LineLength + Hash21(float2(cell, 3.7)) * 7.0;
+                    float dash = floor(sL);
+                    float fd = frac(sL);
+                    float h = Hash21(float2(cell + 0.31, dash));
+                    float on = h < _LineFill ? 1.0 : 0.0;
+                    float center = 0.3 + 0.4 * Hash21(float2(cell + 0.5, dash + 0.7));
+                    float w = _LineWidth * lerp(0.5, 1.5, Hash21(float2(dash + 0.13, cell + 9.0)));
+                    float taper = pow(saturate(sin(fd * 3.14159265)), _LineTaper);
+                    float wob = (ValueNoise(float2(flowM * 5.0, cell * 3.1)) - 0.5) * _LineRough * w;
+                    float halfw = 0.5 * w * taper;
+                    float d = abs(fa - center - wob);
+                    float aa = max(fwidth(fa), 1e-4);
+                    float capFade = 1.0 - smoothstep(0.0, 0.35, abs(input.capM));   // 둥근 끝(반구)에선 선이 극으로 모여 공 무늬가 되므로 흐린다
+                    float lineMask = on * (1.0 - smoothstep(halfw - aa, halfw + aa, d)) * _LineAmount * capFade;
+                    col = lerp(col, _LineColor.rgb * (ends * pulse), lineMask);
+                    extraCover = lineMask * _LineCover;
+                }
             #endif
                 // 가림 정도 = 밝기(가장 밝은 채널, 0~1) × 불투명도 — 흰 심은 배경을 가리고 둘레 빛은 투명하게 번진다.
                 half fade = _Color.a * input.color.a;
-                half cover = saturate(max(col.r, max(col.g, col.b))) * _Opacity * fade;
+                half cover = max(saturate(max(col.r, max(col.g, col.b))) * _Opacity, extraCover) * fade;
                 col *= _Color.rgb * fade * input.color.rgb;
                 return half4(col, cover);
             }

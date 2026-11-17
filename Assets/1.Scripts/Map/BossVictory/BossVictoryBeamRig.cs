@@ -26,6 +26,10 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
     [SerializeField] private Transform end;
     [Tooltip("_BeamTime 시계를 실제 시간으로(처치 연출 시간 배율 무시). 끄면 게임 시간(파티클과 같음).")]
     [SerializeField] private bool unscaledTime;
+    [Tooltip("안쪽 몸통 층(Body 아래 — 파란 Glow·흰 심 Core) — 프로필 victoryBeamInnerScale 이 X·Y 에 곱해진다(저작 × 배율).")]
+    [SerializeField] private Transform[] innerBody = System.Array.Empty<Transform>();
+    [Tooltip("바깥 공기막 층(Body 아래 — 흰 Wisp) — 프로필 victoryBeamAirScale 이 X·Y 에 곱해진다(저작 × 배율).")]
+    [SerializeField] private Transform[] outerAir = System.Array.Empty<Transform>();
 
     public Transform Body => body;
     public Transform Muzzle => muzzle;
@@ -48,6 +52,8 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
     Slot[] _slots;
     ParticleSystem[] _systems;
     Vector3 _bodyHome = Vector3.one, _muzzleHome = Vector3.one, _endHome = Vector3.one;
+    Vector3[] _innerHome = System.Array.Empty<Vector3>(), _airHome = System.Array.Empty<Vector3>();
+    float _innerScale = 1f, _airScale = 1f;
     MaterialPropertyBlock _block;
     float _clock;
     bool _frozen;
@@ -60,6 +66,8 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
         if (body != null) _bodyHome = body.localScale;
         if (muzzle != null) _muzzleHome = muzzle.localScale;
         if (end != null) _endHome = end.localScale;
+        _innerHome = Homes(innerBody);
+        _airHome = Homes(outerAir);
         _systems = GetComponentsInChildren<ParticleSystem>(true);
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
         _slots = new Slot[renderers.Length];
@@ -111,6 +119,9 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
             end.localScale = _endHome * Mathf.Max(0f, width);
         }
 
+        ScaleLayers(innerBody, _innerHome, _innerScale);
+        ScaleLayers(outerAir, _airHome, _airScale);
+
         SetFrozen(frozen);
         if (!_frozen) _clock += unscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
 
@@ -126,6 +137,31 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
             s.renderer.SetPropertyBlock(_block);
         }
     }
+
+    /// <summary>층별 굵기 배율(안쪽 몸통·바깥 공기막) — 다음 Drive 부터 저작 X·Y × 배율. 몸통 전체 굵기 배율(Drive width)과 곱해진다.</summary>
+    public void SetLayerScales(float inner, float air)
+    {
+        _innerScale = Mathf.Max(0f, inner);
+        _airScale = Mathf.Max(0f, air);
+    }
+
+    static Vector3[] Homes(Transform[] layers)
+    {
+        if (layers == null) return System.Array.Empty<Vector3>();
+        var homes = new Vector3[layers.Length];
+        for (int i = 0; i < layers.Length; i++) homes[i] = layers[i] != null ? layers[i].localScale : Vector3.one;
+        return homes;
+    }
+
+    static void ScaleLayers(Transform[] layers, Vector3[] homes, float scale)
+    {
+        if (layers == null) return;
+        for (int i = 0; i < layers.Length && i < homes.Length; i++)
+            if (layers[i] != null) layers[i].localScale = LayerScale(homes[i], scale);
+    }
+
+    /// <summary>층 스케일 — X·Y = 저작 × 배율, Z(길이 방향 — 부모 Body 가 늘인다) = 저작 그대로.</summary>
+    public static Vector3 LayerScale(Vector3 home, float scale) => new Vector3(home.x * Mathf.Max(0f, scale), home.y * Mathf.Max(0f, scale), home.z);
 
     /// <summary>레이저 끝 — 끈다(멈춘 파티클은 재개해 두고 끈다).</summary>
     public void Stop()

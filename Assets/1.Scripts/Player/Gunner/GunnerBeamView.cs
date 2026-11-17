@@ -632,6 +632,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             {
                 Vector3 s = VictoryBeamStart();
                 chargeBeamEnd = s + victoryBeamDir3 * Mathf.Max(0f, victoryLook.beamLength);
+                victoryRig.SetLayerScales(victoryLook.victoryBeamInnerScale, victoryLook.victoryBeamAirScale);
                 victoryRig.Drive(s, chargeBeamEnd, f.LaserFade, victoryLook.beamBrightness, victoryLook.victoryBeamFreeze && f.BeamFrozen, victoryLook.beamWidthScale);
             }
         }
@@ -869,6 +870,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             victoryRigOn = true;
             victoryLaser = true;
             chargeBeamEnd = end;
+            victoryRig.SetLayerScales(victoryLook.victoryBeamInnerScale, victoryLook.victoryBeamAirScale);
             victoryRig.Drive(start, end, 1f, victoryLook.beamBrightness, false, victoryLook.beamWidthScale);
         }
         else
