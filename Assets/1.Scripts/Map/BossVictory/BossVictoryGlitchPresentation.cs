@@ -789,8 +789,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _dashMoved = 0f;
         BossVictoryClip c = DashClips[_dashOrder[k]];
         Transform basis = _boss != null ? _boss.transform : _killer.transform;   // 보스 위치·회전은 복제 — 모든 피어 같은 점
-        _dashFrom = BossVictoryKillerMoves.BossPoint(basis.position, basis.rotation, c.dashFrom);
-        _dashTo = BossVictoryKillerMoves.BossPoint(basis.position, basis.rotation, c.dashTo);
+        Vector3 basisPos = _boss != null ? BossPos : basis.position;   // 손 뻗기·걷기로 걸은 거리 포함(11-17)
+        _dashFrom = BossVictoryKillerMoves.BossPoint(basisPos, basis.rotation, c.dashFrom);
+        _dashTo = BossVictoryKillerMoves.BossPoint(basisPos, basis.rotation, c.dashTo);
         _dashFrom.y = _dashTo.y = _killer.transform.position.y;   // 높이 = 처치자 발(보스 피벗 높이와 무관)
         Vector3 dir = _dashTo - _dashFrom;
         dir.y = 0f;
