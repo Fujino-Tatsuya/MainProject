@@ -38,30 +38,37 @@ public class BossVictoryGunnerBeamRigTests
     }
 
     [Test]
-    public void 뼈대_원통은_Z_0에서_1_반지름_0점5_바깥_법선()
+    public void 뼈대_캡슐은_옆면_Z_0에서_1_반구는_UV2로_밀고_법선은_바깥()
     {
-        Mesh m = BossVictoryGunnerBeamAuthoring.BuildCylinder(16);
+        Mesh m = BossVictoryGunnerBeamAuthoring.BuildCapsule(16, 6);
         try
         {
-            Bounds b = m.bounds;
-            Assert.AreEqual(0f, b.min.z, Tolerance);
-            Assert.AreEqual(1f, b.max.z, Tolerance);
-            Assert.AreEqual(0.5f, b.max.x, Tolerance);
             Vector3[] v = m.vertices, n = m.normals;
-            Vector2[] uv = m.uv;
+            Vector2[] uv = m.uv, uv2 = m.uv2;
             for (int i = 0; i < v.Length; i++)
             {
-                Assert.Greater(Vector3.Dot(new Vector3(v[i].x, v[i].y, 0f), n[i]), 0f, "법선이 바깥");
+                Assert.IsTrue(Mathf.Approximately(v[i].z, 0f) || Mathf.Approximately(v[i].z, 1f), "정점은 z 0·1 에만(반구는 셰이더가 민다)");
                 Assert.AreEqual(v[i].z, uv[i].x, Tolerance, "UV.x = 길이");
+                float e = uv2[i].x;
+                Assert.AreEqual(v[i].z > 0.5f ? 1f : -1f, e == 0f ? (v[i].z > 0.5f ? 1f : -1f) : Mathf.Sign(e), "총구 쪽 −, 끝 쪽 +");
+                // 실제 캡슐 위치(반지름 0.5 만큼 민 점) 기준 법선이 바깥 — 단위 길이.
+                Vector3 p = v[i] + new Vector3(0f, 0f, e * 0.5f);
+                Vector3 axis = new Vector3(0f, 0f, Mathf.Clamp(p.z, 0f, 1f));
+                Assert.AreEqual(1f, n[i].magnitude, 1e-3f);
+                Assert.Greater(Vector3.Dot(p - axis, n[i]) + 1e-4f, 0f, "법선이 바깥");
+                Assert.AreEqual(0.5f, (p - axis).magnitude, 1e-3f, "캡슐 표면(반지름 0.5)");
             }
-            // 바깥에서 본 삼각형이 앞면(시계 방향) — 면 법선(왼손 기준 cross)이 바깥을 향한다.
+            // 삼각형이 바깥을 향함(시계 방향 = 앞면) — 밀어 둔 실제 위치로 판정.
             int[] t = m.triangles;
+            Vector3 P(int k) => v[k] + new Vector3(0f, 0f, uv2[k].x * 0.5f);
             for (int i = 0; i < t.Length; i += 3)
             {
-                Vector3 a = v[t[i]], b1 = v[t[i + 1]], c = v[t[i + 2]];
-                Vector3 face = Vector3.Cross(b1 - a, c - a);
-                Vector3 mid = (a + b1 + c) / 3f;
-                Assert.Greater(Vector3.Dot(face, new Vector3(mid.x, mid.y, 0f)), 0f, $"삼각형 {i / 3} 이 바깥을 향함");
+                Vector3 a = P(t[i]), b = P(t[i + 1]), c = P(t[i + 2]);
+                Vector3 face = Vector3.Cross(b - a, c - a);
+                if (face.sqrMagnitude < 1e-10f) continue;   // 극의 퇴화 삼각형
+                Vector3 mid = (a + b + c) / 3f;
+                Vector3 axis = new Vector3(0f, 0f, Mathf.Clamp(mid.z, 0f, 1f));
+                Assert.Greater(Vector3.Dot(face, mid - axis), 0f, $"삼각형 {i / 3} 이 바깥을 향함");
             }
         }
         finally { Object.DestroyImmediate(m); }

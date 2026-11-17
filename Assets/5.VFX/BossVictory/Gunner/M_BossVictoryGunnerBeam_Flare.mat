@@ -29,19 +29,20 @@ Material:
     - _BeamLength: 10
     - _BeamTime: 0
     - _Billboard: 1
-    - _CorePower: 6
-    - _EndFade: 1
+    - _CorePower: 10
+    - _EndFade: 0
     - _FlowSpeed: 12
-    - _GlowPower: 2
+    - _GlowPower: 3
     - _NoiseAmount: 0
     - _NoiseAround: 3
     - _NoiseScale: 1.2
+    - _Opacity: 0
     - _PulseAmount: 0.12
     - _PulseFreq: 14
-    - _StartFade: 0.15
+    - _StartFade: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _CoreColor: {r: 8, g: 8, b: 8, a: 1}
-    - _GlowColor: {r: 1, g: 2.5, b: 6, a: 1}
+    - _CoreColor: {r: 1.5, g: 1.5, b: 1.5, a: 1}
+    - _GlowColor: {r: 0.3, g: 0.7, b: 1.6, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

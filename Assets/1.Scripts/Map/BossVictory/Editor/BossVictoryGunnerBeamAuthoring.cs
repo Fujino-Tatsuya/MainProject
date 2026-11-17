@@ -4,14 +4,14 @@ using UnityEngine;
 
 /// <summary>
 /// 할 일 302 — 처치 연출 전용 거너 레이저 뼈대 이펙트를 <c>Assets/5.VFX/BossVictory/Gunner/</c> 에 만든다.
-/// 메시 2개(원통 +Z 1m · 빌보드 판) · 머티리얼 3개(코어·글로우·플레어) · 프리팹 FX_BossVictoryGunnerBeam(BossVictoryBeamRig — Body·Muzzle·End)
+/// 메시 2개(캡슐 — 옆면 +Z 1m + 셰이더가 둥글게 미는 반구 · 빌보드 판) · 머티리얼 3개(코어·글로우·플레어) · 프리팹 FX_BossVictoryGunnerBeam(BossVictoryBeamRig — Body·Muzzle·End)
 /// · 거너 프로필 gunnerQ.victoryBeamPrefab 이 비어 있으면 연결. <b>이미 있는 파일은 건드리지 않는다</b>(은희가 고친 이펙트를 덮지 않게 — 다시 만들려면 지우고 실행).
 /// </summary>
 public static class BossVictoryGunnerBeamAuthoring
 {
     const string Folder = "Assets/5.VFX/BossVictory/Gunner";
     const string ShaderPath = Folder + "/BossVictoryGunnerBeam.shader";
-    const string CylinderPath = Folder + "/Mesh_BossVictoryGunnerBeam_Cylinder.asset";
+    const string CapsulePath = Folder + "/Mesh_BossVictoryGunnerBeam_Capsule.asset";
     const string QuadPath = Folder + "/Mesh_BossVictoryGunnerBeam_Quad.asset";
     const string CoreMatPath = Folder + "/M_BossVictoryGunnerBeam_Core.mat";
     const string GlowMatPath = Folder + "/M_BossVictoryGunnerBeam_Glow.mat";
@@ -31,14 +31,14 @@ public static class BossVictoryGunnerBeamAuthoring
             return;
         }
 
-        Mesh cylinder = LoadOrCreate(CylinderPath, () => BuildCylinder(32));
+        Mesh capsule = LoadOrCreate(CapsulePath, () => BuildCapsule(32, 8));
         Mesh quad = LoadOrCreate(QuadPath, BuildQuad);
         Material core = LoadOrCreate(CoreMatPath, () => MakeMaterial(shader, "M_BossVictoryGunnerBeam_Core", false,
-            new Color(10f, 10f, 10f, 1f), new Color(2f, 4f, 8f, 1f), corePower: 6f, glowPower: 2.5f, noise: 0.25f));
+            new Color(6f, 6f, 6f, 1f), new Color(1.5f, 3.5f, 7f, 1f), corePower: 3f, glowPower: 1.5f, noise: 0.25f, opacity: 1f, startFade: 0f, endFade: 0f));
         Material glow = LoadOrCreate(GlowMatPath, () => MakeMaterial(shader, "M_BossVictoryGunnerBeam_Glow", false,
-            Color.black, new Color(0.5f, 1.4f, 4f, 1f), corePower: 8f, glowPower: 1.2f, noise: 0.6f));
+            Color.black, new Color(0.6f, 1.6f, 4f, 1f), corePower: 8f, glowPower: 1f, noise: 0.6f, opacity: 0.5f, startFade: 0f, endFade: 0f));
         Material flare = LoadOrCreate(FlareMatPath, () => MakeMaterial(shader, "M_BossVictoryGunnerBeam_Flare", true,
-            new Color(8f, 8f, 8f, 1f), new Color(1f, 2.5f, 6f, 1f), corePower: 6f, glowPower: 2f, noise: 0f));
+            new Color(1.5f, 1.5f, 1.5f, 1f), new Color(0.3f, 0.7f, 1.6f, 1f), corePower: 10f, glowPower: 3f, noise: 0f, opacity: 0f, startFade: 0f, endFade: 0f));
 
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
         if (prefab == null)
@@ -50,12 +50,12 @@ public static class BossVictoryGunnerBeamAuthoring
             try
             {
                 Transform body = Child(root.transform, "Body", Vector3.zero, Vector3.one);
-                AddMesh(Child(body, "Core", Vector3.zero, new Vector3(0.3f, 0.3f, 1f)), cylinder, core);
-                AddMesh(Child(body, "Glow", Vector3.zero, new Vector3(1.1f, 1.1f, 1f)), cylinder, glow);
+                AddMesh(Child(body, "Core", Vector3.zero, new Vector3(0.3f, 0.3f, 1f)), capsule, core);
+                AddMesh(Child(body, "Glow", Vector3.zero, new Vector3(1.1f, 1.1f, 1f)), capsule, glow);
                 Transform muzzle = Child(root.transform, "Muzzle", Vector3.zero, Vector3.one);
-                AddMesh(Child(muzzle, "Flare", Vector3.zero, Vector3.one * 1.6f), quad, flare);
+                AddMesh(Child(muzzle, "Flare", Vector3.zero, Vector3.one * 0.8f), quad, flare);
                 Transform end = Child(root.transform, "End", Vector3.zero, Vector3.one);
-                AddMesh(Child(end, "Flare", Vector3.zero, Vector3.one * 2.2f), quad, flare);
+                AddMesh(Child(end, "Flare", Vector3.zero, Vector3.one * 1f), quad, flare);
 
                 BossVictoryBeamRig rig = root.AddComponent<BossVictoryBeamRig>();
                 var so = new SerializedObject(rig);
@@ -96,7 +96,7 @@ public static class BossVictoryGunnerBeamAuthoring
         return made;
     }
 
-    static Material MakeMaterial(Shader shader, string name, bool billboard, Color coreColor, Color glowColor, float corePower, float glowPower, float noise)
+    static Material MakeMaterial(Shader shader, string name, bool billboard, Color coreColor, Color glowColor, float corePower, float glowPower, float noise, float opacity, float startFade, float endFade)
     {
         var m = new Material(shader) { name = name };
         m.SetColor("_CoreColor", coreColor);
@@ -104,6 +104,9 @@ public static class BossVictoryGunnerBeamAuthoring
         m.SetFloat("_CorePower", corePower);
         m.SetFloat("_GlowPower", glowPower);
         m.SetFloat("_NoiseAmount", noise);
+        m.SetFloat("_Opacity", opacity);
+        m.SetFloat("_StartFade", startFade);
+        m.SetFloat("_EndFade", endFade);
         m.SetFloat("_Billboard", billboard ? 1f : 0f);
         if (billboard) m.EnableKeyword("_BILLBOARD");
         return m;
@@ -129,43 +132,60 @@ public static class BossVictoryGunnerBeamAuthoring
         r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
     }
 
-    /// <summary>원통 — 축 +Z, z∈[0,1], 반지름 0.5, 옆면만, 바깥 법선. UV.x = 길이(0 = 총구), UV.y = 둘레 0~1(이음매 정점 복제). 정점 색 흰색.</summary>
-    public static Mesh BuildCylinder(int segments)
+    /// <summary>
+    /// 캡슐 — 옆면 축 +Z, z∈[0,1], 반지름 0.5 + 양 끝 반구. 반구 정점은 z 0·1 에 붙어 있고 UV2.x(늘림 비율 −1~1)로 셰이더가 실제 반지름만큼 민다
+    /// (몸통 Z 스케일 = 길이라 메시로 반구를 만들면 길쭉한 타원이 된다). 법선 = 실제 캡슐 법선, UV.x = 길이(0 = 총구 쪽 끝, 1 = 끝 쪽),
+    /// UV.y = 둘레 0~1(이음매 정점 복제), 정점 색 흰색. 경계 상자는 반구가 나가는 만큼 z 로 넓힌다.
+    /// </summary>
+    public static Mesh BuildCapsule(int segments, int capRings)
     {
         segments = Mathf.Max(3, segments);
+        capRings = Mathf.Max(1, capRings);
         int ring = segments + 1;
-        var vertices = new Vector3[ring * 2];
-        var normals = new Vector3[ring * 2];
-        var uvs = new Vector2[ring * 2];
-        var colors = new Color[ring * 2];
-        var triangles = new int[segments * 6];
-        for (int i = 0; i < ring; i++)
+        // 고리 순서 = +Z 로 갈수록: 총구 반구(극 → 적도) · 끝 반구(적도 → 극). 적도 고리 2개 사이 = 옆면.
+        int rings = (capRings + 1) * 2;
+        var vertices = new Vector3[ring * rings];
+        var normals = new Vector3[ring * rings];
+        var uvs = new Vector2[ring * rings];
+        var uv2 = new Vector2[ring * rings];
+        var colors = new Color[ring * rings];
+        for (int r = 0; r < rings; r++)
         {
-            float around = (float)i / segments;
-            float a = around * Mathf.PI * 2f;
-            var n = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f);
-            vertices[i] = n * 0.5f;
-            vertices[ring + i] = n * 0.5f + Vector3.forward;
-            normals[i] = normals[ring + i] = n;
-            uvs[i] = new Vector2(0f, around);
-            uvs[ring + i] = new Vector2(1f, around);
-            colors[i] = colors[ring + i] = Color.white;
+            bool endCap = r > capRings;
+            int k = endCap ? r - (capRings + 1) : capRings - r;   // 0 = 적도 · capRings = 극
+            float lat = (float)k / capRings * Mathf.PI * 0.5f;
+            float c = Mathf.Cos(lat), s = Mathf.Sin(lat) * (endCap ? 1f : -1f);
+            for (int i = 0; i < ring; i++)
+            {
+                float around = (float)i / segments;
+                float a = around * Mathf.PI * 2f;
+                var dir = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f);
+                int v = r * ring + i;
+                vertices[v] = dir * (0.5f * c) + (endCap ? Vector3.forward : Vector3.zero);
+                normals[v] = dir * c + new Vector3(0f, 0f, s);
+                uvs[v] = new Vector2(endCap ? 1f : 0f, around);
+                uv2[v] = new Vector2(s, 0f);
+                colors[v] = Color.white;
+            }
         }
-        for (int i = 0; i < segments; i++)
-        {
-            int t = i * 6;
-            int b0 = i, b1 = i + 1, t0 = ring + i, t1 = ring + i + 1;
-            // 바깥에서 보이는 면이 앞면(Unity 시계 방향) — 각도가 +Z 축 기준 반시계(+X → +Y)로 늘어난다.
-            triangles[t] = b0; triangles[t + 1] = b1; triangles[t + 2] = t0;
-            triangles[t + 3] = b1; triangles[t + 4] = t1; triangles[t + 5] = t0;
-        }
-        var mesh = new Mesh { name = "Mesh_BossVictoryGunnerBeam_Cylinder" };
+        var triangles = new int[(rings - 1) * segments * 6];
+        int t = 0;
+        for (int r = 0; r < rings - 1; r++)
+            for (int i = 0; i < segments; i++)
+            {
+                int b0 = r * ring + i, b1 = b0 + 1, t0 = b0 + ring, t1 = t0 + 1;
+                // 바깥에서 보이는 면이 앞면(Unity 시계 방향) — 각도가 +Z 축 기준 반시계(+X → +Y)로 늘어난다.
+                triangles[t++] = b0; triangles[t++] = b1; triangles[t++] = t0;
+                triangles[t++] = b1; triangles[t++] = t1; triangles[t++] = t0;
+            }
+        var mesh = new Mesh { name = "Mesh_BossVictoryGunnerBeam_Capsule" };
         mesh.vertices = vertices;
         mesh.normals = normals;
         mesh.uv = uvs;
+        mesh.uv2 = uv2;
         mesh.colors = colors;
         mesh.triangles = triangles;
-        mesh.RecalculateBounds();
+        mesh.bounds = new Bounds(new Vector3(0f, 0f, 0.5f), new Vector3(1f, 1f, 3f));
         return mesh;
     }
 
