@@ -69,6 +69,16 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
     /// <summary>지금 재생 중인가.</summary>
     public bool IsPlaying => _handle.IsSet;
 
+    /// <summary>안전 회수 시간(초, 0 = 없음) — 저작 값 또는 마지막 <see cref="SetSafetyTimeout"/>.</summary>
+    public float SafetyTimeout => safetyTimeout;
+
+    /// <summary>
+    /// 안전 회수 시간을 런타임에 바꾼다(0 = 끔). 끝을 애니 이벤트가 아니라 코드(타임라인)가 정하는 긴 재생용 —
+    /// 보스 처치 연출 거너 Q(298): 레이저 유지 시간·차징 길이가 프로필 값이라 저작 1~3초를 넘으면 도중에 강제 회수돼 안 보였다.
+    /// 끈 쪽이 끝날 때 원래 값으로 되돌릴 책임을 진다(<see cref="EffectSocketSafetyOverride"/>). 재생 중에 불러도 바로 적용된다.
+    /// </summary>
+    public void SetSafetyTimeout(float seconds) => safetyTimeout = Mathf.Max(0f, seconds);
+
     /// <summary>
     /// 배율을 런타임에 바꾼다. 크기가 저작 시점에 정해지지 않는 연출용이다 —
     /// 예고 장판은 판정 반경(인스펙터 튜닝값)과 크기가 같아야 하는데, 애니메이션 이벤트는
