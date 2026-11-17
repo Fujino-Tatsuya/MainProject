@@ -6,8 +6,8 @@ using UnityEngine;
 ///
 /// 저작 규칙(은희 — 이펙트 모양은 프리팹·머티리얼에서 자유롭게):
 ///  · 루트 = 총구(레이저 시작점), 루트 +Z = 레이저 방향. 코드가 루트를 총구에 놓고 끝점을 바라보게 돌린다.
-///  · <b>Body</b> = +Z 방향 1m 로 만든다 — 코드가 Body 의 Z 스케일 = 저작 Z × 길이(m). 굵기(X·Y)는 저작 값 그대로.
-///  · <b>Muzzle</b> = 총구 고정(늘이지 않음) — 총구 섬광·플레어.
+///  · <b>Body</b> = +Z 방향 1m 로 만든다 — 코드가 Body 의 Z 스케일 = 저작 Z × 길이(m), 굵기(X·Y) = 저작 × 프로필 굵기 배율(beamWidthScale).
+///  · <b>Muzzle</b> = 총구 고정(늘이지 않음) — 총구 섬광·플레어. Muzzle·End 크기도 저작 × 굵기 배율.
 ///  · <b>End</b> = 코드가 레이저 끝점으로 옮김 — 끝 플레어·착탄·관통 이펙트.
 ///  · 색·흐름은 머티리얼 값 그대로. 코드는 <b>밝기·페이드</b>만 덮는다 — 렌더러 머티리얼의 첫 색 칸(_Color → _BaseColor → _TintColor)에
 ///    저작 색 × 밝기(rgb), 알파 × 페이드(셰이더가 알파로 사라지게 — 뼈대 셰이더는 rgb × 알파). 색 칸이 없는 렌더러는 건너뛴다.
@@ -47,7 +47,7 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
 
     Slot[] _slots;
     ParticleSystem[] _systems;
-    Vector3 _bodyHome = Vector3.one;
+    Vector3 _bodyHome = Vector3.one, _muzzleHome = Vector3.one, _endHome = Vector3.one;
     MaterialPropertyBlock _block;
     float _clock;
     bool _frozen;
@@ -58,6 +58,8 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
     {
         if (_slots != null) return;
         if (body != null) _bodyHome = body.localScale;
+        if (muzzle != null) _muzzleHome = muzzle.localScale;
+        if (end != null) _endHome = end.localScale;
         _systems = GetComponentsInChildren<ParticleSystem>(true);
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
         _slots = new Slot[renderers.Length];
@@ -93,16 +95,21 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
         }
     }
 
-    /// <summary>매 프레임 — 총구 start → 끝 endPoint 로 놓고, 밝기·페이드(0~1)·멈춤을 적용.</summary>
-    public void Drive(Vector3 start, Vector3 endPoint, float fade, float brightness, bool frozen)
+    /// <summary>매 프레임 — 총구 start → 끝 endPoint 로 놓고, 굵기 배율(프로필 beamWidthScale — 몸통 X·Y·총구·끝 플레어)·밝기·페이드(0~1)·멈춤을 적용.</summary>
+    public void Drive(Vector3 start, Vector3 endPoint, float fade, float brightness, bool frozen, float width = 1f)
     {
         Collect();
         Vector3 d = endPoint - start;
         float length = d.magnitude;
         Quaternion rot = length > 1e-4f ? Quaternion.LookRotation(d / length) : transform.rotation;
         transform.SetPositionAndRotation(start, rot);
-        if (body != null) body.localScale = BodyScale(_bodyHome, length);
-        if (end != null) end.SetPositionAndRotation(endPoint, rot);
+        if (body != null) body.localScale = BodyScale(_bodyHome, length, width);
+        if (muzzle != null) muzzle.localScale = _muzzleHome * Mathf.Max(0f, width);
+        if (end != null)
+        {
+            end.SetPositionAndRotation(endPoint, rot);
+            end.localScale = _endHome * Mathf.Max(0f, width);
+        }
 
         SetFrozen(frozen);
         if (!_frozen) _clock += unscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
@@ -140,8 +147,12 @@ public sealed class BossVictoryBeamRig : MonoBehaviour
         }
     }
 
-    /// <summary>몸통 스케일 — 굵기(X·Y) = 저작 그대로, Z = 저작 Z × 길이(m).</summary>
-    public static Vector3 BodyScale(Vector3 home, float length) => new Vector3(home.x, home.y, home.z * Mathf.Max(0f, length));
+    /// <summary>몸통 스케일 — 굵기(X·Y) = 저작 × 굵기 배율, Z = 저작 Z × 길이(m). 몸통 아래 번개 층도 같이 굵어진다(번개 오프셋 단위 = X 스케일).</summary>
+    public static Vector3 BodyScale(Vector3 home, float length, float width = 1f)
+    {
+        float w = Mathf.Max(0f, width);
+        return new Vector3(home.x * w, home.y * w, home.z * Mathf.Max(0f, length));
+    }
 
     /// <summary>색 = 저작 색 × 밝기(rgb), 알파 × 페이드 — 페이드는 알파에만(셰이더가 rgb × 알파를 하면 두 번 곱해져 페이드² 로 너무 빨리 꺼진다).
     /// 뼈대 셰이더·URP 가산(SrcAlpha One)·알파 블렌드 모두 알파로 사라진다. 알파를 안 쓰는 셰이더(One One 에 rgb 만)는 페이드가 안 먹는다.</summary>

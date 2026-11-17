@@ -46,13 +46,13 @@ public sealed class BossVictoryGunnerQ
     [Min(0.01f)] public float overchargeScale = 1f;
     [Tooltip("발사 순간 방출 섬광(FX_GunnerQVent) 크기(배율).")]
     [Min(0.01f)] public float ventScale = 1f;
-    [Tooltip("레이저 굵기 배율(보이는 것만 — 몸통 입자 폭).")]
+    [Tooltip("레이저 굵기 배율(보이는 것만) — 기존 레이저 = 몸통 입자 폭, 302 새 레이저 = 프리팹 Body 굵기(X·Y)·총구·끝 플레어 크기(저작 크기 × 이 값).")]
     [Min(0.01f)] public float beamWidthScale = 1f;
     [Tooltip("레이저 몸통을 3D 원통으로(300) — 몸통 빌보드 입자를 처치 연출 동안만 원통 메시 렌더로 바꿔, 낮은 앵글·레이저 축 방향 컷에서도 두께가 보인다. " +
              "끄면 예전 빌보드(위에서 볼 때만 두께가 보임). 번개·불꽃·섬광은 그대로.")]
     public bool beamMesh3D = true;
     [Tooltip("처치 연출 전용 레이저 이펙트 프리팹(302) — 루트에 BossVictoryBeamRig(Body = +Z 1m 몸통 · Muzzle = 총구 고정 · End = 끝점). " +
-             "넣으면 기존 레이저(FX_GunnerQBeam)를 안 쓰고 이걸 띄운다 — 굵기 배율·3D 원통·흐름·색 덮어쓰기는 안 먹고(모양·색은 프리팹·머티리얼), 길이·유지·페이드·밝기·광원·진동·반동·통과 지점은 그대로. " +
+             "넣으면 기존 레이저(FX_GunnerQBeam)를 안 쓰고 이걸 띄운다 — 3D 원통·흐름·색 덮어쓰기는 안 먹고(모양·색은 프리팹·머티리얼), 굵기 배율·길이·유지·페이드·밝기·광원·진동·반동·통과 지점은 그대로. " +
              "비우면 기존 레이저. 저작 메뉴 'Tools/Boss Victory/거너 레이저 뼈대 이펙트 만들기 (302)'.")]
     public GameObject victoryBeamPrefab;
     [Tooltip("302 새 레이저도 '레이저 멈춤 시점'에 멈출지(파티클 Pause·셰이더 시계 정지). 끄면 유지 동안 계속 움직인다(루프). 기존 레이저는 늘 멈춤.")]

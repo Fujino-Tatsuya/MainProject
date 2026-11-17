@@ -2172,7 +2172,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             }
             case BossVictoryMarker.GunnerFire:
                 DrawProfileFields("처치 연출 전용 레이저 이펙트(302) — 프리팹(루트 BossVictoryBeamRig: Body +Z 1m · Muzzle · End, 폴더 5.VFX/BossVictory/Gunner) · 멈춤 시점에 같이 멈추기(끄면 루프). " +
-                                  "넣으면 아래 굵기 배율·3D 원통·흐름·색 덮어쓰기는 안 먹는다(모양·색 = 프리팹·머티리얼). 비우면 기존 레이저",
+                                  "넣으면 아래 3D 원통·흐름·색 덮어쓰기는 안 먹는다(모양·색 = 프리팹·머티리얼, 굵기 배율은 프리팹 Body 굵기·플레어 크기에 곱해짐). 비우면 기존 레이저",
                     GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamPrefab)), GunnerQField(nameof(BossVictoryGunnerQ.victoryBeamFreeze)));
                 if (GUILayout.Button("뼈대 이펙트 만들기 (302 — 없는 파일만, 비어 있으면 거너 프로필에 연결)", GUILayout.Width(420f)))
                 {

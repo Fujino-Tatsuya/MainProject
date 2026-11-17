@@ -17,6 +17,44 @@ public class BossVictoryGunnerBeamRigTests
     }
 
     [Test]
+    public void 굵기_배율은_몸통_XY에만_곱하고_길이는_그대로()
+    {
+        Vector3 s = BossVictoryBeamRig.BodyScale(new Vector3(0.5f, 0.7f, 1f), 12f, 3f);
+        Assert.AreEqual(1.5f, s.x, Tolerance);
+        Assert.AreEqual(2.1f, s.y, Tolerance);
+        Assert.AreEqual(12f, s.z, Tolerance, "길이는 굵기 배율과 무관");
+        Assert.AreEqual(0f, BossVictoryBeamRig.BodyScale(Vector3.one, 5f, -1f).x, Tolerance, "음수 배율 = 0");
+    }
+
+    [Test]
+    public void 리그_Drive_는_굵기_배율을_몸통과_총구_끝_플레어에_곱한다()
+    {
+        var root = new GameObject("rig");
+        try
+        {
+            var body = new GameObject("Body").transform; body.SetParent(root.transform, false); body.localScale = new Vector3(0.4f, 0.4f, 1f);
+            var muzzle = new GameObject("Muzzle").transform; muzzle.SetParent(root.transform, false); muzzle.localScale = Vector3.one * 0.8f;
+            var end = new GameObject("End").transform; end.SetParent(root.transform, false);
+            root.SetActive(false);
+            var rig = root.AddComponent<BossVictoryBeamRig>();
+            var so = new UnityEditor.SerializedObject(rig);
+            so.FindProperty("body").objectReferenceValue = body;
+            so.FindProperty("muzzle").objectReferenceValue = muzzle;
+            so.FindProperty("end").objectReferenceValue = end;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            rig.Drive(Vector3.zero, new Vector3(0f, 0f, 10f), 1f, 1f, false, 2f);
+            Assert.AreEqual(0.8f, body.localScale.x, Tolerance);
+            Assert.AreEqual(10f, body.localScale.z, Tolerance);
+            Assert.AreEqual(1.6f, muzzle.localScale.x, Tolerance);
+            Assert.AreEqual(2f, end.localScale.x, Tolerance);
+            rig.Drive(Vector3.zero, new Vector3(0f, 0f, 10f), 1f, 1f, false, 1f);
+            Assert.AreEqual(0.4f, body.localScale.x, Tolerance, "배율을 되돌리면 저작 굵기(누적 아님)");
+            Assert.AreEqual(0.8f, muzzle.localScale.x, Tolerance);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    [Test]
     public void 색은_밝기만_곱하고_페이드는_알파에만()
     {
         Color c = BossVictoryBeamRig.Look(new Color(2f, 1f, 0.5f, 0.8f), 3f, 0.5f);
