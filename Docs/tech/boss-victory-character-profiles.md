@@ -10,13 +10,13 @@
 | 백대쉬(거리·시간·곡선·보정 각·후 대기) | `BossVictoryProfile.backDash*` | ✅ |
 | 대상별 시간 배율 4개(하던 동작·처치자 End 후·팀원·보스 End 후) | `BossVictoryProfile.*Scale` | ✅ |
 | 처치 연출 스킬 칸 | `BossVictoryProfile.finisherSlot` | ✅ |
-| 팔레트 기준 색·대비 설정·칸별 직접 지정(271, §4.11) | `BossVictoryProfile.baseColor`·`contrast*`·`paletteOverrides` | ✅ (공용 색 = 기준 팔레트) |
+| 팔레트 17칸 — 칸마다 독립 색(271, 11-16 관계 끊음, §4.11) | `BossVictoryProfile.paletteColors` | ✅ |
 | **RECTIFY 주황 채움 = 캐릭터별(11-12, §4.12)** — 머무름·와이프·방향·들쭉날쭉·줄 굵기·좌우 색·보간 세기·안쪽 주사선 간격·어둡기 | `BossVictoryProfile.rectifyOrange*`·`rectifyScanline*` | ✅
 | 화면 효과 모양(호박색·주사선·찢김·보스 노이즈·CRT 색·셰이더)·벽 숨김 기준·보스 피격 애니 상태·마커 옵션(포커스 블렌드·숨김 대상) | `BossVictoryGlitchSettings` | ❌ 공용 |
 
 - 에셋: 공용 `Assets/Resources/BossVictory/BossVictoryGlitchSettings.asset` · 프로필 `Assets/Resources/BossVictory/Profiles/BossVictoryProfile_{Paladin,Gunner,Assassin}.asset`. 기본 프로필 에셋 `BossVictoryProfile_Default` 는 **11-12 삭제**(사용자 지시) — 공용 `defaultProfile` 칸은 비어 있다.
 - **고르기**: 공용 설정의 `characterProfiles` 표(캐릭터 → 프로필). 캐릭터 = 기존 캐릭터 판별 `TutorialCharacter`(로스터 칸, `TutorialLocalPlayerInfo.ResolveCharacter`). 같은 캐릭터 두 줄이면 앞 줄. **표에 없거나 프로필이 비면 `defaultProfile`, 그것도 비면(정본) 코드 기본값** `BossVictoryProfile.CreateDefault()`(저장 안 되는 인스턴스 하나, 처음 쓸 때 로그 1회). 순수 함수 `BossVictoryProfileSelect.Select`.
-- 처음 내용: 267 이전 설정 에셋 값을 그대로 복제(기본·세 캐릭터 같은 내용) → 그 뒤 캐릭터별 튜닝. 기본 프로필 에셋은 11-12 삭제 — 지금은 표에 없는 캐릭터·처치자를 못 찾은 회차만 코드 기본값(코드 초기값 타임라인 = 옛 기본 곡선, 처치자 검·백대쉬 동시 끔, 기준 색 #D6AB69)을 쓴다.
+- 처음 내용: 267 이전 설정 에셋 값을 그대로 복제(기본·세 캐릭터 같은 내용) → 그 뒤 캐릭터별 튜닝. 기본 프로필 에셋은 11-12 삭제 — 지금은 표에 없는 캐릭터·처치자를 못 찾은 회차만 코드 기본값(코드 초기값 타임라인 = 옛 기본 곡선, 처치자 검·백대쉬 동시 끔, 팔레트 = 코드 기본 색)을 쓴다.
 - 프리팹 수정 없음. `PlayerVictoryFinisher`(어느 프리팹에도 안 붙어 있던 Variant 스킬 칸 컴포넌트)는 삭제 — 스킬 칸은 프로필.
 
 ## 2. 네트워크
@@ -131,29 +131,22 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
   - 낙하 검은 월드 고정 원샷이라 처치자 배율에 원래 안 걸린다 — 느려짐 뒤에도 원래 속도로 떨어진다(맞추지 않음: 공중에서 거의 멈춘 칼이 되고, 마무리 낙뢰 타이밍이 클립 Custom0 과 어긋난다).
 - 프리팹 수정 없음(런타임). 다른 캐릭터는 `PaladinSkillView` 가 없어 칸을 켜도 무시. 새 RPC 없음 — 복제 처치 상태로 각 피어가 `Begin`(늦은 참가자 같음). 순수 판단 `BossVictoryGlitchPresentation.UsesKillerSword`(EditMode `BossVictoryProfileTests`).
 
-## 4.11 기준 색 → 팔레트 자동(271)
+## 4.11 팔레트 = 칸마다 독립 색(271 · 11-16 관계 끊음)
 
-프로필 칸 하나(`baseColor`, 기준 색)로 처치 연출 화면 효과 색 15칸을 계산한다. 순수 함수 `BossVictoryPaletteCalc`(`Map/BossVictory/BossVictoryPalette.cs`), EditMode `BossVictoryPaletteTests`.
+처치 연출 화면 효과 색 17칸 = 프로필 `paletteColors`(칸 순서 = `BossVictoryPaletteSlot`). `BossVictoryPalette.From(profile)` 이 칸을 그대로 읽는다 — **계산 없음, 칸끼리 관계 없음**(한 칸을 바꿔도 다른 칸은 안 바뀐다). EditMode `BossVictoryPaletteTests`.
 
-- **기준 팔레트 = 공용 설정 색 그대로**: `BossVictoryGlitchSettings` 의 amberColor·bossNoiseBright/Dark·rectifyColor·rectifyCircles[0..2] 좌우·rectifyCircleGrayColor·rectifyGlowColor·crtOffGlowColor(+ 처치자 프로필 rectifyOrangeLeft/Right, 11-12 §4.12)는 이제 '팔라딘 기준 팔레트'다. 기준 색의 기준 = 공용 `amberColor`, 대비 기준 색의 기준 = 공용 `crtOffGlowColor`. (`rectifyWhiteColor` 는 옛 이관 전용 숨은 칸이라 빠진다.)
-- **칸** = `BossVictoryPaletteSlot`(호박색·노이즈 밝음/어두움·RECTIFY 외곽선·①②③ 원 좌우·③ 회색·주황 좌우·글로우·TV 꺼짐). 직렬화 값이라 순서를 바꾸지 않는다.
-- **기조 그룹 규칙**(HSV, sRGB 값): 색 = 공용 색에서 색조 += (새 기준 색조 − 공용 호박색 색조), 채도·밝기 ×= (새 기준 ÷ 공용 호박색). 호박색 칸 = 기준 색 자체. 1 이하(LDR) 색은 밝기 1 에서 자르고, 1 넘는 HDR 색은 세기를 비율 그대로 유지(노이즈 밝은 색 배율 `bossNoiseBrightIntensity` 는 색 계산 뒤 그대로 곱한다).
-- **무채색 그대로**: 채도 < 0.02(흰 외곽선·③ 흰·③ 회색·글로우 흰색)는 색조가 없어 기준 색을 바꿔도 그대로.
-- **대비 그룹**(①·② 원 좌우 4색 + TV 꺼짐 발광): 대비 기준 색을 따라간다(그룹 안 색 = 공용 TV 꺼짐 파랑 → 대비 기준 색 관계, 위와 같은 규칙). TV 꺼짐 발광 = 대비 기준 색 자체.
-  - `contrastMode = Auto`(기본): 색조 = 기준 색 색조 + `contrastHueOffset`(기본 174.0697° = 공용 TV 꺼짐 파랑 − 공용 호박색, 팔라딘 결과 그대로 — 창 '색조 차이 = 공용에서 역산' 버튼). 채도·밝기 = 공용 TV 꺼짐 × 기조와 같은 비율 → **하한** `contrastMinSaturation`(0.45)·`contrastMinValue`(0.6).
-  - **하한을 둔 이유**: 비율 규칙만 쓰면 기준 색이 회색(채도 0)일 때 대비 기준 채도도 0 → ①·② 원·TV 꺼짐까지 회색이 돼 RECTIFY 안쪽 색 연출의 '색이 터지는' 단계가 사라진다. 어두운 기준 색도 같은 이유로 밝기 하한. 기조 그룹은 하한 없이 회색·어둡게 따라간다(회색 캐릭터 = 회색 화면이 자연스러움). 팔라딘 값(채도 0.75·밝기 1)은 하한 위라 영향 없음.
-  - `contrastMode = Manual`: `contrastColor` 를 그대로 대비 기준 색으로(하한 안 걸림).
-- **칸별 직접 지정**: 프로필 `paletteOverrides`(칸·manual·색). manual 켬 = 그 칸은 그 색 그대로(HDR 가능), 끄면 자동(색은 다시 켤 때를 위해 남김). 같은 칸 두 줄이면 앞 줄. 기본 = 비어 있음(전부 자동).
-- **처음 값**: 세 프로필(팔라딘·거너·어쌔신)과 코드 기본값 모두 기준 색 #D6AB69(= 공용 호박색) → 지금 색과 같다. 테스트는 값이 아니라 관계를 고정한다(기준 색 = 공용 호박색이면 공용 색 그대로, 오차 1e-3 — 세 프로필 기준 색은 사용자 튜닝 값, 코드 기본값만 #D6AB69 고정). 기본 프로필 에셋은 11-12 삭제.
-- **런타임**: `BossVictoryGlitchPresentation.Begin` 이 처치자 프로필을 고르는 순간 `_palette` 를 계산해 `BossVictoryGlitchRender.Enable(settings, palette, orange)`·TV 꺼짐 `BossVictoryCrtOff` 에 넘긴다. 새 RPC 없음 — 복제된 `KillerClientId` → 처치자 캐릭터 → 프로필 → 같은 팔레트(늦은 참가자도). 렌더러 `Enable` 은 이미 켜져 있으면 색만 다시 넣는다.
-- **편집**: 타임라인 창 인스펙터 위 **'팔레트'** 버튼(또는 노란 틴트·보스 노이즈·TV 꺼짐·RECTIFY 트랙 칸의 '팔레트') — 기준 색·대비 모드/색조 차이/하한(또는 대비 색), 계산된 대비 기준 색, 15칸 견본(자동/직접 표시·체크 = 직접 지정·직접이면 색 편집). Play 중 연출이 돌면 바꾼 값이 바로 화면에(`RefreshLook`, TV 꺼짐은 다음 꺼짐부터). 트랙 칸의 공용 색을 고치면 기준 팔레트가 바뀌어 모든 캐릭터에 같은 관계로 퍼진다.
+- **11-16 관계 끊음(사용자 요청 — "다른 색에 의해 내 색이 정해지는 모든 컬러를 화면 색으로 역산해 넣고 관계를 끊어줘")**: 그 전까지는 프로필 기준 색(`baseColor`) 하나에서 공용 설정 색(= 팔라딘 기준 팔레트)을 색조 회전·채도/밝기 비율로 옮겨 계산했다(대비 그룹 = 대비 기준 색 자동/직접 + 하한, 글자 그룹 = `textBaseColor`(11-13), 칸별 직접 지정 `paletteOverrides`, 주황 채움 원본 = 프로필 `rectifyOrangeLeft/Right`). 세 프로필마다 그 계산 결과(그때 화면 색)를 배치 모드에서 옛 계산식 그대로 구워 `paletteColors` 에 넣고, 계산식(`BossVictoryPaletteCalc`)·입력 칸(`baseColor`·`separateTextColor`·`textBaseColor`·`contrast*`·`paletteOverrides`·`rectifyOrangeLeft/Right`)을 지웠다.
+- **공용 설정 색 칸은 화면에 안 쓴다**: `amberColor`·`bossNoiseBright/DarkColor`·`rectifyColor`·`rectifyCircles[].left/rightColor`·`rectifyCircleGrayColor`·`rectifyGlowColor`·`crtOffGlowColor` 는 옛 값 보관용 숨은 칸(`[HideInInspector]`) — 창 트랙 칸에서도 뺐다. 세기·모양 값(`bossNoiseBrightIntensity` 등)은 그대로 공용.
+- **코드 기본 색**: `BossVictoryPalette.CreateDefaultColors()` = 굽기 때 팔라딘 색. 프로필이 없는 회차(코드 기본 프로필)·칸이 모자란 프로필은 이 색으로 그린다.
+- **런타임**: `BossVictoryGlitchPresentation.Begin` 이 처치자 프로필을 고르는 순간 `_palette = BossVictoryPalette.From(profile)` → `BossVictoryGlitchRender.Enable/ApplyLook`·TV 꺼짐 `BossVictoryCrtOff`. 새 RPC 없음 — 복제된 `KillerClientId` → 처치자 캐릭터 → 프로필 → 같은 색(늦은 참가자도).
+- **편집**: 타임라인 창 인스펙터 위 **'팔레트'** 버튼(또는 노란 틴트·보스 노이즈·TV 꺼짐·RECTIFY 트랙 칸의 '팔레트') — 17칸 색을 바로 편집(HDR). Play 중 연출이 돌면 바로 화면에(`RefreshLook`, TV 꺼짐은 다음 꺼짐부터). 프로필 에셋 인스펙터에서도 `paletteColors` 로 고칠 수 있다(다음 회차부터).
 
 ## 4.12 RECTIFY 주황 채움 = 캐릭터별(11-12)
 
 공용 설정의 'RECTIFY 주황 채움' 10칸(`rectifyOrangeHold/Wipe/RightToLeft/Jitter/RowPixels/Left/Right/Gradient`·`rectifyScanlineSpacing/Dark`)을 `BossVictoryProfile`(인스펙터 'RECTIFY 주황 채움(캐릭터별)')로 옮기고 공용에서는 지웠다.
 - **이전**: 세 프로필에 옮기기 전 공용 값(사용자 튜닝 포함 — 왼쪽→오른쪽·좌 (1, 0.27, 0)·우 (1, 0, 0.455))을 Unity 에서 그대로 복사 → 화면은 옮기기 전과 같다. `CreateDefault()`(표에 없는 캐릭터) 기본값도 같은 값(`BossVictoryOrangeLook.Default*`).
 - **런타임**: 처치자 프로필 → `BossVictoryOrangeLook.From(profile)`(하한·0~1 자르기) → `BossVictoryGlitchRender.Enable/ApplyLook(settings, palette, orange)`. 처치자 = 복제된 `KillerClientId`(새 RPC·복제 값 없음).
-- **팔레트(271)**: 칸 `OrangeLeft/Right` 는 그대로, 기준(원본) 색만 처치자 프로필 `rectifyOrangeLeft/Right`(`ReferenceColors(settings, profile)`). 기준 색 따라가기·칸별 직접 지정 규칙은 같고 팔레트 견본도 프로필 값을 따른다.
+- **팔레트(271)**: 주황 채움 색 = 팔레트 칸 `OrangeLeft/Right`(11-16부터 칸에 직접 — 프로필 `rectifyOrangeLeft/Right` 원본 칸은 지움, §4.11). 이 절의 10칸 중 색 2칸이 빠져 지금은 모양 8칸.
 - **편집**: 타임라인 창 RECTIFY 안쪽 색 트랙 칸 — '주황 채움' 칸이 지금 고른 캐릭터 프로필 값. 테스트 `BossVictoryOrangeProfileTests`(세 프로필 값 = 옛 공용 값 · 렌더 값 = 처치자 프로필).
 
 ## 4.13 처치자 이동 = 캐릭터별(272)
@@ -208,7 +201,7 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 
 - **림라이트(역림)**: 보스 실루엣 안쪽 전부 = 팔레트 칸 '보스 림 안쪽'(`RimInside`) × `bossRimInsideIntensity`(기본 2 — 1 넘으면 블룸이 받는 과노출), 테두리만 '보스 림 테두리'(`RimEdge`). 노이즈 텍스처 없음.
 - **테두리 = 프레넬**(카메라 기준 모든 가장자리, 방향 치우침 없음): 마스크 패스(`BossVictoryGlitchMask.shader`)가 보스를 그릴 때 G 채널 = 1 − saturate(N·V)(플레이어 G 0). 합성(`BossVictoryGlitch.shader`)에서 림 가중치 = smoothstep(문턱 − 부드러움, 문턱 + 부드러움, G), 문턱 = 1 − `bossRimWidth`(기본 0.35), 부드러움 `bossRimSoftness`(기본 0.1). 같은 식 = `BossVictoryBossLook.RimWeight`. 새 텍스처·메시·패스 없음(기존 마스크 ID 텍스처의 빈 G 채널), 셰이더는 공용 설정 `maskShader`·`compositeShader` 칸 그대로(빌드 포함 참조).
-- **색(271 팔레트)**: 칸 15 `RimInside` 기준 = 공용 `bossNoiseBrightColor`, 칸 16 `RimEdge` 기준 = `bossNoiseDarkColor` — 처치자 프로필 기준 색을 노이즈 두 색과 같은 규칙으로 따라가고 팔레트 패널에서 직접 지정 가능. 노이즈 밝은 색 배율 `bossNoiseBrightIntensity` 는 노이즈에만(림 안쪽은 `bossRimInsideIntensity`).
+- **색(271 팔레트)**: 칸 15 `RimInside`·칸 16 `RimEdge` — 다른 칸처럼 독립 색(11-16 관계 끊음 전엔 노이즈 두 색을 따라갔다, §4.11). 노이즈 밝은 색 배율 `bossNoiseBrightIntensity` 는 노이즈에만(림 안쪽은 `bossRimInsideIntensity`).
 - **편집**: 타임라인 창 '보스 노이즈' 클립 노드 칸 '보스 표현(캐릭터별)'(모드·굵기·부드러움·안쪽 세기) + '팔레트' 패널 두 칸. Play 중 바꾸면 바로 반영. 디버그 랩(DebugBossVictory) F1 로 어쌔신을 고르면 바로 확인. 어쌔신 설정 메뉴 `Tools/Boss Victory/어쌔신 보스 표현 = 림라이트`.
 - 각 피어 로컬 표시, 새 RPC 없음. EditMode `BossVictoryBossLookTests`(기본값·캐릭터별 모드·팔레트 칸·림 가중치·셰이더 오류 없음).
 - 한계: 프레넬은 메시 법선 기준이라 평평한 면이 넓은 부위는 테두리가 굵거나 얇게 보일 수 있다(굵기·부드러움으로 맞춤). 마스크는 점 샘플이라 테두리 경계가 픽셀 단위.

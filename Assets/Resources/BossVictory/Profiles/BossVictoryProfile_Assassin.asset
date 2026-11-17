@@ -765,20 +765,29 @@ MonoBehaviour:
     bossSlowTime: 0.46
     chargeStartTime: -1
     killerActionEndTime: 0
-  baseColor: {r: 0.8867924, g: 0.225881, b: 0.2298093, a: 1}
-  contrastMode: 0
-  contrastHueOffset: 174.0697
-  contrastColor: {r: 0.25, g: 0.62, b: 1, a: 1}
-  contrastMinSaturation: 0.45
-  contrastMinValue: 0.6
-  paletteOverrides: []
+  paletteColors:
+  - {r: 0.4415095, g: 0.069142014, b: 0.0720973, a: 1}
+  - {r: 1, g: 0.8794998, b: 0.88432217, a: 1}
+  - {r: 0.24034558, g: 0, b: 0.116915695, a: 1}
+  - {r: 1, g: 1, b: 1, a: 1}
+  - {r: 0, g: 1, b: 0.007710457, a: 1}
+  - {r: 1, g: 0.787105, b: 0.0013071299, a: 1}
+  - {r: 0.13725483, g: 1, b: 0.45734322, a: 1}
+  - {r: 0, g: 0.13119315, b: 0.65882355, a: 1}
+  - {r: 0, g: 0.20979705, b: 0.41176468, a: 1}
+  - {r: 0.47441345, g: 0.060056828, b: 0.9094339, a: 1}
+  - {r: 0.5411765, g: 0.5411765, b: 0.5411765, a: 1}
+  - {r: 0, g: 0, b: 0, a: 1}
+  - {r: 0.47843134, g: 0, b: 0.02325414, a: 1}
+  - {r: 1, g: 1, b: 1, a: 1}
+  - {r: 0, g: 1, b: 0.8952179, a: 1}
+  - {r: 1, g: 0.8794998, b: 0.88432217, a: 1}
+  - {r: 0.24034558, g: 0, b: 0.116915695, a: 1}
   rectifyOrangeHold: 0.05
   rectifyOrangeWipe: 0.1
   rectifyOrangeRightToLeft: 0
   rectifyOrangeJitter: 0.2
   rectifyOrangeRowPixels: 4
-  rectifyOrangeLeft: {r: 0, g: 0, b: 0, a: 1}
-  rectifyOrangeRight: {r: 0.4792453, g: 0.1895526, b: 0, a: 1}
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.003
   rectifyScanlineDark: 0

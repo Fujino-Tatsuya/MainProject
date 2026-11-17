@@ -4,7 +4,7 @@ using UnityEngine.Serialization;
 
 /// <summary>
 /// 보스 처치 연출 캐릭터별 프로필(할 일 267 — A안: 캐릭터별 값을 에셋 통째로). 타임라인 전체(카메라 컷·처치자 평타·마커·끝 자르기·느려짐·보스 노드·화면 효과 세기 클립) +
-/// 백대쉬 + 대상별 시간 배율 + 처치 연출 스킬 칸 + 팔레트 기준 색(271). 화면 효과 모양(노이즈·찢김·CRT·셰이더·벽 숨김 기준)과 기준(팔라딘) 색은 공용 <see cref="BossVictoryGlitchSettings"/> — 실제 색 = <see cref="BossVictoryPaletteCalc"/>.
+/// 백대쉬 + 대상별 시간 배율 + 처치 연출 스킬 칸 + 팔레트(271 — 칸마다 독립 색 17칸, <see cref="BossVictoryPalette"/>). 화면 효과 모양(노이즈·찢김·CRT·셰이더·벽 숨김 기준)은 공용 <see cref="BossVictoryGlitchSettings"/>.
 /// 고르는 곳 = 공용 설정의 '캐릭터 → 프로필' 표(<see cref="BossVictoryGlitchSettings.characterProfiles"/>), 없거나 비면 기본 프로필(<see cref="BossVictoryGlitchSettings.defaultProfile"/>).
 /// 정본 에셋 = <c>Resources/BossVictory/Profiles/</c>(저작 메뉴 <c>Tools/Boss Victory/캐릭터별 프로필 만들기 (267)</c>).
 /// </summary>
@@ -75,21 +75,9 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
     public BossVictoryTimeline timeline = BossVictoryTimeline.CreateDefault();
 
-    [Header("팔레트(271 — 기준 색 하나로 화면 효과 색 자동, 계산 = BossVictoryPaletteCalc)")]
-    [Tooltip("이 캐릭터 기준 색. 공용 설정 색들은 '공용 amberColor 기준' 관계로 해석해 이 색을 따라간다(색조 회전 + 채도·밝기 비율). 공용 amberColor 와 같으면 공용 색 그대로.")]
-    public Color baseColor = BossVictoryPaletteCalc.DefaultBaseColor;
-    [Tooltip("대비 그룹(① 마젠타·② 블루 원 좌우·TV 꺼짐 발광) 기준 색 — 자동 = 기준 색 색조 + 색조 차이 / 직접 지정 = 아래 대비 색.")]
-    public BossVictoryContrastMode contrastMode = BossVictoryContrastMode.Auto;
-    [Tooltip("자동일 때 대비 기준 색 색조 = 기준 색 색조 + 이 값(도). 기본 = 공용 TV 꺼짐 파랑 − 공용 amberColor 에서 역산(팔라딘 결과 그대로).")]
-    [Range(-180f, 180f)] public float contrastHueOffset = BossVictoryPaletteCalc.DefaultContrastHueOffset;
-    [Tooltip("직접 지정일 때 대비 기준 색(TV 꺼짐 발광 색이 그대로 이 색).")]
-    public Color contrastColor = BossVictoryPaletteCalc.DefaultContrastColor;
-    [Tooltip("자동일 때 대비 기준 색 채도 하한 — 기준 색이 회색에 가까워도 대비색이 죽지 않게.")]
-    [Range(0f, 1f)] public float contrastMinSaturation = BossVictoryPaletteCalc.DefaultContrastMinSaturation;
-    [Tooltip("자동일 때 대비 기준 색 밝기 하한 — 기준 색이 어두워도 대비색이 보이게.")]
-    [Range(0f, 1f)] public float contrastMinValue = BossVictoryPaletteCalc.DefaultContrastMinValue;
-    [Tooltip("칸별 직접 지정(기본 = 비어 있음 = 전부 자동). manual 켬 = 그 칸은 이 색 그대로.")]
-    public List<BossVictoryPaletteOverride> paletteOverrides = new List<BossVictoryPaletteOverride>();
+    [Header("팔레트(271 — 칸마다 독립 색, 칸 순서 = BossVictoryPaletteSlot)")]
+    [Tooltip("화면 효과 색 17칸(배경 호박색·보스 노이즈·RECTIFY 외곽선·①②③ 원·회색·주황 채움·글로우·TV 꺼짐·보스 림). 칸끼리 관계 없음 — 한 칸을 바꿔도 다른 칸은 그대로(11-16 관계 끊음, 그때 화면 색을 구워 넣음). 편집은 타임라인 창 '팔레트' 칸.")]
+    [ColorUsage(true, true)] public Color[] paletteColors = BossVictoryPalette.CreateDefaultColors();
 
     [Header("RECTIFY 주황 채움(캐릭터별) — 흰 원이 다 퍼진 뒤(11-12 공용 설정에서 옮김)")]
     [Tooltip("흰 원이 다 퍼진 뒤 흰색으로 머무는 시간(초).")]
@@ -102,10 +90,6 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Range(0f, 1f)] public float rectifyOrangeJitter = BossVictoryOrangeLook.DefaultJitter;
     [Tooltip("와이프 줄 굵기(px).")]
     [Min(1f)] public float rectifyOrangeRowPixels = BossVictoryOrangeLook.DefaultRowPixels;
-    [Tooltip("주황 채움 왼쪽 색(W 쪽) — 팔레트 칸 OrangeLeft 의 기준 색(기준 색을 따라 자동 변환, 칸 직접 지정이 있으면 그 색).")]
-    public Color rectifyOrangeLeft = BossVictoryOrangeLook.DefaultLeft;
-    [Tooltip("주황 채움 오른쪽 색(T 쪽) — 팔레트 칸 OrangeRight 의 기준 색.")]
-    public Color rectifyOrangeRight = BossVictoryOrangeLook.DefaultRight;
     [Tooltip("좌→우 색 보간 세기(0 = 왼쪽 색만).")]
     [Range(0f, 1f)] public float rectifyOrangeGradient = BossVictoryOrangeLook.DefaultGradient;
     [Tooltip("안쪽 주사선 간격(화면 높이 비율).")]
@@ -162,18 +146,14 @@ public readonly struct BossVictoryOrangeLook
     public const bool DefaultRightToLeft = false;
     public const float DefaultJitter = 0.2f;
     public const float DefaultRowPixels = 4f;
-    public static readonly Color DefaultLeft = new Color(1f, 0.2696447f, 0f, 1f);
-    public static readonly Color DefaultRight = new Color(1f, 0f, 0.455451f, 1f);
     public const float DefaultGradient = 1f;
     public const float DefaultScanlineSpacing = 0.003f;
     public const float DefaultScanlineDark = 0f;
 
     public readonly float Hold, Wipe, Jitter, RowPixels, Gradient, ScanlineSpacing, ScanlineDark;
     public readonly bool RightToLeft;
-    /// <summary>기준 색(팔레트 칸 OrangeLeft/Right 의 원본 — 실제 그리는 색은 팔레트 결과).</summary>
-    public readonly Color Left, Right;
 
-    BossVictoryOrangeLook(float hold, float wipe, bool rightToLeft, float jitter, float rowPixels, Color left, Color right,
+    BossVictoryOrangeLook(float hold, float wipe, bool rightToLeft, float jitter, float rowPixels,
         float gradient, float scanlineSpacing, float scanlineDark)
     {
         Hold = Mathf.Max(0f, hold);
@@ -181,19 +161,17 @@ public readonly struct BossVictoryOrangeLook
         RightToLeft = rightToLeft;
         Jitter = Mathf.Clamp01(jitter);
         RowPixels = Mathf.Max(1f, rowPixels);
-        Left = left;
-        Right = right;
         Gradient = Mathf.Clamp01(gradient);
         ScanlineSpacing = scanlineSpacing;
         ScanlineDark = Mathf.Clamp01(scanlineDark);
     }
 
     public static BossVictoryOrangeLook Default => new BossVictoryOrangeLook(DefaultHold, DefaultWipe, DefaultRightToLeft, DefaultJitter,
-        DefaultRowPixels, DefaultLeft, DefaultRight, DefaultGradient, DefaultScanlineSpacing, DefaultScanlineDark);
+        DefaultRowPixels, DefaultGradient, DefaultScanlineSpacing, DefaultScanlineDark);
 
     public static BossVictoryOrangeLook From(BossVictoryProfile p) => p == null ? Default
         : new BossVictoryOrangeLook(p.rectifyOrangeHold, p.rectifyOrangeWipe, p.rectifyOrangeRightToLeft, p.rectifyOrangeJitter,
-            p.rectifyOrangeRowPixels, p.rectifyOrangeLeft, p.rectifyOrangeRight, p.rectifyOrangeGradient,
+            p.rectifyOrangeRowPixels, p.rectifyOrangeGradient,
             p.rectifyScanlineSpacing, p.rectifyScanlineDark);
 }
 
