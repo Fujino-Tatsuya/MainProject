@@ -38,7 +38,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         var w = GetWindow<BossVictoryTimelineWindow>();
         w.titleContent = new GUIContent("처치 연출 타임라인");
-        w.minSize = new Vector2(520f, 360f);
+        w.minSize = new Vector2(MinPanelWidth + SplitterWidth + MinTimelineWidth + 40f, 360f);
         w.Show();
     }
 
@@ -48,31 +48,32 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Undo.undoRedoPerformed += OnUndoRedo;
         SceneView.duringSceneGui += OnSceneGUI;   // 순간이동 Q 두 점 핸들(272)
         wantsMouseMove = false;
-        _inspectorHeight = EditorPrefs.GetFloat(InspectorHeightPref, DefaultInspectorHeight);
+        _panelWidth = EditorPrefs.GetFloat(PanelWidthPref, DefaultPanelWidth);
     }
 
-    // ── 타임라인 / 노드 인스펙터 분할 바(255 후속 9) — 위아래로 끌어 인스펙터 높이(최소·최대 제한, EditorPrefs 기억). 넘치는 쪽은 세로 스크롤. ──
-    const string InspectorHeightPref = "BossVictoryTimelineWindow.InspectorHeight";
-    const float DefaultInspectorHeight = 260f;
-    const float MinInspectorHeight = 80f;
-    const float MinTimelineHeight = 120f;
-    const float SplitterHeight = 6f;
-    float _inspectorHeight = DefaultInspectorHeight;
+    // ── 왼쪽 속성 패널 / 타임라인 분할 막대(296 — 옛 아래 칸 255 후속 9 를 왼쪽 세로 패널로) — 좌우로 끌어 패널 폭(최소·최대 제한, EditorPrefs 기억).
+    //    패널 내용이 길면 세로 스크롤. 타임라인은 오른쪽 나머지. ──
+    const string PanelWidthPref = "BossVictoryTimelineWindow.PanelWidth";
+    const float DefaultPanelWidth = 360f;
+    const float MinPanelWidth = 220f;
+    const float MinTimelineWidth = 260f;
+    const float SplitterWidth = 6f;
+    float _panelWidth = DefaultPanelWidth;
     bool _splitDragging;
     Vector2 _timelineScroll;
     Rect _bodyVisible;          // 트랙 스크롤 뷰 안 좌표의 보이는 칸(267 후속 — 밖을 누른 이벤트 무시)
     int _rulerControlId = -1;   // 시간 눈금 재생 헤드 끌기 hotControl
     Vector2 _inspectorScroll;
 
-    float MaxInspectorHeight => Mathf.Max(MinInspectorHeight, position.height - EditorStyles.toolbar.fixedHeight - SplitterHeight - MinTimelineHeight);
+    float MaxPanelWidth => Mathf.Max(MinPanelWidth, position.width - SplitterWidth - MinTimelineWidth);
+    float PanelWidth => Mathf.Clamp(_panelWidth, MinPanelWidth, MaxPanelWidth);
 
-    void DrawSplitter()
+    void DrawSplitter(Rect bar)
     {
-        Rect bar = GUILayoutUtility.GetRect(position.width, SplitterHeight, GUILayout.ExpandWidth(true));
         int id = GUIUtility.GetControlID(FocusType.Passive);
         Event e = Event.current;
-        EditorGUI.DrawRect(new Rect(bar.x, bar.y + SplitterHeight * 0.5f - 1f, bar.width, 2f), _splitDragging ? Color.white : new Color(0.08f, 0.08f, 0.08f));
-        EditorGUIUtility.AddCursorRect(bar, MouseCursor.ResizeVertical);
+        EditorGUI.DrawRect(new Rect(bar.x + SplitterWidth * 0.5f - 1f, bar.y, 2f, bar.height), _splitDragging ? Color.white : new Color(0.08f, 0.08f, 0.08f));
+        EditorGUIUtility.AddCursorRect(bar, MouseCursor.ResizeHorizontal);
         switch (e.type)
         {
             case EventType.MouseDown when e.button == 0 && bar.Contains(e.mousePosition):
@@ -81,14 +82,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 e.Use();
                 break;
             case EventType.MouseDrag when _splitDragging && GUIUtility.hotControl == id:
-                _inspectorHeight = Mathf.Clamp(position.height - e.mousePosition.y - SplitterHeight * 0.5f, MinInspectorHeight, MaxInspectorHeight);
+                _panelWidth = Mathf.Clamp(e.mousePosition.x - SplitterWidth * 0.5f, MinPanelWidth, MaxPanelWidth);
                 e.Use();
                 Repaint();
                 break;
             case EventType.MouseUp when _splitDragging:
                 _splitDragging = false;
                 if (GUIUtility.hotControl == id) GUIUtility.hotControl = 0;
-                EditorPrefs.SetFloat(InspectorHeightPref, _inspectorHeight);
+                EditorPrefs.SetFloat(PanelWidthPref, _panelWidth);
                 e.Use();
                 break;
         }
@@ -165,13 +166,31 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             FitAll();
         }
 
-        // 타임라인 영역(267 후속 — 스크롤바): 위 시간 눈금 = 세로 고정·가로(_scrollTime) 따라감 · 왼쪽 이름 열 = 세로 따라감·가로 고정 ·
-        // 세로 = 스크롤 뷰(트랙이 넘치면 막대, 맨 밑에 트랙 1칸 여유) · 가로 = 시간 스크롤 막대(확대해서 넘칠 때만, 맨 아래 고정).
+        // 왼쪽 = 속성 패널(296 — 세로 스크롤, 폭은 분할 막대) · 오른쪽 = 타임라인. 선택이 바뀌는 타임라인 입력보다 패널을 먼저 그린다(같은 이벤트 안 레이아웃 어긋남 방지).
+        if (!HasClipSelection) _selIndex = -1;   // Undo 로 목록이 줄었으면
+        using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandHeight(true)))
+        {
+            float panelWidth = PanelWidth;
+            _inspectorScroll = EditorGUILayout.BeginScrollView(_inspectorScroll, GUILayout.Width(panelWidth), GUILayout.ExpandHeight(true));
+            float labelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = Mathf.Clamp(panelWidth * 0.45f, 90f, 170f);
+            DrawInspector();
+            EditorGUIUtility.labelWidth = labelWidth;
+            EditorGUILayout.EndScrollView();
+            DrawSplitter(GUILayoutUtility.GetRect(SplitterWidth, SplitterWidth, 10f, 100000f, GUILayout.ExpandHeight(true)));
+            Rect timelineView = GUILayoutUtility.GetRect(MinTimelineWidth, 100000f, 100f, 100000f, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            DrawTimeline(timelineView);
+        }
+        ShowPendingCopyPopup();
+    }
+
+    // 타임라인 영역(267 후속 — 스크롤바): 위 시간 눈금 = 세로 고정·가로(_scrollTime) 따라감 · 왼쪽 이름 열 = 세로 따라감·가로 고정 ·
+    // 세로 = 스크롤 뷰(트랙이 넘치면 막대, 맨 밑에 트랙 1칸 여유) · 가로 = 시간 스크롤 막대(확대해서 넘칠 때만, 맨 아래 고정).
+    void DrawTimeline(Rect view)
+    {
         int rows = BossVictoryTimeline.Tracks.Length + MarkerRowCount;
         float contentHeight = rows * RowHeight + RowHeight;
-        float inspectorHeight = Mathf.Clamp(_inspectorHeight, MinInspectorHeight, MaxInspectorHeight);
-        float timelineHeight = Mathf.Max(MinTimelineHeight, position.height - EditorStyles.toolbar.fixedHeight - SplitterHeight - inspectorHeight);
-        Rect view = GUILayoutUtility.GetRect(position.width, timelineHeight, GUILayout.ExpandWidth(true));
+        if (Event.current.type == EventType.Repaint) _timelineWidth = view.width;
         float vBarWidth = GUI.skin.verticalScrollbar.fixedWidth > 0f ? GUI.skin.verticalScrollbar.fixedWidth : 15f;
         float hBarHeight = GUI.skin.horizontalScrollbar.fixedHeight > 0f ? GUI.skin.horizontalScrollbar.fixedHeight : 15f;
         bool vBar = false, hBar = false;
@@ -196,7 +215,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Rect content = new Rect(0f, 0f, LabelWidth + laneWidth, contentHeight);
         _timelineScroll.x = 0f;
         _timelineScroll = GUI.BeginScrollView(body, _timelineScroll, content, false, false);
-        _bodyVisible = new Rect(0f, _timelineScroll.y, LabelWidth + laneWidth, body.height);   // 스크롤 뷰 안 좌표의 보이는 칸 — 밖(눈금·인스펙터)을 누른 것은 무시
+        _bodyVisible = new Rect(0f, _timelineScroll.y, LabelWidth + laneWidth, body.height);   // 스크롤 뷰 안 좌표의 보이는 칸 — 밖(눈금·패널)을 누른 것은 무시
         Rect labels = new Rect(0f, 0f, LabelWidth, rows * RowHeight);
         Rect lanes = new Rect(LabelWidth, 0f, laneWidth, rows * RowHeight);
 
@@ -208,16 +227,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         DrawTrackClips(lanes);
         DrawMarkers(lanes);
         DrawPlayhead(lanes);
+        DrawSelectRect(lanes);
         AddCursorRects(lanes);
         GUI.EndScrollView(false);   // 휠은 줌(HandleView) — 세로는 스크롤 막대로
         if (hBar) DrawScrollbar(scroll);
-
-        DrawSplitter();
-        _inspectorScroll = EditorGUILayout.BeginScrollView(_inspectorScroll, GUILayout.Height(inspectorHeight));
-        DrawInspector();
-        EditorGUILayout.EndScrollView();
-        ShowPendingCopyPopup();
     }
+
+    float _timelineWidth = -1f;   // 지난 그리기의 타임라인 폭(전체 보기 — 왼쪽 패널 뺀 폭, 아직 안 그렸으면 -1)
 
     // 줄 이름 누르기 = 그 노드 선택(트랙 = 모양 값 · 마커 = 시각·옵션) — 255 후속 3.
     void HandleLabelClick(Rect labels)
@@ -255,7 +271,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void FitAll()
     {
         if (Timeline == null) return;
-        float width = Mathf.Max(100f, position.width - LabelWidth - 20f);
+        float timelineWidth = _timelineWidth > 0f ? _timelineWidth : position.width - PanelWidth - SplitterWidth;   // 왼쪽 속성 패널(296) 뺀 타임라인 폭
+        float width = Mathf.Max(100f, timelineWidth - LabelWidth - 20f);
         _pixelsPerSecond = Mathf.Clamp(width / Mathf.Max(0.5f, Timeline.Duration + 0.3f), MinPixelsPerSecond, MaxPixelsPerSecond);
         _scrollTime = 0f;
         Repaint();
@@ -640,12 +657,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 끌기 = 이동 · 양 끝(좌우 화살표 커서 — 왼쪽 = 시작 이동·끝 고정, 오른쪽 = 길이) · 클립 위 마름모 = 키(중간 키 끌기 = 시각, 더블클릭 = 키 추가, 255 후속 6) ·
     // 우클릭 = 추가/복사/붙여넣기/삭제 · Del(키 선택 중이면 그 키) · Ctrl+C/V · 0.01초 스냅 · Undo.
 
-    enum DragMode { None, Move, ResizeLeft, ResizeRight, Key, Marker, Playhead, NodeTrim, CutBlend }
+    // Rect = 빈 곳 사각형 선택 · Group = 여러 개 같이 끌기(296).
+    enum DragMode { None, Move, ResizeLeft, ResizeRight, Key, Marker, Playhead, NodeTrim, CutBlend, Rect, Group }
 
     const float MinLength = 0.01f;
     const float HandleSize = 7f;
 
     [SerializeField] bool _snap = true;
+    [SerializeField] bool _helpFold = true;   // 왼쪽 패널 '조작' 접기(296)
     int _selTrack = -1;
     int _selIndex = -1;
     int _selMarker = -1;
@@ -662,8 +681,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     float Snap(float t) => _snap ? Mathf.Round(t * 100f) / 100f : t;
 
-    bool IsSelected(BossVictoryTrack track, int index) => (_selTrack == (int)track && _selIndex == index) || _multi.Contains(NodeRef.Clip(track, index));
-    bool IsSelectedMarker(BossVictoryMarker marker) => _selMarker == (int)marker || _multi.Contains(NodeRef.Marker(marker));
+    // 여러 개 선택(296)이면 그 목록만 — 하나면 _sel*(키를 고른 클립도 선택으로 보임, 지금까지 그대로).
+    bool IsSelected(BossVictoryTrack track, int index) => _multi.Count > 0 ? _multi.Contains(NodeRef.Clip(track, index)) : _selTrack == (int)track && _selIndex == index;
+    bool IsSelectedMarker(BossVictoryMarker marker) => _multi.Count > 0 ? _multi.Contains(NodeRef.Marker(marker)) : _selMarker == (int)marker;
+    bool IsSelectedKey(BossVictoryTrack track, int clip, int key) => _multi.Count > 0 ? _multi.Contains(NodeRef.KeyOf(track, clip, key)) : _selTrack == (int)track && _selIndex == clip && _selKey == key;
     bool HasClipSelection => _selTrack >= 0 && _selIndex >= 0 && _selIndex < Timeline.Clips((BossVictoryTrack)_selTrack).Count;
 
     bool _selFinisher;   // '처치 연출 스킬 End' 줄 노드(시간 배율 칸)
@@ -727,7 +748,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         for (int k = 0; k < n; k++)
         {
             Vector2 p = KeyPoint(r, track, clip, k);
-            bool on = selected && _selKey == k;
+            bool on = IsSelectedKey(track, clip, k);
             float s = on ? KeySize + 2f : KeySize;
             Handles.color = on ? Color.white : (selected ? KeyColor : KeyColor * 0.8f);
             Handles.DrawAAConvexPolygon(new Vector3(p.x, p.y - s), new Vector3(p.x + s, p.y), new Vector3(p.x, p.y + s), new Vector3(p.x - s, p.y));
@@ -810,9 +831,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Repaint();
     }
 
-    void DragKey(BossVictoryTrack track, int clip, int key, float mouseTime)
+    void DragKey(BossVictoryTrack track, int clip, int key, float mouseTime) => SetKeyTime(track, clip, key, Snap(mouseTime));
+
+    // 중간 키를 타임라인 초 time 으로(앞뒤 키 사이로 막음) — 하나 끌기·여러 개 같이 끌기(296) 공용.
+    void SetKeyTime(BossVictoryTrack track, int clip, int key, float time)
     {
-        float u = (Snap(mouseTime) - KeySpanStart(track, clip)) / KeySpanLength(track, clip);
+        float u = (time - KeySpanStart(track, clip)) / KeySpanLength(track, clip);
         if (track == BossVictoryTrack.CameraCut)
         {
             BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[clip];
@@ -960,6 +984,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     void OnUndoRedo()
     {
         if (_settings == null || _profile == null) return;
+        PruneMulti();   // 여러 개 선택(296) — 사라진 번호 빼기
         if (_selIndex >= 0 && !HasClipSelection) Select(-1, -1, -1);
         if (_selMarker >= BossVictoryTimeline.Markers.Length) Select(-1, -1, -1);
         _drag = DragMode.None;
@@ -1011,6 +1036,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 e.Use();
                 break;
             case EventType.MouseUp when e.button == 0 && _drag != DragMode.None:
+                if (_drag == DragMode.Rect) FinishSelectRect(lanes);   // 사각형 선택(296)
                 if (_dragRecorded) Save();
                 EndDragUndo();
                 _drag = DragMode.None;
@@ -1030,9 +1056,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 e.Use();
                 break;
             case EventType.KeyDown when e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace:
-                if (HasClipSelection && GUIUtility.keyboardControl == 0)
+                if ((HasClipSelection || _multi.Count >= 2) && GUIUtility.keyboardControl == 0)
                 {
-                    DeleteSelected();
+                    DeleteSelected();   // 여러 개 선택이면 전부(296)
                     e.Use();
                 }
                 break;
@@ -1050,7 +1076,16 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 PasteAt(_selTrack >= 0 ? (BossVictoryTrack)_selTrack : s_clipboardTrack, _playhead);
                 break;
             case "Duplicate":
-                if (HasClipSelection)
+                if (_multi.Count >= 2)   // 여러 개(296) — 선택 클립을 가장 늦은 끝 뒤에 간격 그대로
+                {
+                    float end = MultiClipEnd();
+                    if (CopyMulti())
+                    {
+                        if (s_clipboardMulti != null) PasteMulti(end);
+                        else PasteAt(s_clipboardTrack, end);
+                    }
+                }
+                else if (HasClipSelection)
                 {
                     CopySelected();
                     BossVictoryClip c = Timeline.Clips((BossVictoryTrack)_selTrack)[_selIndex];
@@ -1065,13 +1100,23 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         _dragRecorded = false;
         Event ev = Event.current;
-        if ((ev.control || ev.command) && TryPickNode(lanes, mouse, out NodeRef picked))   // 여러 개 선택(267 — 다른 캐릭터에 복사용)
+        _dragMouseT0 = XToTime(lanes, mouse.x);
+        if (ev.shift || ev.control || ev.command)   // 여러 개 선택(267·296) — 노드 = 넣기/빼기, 빈 곳 = 사각형으로 더하기
         {
-            ToggleMulti(picked);
-            _drag = DragMode.None;
+            if (TryPickNode(lanes, mouse, out NodeRef picked))
+            {
+                ToggleMulti(picked);
+                _drag = DragMode.None;
+            }
+            else BeginSelectRect(mouse, true);
             return;
         }
-        _dragMouseT0 = XToTime(lanes, mouse.x);
+        // 여러 개 선택 안의 노드를 잡으면 = 전부 같이 끌기(296). 처치 연출 스킬·보스 피격 애니 끝 자르기는 그 노드 하나만.
+        if (_multi.Count >= 2 && TryPickNode(lanes, mouse, out NodeRef grabbed, out DragMode grabMode) && _multi.Contains(grabbed) && grabMode != DragMode.NodeTrim)
+        {
+            BeginGroupDrag(grabbed, grabMode);
+            return;
+        }
         if (PickClipNode(lanes, mouse, out BossVictoryMarker node, out bool trimEdge))
         {
             Select(-1, -1, (int)node);
@@ -1112,7 +1157,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             break;
         }
         Select(-1, -1, -1);
-        _drag = DragMode.None;
+        BeginSelectRect(mouse, false);   // 빈 곳 = 선택 풀기 + 끌면 사각형 선택(296)
     }
 
     // 클립 손잡이 고르기(키 마름모는 먼저 PickKey) — 순서 = ① 가장 가까운 끝(몸통보다 먼저, 이웃 클립 포함) ② 몸통.
@@ -1201,8 +1246,20 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             SetPlayhead(mt);
             return;
         }
+        if (_drag == DragMode.Rect)   // 사각형 선택(296) — 놓을 때 고른다
+        {
+            _rectB = mouse;
+            Repaint();
+            return;
+        }
         RecordDrag();   // 매 끌기 이벤트 기록 — 손을 떼면 한 묶음으로 합친다
         _dragRecorded = true;
+        if (_drag == DragMode.Group)   // 여러 개 같이 끌기(296)
+        {
+            ApplyGroupDrag(mt);
+            Repaint();
+            return;
+        }
         if (_drag == DragMode.NodeTrim)
         {
             DragNodeTrim((BossVictoryMarker)_selMarker, mt);
@@ -1316,7 +1373,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             }
             if (CanAdd(track)) menu.AddItem(new GUIContent($"클립 추가 ({t:0.00}초)"), false, () => AddClip(tr, t));
             else menu.AddDisabledItem(new GUIContent("클립 추가 (이 트랙은 1개만)"));
-            if (s_hasClipboard && CanAdd(track)) menu.AddItem(new GUIContent($"붙여넣기 ({t:0.00}초)"), false, () => PasteAt(tr, t));
+            if (s_hasClipboard && (s_clipboardMulti != null || CanAdd(track))) menu.AddItem(new GUIContent(s_clipboardMulti != null ? $"붙여넣기 — 클립 {s_clipboardMulti.Count}개, 각자 트랙 ({t:0.00}초)" : $"붙여넣기 ({t:0.00}초)"), false, () => PasteAt(tr, t));
             else menu.AddDisabledItem(new GUIContent("붙여넣기"));
             menu.ShowAsContext();
             return;
@@ -1389,7 +1446,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     void CopySelected()
     {
+        if (_multi.Count >= 2) { CopyMulti(); return; }   // 여러 개(296) — 선택 클립 전부(트랙·간격 유지)
         if (!HasClipSelection) return;
+        s_clipboardMulti = null;
         s_clipboardTrack = (BossVictoryTrack)_selTrack;
         s_clipboard = Timeline.Clips(s_clipboardTrack)[_selIndex].WithCopiedKeys();
         s_clipboardShot = s_clipboardTrack == BossVictoryTrack.CameraCut ? Timeline.CameraCutShot(_selIndex).WithCopiedKeys() : BossVictoryCameraCuts.Cut.Default;
@@ -1398,6 +1457,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     void PasteAt(BossVictoryTrack track, float start)
     {
+        if (s_clipboardMulti != null) { PasteMulti(start); return; }   // 여러 개 클립보드(296) — 각자 트랙에
         if (!s_hasClipboard || !CanAdd(track)) return;
         Record("처치 연출 타임라인 붙여넣기");
         BossVictoryClip c = s_clipboard.WithCopiedKeys();   // 키 목록은 클립마다 따로
@@ -1418,6 +1478,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     void DeleteSelected()
     {
+        if (_multi.Count >= 2) { DeleteMulti(); return; }   // 여러 개(296)
         if (!HasClipSelection) return;
         if (_selKey >= 0)   // 키 선택 중 = 그 키(시작·끝 키는 지우지 않는다)
         {
@@ -1517,18 +1578,24 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 선택 클립·마커 수치 직접 입력
     void DrawInspector()
     {
-        using (new EditorGUILayout.HorizontalScope())
+        _snap = EditorGUILayout.ToggleLeft("0.01초 스냅", _snap);
+        _helpFold = EditorGUILayout.Foldout(_helpFold, "조작", true);
+        if (_helpFold)
+            EditorGUILayout.LabelField("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 클립 양 끝 끌기 = 길이 · 우클릭 = 추가/복사/붙여넣기/삭제·다른 캐릭터에 복사 · " +
+                "Shift(또는 Ctrl)+클릭 = 여러 개 선택(다시 누르면 빠짐 — 클립·마커·키 섞어서) · 빈 곳 끌기 = 사각형 선택(Shift = 더하기) · 빈 곳 클릭 = 선택 풀기 · " +
+                "선택한 것 하나를 끌면 전부 같은 초만큼 이동 · 선택 클립 끝 끌기 = 전부 같은 초만큼 길이 · Del · Ctrl+C/V/D · Ctrl+Z 되돌리기 · Ctrl+Y·Ctrl+Shift+Z 다시 하기", EditorStyles.wordWrappedMiniLabel);
+        if (_multi.Count >= 2)
         {
-            _snap = EditorGUILayout.ToggleLeft("0.01초 스냅", _snap, GUILayout.Width(100f));
-            GUILayout.Label("휠 = 줌 · 가운데 버튼 끌기 = 이동 · 클립 양 끝 끌기 = 길이 · 우클릭 = 추가/복사/붙여넣기/삭제·다른 캐릭터에 복사 · Ctrl+클릭 = 여러 개 선택 · Del · Ctrl+C/V/D · Ctrl+Z 되돌리기 · Ctrl+Y·Ctrl+Shift+Z 다시 하기", EditorStyles.miniLabel);
+            DrawMultiInspector();   // 여러 개 선택(296) — 개수 + 같은 종류면 공통 칸
+            return;
         }
         DrawFinisherEnd();
-        using (new EditorGUILayout.HorizontalScope())
+        using (new EditorGUILayout.VerticalScope())   // 왼쪽 패널(296) — 좁아도 사유가 보이게 세로로
         {
             string reason = SceneViewBlockReason(out _, out _);
             using (new EditorGUI.DisabledScope(reason != null))
-                if (GUILayout.Button($"Scene 뷰로 새 카메라 컷 ({_playhead:0.00}초)", GUILayout.Width(220f))) AddCutFromSceneView();
-            if (reason != null) GUILayout.Label(reason, EditorStyles.miniLabel);
+                if (GUILayout.Button($"Scene 뷰로 새 카메라 컷 ({_playhead:0.00}초)")) AddCutFromSceneView();
+            if (reason != null) GUILayout.Label(reason, EditorStyles.wordWrappedMiniLabel);
         }
         if (_selMarker >= 0)
         {
@@ -2018,7 +2085,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     nameof(BossVictoryProfile.backDashEase), nameof(BossVictoryProfile.backDashAngle),
                     nameof(BossVictoryProfile.backDashIdleDelay), nameof(BossVictoryProfile.finisherWithBackDash));
                 EditorGUILayout.LabelField("방향 = 보스 반대쪽을 보정 각만큼 돌림(+ = 시계 방향). 후 대기 = 백대쉬 끝 ~ Idle 복귀. 리액션 애니는 보스 등장 밀림과 같다(등장 연출 값은 그대로). 기본값 = 보스 등장 밀림 값.", EditorStyles.wordWrappedMiniLabel);
-                if (GUILayout.Button("스킬 연출 시작 = 백대쉬 시작 + 시간 + 후 대기", GUILayout.Width(300f)))
+                if (GUILayout.Button("스킬 연출 시작 = 백대쉬 시작 + 시간 + 후 대기"))
                 {
                     Record("처치 연출 타임라인 스킬 연출 시작 맞추기");
                     Timeline.SetMarkerTime(BossVictoryMarker.FinisherStart, Snap(BossVictoryKillerSequence.DefaultFinisherStart(
@@ -2831,22 +2898,28 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         }
     }
 
-    // ── 노드 여러 개 선택(Ctrl/⌘ 클릭) · 다른 캐릭터에 복사(267) ─────────────
-    // 마커(하나뿐인 노드)는 덮어쓰기, 클립은 같은 시각에 새로 추가(TV 꺼짐·처치자 평타처럼 1개뿐인 트랙은 덮어쓰기). Undo 한 번에 되돌림.
+    // ── 노드 여러 개 선택(Shift·Ctrl/⌘ 클릭 · 빈 곳 사각형 — 267·296) · 다른 캐릭터에 복사(267) ─────────────
+    // 복사: 마커(하나뿐인 노드)는 덮어쓰기, 클립은 같은 시각에 새로 추가(TV 꺼짐·처치자 평타처럼 1개뿐인 트랙은 덮어쓰기). 키는 복사 대상 아님. Undo 한 번에 되돌림.
+    // 선택 = 하나면 _selTrack/_selIndex/_selMarker/_selKey(지금까지 그대로), 둘 이상이면 _multi(+ 마지막으로 누른 것이 _sel* — 끌기 기준).
 
     readonly struct NodeRef : System.IEquatable<NodeRef>
     {
-        public readonly int Track;   // 클립 노드 = 트랙(마커면 -1)
-        public readonly int Index;   // 클립 번호
-        public readonly int MarkerId; // 마커(클립이면 -1)
+        public readonly int Track;    // 클립·키 노드 = 트랙(마커면 -1)
+        public readonly int Index;    // 클립 번호(키면 그 키가 든 클립)
+        public readonly int MarkerId; // 마커(클립·키면 -1)
+        public readonly int Key;      // 키 번호(296 — 클립·마커면 -1)
 
-        NodeRef(int track, int index, int marker) { Track = track; Index = index; MarkerId = marker; }
-        public static NodeRef Clip(BossVictoryTrack track, int index) => new NodeRef((int)track, index, -1);
-        public static NodeRef Marker(BossVictoryMarker marker) => new NodeRef(-1, -1, (int)marker);
+        NodeRef(int track, int index, int marker, int key) { Track = track; Index = index; MarkerId = marker; Key = key; }
+        public static NodeRef Clip(BossVictoryTrack track, int index) => new NodeRef((int)track, index, -1, -1);
+        public static NodeRef Marker(BossVictoryMarker marker) => new NodeRef(-1, -1, (int)marker, -1);
+        public static NodeRef KeyOf(BossVictoryTrack track, int clip, int key) => new NodeRef((int)track, clip, -1, key);
         public bool IsMarker => MarkerId >= 0;
-        public bool Equals(NodeRef o) => Track == o.Track && Index == o.Index && MarkerId == o.MarkerId;
+        public bool IsKey => Key >= 0;
+        public bool IsClip => !IsMarker && !IsKey;
+        public NodeRef ClipOfKey => new NodeRef(Track, Index, -1, -1);
+        public bool Equals(NodeRef o) => Track == o.Track && Index == o.Index && MarkerId == o.MarkerId && Key == o.Key;
         public override bool Equals(object o) => o is NodeRef n && Equals(n);
-        public override int GetHashCode() => (Track * 397 ^ Index) * 31 ^ MarkerId;
+        public override int GetHashCode() => ((Track * 397 ^ Index) * 31 ^ MarkerId) * 17 ^ Key;
     }
 
     readonly List<NodeRef> _multi = new List<NodeRef>();
@@ -2856,13 +2929,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     bool TryPrimaryNode(out NodeRef node)
     {
         if (_selMarker >= 0) { node = NodeRef.Marker((BossVictoryMarker)_selMarker); return true; }
+        if (HasClipSelection && _selKey >= 0) { node = NodeRef.KeyOf((BossVictoryTrack)_selTrack, _selIndex, _selKey); return true; }
         if (HasClipSelection) { node = NodeRef.Clip((BossVictoryTrack)_selTrack, _selIndex); return true; }
         node = default;
         return false;
     }
 
-    // 복사할 노드 = 여러 개 선택이 있으면 그것, 없으면 지금 선택 하나.
-    List<NodeRef> CopySelection()
+    // 지금 선택 전부(여러 개면 그것, 아니면 하나 또는 없음).
+    List<NodeRef> SelectionList()
     {
         if (_multi.Count > 0) return new List<NodeRef>(_multi);
         var one = new List<NodeRef>();
@@ -2870,37 +2944,631 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return one;
     }
 
-    bool TryPickNode(Rect lanes, Vector2 mouse, out NodeRef node)
+    // 다른 캐릭터에 복사할 노드 = 지금 선택(키 제외 — 키는 클립 안 값).
+    List<NodeRef> CopySelection()
     {
-        if (PickClipNode(lanes, mouse, out BossVictoryMarker clipNode, out _)) { node = NodeRef.Marker(clipNode); return true; }
-        if (PickMarker(lanes, mouse, out BossVictoryMarker marker)) { node = NodeRef.Marker(marker); return true; }
+        List<NodeRef> list = SelectionList();
+        list.RemoveAll(n => n.IsKey);
+        return list;
+    }
+
+    bool TryPickNode(Rect lanes, Vector2 mouse, out NodeRef node) => TryPickNode(lanes, mouse, out node, out _);
+
+    // 누른 노드 + 잡은 손잡이(몸통 = Move/Marker/Key · 클립 끝 = Resize · 처치 연출 스킬 끝 = NodeTrim). 순서 = 끌기(BeginDrag)와 같다(컷 블렌드 쐐기 제외).
+    bool TryPickNode(Rect lanes, Vector2 mouse, out NodeRef node, out DragMode mode)
+    {
+        if (PickClipNode(lanes, mouse, out BossVictoryMarker clipNode, out bool trimEdge))
+        {
+            node = NodeRef.Marker(clipNode);
+            mode = trimEdge ? DragMode.NodeTrim : DragMode.Marker;
+            return true;
+        }
+        if (PickMarker(lanes, mouse, out BossVictoryMarker marker)) { node = NodeRef.Marker(marker); mode = DragMode.Marker; return true; }
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
         {
             if (!RowRect(lanes, TrackRow(track)).Contains(mouse)) continue;
-            if (PickClip(lanes, track, mouse, out int index, out _)) { node = NodeRef.Clip(track, index); return true; }
+            if (PickKey(lanes, track, mouse, out int keyClip, out int key)) { node = NodeRef.KeyOf(track, keyClip, key); mode = DragMode.Key; return true; }
+            if (PickClip(lanes, track, mouse, out int index, out mode)) { node = NodeRef.Clip(track, index); return true; }
             break;
         }
         node = default;
+        mode = DragMode.None;
         return false;
     }
 
-    // Ctrl/⌘ 클릭 — 노드를 여러 개 선택에 넣거나 뺀다(처음이면 지금 선택도 같이 넣는다). 끌기 없음.
+    // Shift·Ctrl/⌘ 클릭 — 노드를 여러 개 선택에 넣거나 뺀다(처음이면 지금 선택도 같이 넣는다). 끌기 없음.
     void ToggleMulti(NodeRef node)
     {
         if (_multi.Count == 0 && TryPrimaryNode(out NodeRef primary) && !primary.Equals(node)) _multi.Add(primary);
-        if (!_multi.Remove(node)) _multi.Add(node);
-        _selTrack = node.IsMarker ? -1 : node.Track;
-        _selIndex = node.IsMarker ? -1 : node.Index;
-        _selMarker = node.IsMarker ? node.MarkerId : -1;
-        _selKey = -1;
+        bool added = BossVictoryMultiEdit.Toggle(_multi, node);
+        if (added) SetPrimary(node);
+        else if (_multi.Count > 0) SetPrimary(_multi[_multi.Count - 1]);
+        else SetPrimary(null);
+        if (_multi.Count <= 1) _multi.Clear();   // 하나만 남으면 = 보통 선택(_sel*)
+    }
+
+    // 선택을 통째로 바꾼다(사각형 선택·붙여넣기 — 296). 0개 = 선택 없음, 1개 = 보통 선택.
+    void SetSelection(List<NodeRef> nodes)
+    {
+        _multi.Clear();
+        if (nodes.Count >= 2) _multi.AddRange(nodes);
+        SetPrimary(nodes.Count > 0 ? nodes[nodes.Count - 1] : (NodeRef?)null);
+    }
+
+    // _sel* = 이 노드(여러 개 선택은 그대로 — 끌기 기준·마지막으로 누른 것).
+    void SetPrimary(NodeRef? node)
+    {
+        NodeRef n = node.GetValueOrDefault();
+        bool has = node.HasValue;
+        _selTrack = has && !n.IsMarker ? n.Track : -1;
+        _selIndex = has && !n.IsMarker ? n.Index : -1;
+        _selMarker = has && n.IsMarker ? n.MarkerId : -1;
+        _selKey = has && n.IsKey ? n.Key : -1;
         _selFinisher = false;
         _selPalette = false;
         GUI.FocusControl(null);
     }
 
+    bool IsValid(NodeRef n)
+    {
+        if (n.IsMarker) return n.MarkerId < BossVictoryTimeline.Markers.Length;
+        if (n.Track < 0 || n.Track >= BossVictoryTimeline.Tracks.Length) return false;
+        var track = (BossVictoryTrack)n.Track;
+        if (n.Index < 0 || n.Index >= Timeline.Clips(track).Count) return false;
+        return !n.IsKey || n.Key < KeyCount(track, n.Index);
+    }
+
+    // Undo 등으로 번호가 사라진 노드를 뺀다.
+    void PruneMulti()
+    {
+        if (_multi.Count == 0) return;
+        _multi.RemoveAll(n => !IsValid(n));
+        if (_multi.Count <= 1)
+        {
+            NodeRef? last = _multi.Count == 1 ? _multi[0] : (NodeRef?)null;
+            _multi.Clear();
+            SetPrimary(last);
+        }
+    }
+
     string NodeLabel(NodeRef n) => n.IsMarker
         ? BossVictoryTimeline.MarkerLabel((BossVictoryMarker)n.MarkerId)
-        : $"{BossVictoryTimeline.TrackLabel((BossVictoryTrack)n.Track)} #{n.Index + 1}";
+        : n.IsKey
+            ? $"{BossVictoryTimeline.TrackLabel((BossVictoryTrack)n.Track)} #{n.Index + 1} 키 #{n.Key + 1}"
+            : $"{BossVictoryTimeline.TrackLabel((BossVictoryTrack)n.Track)} #{n.Index + 1}";
+
+    // ── 사각형 선택(296) — 빈 곳 끌기. Shift(또는 Ctrl/⌘)면 지금 선택에 더하기. 클립·마커·클립 노드(처치 연출 스킬·보스 피격 애니)를 잡는다(키는 Shift+클릭으로). ──
+
+    Vector2 _rectA, _rectB;
+    bool _rectAdditive;
+    List<NodeRef> _rectBase;
+    static readonly Color SelectRectFill = new Color(0.45f, 0.65f, 1f, 0.15f);
+    static readonly Color SelectRectLine = new Color(0.55f, 0.75f, 1f, 0.9f);
+
+    Rect SelectRect => Rect.MinMaxRect(Mathf.Min(_rectA.x, _rectB.x), Mathf.Min(_rectA.y, _rectB.y), Mathf.Max(_rectA.x, _rectB.x), Mathf.Max(_rectA.y, _rectB.y));
+
+    void BeginSelectRect(Vector2 mouse, bool additive)
+    {
+        _drag = DragMode.Rect;
+        _rectA = _rectB = mouse;
+        _rectAdditive = additive;
+        _rectBase = SelectionList();
+    }
+
+    void FinishSelectRect(Rect lanes)
+    {
+        Rect r = SelectRect;
+        if (r.width < 3f && r.height < 3f) return;   // 클릭(끌기 아님) — 빈 곳 클릭 = 이미 선택 풀림(Shift 면 그대로)
+        SetSelection(BossVictoryMultiEdit.CombineSelection(_rectBase, NodesInRect(lanes, r), _rectAdditive));
+    }
+
+    List<NodeRef> NodesInRect(Rect lanes, Rect r)
+    {
+        var hits = new List<NodeRef>();
+        foreach (BossVictoryMarker m in BossVictoryTimeline.Markers)
+        {
+            if (IsClipNode(m))
+            {
+                if (ClipNodeRect(lanes, m, out Rect nr) && nr.Overlaps(r)) hits.Add(NodeRef.Marker(m));
+                continue;
+            }
+            Rect row = RowRect(lanes, MarkerRow(m));
+            float x = TimeToX(lanes, Timeline.MarkerTime(m));
+            if (x < lanes.x || x > lanes.xMax) continue;
+            if (new Rect(x - MarkerSize, row.center.y - MarkerSize, MarkerSize * 2f, MarkerSize * 2f).Overlaps(r)) hits.Add(NodeRef.Marker(m));
+        }
+        foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
+        {
+            List<BossVictoryClip> clips = Timeline.Clips(track);
+            for (int i = 0; i < clips.Count; i++)
+                if (ClipRect(lanes, TrackRow(track), clips[i]).Overlaps(r)) hits.Add(NodeRef.Clip(track, i));
+        }
+        return hits;
+    }
+
+    void DrawSelectRect(Rect lanes)
+    {
+        if (_drag != DragMode.Rect) return;
+        Rect r = SelectRect;
+        EditorGUI.DrawRect(r, SelectRectFill);
+        DrawOutline(r, SelectRectLine);
+    }
+
+    // ── 여러 개 같이 끌기(296) — 선택한 것 하나를 잡으면 전부 같은 Δ초. 스냅 = 잡은 노드 기준, 그 Δ 를 나머지에 그대로(0초 앞으로는 Δ 를 한 번에 막아 간격 유지).
+    //    클립 끝을 잡으면 선택 클립 전부 같은 Δ 로 길이(클립마다 최소 길이). 못 움직이는 노드(꺼진 마커·시작·끝 키·클립과 같이 가는 키 등)는 건너뜀. Undo 한 번(끌기 묶음). ──
+
+    struct GroupItem
+    {
+        public NodeRef Node;
+        public float T0;    // 클립 = 시작 · 마커 = 시각 · 키 = 타임라인 초
+        public float Len0;  // 클립 = 길이 · 키 = 기준 구간 길이
+    }
+
+    readonly List<GroupItem> _group = new List<GroupItem>();
+    NodeRef _groupGrab;
+    DragMode _groupMode;   // Move · ResizeLeft · ResizeRight
+
+    void BeginGroupDrag(NodeRef grabbed, DragMode mode)
+    {
+        _groupGrab = grabbed;
+        _groupMode = grabbed.IsClip && (mode == DragMode.ResizeLeft || mode == DragMode.ResizeRight) ? mode : DragMode.Move;
+        _group.Clear();
+        foreach (NodeRef n in _multi)
+        {
+            if (!IsValid(n)) continue;
+            var item = new GroupItem { Node = n };
+            if (n.IsMarker) item.T0 = Timeline.MarkerTime((BossVictoryMarker)n.MarkerId);
+            else if (n.IsKey)
+            {
+                var track = (BossVictoryTrack)n.Track;
+                item.Len0 = KeySpanLength(track, n.Index);
+                item.T0 = KeySpanStart(track, n.Index) + KeyU(track, n.Index, n.Key) * item.Len0;
+            }
+            else
+            {
+                BossVictoryClip c = Timeline.Clips((BossVictoryTrack)n.Track)[n.Index];
+                item.T0 = c.start;
+                item.Len0 = c.length;
+            }
+            _group.Add(item);
+        }
+        SetPrimary(grabbed);   // 여러 개 선택은 그대로
+        _drag = DragMode.Group;
+    }
+
+    // 이 노드가 '이동'에서 움직이는가.
+    bool GroupMovable(in GroupItem it)
+    {
+        NodeRef n = it.Node;
+        if (n.IsMarker) return !(BossVictoryTimeline.ZeroMeansOff((BossVictoryMarker)n.MarkerId) && it.T0 <= 0f);   // 꺼진 마커(0)는 그대로
+        if (n.IsKey)
+        {
+            if (_multi.Contains(n.ClipOfKey)) return false;   // 클립이 같이 움직이면 키는 비율대로 따라간다
+            return n.Key > 0 && n.Key < KeyCount((BossVictoryTrack)n.Track, n.Index) - 1;   // 시작·끝 키 = 클립 양 끝 고정
+        }
+        return true;
+    }
+
+    // 클립 끝 끌기에서 길이가 바뀌는가 — 컷(길이 자동)·마커·키 제외.
+    static bool GroupResizable(in GroupItem it) => it.Node.IsClip && BossVictoryTimeline.KindOf((BossVictoryTrack)it.Node.Track) != BossVictoryTimeline.TrackKind.Cut;
+
+    // '이동' Δ 기준 시각 — 처치자 평타(시작 0 고정)는 끝이 움직인다.
+    static float MoveOrigin(in GroupItem it) =>
+        it.Node.IsClip && BossVictoryTimeline.StartFixed((BossVictoryTrack)it.Node.Track) ? it.T0 + it.Len0 : it.T0;
+
+    void ApplyGroupDrag(float mouseTime)
+    {
+        int grab = _group.FindIndex(g => g.Node.Equals(_groupGrab));
+        if (grab < 0) return;
+        GroupItem g0 = _group[grab];
+        float origin = _groupMode == DragMode.ResizeRight ? g0.T0 + g0.Len0 : _groupMode == DragMode.ResizeLeft ? g0.T0 : MoveOrigin(g0);
+        float d = BossVictoryMultiEdit.SnapDelta(origin, mouseTime - _dragMouseT0, _snap);
+        if (_groupMode == DragMode.Move)
+        {
+            var origins = new List<float>(_group.Count);
+            foreach (GroupItem it in _group)
+                if (GroupMovable(it) && !it.Node.IsKey && !(it.Node.IsClip && BossVictoryTimeline.StartFixed((BossVictoryTrack)it.Node.Track)))
+                    origins.Add(it.T0);
+            d = BossVictoryMultiEdit.ClampMoveDelta(d, BossVictoryMultiEdit.Earliest(origins));
+        }
+        foreach (GroupItem it in _group)
+        {
+            if (!IsValid(it.Node)) continue;
+            if (_groupMode == DragMode.Move)
+            {
+                if (!GroupMovable(it)) continue;
+                if (it.Node.IsMarker) Timeline.SetMarkerTime((BossVictoryMarker)it.Node.MarkerId, Mathf.Max(0f, it.T0 + d));
+                else if (it.Node.IsKey) SetKeyTime((BossVictoryTrack)it.Node.Track, it.Node.Index, it.Node.Key, it.T0 + d);
+                else
+                {
+                    var track = (BossVictoryTrack)it.Node.Track;
+                    List<BossVictoryClip> clips = Timeline.Clips(track);
+                    BossVictoryClip c = clips[it.Node.Index];
+                    if (BossVictoryTimeline.StartFixed(track)) c.length = Mathf.Max(MinLength, it.T0 + it.Len0 + d);   // 끝이 움직임(Clamp 가 시작 0)
+                    else c.start = Mathf.Max(0f, it.T0 + d);
+                    clips[it.Node.Index] = Clamp(track, c);
+                }
+                continue;
+            }
+            if (!GroupResizable(it)) continue;
+            var rtrack = (BossVictoryTrack)it.Node.Track;
+            List<BossVictoryClip> rclips = Timeline.Clips(rtrack);
+            BossVictoryClip rc = rclips[it.Node.Index];
+            float s, l;
+            if (_groupMode == DragMode.ResizeLeft) BossVictoryMultiEdit.ResizeLeft(it.T0, it.Len0, d, MinLength, out s, out l);
+            else BossVictoryMultiEdit.ResizeRight(it.T0, it.Len0, d, MinLength, out s, out l);
+            rc.start = s;
+            rc.length = l;
+            rclips[it.Node.Index] = Clamp(rtrack, rc);
+        }
+    }
+
+    // ── 여러 개 삭제·복사·붙여넣기(296 — 기존 Del·Ctrl+C/V/D 를 여러 개에도) ──
+    // 삭제 = 선택 클립 전부 + 클립과 같이 지우지 않는 중간 키(마커는 지울 수 없어 건너뜀). 복사 = 선택 클립(트랙·간격 유지 — 붙여넣기는 각자 트랙, 가장 앞 클립이 그 시각).
+
+    struct ClipboardItem
+    {
+        public BossVictoryTrack Track;
+        public BossVictoryClip Clip;   // start = 가장 앞 클립 기준 오프셋
+        public BossVictoryCameraCuts.Cut Shot;
+    }
+
+    static List<ClipboardItem> s_clipboardMulti;   // null = 하나짜리 클립보드(s_clipboard)
+
+    void DeleteMulti()
+    {
+        var keys = new List<NodeRef>();
+        var clips = new List<NodeRef>();
+        foreach (NodeRef n in _multi)
+        {
+            if (!IsValid(n) || n.IsMarker) continue;
+            if (n.IsClip) clips.Add(n);
+            else if (!_multi.Contains(n.ClipOfKey) && n.Key > 0 && n.Key < KeyCount((BossVictoryTrack)n.Track, n.Index) - 1) keys.Add(n);
+        }
+        if (keys.Count == 0 && clips.Count == 0) return;
+        Record("처치 연출 타임라인 여러 개 삭제");
+        keys.Sort((a, b) => b.Key.CompareTo(a.Key));   // 같은 클립 안 뒤 키부터
+        foreach (NodeRef k in keys)
+        {
+            if (k.Track == (int)BossVictoryTrack.CameraCut) Timeline.cameraCutShots[k.Index].keys.RemoveAt(k.Key);
+            else Timeline.Clips((BossVictoryTrack)k.Track)[k.Index].keys.RemoveAt(k.Key);
+        }
+        clips.Sort((a, b) => a.Track != b.Track ? a.Track.CompareTo(b.Track) : b.Index.CompareTo(a.Index));   // 트랙마다 뒤 번호부터
+        foreach (NodeRef c in clips)
+        {
+            Timeline.Clips((BossVictoryTrack)c.Track).RemoveAt(c.Index);
+            if (c.Track == (int)BossVictoryTrack.CameraCut && c.Index < Timeline.cameraCutShots.Count) Timeline.cameraCutShots.RemoveAt(c.Index);
+        }
+        Select(-1, -1, -1);
+        Save();
+        Repaint();
+    }
+
+    // 여러 개 선택 복사 — 클립이 둘 이상이면 여러 개 클립보드, 하나면 보통 클립보드. 클립이 없으면 false(그대로).
+    bool CopyMulti()
+    {
+        var items = new List<ClipboardItem>();
+        float first = float.PositiveInfinity;
+        foreach (NodeRef n in _multi)
+            if (n.IsClip && IsValid(n)) first = Mathf.Min(first, Timeline.Clips((BossVictoryTrack)n.Track)[n.Index].start);
+        foreach (NodeRef n in _multi)
+        {
+            if (!n.IsClip || !IsValid(n)) continue;
+            var track = (BossVictoryTrack)n.Track;
+            BossVictoryClip c = Timeline.Clips(track)[n.Index].WithCopiedKeys();
+            c.start -= first;
+            items.Add(new ClipboardItem
+            {
+                Track = track,
+                Clip = c,
+                Shot = track == BossVictoryTrack.CameraCut ? Timeline.CameraCutShot(n.Index).WithCopiedKeys() : BossVictoryCameraCuts.Cut.Default,
+            });
+        }
+        if (items.Count == 0) return false;
+        if (items.Count == 1)
+        {
+            s_clipboardMulti = null;
+            s_clipboardTrack = items[0].Track;
+            s_clipboard = items[0].Clip;
+            s_clipboardShot = items[0].Shot;
+        }
+        else s_clipboardMulti = items;
+        s_hasClipboard = true;
+        return true;
+    }
+
+    // 여러 개 클립보드 붙여넣기 — 각자 트랙에, 가장 앞 클립 = start(간격 유지). 1개뿐인 트랙이 이미 차 있으면 건너뜀. 붙인 것을 선택.
+    void PasteMulti(float start)
+    {
+        if (s_clipboardMulti == null || s_clipboardMulti.Count == 0) return;
+        Record("처치 연출 타임라인 여러 개 붙여넣기");
+        var pasted = new List<NodeRef>();
+        foreach (ClipboardItem item in s_clipboardMulti)
+        {
+            if (!CanAdd(item.Track)) continue;
+            BossVictoryClip c = item.Clip.WithCopiedKeys();
+            if (BossVictoryTimeline.HasFades(item.Track)) c.MigrateFadesToKeys();
+            else c.keys = null;
+            c.start = Mathf.Max(0f, Snap(start + item.Clip.start));
+            List<BossVictoryClip> clips = Timeline.Clips(item.Track);
+            clips.Add(Clamp(item.Track, c));
+            if (item.Track == BossVictoryTrack.CameraCut)
+            {
+                Timeline.SyncCameraCutShots();
+                Timeline.cameraCutShots[clips.Count - 1] = item.Shot.WithCopiedKeys();
+            }
+            pasted.Add(NodeRef.Clip(item.Track, clips.Count - 1));
+        }
+        SetSelection(pasted);
+        Save();
+        Repaint();
+    }
+
+    // 선택 클립 중 가장 늦은 끝(복제 = 그 뒤에 붙여넣기). 클립이 없으면 재생 헤드.
+    float MultiClipEnd()
+    {
+        float end = _playhead;
+        bool any = false;
+        foreach (NodeRef n in _multi)
+        {
+            if (!n.IsClip || !IsValid(n)) continue;
+            float e = Timeline.Clips((BossVictoryTrack)n.Track)[n.Index].End;
+            end = any ? Mathf.Max(end, e) : e;
+            any = true;
+        }
+        return end;
+    }
+
+    // ── 여러 개 선택 칸(296) — "N개 선택" + 같은 종류면 공통 칸(고치면 전부에), 다르면 개수만 ──
+
+    static readonly string[] MultiKindLabels = { "클립", "마커", "키" };
+
+    void DrawMultiInspector()
+    {
+        PruneMulti();
+        if (_multi.Count < 2) return;
+        EditorGUILayout.LabelField($"{_multi.Count}개 선택", EditorStyles.boldLabel);
+        for (int i = 0; i < _multi.Count && i < 8; i++) EditorGUILayout.LabelField("· " + NodeLabel(_multi[i]), EditorStyles.miniLabel);
+        if (_multi.Count > 8) EditorGUILayout.LabelField($"… 외 {_multi.Count - 8}개", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField("하나를 끌면 전부 같은 초만큼 이동 · 선택 클립 끝 끌기 = 전부 같은 초만큼 길이 · Del = 클립·중간 키 삭제(마커 제외) · Ctrl+C/V/D = 클립(트랙·간격 유지).", EditorStyles.wordWrappedMiniLabel);
+        EditorGUILayout.Space(4f);
+
+        NodeRef a = _multi[0];
+        bool sameKind = true, sameTrack = true;
+        foreach (NodeRef n in _multi)
+        {
+            if (n.IsMarker != a.IsMarker || n.IsKey != a.IsKey) sameKind = false;
+            if (n.Track != a.Track) sameTrack = false;
+        }
+        if (!sameKind || (!a.IsMarker && !sameTrack))
+        {
+            EditorGUILayout.HelpBox(sameKind ? "트랙이 달라 공통 칸이 없다." : "종류(클립·마커·키)가 섞여 공통 칸이 없다.", MessageType.None);
+            return;
+        }
+        int kind = a.IsMarker ? 1 : a.IsKey ? 2 : 0;
+        EditorGUILayout.LabelField($"공통 칸 — {MultiKindLabels[kind]} {_multi.Count}개{(a.IsMarker ? "" : $" · {BossVictoryTimeline.TrackLabel((BossVictoryTrack)a.Track)}")} (값이 다르면 '—', 고치면 그 칸만 전부에)", EditorStyles.wordWrappedMiniLabel);
+        if (a.IsMarker) DrawMultiMarkerFields();
+        else if (a.IsKey) DrawMultiKeyFields((BossVictoryTrack)a.Track);
+        else DrawMultiClipFields((BossVictoryTrack)a.Track);
+    }
+
+    // 값 목록 → 같으면 그 값, 다르면 '—' 로 그리는 칸. 고쳤으면 true.
+    static bool MixedFloat(string label, List<float> values, out float result, float min = float.NegativeInfinity)
+    {
+        bool mixed = false;
+        for (int i = 1; i < values.Count; i++) if (!Mathf.Approximately(values[i], values[0])) mixed = true;
+        EditorGUI.showMixedValue = mixed;
+        EditorGUI.BeginChangeCheck();
+        result = Mathf.Max(min, EditorGUILayout.FloatField(label, values[0]));
+        bool changed = EditorGUI.EndChangeCheck();
+        EditorGUI.showMixedValue = false;
+        return changed;
+    }
+
+    static bool MixedPopup(string label, List<int> values, string[] options, out int result)
+    {
+        bool mixed = false;
+        for (int i = 1; i < values.Count; i++) if (values[i] != values[0]) mixed = true;
+        EditorGUI.showMixedValue = mixed;
+        EditorGUI.BeginChangeCheck();
+        result = EditorGUILayout.Popup(label, Mathf.Clamp(values[0], 0, options.Length - 1), options);
+        bool changed = EditorGUI.EndChangeCheck();
+        EditorGUI.showMixedValue = false;
+        return changed;
+    }
+
+    static bool MixedVector3(string label, List<Vector3> values, out Vector3 result)
+    {
+        bool mixed = false;
+        for (int i = 1; i < values.Count; i++) if (values[i] != values[0]) mixed = true;
+        EditorGUI.showMixedValue = mixed;
+        EditorGUI.BeginChangeCheck();
+        result = EditorGUILayout.Vector3Field(label, values[0]);
+        bool changed = EditorGUI.EndChangeCheck();
+        EditorGUI.showMixedValue = false;
+        return changed;
+    }
+
+    void MultiClipFloat(BossVictoryTrack track, string label, System.Func<BossVictoryClip, float> get, System.Func<BossVictoryClip, float, BossVictoryClip> set, float min = float.NegativeInfinity)
+    {
+        var values = new List<float>();
+        foreach (NodeRef n in _multi) values.Add(get(Timeline.Clips(track)[n.Index]));
+        if (!MixedFloat(label, values, out float v, min)) return;
+        ApplyMultiClips(track, c => set(c, v));
+    }
+
+    void MultiClipPopup(BossVictoryTrack track, string label, string[] options, System.Func<BossVictoryClip, int> get, System.Func<BossVictoryClip, int, BossVictoryClip> set)
+    {
+        var values = new List<int>();
+        foreach (NodeRef n in _multi) values.Add(get(Timeline.Clips(track)[n.Index]));
+        if (!MixedPopup(label, values, options, out int v)) return;
+        ApplyMultiClips(track, c => set(c, v));
+    }
+
+    void MultiClipVector3(BossVictoryTrack track, string label, System.Func<BossVictoryClip, Vector3> get, System.Func<BossVictoryClip, Vector3, BossVictoryClip> set)
+    {
+        var values = new List<Vector3>();
+        foreach (NodeRef n in _multi) values.Add(get(Timeline.Clips(track)[n.Index]));
+        if (!MixedVector3(label, values, out Vector3 v)) return;
+        ApplyMultiClips(track, c => set(c, v));
+    }
+
+    void ApplyMultiClips(BossVictoryTrack track, System.Func<BossVictoryClip, BossVictoryClip> change)
+    {
+        RecordField("처치 연출 타임라인 여러 클립 수치");
+        List<BossVictoryClip> clips = Timeline.Clips(track);
+        foreach (NodeRef n in _multi) clips[n.Index] = Clamp(track, change(clips[n.Index]));
+        Save();
+    }
+
+    // 같은 트랙 클립 — 시작·길이(처치자 평타 = 끝) + 트랙 값(노이즈 UV·두둥실·순간이동 두 점).
+    void DrawMultiClipFields(BossVictoryTrack track)
+    {
+        if (BossVictoryTimeline.StartFixed(track))
+            MultiClipFloat(track, "끝(초) = 동작 끊는 시각", c => c.length, (c, v) => { c.length = v; return c; }, MinLength);
+        else
+        {
+            MultiClipFloat(track, "시작(초)", c => c.start, (c, v) => { c.start = v; return c; }, 0f);
+            if (BossVictoryTimeline.KindOf(track) != BossVictoryTimeline.TrackKind.Cut)
+                MultiClipFloat(track, "길이(초)", c => c.length, (c, v) => { c.length = v; return c; }, MinLength);
+        }
+        if (BossVictoryTimeline.IsUvScroll(track))
+        {
+            MultiClipFloat(track, "시작 오프셋(UV)", c => c.uvFrom, (c, v) => { c.uvFrom = v; return c; });
+            MultiClipFloat(track, "끝 오프셋(UV)", c => c.uvTo, (c, v) => { c.uvTo = v; return c; });
+            MultiClipPopup(track, "이징", KeyCurveLabels, c => (int)c.uvEase, (c, v) => { c.uvEase = (BossVictoryKeyCurve)v; return c; });
+        }
+        if (BossVictoryTimeline.IsAssassinDash(track))
+        {
+            MultiClipVector3(track, "시작 지점(보스 기준)", c => c.dashFrom, (c, v) => { c.dashFrom = FlatOffset(v); return c; });
+            MultiClipVector3(track, "도착 지점(보스 기준)", c => c.dashTo, (c, v) => { c.dashTo = FlatOffset(v); return c; });
+        }
+        if (BossVictoryTimeline.IsBob(track))
+        {
+            MultiClipFloat(track, "진폭(화면 높이 %)", c => c.bobAmplitude, (c, v) => { c.bobAmplitude = v; return c; });
+            MultiClipFloat(track, "주기(초)", c => c.bobPeriod, (c, v) => { c.bobPeriod = v; return c; }, 0f);
+            MultiClipFloat(track, "시작 위상(주기)", c => c.bobPhase, (c, v) => { c.bobPhase = Mathf.Clamp01(v); return c; });
+            MultiClipFloat(track, "감쇠(1/초)", c => c.bobDamping, (c, v) => { c.bobDamping = v; return c; }, 0f);
+        }
+        if (track == BossVictoryTrack.CameraCut)
+            EditorGUILayout.LabelField("컷 화면·기준은 하나씩 고친다(컷마다 다른 화면).", EditorStyles.wordWrappedMiniLabel);
+    }
+
+    // 같은 트랙 키 — 세기 키 = 세기·다음 키까지 곡선 · 컷 화면 키 = FOV·곡선.
+    void DrawMultiKeyFields(BossVictoryTrack track)
+    {
+        bool cut = track == BossVictoryTrack.CameraCut;
+        var curves = new List<int>();
+        var values = new List<float>();
+        foreach (NodeRef n in _multi)
+        {
+            if (cut)
+            {
+                BossVictoryCameraCuts.CutKey k = Timeline.cameraCutShots[n.Index].keys[n.Key];
+                curves.Add((int)k.curve);
+                values.Add(k.fov);
+            }
+            else
+            {
+                BossVictoryKey k = Timeline.Clips(track)[n.Index].keys[n.Key];
+                curves.Add((int)k.curve);
+                values.Add(k.value);
+            }
+        }
+        bool valueChanged = MixedFloat(cut ? "FOV" : "세기", values, out float value);
+        bool curveChanged = MixedPopup("다음 키까지 곡선", curves, KeyCurveLabels, out int curve);
+        if (!valueChanged && !curveChanged) return;
+        RecordField("처치 연출 타임라인 여러 키 수치");
+        foreach (NodeRef n in _multi)
+        {
+            if (cut)
+            {
+                BossVictoryCameraCuts.Cut shot = Timeline.cameraCutShots[n.Index];
+                BossVictoryCameraCuts.CutKey k = shot.keys[n.Key];
+                if (valueChanged) k.fov = Mathf.Clamp(value, 10f, 90f);
+                if (curveChanged) k.curve = (BossVictoryKeyCurve)curve;
+                shot.keys[n.Key] = k;
+            }
+            else
+            {
+                BossVictoryClip c = Timeline.Clips(track)[n.Index];
+                BossVictoryKey k = c.keys[n.Key];
+                if (valueChanged) k.value = Mathf.Clamp01(value);
+                if (curveChanged) k.curve = (BossVictoryKeyCurve)curve;
+                c.keys[n.Key] = k;
+            }
+        }
+        Save();
+    }
+
+    // 마커 — 시각(같게 맞추기) + 전부 거너 Q 단계 마커면 단계 칸 공통.
+    void DrawMultiMarkerFields()
+    {
+        var times = new List<float>();
+        foreach (NodeRef n in _multi) times.Add(Timeline.MarkerTime((BossVictoryMarker)n.MarkerId));
+        if (MixedFloat("시각(초)", times, out float t, 0f))
+        {
+            RecordField("처치 연출 타임라인 여러 마커 시각");
+            foreach (NodeRef n in _multi) Timeline.SetMarkerTime((BossVictoryMarker)n.MarkerId, t);
+            Save();
+        }
+        var stagePaths = new List<string>();
+        foreach (NodeRef n in _multi)
+        {
+            var m = (BossVictoryMarker)n.MarkerId;
+            if (m < BossVictoryMarker.GunnerStage1 || m > BossVictoryMarker.GunnerStage3) { stagePaths = null; break; }
+            stagePaths.Add(GunnerQField($"stage{m - BossVictoryMarker.GunnerStage1 + 1}"));
+        }
+        if (stagePaths != null) DrawCommonProfileProperties("거너 Q 단계(294) 공통 칸", stagePaths);
+    }
+
+    // 프로필 SO 의 같은 모양 칸 여러 개(경로 목록)를 한 번에 — 첫 경로의 하위 칸마다 값이 다르면 '—', 고치면 그 칸만 전부에(boxedValue).
+    void DrawCommonProfileProperties(string title, IReadOnlyList<string> paths)
+    {
+        if (paths == null || paths.Count == 0) return;
+        if (_profileSo == null || _profileSo.targetObject != _profile) _profileSo = new SerializedObject(_profile);
+        _profileSo.Update();
+        SerializedProperty first = _profileSo.FindProperty(paths[0]);
+        if (first == null) return;
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
+        int indent = EditorGUI.indentLevel;
+        SerializedProperty it = first.Copy();
+        SerializedProperty end = first.GetEndProperty();
+        bool enter = true;
+        while (it.NextVisible(enter) && !SerializedProperty.EqualContents(it, end))
+        {
+            bool group = it.propertyType == SerializedPropertyType.Generic && !it.isArray;
+            enter = group;   // 안쪽 묶음(클래스·구조체)은 펼쳐 칸마다
+            EditorGUI.indentLevel = indent + Mathf.Max(0, it.depth - first.depth - 1);
+            if (group)
+            {
+                EditorGUILayout.LabelField(it.displayName, EditorStyles.miniBoldLabel);
+                continue;
+            }
+            string rel = it.propertyPath.Substring(first.propertyPath.Length);
+            var others = new List<SerializedProperty>();
+            bool mixed = false;
+            for (int i = 1; i < paths.Count; i++)
+            {
+                SerializedProperty o = _profileSo.FindProperty(paths[i] + rel);
+                if (o == null) continue;
+                others.Add(o);
+                if (!SerializedProperty.DataEquals(it, o)) mixed = true;
+            }
+            EditorGUI.showMixedValue = mixed;
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(it, true);
+            if (EditorGUI.EndChangeCheck())
+            {
+                object v = it.boxedValue;
+                foreach (SerializedProperty o in others) o.boxedValue = v;
+            }
+            EditorGUI.showMixedValue = false;
+        }
+        EditorGUI.indentLevel = indent;
+        if (_profileSo.ApplyModifiedProperties()) SavePalette();
+    }
 
     void AddCopyToCharactersItem(GenericMenu menu, Vector2 mouse)
     {
