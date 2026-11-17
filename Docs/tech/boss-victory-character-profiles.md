@@ -231,6 +231,13 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
     - **한계** — 덮은 풀 인스턴스는 정리 때까지 덮인 채다. 그 사이 같은 풀을 다른 거너 Q 가 다시 쓰면 배율이 따라간다(처치 연출 중이라 드묾).
     - 테스트 `BossVictoryChargeFxTests`: 기본값 = 지금 모습 · 구간·파트 보간 · 반복 간격 계단 · 페이드 · 번쩍 · 기준 추적 · 곡선 배율 · 렌더 모드 → 파트.
   - **레이저·차징이 도중에 사라지던 버그(298)** — 소켓 안전 회수(`EffectSocketPlayer.safetyTimeout`, 프리팹 저작 레이저 `QBeamFx` 1초·차징 루프·과충전 3초·알림 1초)가 프로필 유지 시간(예: `beamHoldSeconds` 31.6)보다 짧았다. 그래서 "1.0초 동안 종료되지 않아 강제 회수" 경고와 함께 레이저가 꺼졌다. 처치 연출이 트는 차징·알림(루프로 틀 때)·과충전·레이저 소켓은 재생 직전에 안전 회수를 끈다(`EffectSocketSafetyOverride`, `EffectSocketPlayer.SetSafetyTimeout`). 정리(`EndVictoryCharge`) 때 저작 값으로 되돌린다. 테스트 `BossVictoryGunnerLaserTests`.
+  - **레이저 정지 화면(299)** — 레이저 이펙트 `FX_GunnerQBeam`(SVN)은 파트 16개가 전부 원샷이다(대부분 0.05초, Beam 1초). 그래서 소켓을 붙잡고 있어도 1초 남짓이면 입자가 다 죽고, `beamHoldSeconds` 는 끄는 시각만 늦췄다.
+    - 프로필 `beamFreezeAt`(발사 뒤 타임라인 초, 기본 0.12 = 빔이 다 뻗은 순간)에 그 레이저 인스턴스 입자를 전부 `Pause` 한다(정지 화면).
+    - 유지 시간 끝에 다시 재생해 원래 소멸 꼬리가 나온다. 페이드아웃(295)은 유지 끝부터 기존대로다.
+    - 유지 시간 ≤ 멈춤 시점이면 멈추지 않는다(예전 그대로).
+    - 판정은 타임라인 초 기준 순수 함수 `BossVictoryGunnerCharge.BeamFrozen` → `Frame.BeamFrozen` 이라 시간 배율·글리치와 무관하다.
+    - 멈춘 동안에도 밝기·페이드(색 블록)·폭은 그대로 먹는다. 레이저 끝·정리(`EndVictoryLaser`)에서 먼저 재개하므로 멈춘 채 풀에 돌아가지 않는다. 평소 Q 는 불변.
+    - 창 발사 마커 칸 '레이저 멈춤 시점'. 테스트 `BossVictoryGunnerLaserTests`.
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
 

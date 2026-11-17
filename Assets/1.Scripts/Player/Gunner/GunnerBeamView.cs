@@ -511,6 +511,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private Light victoryLight;
     private bool victoryBurstLooping;
     private bool victoryOverchargeTuned;
+    // 299 — 레이저 정지 화면: 멈춘 레이저 입자(유지 시간 끝·정리 때 다시 재생)
+    private readonly List<ParticleSystem> victoryBeamPaused = new List<ParticleSystem>();
 
     /// <summary>[이 피어] 처치 연출 거너 Q 를 그리는 중인가(평소 충전 BeginCharge 를 막는다).</summary>
     public bool IsVictoryCharging => victoryOn;
@@ -593,6 +595,9 @@ public class GunnerBeamView : BaseNetworkBehaviour
 
         if (victoryLaser)
         {
+            // 정지 화면(299) — 레이저 이펙트는 1초 남짓 원샷이라 유지 시간 동안 입자를 멈춰 둔다. 유지 끝에 다시 재생 = 원래 소멸 꼬리.
+            if (f.BeamFrozen && victoryBeamPaused.Count == 0) FreezeVictoryBeam();
+            else if (!f.BeamFrozen && victoryBeamPaused.Count > 0) ResumeVictoryBeam();
             if (!f.LaserOn) EndVictoryLaser();
             else victoryFx.ApplyUniform(chargeBeamPlayer, 1f, victoryLook.beamBrightness, f.LaserFade);
         }
@@ -716,9 +721,38 @@ public class GunnerBeamView : BaseNetworkBehaviour
         }
     }
 
+    // 레이저 인스턴스 입자 전부 멈춤(시간 정지 — 입자 유지, 렌더러 색 블록·폭은 그대로 먹는다). 299.
+    private void FreezeVictoryBeam()
+    {
+        if (chargeBeamPlayer == null) return;
+        int count = chargeBeamPlayer.GetInstances(BeamInstances);
+        for (int i = 0; i < count; i++)
+        {
+            BeamInstances[i].GetComponentsInChildren(true, BeamSystems);
+            for (int k = 0; k < BeamSystems.Count; k++)
+            {
+                ParticleSystem ps = BeamSystems[k];
+                ps.Pause(false);
+                victoryBeamPaused.Add(ps);
+            }
+        }
+    }
+
+    // 멈춘 레이저 다시 재생(유지 끝·레이저 끝·정리). 풀에 멈춘 채 돌아가지 않게 반드시 거친다.
+    private void ResumeVictoryBeam()
+    {
+        for (int i = 0; i < victoryBeamPaused.Count; i++)
+        {
+            ParticleSystem ps = victoryBeamPaused[i];
+            if (ps != null && ps.isPaused) ps.Play(false);
+        }
+        victoryBeamPaused.Clear();
+    }
+
     private void EndVictoryLaser()
     {
         victoryLaser = false;
+        ResumeVictoryBeam();   // 299 — 멈춘 채 회수·반납되지 않게 먼저 재개
         chargeBeamStopAt = -1f;
         // 페이드아웃(295)이 있으면 0 까지 내려간 뒤라 남은 입자 없이 바로 걷는다(덮은 밝기를 되돌릴 때 잔상이 다시 밝아지지 않게). 없으면 예전 그대로 자연 해제.
         if (chargeBeamPlayer != null)

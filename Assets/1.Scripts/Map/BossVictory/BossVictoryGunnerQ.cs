@@ -60,6 +60,9 @@ public sealed class BossVictoryGunnerQ
     [Min(0f)] public float sphereDelay;
     [Tooltip("레이저 유지 시간(타임라인 초) — 발사 마커부터.")]
     [Min(0.01f)] public float beamHoldSeconds = 0.5f;
+    [Tooltip("레이저 멈춤 시점(발사 뒤 타임라인 초, 299) — 빔이 다 뻗은 순간 레이저 입자를 그대로 멈췄다가(정지 화면) 유지 시간 끝에 다시 재생해 원래 소멸 꼬리를 튼다. " +
+             "레이저 이펙트가 1초 남짓 원샷이라 멈추지 않으면 유지 시간이 길어도 화면엔 안 남는다. 유지 시간 ≤ 이 값이면 멈추지 않음(예전 그대로).")]
+    [Min(0f)] public float beamFreezeAt = 0.12f;
 
     // ── 차징 이펙트 세부(할 일 295) — 마커마다(차징 시작·1·2·3단계) 파트별 배율·포인트 라이트, 마커 사이 = 그 단계 곡선(ease)으로 보간.
     //    기본값 = 지금 모습(배율 1·라이트 0·흔들림 0). 차징 루프 FX_GunnerCharge(SVN 아트) 프리팹은 그대로 — 런타임에 인스턴스 값을 배율로 덮고 끝나면 되돌린다. ──
@@ -212,6 +215,7 @@ public static class BossVictoryGunnerCharge
         public bool LaserOn;        // 발사 ≤ t < 발사 + 유지 시간 + 페이드아웃(295)
         public float LaserFade;     // 레이저 알파(295) — 유지 중 1, 페이드아웃 동안 1 → 0
         public float FlashIntensity; // 발사 번쩍 라이트 세기(295) — 발사부터 길이 동안 세기 → 0
+        public bool BeamFrozen;     // 레이저 정지 화면(299) — 발사 + 멈춤 시점 ≤ t < 발사 + 유지 시간(멈춤 시점 < 유지 시간일 때만)
         public ChargeFxSample Fx;   // 차징 이펙트 파트 배율·포인트 라이트(295 — 마커 사이 보간)
     }
 
@@ -264,6 +268,7 @@ public static class BossVictoryGunnerCharge
         f.LaserOn = f.Fired && sinceFire < hold + fade;
         f.LaserFade = f.LaserOn ? LaserFade(sinceFire, hold, fade) : 0f;
         f.FlashIntensity = FireFlash(q.fireFlashIntensity, q.fireFlashDuration, sinceFire);
+        f.BeamFrozen = f.Fired && BeamFrozen(sinceFire, q.beamFreezeAt, hold);
         return f;
     }
 
@@ -274,6 +279,10 @@ public static class BossVictoryGunnerCharge
         if (fade <= 0f) return 0f;
         return Mathf.Clamp01(1f - (sinceFire - hold) / fade);
     }
+
+    /// <summary>레이저 정지 화면(299) — 발사 뒤 <paramref name="freezeAt"/> ≤ 경과 < <paramref name="hold"/> 이면 멈춤. 멈춤 시점 ≥ 유지 시간이면 멈추지 않는다(예전 그대로).</summary>
+    public static bool BeamFrozen(float sinceFire, float freezeAt, float hold) =>
+        freezeAt < hold && sinceFire >= Mathf.Max(0f, freezeAt) && sinceFire < hold;
 
     /// <summary>발사 번쩍 세기(295) — 발사 순간 <paramref name="peak"/> → 길이 동안 선형으로 0. 발사 전·길이 뒤·세기 0 = 0.</summary>
     public static float FireFlash(float peak, float duration, float sinceFire)
