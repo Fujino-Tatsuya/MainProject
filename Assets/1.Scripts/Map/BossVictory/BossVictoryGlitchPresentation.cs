@@ -92,6 +92,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     float _dashClipSpan = -1f;        // 애니 Custom0 → End 클립 구간(초) — 이동 중 애니 배율
     float _dashCustom0;               // 애니 Custom0 클립 시각(초) — 클립마다 이 프레임부터
     float _dashAnimScale = -1f;       // 이동 중 처치자 애니 배율(아니면 -1)
+    float _dashStateSpeed = -1f;      // 순간이동 Q 상태 속도(실제로 읽은 값 — 아직 못 읽었으면 -1, 297)
     PlayerMotor _dashMoveMotor;
     AssassinSkillView _dashPierce;
 
@@ -682,6 +683,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _dashOn = true;
         _dashSeg = -1;
         _dashSegEnded = false;
+        _dashStateSpeed = -1f;
+        _dashArrivalLogged = -1;
         Edit.Log($"[BossVictory] 순간이동 Q 트랙 — 클립 {_dashOrder.Count}개 · {state} Custom0 {_dashCustom0:0.###}초부터(구간 {_dashClipSpan:0.###}초)" +
                  (FinisherTrim > 0f ? $" · 마지막 뒤 정지 {FinisherTrim:0.###}초" : "") + $" (글리치 t {_glitchTime:0.00})", this);
     }
@@ -698,13 +701,41 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
         if (_dashSeg >= 0 && !_dashSegEnded && _glitchTime >= BossVictoryAssassinDash.SegmentEnd(clips, _dashOrder, _dashSeg))
             EndDashSegment();
+        // 상태 속도 = 그 상태를 실제로 읽은 값만 기억(Play 직후 Animator 갱신 전 프레임엔 못 읽어 1 로 튀지 않게, 297).
+        if (TryStateSpeed(_killerAnimator, _finisherState, out float stateSpeed)) _dashStateSpeed = stateSpeed;
         _dashAnimScale = _dashSeg >= 0 && !_dashSegEnded
-            ? BossVictoryKillerMoves.MoveAnimScale(_dashClipSpan, clips[_dashOrder[_dashSeg]].length, StateSpeed(_killerAnimator, _finisherState))
+            ? BossVictoryKillerMoves.MoveAnimScale(_dashClipSpan, clips[_dashOrder[_dashSeg]].length, _dashStateSpeed > 0f ? _dashStateSpeed : 1f)
             : -1f;
+        LogLastDashArrival();
+    }
+
+    // [진단 — 랩 timelineClockLog 켤 때만, 297] 이동 하나가 끝난 뒤 실제 처치자 위치 vs 목표 도착점(벽에 막혔는지). 오너 = 모터 이동 결과, 다른 피어 = 복제 위치(지연 포함).
+    // 다음 클립 순간이동 직전(EnterDashSegment)과 마지막 클립 끝 0.1초 뒤(물리 반영 여유)에 한 줄.
+    int _dashArrivalLogged = -1;
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    void LogDashArrival(int seg)
+    {
+        if (!TimelineClockLog || seg < 0 || seg <= _dashArrivalLogged || _killer == null) return;
+        _dashArrivalLogged = seg;
+        float eased = BossVictoryAssassinDash.Progress(DashClips, _dashOrder, seg, BossVictoryAssassinDash.SegmentEnd(DashClips, _dashOrder, seg), _profile.teleportMoveEase);
+        Vector3 target = Vector3.LerpUnclamped(_dashFrom, _dashTo, eased);
+        Vector3 actual = _killer.transform.position;
+        Vector3 d = actual - target;
+        d.y = 0f;
+        ClockLog($"순간이동 Q #{seg + 1} 도착 확인 — 실제 {actual} · 목표 {target} · 수평 거리 {d.magnitude:0.00}m{(_killer.IsOwner ? "(오너 이동)" : "(복제 위치)")}");
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    void LogLastDashArrival()
+    {
+        if (!TimelineClockLog || _dashSeg < 0 || _dashSeg != _dashOrder.Count - 1 || !_dashSegEnded) return;
+        if (_glitchTime >= BossVictoryAssassinDash.SegmentEnd(DashClips, _dashOrder, _dashSeg) + 0.1f) LogDashArrival(_dashSeg);
     }
 
     void EnterDashSegment(int k)
     {
+        LogDashArrival(k - 1);   // 앞 이동 도착 확인(순간이동 전 — _dashFrom/_dashTo 가 아직 앞 클립 값)
         _dashSeg = k;
         _dashSegEnded = false;
         _dashMoved = 0f;
@@ -731,14 +762,17 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
 
         // 애니 — 첫 클립은 상태를 쥐고(스킬 없이 표시만), 클립마다 Custom0 프레임부터 다시.
+        // 몸 방향 = Armature(PlayerMovement) — 모든 피어 같은 길. 루트는 돌리지 않는다(루트 회전은 복제되지 않아 피어·회차마다 남았다, 297).
         if (k == 0 && !_killerSkills.PlayPresentationStateOnly(_profile.teleportMoveState, dir))
             Edit.LogError($"[BossVictory] 순간이동 Q 상태 '{_profile.teleportMoveState}' 를 못 틀었다({_killer.name}).", this);
-        else if (k > 0 && dir.sqrMagnitude > 0.0001f) _killer.transform.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+        else if (k > 0 && dir.sqrMagnitude > 0.0001f && _killer.TryGetComponent(out PlayerMovement facing)) facing.RotateImmediately(dir);
         if (_killerAnimator != null && _killerAnimator.runtimeAnimatorController != null)
         {
             AnimationClip clip = AnimationEventRequirements.FindStateClip(_killerAnimator.runtimeAnimatorController, _profile.teleportMoveState);
             float len = clip != null && clip.length > 0f ? clip.length : 1f;
-            _killerAnimator.Play(_finisherState, 0, _dashCustom0 / len);
+            // 시작 프레임 = Custom0 + 늦게 들어간 만큼(이 단계는 시각이 지난 다음 프레임에 들어온다 — 끊긴 프레임이면 더 늦다, 297).
+            float startClip = BossVictoryKillerMoves.SegmentStartClipTime(_dashCustom0, _dashClipSpan, c.start, c.length, _glitchTime);
+            _killerAnimator.Play(_finisherState, 0, startClip / len);
         }
         if (_dashPierce != null) _dashPierce.BeginPierce(_dashFrom, dir);
         ClockLog($"순간이동 Q #{k + 1} 시작 {c.start:0.000}s");
@@ -772,13 +806,16 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _dashMoveMotor = null;
     }
 
-    // 0층 그 상태의 상태 속도(speed × multiplier) — Animator.speed 는 빼고. 그 상태가 아니면 1.
-    static float StateSpeed(Animator a, int stateHash)
+    // 0층 그 상태의 상태 속도(speed × multiplier) — Animator.speed 는 빼고. 그 상태를 재생(또는 그 상태로 전이) 중일 때만 true.
+    static bool TryStateSpeed(Animator a, int stateHash, out float speed)
     {
-        if (a == null || !a.isActiveAndEnabled || stateHash == 0) return 1f;
+        speed = 1f;
+        if (a == null || !a.isActiveAndEnabled || stateHash == 0) return false;
         AnimatorStateInfo info = a.IsInTransition(0) && a.GetNextAnimatorStateInfo(0).shortNameHash == stateHash
             ? a.GetNextAnimatorStateInfo(0) : a.GetCurrentAnimatorStateInfo(0);
-        return info.shortNameHash == stateHash && info.speed > 0f ? info.speed : 1f;
+        if (info.shortNameHash != stateHash || info.speed <= 0f) return false;
+        speed = info.speed;
+        return true;
     }
 
     static float SkillEventTime(AnimationClip clip, SkillAnimationEventType type)
@@ -1455,6 +1492,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         var s = new BossVictoryCameraCuts.Subjects();
         s.Killer = _killer != null ? _killer.transform.position : _state.HitPoint;
         s.BossBase = _boss != null ? _boss.transform.position : _state.HitPoint;
+        s.BossForward = _boss != null ? _boss.transform.forward : Vector3.forward;   // 기준 '보스 정면'(297) — 순간이동 두 점과 같은 보스 회전(복제값)
         Transform weapon = KillerWeapon();
         s.HasWeapon = weapon != null;
         s.Weapon = weapon != null ? weapon.position : default;
@@ -1653,11 +1691,16 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
                      : _dashAnimScale >= 0f ? _dashAnimScale   // 순간이동 Q 이동 중(272 후속) — 애니 Custom0→End 가 클립 길이에 맞게
                      : _phase == Phase.Slow ? _profile.killerAfterFinisherScale
                      : _killerStep == BossVictoryKillerSequence.Step.CurrentAction ? _profile.killerCurrentActionScale
+                     : _dashOn ? 1f   // 순간이동 Q 클립 사이·뒤 — 절대 1(공속 무관, 297)
                      : -1f,   // 백대쉬·처치 연출 스킬 동안은 덮지 않는다(1)
         Role.Other => _profile.otherPlayersScale,
         Role.Boss => BossTimeScale,
         _ => -1f,
     };
+
+    // 순간이동 Q(272 후속) 동안 처치자 배율 = Animator.speed 절대값(297) — 원래 값(공속 배율: 처치 순간 평타·스킬이 끊기지 않고 남으면 공속을 탄다)과 곱하지 않는다.
+    // 이동 배율(MoveAnimScale)·정지 프레임·느려짐이 처치 순간 하던 동작·공속 버프와 무관하게 같은 자세가 된다. 풀 때는 원래 값으로 돌린다(위 _animatorSpeeds).
+    bool AbsoluteScale(Role role) => role == Role.Killer && _dashOn;
 
     // 매 프레임(실행 순서 10001) — 다른 계통(공속 배율 등)이 Update 에서 쓴 값을 그 뒤에 덮는다.
     void TickAnimators()
@@ -1675,7 +1718,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             // 덮기 전 값, 또는 덮는 동안 다른 계통이 바꾼 값 = 풀 때 돌릴 "원래 값".
             if (a.speed > 0f && (!_animatorOverridden[i] || !Mathf.Approximately(a.speed, _animatorLastSet[i])))
                 _animatorSpeeds[i] = a.speed;
-            float want = _animatorSpeeds[i] * scale;
+            float want = AbsoluteScale(_animatorRoles[i]) ? scale : _animatorSpeeds[i] * scale;
             if (!Mathf.Approximately(a.speed, want)) a.speed = want;
             _animatorLastSet[i] = want;
             _animatorOverridden[i] = true;

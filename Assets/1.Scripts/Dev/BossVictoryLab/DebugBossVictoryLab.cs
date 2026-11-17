@@ -331,6 +331,8 @@ public sealed class DebugBossVictoryLab : MonoBehaviour
     static void PlaceKiller(Player killer, Vector3 position, Quaternion rotation)
     {
         // 몸 방향 = Armature(이동 시뮬레이션이 돌리는 쪽) — 즉시 돌리고 Motor 상태도 맞춘다(평타 즉시 회전과 같은 길).
+        // 루트 회전 초기화(297) — 몸 방향은 Armature 만 쓴다. 옛 순간이동 Q 가 루트를 돌려 회차마다 남던 값을 지운다(Armature 는 아래에서 세계 방향으로 다시 맞춘다).
+        killer.transform.rotation = Quaternion.identity;
         PlayerMovement movement = killer.GetComponent<PlayerMovement>();
         if (movement != null) movement.RotateImmediately(rotation * Vector3.forward);
 
