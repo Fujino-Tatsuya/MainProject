@@ -26,7 +26,7 @@ public static class BossVictoryKillerMoves
     /// <summary>
     /// 처치자 단계 시각 — 이동 방식별로 '백대쉬 시작' 단계(= 백대쉬 / 후퇴)와 '처치 연출 스킬' 단계 시각을 고른다.
     /// 백대쉬 = 마커 그대로. 순간이동 = 백대쉬 없음 · 처치 연출 단계 = 어쌔신 트랙 첫 클립 시작(없으면 무한대).
-    /// 후퇴 차징 — 가까우면 백대쉬 시작 → 'Q 차징 시작' 마커, 멀면 백대쉬 없음(무한대)·백대쉬 시작 시각에 바로 Q 차징.
+    /// 후퇴 차징 — 가까우면 백대쉬 시작 → '거너 Q 차징 시작' 마커, 멀면 백대쉬 없음(무한대)·같은 '차징 시작' 마커에 Q 차징(294 — 옛: 백대쉬 시작 시각에 바로).
     /// </summary>
     public static BossVictoryKillerSequence.Times Times(BossVictoryTimeline tl, BossVictoryKillerMove move, bool tooClose)
     {
@@ -41,7 +41,7 @@ public static class BossVictoryKillerMoves
                 t.FinisherStart = tl.ChargeStartTime;
                 return t;
             case BossVictoryKillerMove.RetreatCharge:
-                t.FinisherStart = tl.backDashStartTime;
+                t.FinisherStart = tl.ChargeStartTime;
                 t.BackDashStart = float.PositiveInfinity;
                 return t;
             default:
@@ -87,10 +87,6 @@ public static class BossVictoryKillerMoves
         if (clipSpan <= 0f || moveSeconds <= 0f) return 1f;
         return clipSpan / moveSeconds / (stateSpeed > 0f ? stateSpeed : 1f);
     }
-
-    /// <summary>거너 처치 연출 차징 구체 크기 = 시작 크기 → 목표 크기(성장 곡선, 진행 <paramref name="t"/> 0~1). t = 1(발사 순간) = 목표 크기.</summary>
-    public static float ChargeScale(float from, float to, AnimationCurve growth, float t) =>
-        Mathf.LerpUnclamped(from, to, Ease(growth, Mathf.Clamp01(t)));
 
     static float Ease(AnimationCurve curve, float u) =>
         curve != null && curve.length > 0 ? curve.Evaluate(u) : u;

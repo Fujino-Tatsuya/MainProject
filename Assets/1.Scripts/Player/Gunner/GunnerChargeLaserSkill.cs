@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -95,36 +94,12 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
     private GunnerChargeLaserData QData => Data as GunnerChargeLaserData;
 
-    // ── 보스 처치 연출 표시 전용 재생(267 후속) — 이 피어만, 판정·특성 없음 ──
-    // 집중 자세(시전 상태) + 기본 충전 연출 → 기본 최대 충전 시간(데이터 1.2초) 뒤 대상(보스) 방향 최대 충전 사거리·기본 폭으로
-    // 발사 연출 한 번(충전 지우기 → 섬광 → 레이저 → Gunner_Q_Fire). 그 클립 End 이벤트 = 처치 연출 스킬 End.
-    // 모든 피어가 같은 처치 상태·시각으로 각자 튼다 — 새 RPC 없음.
-    private Coroutine presentationFire;
-
+    // ── 보스 처치 연출 표시 전용 재생(267 후속 → 294) — 이 피어만, 판정·특성 없음 ──
+    // 집중 자세(시전 상태 애니)만 이 스킬이 튼다(PlayerSkillController.PlayPresentationOnly). 차징 구체·3단계·발사(큰 레이저 → Gunner_Q_Fire)는
+    // 처치 연출 타임라인 '거너 Q' 마커가 GunnerBeamView 처치 연출 경로(BeginVictoryCharge/SetVictoryFrame)로 그린다 — 옛 1.2초 고정 대기 없음.
+    // Gunner_Q_Fire 클립 End 이벤트 = 처치 연출 스킬 End. 모든 피어가 같은 처치 상태·시각으로 각자 — 새 RPC 없음. 실전 Q 는 그대로.
     public override string PresentationEndStateName => view != null ? view.ChargeFireStateName : "Gunner_Q_Fire";
 
-    public override void OnPresentationOnlyStart(Transform target)
-    {
-        GunnerChargeLaserData data = QData;
-        if (data == null || view == null || owner == null) return;
-        view.BeginPresentationCharge(data.MaxChargeTime);   // OnClientPlay 의 특성 충전 시간·색을 기본으로 다시
-        if (presentationFire != null) StopCoroutine(presentationFire);
-        presentationFire = StartCoroutine(PresentationFire(data, target));
-    }
-
-    private IEnumerator PresentationFire(GunnerChargeLaserData data, Transform target)
-    {
-        yield return new WaitForSeconds(data.MaxChargeTime);
-        presentationFire = null;
-        if (owner == null || view == null) yield break;
-        Vector3 dir = target != null ? target.position - owner.transform.position : owner.transform.forward;
-        dir.y = 0f;
-        dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : owner.transform.forward;
-        Vector3 origin = FireOrigin(owner.transform.position, data);
-        float range = data.RangeAt(1f);
-        float length = beam != null ? beam.CastLength(origin, dir, range, data.BeamWidth * 0.5f, data.BlockingLayers) : range;
-        view.PlayPresentationChargeLaser(origin, origin + dir * length, data.BeamWidth, length < range - 0.01f);
-    }
     private ulong SourceId => owner != null ? owner.NetworkObjectId : 0;
     private bool HasAuthority => owner != null && (!owner.IsSpawned || owner.IsServer);
     private PlayerTraitModifiers Traits => owner != null ? owner.TraitModifiers : null;
@@ -487,7 +462,6 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
     public override void OnEnd(SkillEndReason reason)
     {
-        if (presentationFire != null) { StopCoroutine(presentationFire); presentationFire = null; }   // 처치 연출 취소
         if (fired)
             GunnerSkillEventRules.WarnIfFallbackEnded(reason, "Q", "gunner_skill_Q_fire", SkillAnimationEventType.End, this);
         lineIndicator?.HideCharge();

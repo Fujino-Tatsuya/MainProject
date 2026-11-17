@@ -201,15 +201,18 @@ public sealed class BossVictoryKillerMoveTests
     }
 
     [Test]
-    public void 후퇴_차징_멀면_백대쉬_없이_백대쉬_시작_시각에_Q()
+    public void 후퇴_차징_멀면_백대쉬_없이_차징_시작_마커에_Q()
     {
         var tl = BossVictoryTimeline.CreateDefault();
         tl.backDashStartTime = 0.2f;
         BossVictoryKillerSequence.Times t = BossVictoryKillerMoves.Times(tl, BossVictoryKillerMove.RetreatCharge, tooClose: false);
-        Assert.AreEqual(0.2f, t.FinisherStart, Tolerance);
+        Assert.AreEqual(0.4f, t.FinisherStart, Tolerance, "멀어도 차징 시작 마커(기본 = 백대쉬 시작 + 0.2, 294)");
         Assert.IsTrue(float.IsPositiveInfinity(t.BackDashStart), "백대쉬 없음");
-        Assert.AreNotEqual(BossVictoryKillerSequence.Step.BackDash, BossVictoryKillerSequence.Target(t, 0.19f));
-        Assert.AreEqual(BossVictoryKillerSequence.Step.Finisher, BossVictoryKillerSequence.Target(t, 0.2f));
+        Assert.AreNotEqual(BossVictoryKillerSequence.Step.BackDash, BossVictoryKillerSequence.Target(t, 0.3f));
+        Assert.AreNotEqual(BossVictoryKillerSequence.Step.Finisher, BossVictoryKillerSequence.Target(t, 0.39f));
+        Assert.AreEqual(BossVictoryKillerSequence.Step.Finisher, BossVictoryKillerSequence.Target(t, 0.4f));
+        tl.SetMarkerTime(BossVictoryMarker.ChargeStart, 0.9f);
+        Assert.AreEqual(0.9f, BossVictoryKillerMoves.Times(tl, BossVictoryKillerMove.RetreatCharge, false).FinisherStart, Tolerance, "끌어 고정 — 가까울 때와 같은 마커");
         Assert.IsFalse(BossVictoryKillerSequence.StartDashDuringFinisher(true, BossVictoryKillerSequence.Step.Finisher, false, t.BackDashStart, 10f),
             "Q 중에도 백대쉬가 늦게 시작하지 않는다");
     }
@@ -223,18 +226,7 @@ public sealed class BossVictoryKillerMoveTests
         Assert.IsFalse(BossVictoryTimeline.ZeroMeansOff(BossVictoryMarker.ChargeStart));
     }
 
-    // ── 차징 구체(거너) ──
-
-    [Test]
-    public void 차징_구체는_시작에서_목표_크기로_발사_순간_목표()
-    {
-        AnimationCurve linear = AnimationCurve.Linear(0f, 0f, 1f, 1f);
-        Assert.AreEqual(0.5f, BossVictoryKillerMoves.ChargeScale(0.5f, 2f, linear, 0f), Tolerance, "시작");
-        Assert.AreEqual(1.25f, BossVictoryKillerMoves.ChargeScale(0.5f, 2f, linear, 0.5f), Tolerance, "가운데");
-        Assert.AreEqual(2f, BossVictoryKillerMoves.ChargeScale(0.5f, 2f, linear, 1f), Tolerance, "최대 충전 = 목표");
-        Assert.AreEqual(2f, BossVictoryKillerMoves.ChargeScale(0.5f, 2f, linear, 3f), Tolerance, "넘쳐도 목표");
-        Assert.AreEqual(1.25f, BossVictoryKillerMoves.ChargeScale(0.5f, 2f, null, 0.5f), Tolerance, "곡선 없음 = 선형");
-    }
+    // 차징 구체 크기(거너)는 3단계 마커로 — BossVictoryGunnerQTests(294).
 
     // ── 프로필 기본값·정본 연결 ──
 

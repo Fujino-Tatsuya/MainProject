@@ -167,7 +167,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
         // 타임라인 영역(267 후속 — 스크롤바): 위 시간 눈금 = 세로 고정·가로(_scrollTime) 따라감 · 왼쪽 이름 열 = 세로 따라감·가로 고정 ·
         // 세로 = 스크롤 뷰(트랙이 넘치면 막대, 맨 밑에 트랙 1칸 여유) · 가로 = 시간 스크롤 막대(확대해서 넘칠 때만, 맨 아래 고정).
-        int rows = BossVictoryTimeline.Tracks.Length + BossVictoryTimeline.Markers.Length;
+        int rows = BossVictoryTimeline.Tracks.Length + MarkerRowCount;
         float contentHeight = rows * RowHeight + RowHeight;
         float inspectorHeight = Mathf.Clamp(_inspectorHeight, MinInspectorHeight, MaxInspectorHeight);
         float timelineHeight = Mathf.Max(MinTimelineHeight, position.height - EditorStyles.toolbar.fixedHeight - SplitterHeight - inspectorHeight);
@@ -225,7 +225,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Event e = Event.current;
         if (e.type != EventType.MouseDown || e.button != 0 || !labels.Contains(e.mousePosition) || !_bodyVisible.Contains(e.mousePosition)) return;
         int row = Mathf.FloorToInt((e.mousePosition.y - labels.y) / RowHeight);
-        int markers = BossVictoryTimeline.Markers.Length;
+        int markers = MarkerRowCount;
         if (row < markers) Select(-1, -1, row);
         else if (row - markers < BossVictoryTimeline.Tracks.Length) Select(row - markers, -1, -1);
         else return;
@@ -268,8 +268,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     Rect RowRect(Rect lanes, int row) => new Rect(lanes.x, lanes.y + row * RowHeight, lanes.width, RowHeight);
     // 위 = 마커 줄(로비 전환·카메라·숨김 — 첫 화면에 바로 보이게), 아래 = 클립 트랙.
-    static int MarkerRow(BossVictoryMarker marker) => (int)marker;
-    static int TrackRow(BossVictoryTrack track) => BossVictoryTimeline.Markers.Length + (int)track;
+    // 거너 Q 마커 5개(차징 시작·1·2·3단계·발사 — 294)는 한 줄 '거너 Q'(차징 시작 줄)에 같이 놓는다.
+    static int MarkerRow(BossVictoryMarker marker) => BossVictoryTimeline.IsGunnerQ(marker) ? (int)BossVictoryMarker.ChargeStart : (int)marker;
+    static readonly int MarkerRowCount = (int)BossVictoryMarker.ChargeStart + 1;
+    static int TrackRow(BossVictoryTrack track) => MarkerRowCount + (int)track;
 
     Rect ClipRect(Rect lanes, int row, BossVictoryClip clip)
     {
@@ -304,9 +306,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         int row = 0;
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
+            if (MarkerRow(marker) != row) continue;   // 거너 Q 1·2·3단계·발사 = 차징 시작 줄(294)
             DrawRowBackground(labels, lanes, row);
-            GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight),
-                IsClipNode(marker) ? "▬ " + ClipNodeLabel(marker) : "◆ " + BossVictoryTimeline.MarkerLabel(marker), MarkerLabelStyle(marker));
+            string label = IsClipNode(marker) ? "▬ " + ClipNodeLabel(marker)
+                : marker == BossVictoryMarker.ChargeStart ? "◆ 거너 Q(차징·1·2·3단계·발사)"
+                : "◆ " + BossVictoryTimeline.MarkerLabel(marker);
+            GUI.Label(new Rect(labels.x + 6f, labels.y + row * RowHeight + 4f, LabelWidth - 8f, RowHeight), label, MarkerLabelStyle(marker));
             row++;
         }
         foreach (BossVictoryTrack track in BossVictoryTimeline.Tracks)
@@ -465,9 +470,21 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     };
 
     static string MarkerText(BossVictoryTimeline tl, BossVictoryMarker marker) =>
-        BossVictoryTimeline.ZeroMeansOff(marker) && tl.MarkerTime(marker) <= 0f
+        BossVictoryTimeline.IsGunnerQ(marker) ? GunnerQShortLabel(marker)
+        : BossVictoryTimeline.ZeroMeansOff(marker) && tl.MarkerTime(marker) <= 0f
             ? $"{BossVictoryTimeline.MarkerLabel(marker)} ({OffText(marker)})"
             : $"{BossVictoryTimeline.MarkerLabel(marker)} {tl.MarkerTime(marker):0.00}s";
+
+    // 거너 Q 한 줄(294) — 마커 5개가 붙어 있어 라벨은 이름만 짧게(시각은 선택하면 아래 칸).
+    static string GunnerQShortLabel(BossVictoryMarker marker) => marker switch
+    {
+        BossVictoryMarker.ChargeStart => "차징",
+        BossVictoryMarker.GunnerStage1 => "1단계",
+        BossVictoryMarker.GunnerStage2 => "2단계",
+        BossVictoryMarker.GunnerStage3 => "3단계",
+        BossVictoryMarker.GunnerFire => "발사",
+        _ => BossVictoryTimeline.MarkerLabel(marker),
+    };
 
     static readonly string[] AnchorLabels = { "가운데", "처치자", "보스", "처치자 무기(매 프레임)" };
 
@@ -480,6 +497,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         GUI.BeginClip(lanes);
         Rect local = new Rect(0f, 0f, lanes.width, lanes.height);
         DrawClipNodes(local);
+        bool gunnerPinLeft = false, gunnerPinRight = false;   // 거너 Q 줄(294) — 화면 밖 핀은 쪽마다 하나
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
             if (IsClipNode(marker)) continue;   // 처치 연출 스킬·보스 피격 애니 = 클립(255 후속 7·10)
@@ -489,6 +507,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             Rect row = RowRect(local, MarkerRow(marker));
             string text = MarkerText(Timeline, marker);
             GUIStyle style = MarkerLabelStyle(marker);
+            if (BossVictoryTimeline.IsGunnerQ(marker) && (x < 0f || x > local.width))
+            {
+                if (x < 0f ? gunnerPinLeft : gunnerPinRight) continue;
+                if (x < 0f) gunnerPinLeft = true;
+                else gunnerPinRight = true;
+                text = "거너 Q";
+            }
             float textWidth = style.CalcSize(new GUIContent(text)).x;
             if (x < 0f || x > local.width)
             {
@@ -525,27 +550,59 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     }
 
     // 마커 잡기 — 마름모 ±(크기+4)px 또는 라벨 위. 화면 밖 ◀/▶ 라벨을 누르면 그 마커가 보이게 옮긴다.
+    // 거너 Q 줄(294)은 마커 5개가 한 줄 — 보이는 마커를 먼저 잡고(가까운 것), 화면 밖으로 옮기는 것은 그 쪽 끝 핀을 눌렀을 때만.
     bool PickMarker(Rect lanes, Vector2 mouse, out BossVictoryMarker picked)
     {
+        picked = default;
+        float best = float.MaxValue;
+        bool found = false;
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
             if (IsClipNode(marker)) continue;   // 클립 — PickClipNode
-            picked = marker;
             Rect row = RowRect(lanes, MarkerRow(marker));
             if (!row.Contains(mouse)) continue;
             float x = TimeToX(lanes, Timeline.MarkerTime(marker));
-            if (x < lanes.x || x > lanes.xMax)
-            {
-                _scrollTime = Mathf.Max(0f, Timeline.MarkerTime(marker) - lanes.width * 0.5f / _pixelsPerSecond);
-                Repaint();
-                return false;
-            }
+            if (x < lanes.x || x > lanes.xMax) continue;
             float textWidth = MarkerLabelStyle(marker).CalcSize(new GUIContent(MarkerText(Timeline, marker))).x;
             Rect label = MarkerLabelRect(new Rect(lanes.x, row.y, lanes.width, row.height), x, textWidth, lanes.xMax);
-            if (Mathf.Abs(mouse.x - x) <= MarkerSizeLobby + 4f || label.Contains(mouse)) return true;
+            float d = Mathf.Abs(mouse.x - x);
+            if ((d <= MarkerSizeLobby + 4f || label.Contains(mouse)) && d < best)
+            {
+                best = d;
+                picked = marker;
+                found = true;
+            }
         }
-        picked = default;
+        if (found) return true;
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        {
+            if (IsClipNode(marker)) continue;
+            Rect row = RowRect(lanes, MarkerRow(marker));
+            if (!row.Contains(mouse)) continue;
+            float x = TimeToX(lanes, Timeline.MarkerTime(marker));
+            if (x >= lanes.x && x <= lanes.xMax) continue;
+            if (BossVictoryTimeline.IsGunnerQ(marker) && (x < lanes.x ? mouse.x > lanes.x + PinPickWidth : mouse.x < lanes.xMax - PinPickWidth)) continue;
+            _scrollTime = Mathf.Max(0f, Timeline.MarkerTime(marker) - lanes.width * 0.5f / _pixelsPerSecond);
+            Repaint();
+            return false;
+        }
         return false;
+    }
+
+    const float PinPickWidth = 90f;   // 거너 Q 줄 화면 밖 핀 누르는 폭(px)
+
+    // 거너 Q 줄에서 시각 t 에 가장 가까운 마커(우클릭 메뉴).
+    BossVictoryMarker NearestGunnerQ(float t)
+    {
+        BossVictoryMarker best = BossVictoryMarker.ChargeStart;
+        float bestD = float.MaxValue;
+        foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
+        {
+            if (!BossVictoryTimeline.IsGunnerQ(marker)) continue;
+            float d = Mathf.Abs(Timeline.MarkerTime(marker) - t);
+            if (d < bestD) { bestD = d; best = marker; }
+        }
+        return best;
     }
 
     // 재생 헤드 세로 선 — 눈금(창 좌표)과 트랙(스크롤 뷰 안) 에 따로 그린다. r = 그 칸(x 기준 = r.x).
@@ -1220,7 +1277,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         foreach (BossVictoryMarker marker in BossVictoryTimeline.Markers)
         {
             if (!RowRect(lanes, MarkerRow(marker)).Contains(mouse)) continue;
-            BossVictoryMarker m = marker;
+            BossVictoryMarker m = BossVictoryTimeline.IsGunnerQ(marker) ? NearestGunnerQ(t) : marker;   // 거너 Q 줄(294) = 가장 가까운 마커
             if (!_multi.Contains(NodeRef.Marker(m))) Select(-1, -1, (int)m);   // 여러 개 선택 안의 노드면 그대로
             menu.AddItem(new GUIContent($"여기({t:0.00}초)로 옮기기"), false, () => MoveMarker(m, t));
             menu.AddItem(new GUIContent($"재생 헤드({_playhead:0.00}초)로 옮기기"), false, () => MoveMarker(m, _playhead));
@@ -1446,8 +1503,14 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryMarker.BossSlow =>
             "이 시각부터 보스 ×End 후 배율(아래 칸). 0 = 끔 — '느려짐 시작'(그것도 끔이면 처치 연출 스킬 End) 순간을 따른다. 뒤에 정지가 오면 정지.",
         BossVictoryMarker.ChargeStart =>
-            "거너(처치자 이동 = 후퇴 차징)만 — 처치 순간 보스와 가까워 E·백대쉬를 했을 때 이 시각에 Q 차징을 시작한다(멀면 백대쉬 시작 시각에 바로 차징 — 이 마커 무시). " +
-            "기본 = 백대쉬 시작 + 0.2초(끌면 그 시각에 고정). 다른 이동 방식에선 쓰지 않는다.",
+            "거너(처치자 이동 = 후퇴 차징)만 — 이 시각에 Q 차징(집중 자세)을 시작한다. 보스와 가까우면 그 전에 '백대쉬 시작'에 E 표시 + 백대쉬, 멀어도 이 시각을 따른다(294). " +
+            "차징 구체는 아래 '구체 지연'만큼 늦게 나온다. 기본 = 백대쉬 시작 + 0.2초(끌면 그 시각에 고정). 다른 이동 방식에선 쓰지 않는다.",
+        BossVictoryMarker.GunnerStage1 or BossVictoryMarker.GunnerStage2 or BossVictoryMarker.GunnerStage3 =>
+            "거너 Q 단계 마커(294) — 이 시각에 차징 구체가 아래 '도달 크기'가 된다(앞 마커에서 '곡선'으로 커짐). 도달 순간 최대 충전 알림(켜기·크기), 한계 돌파 색 1→2→3 단계를 차례로 입힌다(차징 시작~1단계 전 = 0). " +
+            "3단계부터 발사까지 과충전 루프. 앞 마커보다 앞으로 끌면 앞 마커 시각으로 친다.",
+        BossVictoryMarker.GunnerFire =>
+            "거너 Q 발사(294) — 이 시각에 구체를 지우고 방출 섬광 → 큰 레이저(벽 무시·보스 관통·길이 칸·착탄 이펙트 없음) → Gunner_Q_Fire(그 End 이벤트 = 처치 연출 스킬 End). " +
+            "레이저는 '유지 시간'(타임라인 초) 뒤 꺼진다. 처치 연출 시간 배율과 무관하게 이 시각에 쏜다. 옛 1.2초 고정 대기 대신.",
         _ => "",
     };
 
@@ -1947,7 +2010,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 }
                 if (_profile.killerMove == BossVictoryKillerMove.RetreatCharge)
                 {
-                    DrawProfileFields("후퇴 차징(가까우면 이 마커에 후퇴 스킬 + 백대쉬 → 'Q 차징 시작' / 멀면 이 마커에 바로 Q)",
+                    DrawProfileFields("후퇴 차징(가까우면 이 마커에 후퇴 스킬 + 백대쉬 · Q 차징은 가깝든 멀든 '거너 Q' 줄 차징 시작 마커에 — 294)",
                         nameof(BossVictoryProfile.retreatDistance), nameof(BossVictoryProfile.retreatSkillSlot));
                 }
                 DrawProfileFields("백대쉬(처치 연출 전용 · 이 캐릭터 프로필)",
@@ -1982,16 +2045,36 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawProfileFields("보스 End 후 배율", nameof(BossVictoryProfile.bossAfterFinisherScale));
                 break;
             case BossVictoryMarker.ChargeStart:
-                DrawProfileFields("거너 Q 차징 구체(272 · 이 캐릭터 프로필 — 최대 충전 = 목표 크기로 발사, 레이저 폭 그대로)",
-                    nameof(BossVictoryProfile.chargeScaleFrom), nameof(BossVictoryProfile.chargeScaleTo), nameof(BossVictoryProfile.chargeScaleCurve));
+                DrawProfileFields("거너 Q 차징(294 · 이 캐릭터 프로필) — 시작 크기 · 구체 지연(타임라인 초) · 차징 오프셋(총구 기준 x 옆·y 위·z 앞, 구체·알림·과충전)",
+                    GunnerQField(nameof(BossVictoryGunnerQ.startScale)), GunnerQField(nameof(BossVictoryGunnerQ.sphereDelay)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.chargeOffset)));
                 if (Timeline.chargeStartTime >= 0f && GUILayout.Button($"자동으로(백대쉬 시작 + {BossVictoryTimeline.DefaultChargeDelay:0.0}초)", GUILayout.Width(220f)))
                 {
                     Record("처치 연출 타임라인 Q 차징 시작 자동");
                     Timeline.chargeStartTime = -1f;
                     Save();
                 }
-                if (_profile.killerMove != BossVictoryKillerMove.RetreatCharge)
-                    EditorGUILayout.HelpBox("이 프로필은 처치자 이동이 '후퇴 차징'이 아니라 이 마커를 쓰지 않는다.", MessageType.Info);
+                DrawGunnerQNote();
+                break;
+            case BossVictoryMarker.GunnerStage1:
+            case BossVictoryMarker.GunnerStage2:
+            case BossVictoryMarker.GunnerStage3:
+            {
+                int k = marker - BossVictoryMarker.GunnerStage1 + 1;
+                string stage = GunnerQField($"stage{k}");
+                DrawProfileFields($"거너 Q {k}단계(294 · 이 캐릭터 프로필) — 도달 크기·곡선(앞 마커 → 이 마커)·최대 충전 알림 켜기·크기 · 한계 돌파 색 {k}",
+                    $"{stage}.{nameof(BossVictoryGunnerQ.Stage.sphereScale)}", $"{stage}.{nameof(BossVictoryGunnerQ.Stage.ease)}",
+                    $"{stage}.{nameof(BossVictoryGunnerQ.Stage.burst)}", $"{stage}.{nameof(BossVictoryGunnerQ.Stage.burstScale)}");
+                if (k == 3) DrawProfileFields("과충전 루프(3단계 ~ 발사)", GunnerQField(nameof(BossVictoryGunnerQ.overchargeScale)));
+                DrawGunnerQNote();
+                break;
+            }
+            case BossVictoryMarker.GunnerFire:
+                DrawProfileFields("거너 Q 발사(294 · 이 캐릭터 프로필) — 방출 섬광 크기 · 레이저 굵기 배율(보이는 것만) · 길이(m, 벽 무시·보스 관통) · 유지 시간(타임라인 초) · 발사 오프셋(총구 기준 x 옆·y 위·z 앞, 섬광·레이저 시작점)",
+                    GunnerQField(nameof(BossVictoryGunnerQ.ventScale)), GunnerQField(nameof(BossVictoryGunnerQ.beamWidthScale)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.beamLength)), GunnerQField(nameof(BossVictoryGunnerQ.beamHoldSeconds)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.fireOffset)));
+                DrawGunnerQNote();
                 break;
             case BossVictoryMarker.FocusKiller:
             {
@@ -2010,6 +2093,17 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 EditorGUILayout.LabelField("팀원 = 렌더러·월드 캔버스·머리 위 체력바(몸 아래 소켓 이펙트 포함) · + 붙은 이펙트 = 팀원을 따라다니는 풀 이펙트도. 소환물은 지금 플레이어 캐릭터에 없다.", EditorStyles.wordWrappedMiniLabel);
                 break;
         }
+    }
+
+    // 거너 Q 칸(294) — 프로필 gunnerQ 안 칸 경로.
+    static string GunnerQField(string name) => $"{nameof(BossVictoryProfile.gunnerQ)}.{name}";
+
+    void DrawGunnerQNote()
+    {
+        EditorGUILayout.LabelField("거너 Q 줄 = 차징 시작 → 1단계 → 2단계 → 3단계 → 발사(마커 5개, 끌기·스냅·Undo 기존대로). 시각 = 타임라인 초 — 처치자·이펙트 시간 배율과 무관하게 마커 시각에. " +
+            "전 피어가 같은 타임라인으로 각자 재생(새 RPC·복제 값 없음, 이 피어 표시 전용).", EditorStyles.wordWrappedMiniLabel);
+        if (_profile.killerMove != BossVictoryKillerMove.RetreatCharge)
+            EditorGUILayout.HelpBox("이 프로필은 처치자 이동이 '후퇴 차징'이 아니라 거너 Q 줄을 쓰지 않는다.", MessageType.Info);
     }
 
     // 트랙 노드(트랙 이름 또는 그 클립 선택) — 그 트랙 모양 값.

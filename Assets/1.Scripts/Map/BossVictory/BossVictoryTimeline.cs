@@ -35,7 +35,11 @@ public enum BossVictoryMarker
     BossHitAnim,      // 보스 피격 애니 시작 — 설정 SO 상태(23호 getowned = Boss_23_ParryHit_InPlace)를 처음부터, 보스 ×1(상태 이름이 비면 없음 — 255 후속 5)
     BossFreeze,       // 보스 정지 — 보스 배율 0(그 자세로). 0 = 끔
     BossSlow,         // 보스 슬로우 — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End)
-    ChargeStart,      // Q 차징 시작(거너 — 처치자 이동 '후퇴 차징'이고 보스와 가까울 때만, 할 일 272). 기본(-1) = 백대쉬 시작 + 0.2초
+    ChargeStart,      // 거너 Q 차징 시작(처치자 이동 '후퇴 차징' — 가깝든 멀든 이 시각에 Q 차징, 272·294). 기본(-1) = 백대쉬 시작 + 0.2초. 창 '거너 Q' 줄
+    GunnerStage1,     // 거너 Q 1단계(294) — 구체 1단계 크기 도달·알림·한계 돌파 색 1. 창 '거너 Q' 줄(ChargeStart 와 같은 줄)
+    GunnerStage2,     // 거너 Q 2단계(294)
+    GunnerStage3,     // 거너 Q 3단계(294) — 과충전 루프 켬
+    GunnerFire,       // 거너 Q 발사(294) — 큰 레이저(벽 무시·보스 관통), Gunner_Q_Fire 의 End = 처치 연출 스킬 End
 }
 
 /// <summary>
@@ -188,8 +192,16 @@ public sealed class BossVictoryTimeline
     [Min(0f)] public float bossFreezeTime;
     [Tooltip("보스 슬로우(초) — 보스 End 후 배율. 0 = 끔(느려짐 시작 → 그것도 끔이면 스킬 End).")]
     [Min(0f)] public float bossSlowTime;
-    [Tooltip("Q 차징 시작(초, 거너 후퇴 차징 — 보스와 가까워 E·백대쉬를 할 때만, 할 일 272). 음수 = 자동(백대쉬 시작 + 0.2초). 멀면 백대쉬 시작 시각에 바로 차징.")]
+    [Tooltip("거너 Q 차징 시작(초, 거너 후퇴 차징 — 보스와 가깝든 멀든 이 시각에 Q 차징, 할 일 272·294). 음수 = 자동(백대쉬 시작 + 0.2초).")]
     public float chargeStartTime = -1f;
+    [Tooltip("거너 Q 1단계(초, 294) — 구체 1단계 크기 도달·최대 충전 알림·한계 돌파 색 1.")]
+    [Min(0f)] public float gunnerStage1Time = DefaultActionEnd + DefaultChargeDelay + 0.3f;
+    [Tooltip("거너 Q 2단계(초, 294).")]
+    [Min(0f)] public float gunnerStage2Time = DefaultActionEnd + DefaultChargeDelay + 0.6f;
+    [Tooltip("거너 Q 3단계(초, 294) — 과충전 루프를 켠다.")]
+    [Min(0f)] public float gunnerStage3Time = DefaultActionEnd + DefaultChargeDelay + 0.9f;
+    [Tooltip("거너 Q 발사(초, 294) — 큰 레이저(벽 무시·보스 관통). 옛 1.2초 고정 대기 대신.")]
+    [Min(0f)] public float gunnerFireTime = DefaultActionEnd + DefaultChargeDelay + BossVictoryGunnerCharge.LegacyChargeSeconds;
 
     /// <summary>Q 차징 시작 기본 = 백대쉬 시작 뒤 이 초(할 일 272).</summary>
     public const float DefaultChargeDelay = 0.2f;
@@ -239,6 +251,10 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.BossFreeze => bossFreezeTime,
         BossVictoryMarker.BossSlow => bossSlowTime,
         BossVictoryMarker.ChargeStart => ChargeStartTime,
+        BossVictoryMarker.GunnerStage1 => gunnerStage1Time,
+        BossVictoryMarker.GunnerStage2 => gunnerStage2Time,
+        BossVictoryMarker.GunnerStage3 => gunnerStage3Time,
+        BossVictoryMarker.GunnerFire => gunnerFireTime,
         _ => throw new ArgumentOutOfRangeException(nameof(marker)),
     };
 
@@ -257,6 +273,10 @@ public sealed class BossVictoryTimeline
             case BossVictoryMarker.BossFreeze: bossFreezeTime = time; break;
             case BossVictoryMarker.BossSlow: bossSlowTime = time; break;
             case BossVictoryMarker.ChargeStart: chargeStartTime = time; break;
+            case BossVictoryMarker.GunnerStage1: gunnerStage1Time = time; break;
+            case BossVictoryMarker.GunnerStage2: gunnerStage2Time = time; break;
+            case BossVictoryMarker.GunnerStage3: gunnerStage3Time = time; break;
+            case BossVictoryMarker.GunnerFire: gunnerFireTime = time; break;
         }
     }
 
@@ -319,7 +339,11 @@ public sealed class BossVictoryTimeline
         BossVictoryMarker.BossHitAnim => "보스 피격 애니 시작",
         BossVictoryMarker.BossFreeze => "보스 정지",
         BossVictoryMarker.BossSlow => "보스 슬로우",
-        BossVictoryMarker.ChargeStart => "Q 차징 시작(거너)",
+        BossVictoryMarker.ChargeStart => "거너 Q 차징 시작",
+        BossVictoryMarker.GunnerStage1 => "거너 Q 1단계",
+        BossVictoryMarker.GunnerStage2 => "거너 Q 2단계",
+        BossVictoryMarker.GunnerStage3 => "거너 Q 3단계",
+        BossVictoryMarker.GunnerFire => "거너 Q 발사",
         _ => marker.ToString(),
     };
 
@@ -474,6 +498,11 @@ public sealed class BossVictoryTimeline
         clip = default;
         return false;
     }
+
+    /// <summary>거너 Q 줄 마커인가(차징 시작·1·2·3단계·발사 — 창에서 한 줄 '거너 Q', 294).</summary>
+    public static bool IsGunnerQ(BossVictoryMarker marker) =>
+        marker is BossVictoryMarker.ChargeStart or BossVictoryMarker.GunnerStage1 or BossVictoryMarker.GunnerStage2
+            or BossVictoryMarker.GunnerStage3 or BossVictoryMarker.GunnerFire;
 
     /// <summary>0 이 '끔'인 마커인가(느려짐 시작·보스 정지·보스 슬로우). 나머지는 0 = 처치 순간.</summary>
     public static bool ZeroMeansOff(BossVictoryMarker marker) =>

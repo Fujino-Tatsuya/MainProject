@@ -157,9 +157,9 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 |---|---|---|---|
 | `BackDash`(기본) | 팔라딘 | 백대쉬(지금 그대로) | 스킬 연출 시작 마커에 처치 연출 스킬 |
 | `TeleportDash` | 어쌔신 | 없음 | 트랙 '어쌔신 순간이동·Q 이동' 클립마다 순간이동 → Q 이동(첫 클립 시작부터) |
-| `RetreatCharge` | 거너 | 가까울 때만: 후퇴 스킬(E) 표시 + 백대쉬(이동만) | 가까움 = 'Q 차징 시작' 마커 / 멂 = 백대쉬 시작 시각에 바로 Q |
+| `RetreatCharge` | 거너 | 가까울 때만: 후퇴 스킬(E) 표시 + 백대쉬(이동만) | 가까움·멂 모두 '거너 Q 차징 시작' 마커(294) |
 
-- **공통**: 이동은 처치자 **오너만 실제로**(PlayerMotor), 다른 피어는 복제 위치. 애니·이펙트는 각 피어 로컬. **새 RPC·복제 값 없음**. 처치 연출에 특성 연출 없음(어쌔신 일섬 `DashTint` 안 씀, 거너 Q 는 기존 `BeginPresentationCharge` 기본 색).
+- **공통**: 이동은 처치자 **오너만 실제로**(PlayerMotor), 다른 피어는 복제 위치. 애니·이펙트는 각 피어 로컬. **새 RPC·복제 값 없음**. 처치 연출에 특성 연출 없음(어쌔신 일섬 `DashTint` 안 씀, 거너 Q 는 아래 294 단계 색 — 특성 색 아님).
 - **어쌔신 순간이동 Q — 타임라인 트랙 '어쌔신 순간이동·Q 이동'(272 후속, `BossVictoryTrack.AssassinDash` · 목록 `timeline.assassinDash`)**:
   - **클립 하나 = 한 번**: 클립 시작에 그 클립의 **시작 지점**으로 순간이동 → 클립 길이 동안 **도착 지점**까지 Q 이동(곡선 `teleportMoveEase`) → 끝에 일섬 1번.
   - **여러 개 = 시작 순서대로 #1 → #2 …**(시작이 같으면 목록 순). 겹치면 앞 클립은 다음 클립 시작에서 끝난다(그 자리까지만 가고 일섬 끝점도 거기). 순수 함수 `BossVictoryAssassinDash`(`Order`·`Number`·`SegmentEnd`·`Current`·`AllDone`·`Progress`).
@@ -173,9 +173,17 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
   - 원래 처치 연출(R 변신)을 대신한다 — `finisherSlot` 은 이 이동에서 안 쓴다(칸은 남김).
   - Scene 뷰: 타임라인 창이 열려 있고 이동이 순간이동이면 **모든 클립**의 두 점·경로를 `#n 시작`·`#n 도착` 라벨로 그리고, 고른 클립만 밝게 + 위치 핸들(높이 0 으로 저장). 기준 보스 = 재생 중 보스 → 이 세션 마지막 회차 보스 → 열린 씬의 23호. 트랙 클립에도 `#n` 이 보인다.
 - **거너 후퇴 차징**(제자리 — 순간이동 없음):
-  - 처치 순간 보스와 수평 거리 < `retreatDistance`(기본 5m)면 '백대쉬 시작'에 `retreatSkillSlot`(E 냉각 백스텝) 표시 전용 재생(냉기·궤적 — 그 스킬 이동은 안 돎) + 백대쉬(기존 백대쉬 칸, 보스 반대쪽, 이동만). 'Q 차징 시작' 마커(`chargeStartTime`, 기본 -1 = 백대쉬 시작 + 0.2초 — 끌면 고정)에 E 표시를 접고 처치 연출 스킬(Q) — 백대쉬는 끊지 않고 이어 감.
-  - 멀면 E·백대쉬 없이 '백대쉬 시작' 시각에 바로 Q.
-  - Q = 기존 `GunnerChargeLaserSkill.OnPresentationOnlyStart`(1.2초 충전 → 보스 쪽 발사). 차징 구체 크기만 프로필 `chargeScaleFrom → chargeScaleTo`(+ `chargeScaleCurve`) — `GunnerBeamView.SetPresentationChargeScale`, 정리 때 끈다. 발사 순간 = 목표 크기, 레이저 폭 그대로.
+  - 처치 순간 보스와 수평 거리 < `retreatDistance`(기본 5m)면 '백대쉬 시작'에 `retreatSkillSlot`(E 냉각 백스텝) 표시 전용 재생(냉기·궤적 — 그 스킬 이동은 안 돎) + 백대쉬(기존 백대쉬 칸, 보스 반대쪽, 이동만). '거너 Q 차징 시작' 마커(`chargeStartTime`, 기본 -1 = 백대쉬 시작 + 0.2초 — 끌면 고정)에 E 표시를 접고 처치 연출 스킬(Q) — 백대쉬는 끊지 않고 이어 감.
+  - 멀면 E·백대쉬 없이 **같은 '거너 Q 차징 시작' 마커**에 Q(294 — 옛 '백대쉬 시작 시각에 바로 Q' 폐기).
+  - **3단계 차징·큰 레이저(294)** — 타임라인 트랙 '◆ 거너 Q' 한 줄에 마커 5개: 차징 시작 → 1단계 → 2단계 → 3단계 → 발사(`BossVictoryMarker.ChargeStart`·`GunnerStage1~3`·`GunnerFire`, 칸 `chargeStartTime`·`gunnerStage1/2/3Time`·`gunnerFireTime`). 기본 = 차징 시작 + 0.3 / 0.6 / 0.9 / 1.2초(옛 1.2초 충전과 같은 길이). 순서가 뒤집히면 앞 마커 시각으로 붙인다(`BossVictoryGunnerCharge.Times.Ordered`).
+    - 진행은 프리젠테이션이 글리치 시각(타임라인 초)으로 계산(`BossVictoryGunnerCharge.Evaluate`)해 매 프레임 `GunnerBeamView.SetVictoryFrame` 에 넘긴다 — 뷰는 그리기만. 연출 시간 배율과 무관하게 마커에 맞는다. 옛 1.2초 코루틴(`GunnerChargeLaserSkill.OnPresentationOnlyStart`)은 지웠다. Gunner_Q_Fire 의 End = 처치 연출 스킬 End 는 그대로.
+    - 수치 = 프로필 `gunnerQ`(`BossVictoryGunnerQ`, `Map/BossVictory/BossVictoryGunnerQ.cs`). 창에서 거너 Q 마커를 고르면 아래 칸에 그 마커 값:
+      - 차징 시작: 시작 크기 `startScale`·구체 등장 지연 `sphereDelay`(타임라인 초)·차징 오프셋 `chargeOffset`(총구 기준 옆 x·위 y·앞 z — 구체·경고·과충전).
+      - 1~3단계: 도달 크기 `stageN.sphereScale`·이전 마커 → 이 마커 보간 곡선 `ease`·도달 순간 경고 폭발(`chargeFullPlayer`) 켜기·크기. 3단계 = 과충전(`overchargePlayer`) 시작·크기 `overchargeScale`. 단계 색 = `OverdriveTint` 1 → 2 → 3(1단계 전 = 0).
+      - 발사: 배출(`chargeVent`) 크기·레이저 폭 배율(표시만)·길이 `beamLength`(m)·유지 `beamHoldSeconds`(타임라인 초)·발사 오프셋 `fireOffset`(배출·레이저 시작).
+    - 레이저 = 보스 방향 수평, 벽 무시·보스 관통·길이 칸 그대로, 피격 이펙트 없음. 오프셋 0 이면 원래 소켓 자리. 소켓·크기·폭은 실제 Q 와 공유하는 풀 인스턴스라 레이저 끝·정리 때 원래 값으로 되돌린다.
+    - 이관: 옛 `chargeScaleFrom/To/Curve` 는 숨긴 칸으로 남아 프로필 `OnEnable` 에서 한 번 옮긴다(단계 크기 = Lerp(from, to, curve(k/3)), 1~3단계·발사 마커 = 차징 시작 + 0.3/0.6/0.9/1.2) — 끝나면 `chargeScaleFrom = -1`. 저장은 에셋을 다시 저장할 때.
+    - 새 RPC·복제 값 없음 — 각 피어 로컬 표시. 테스트 `BossVictoryGunnerQTests`(마커 시각·단계 크기 보간·이관).
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
 
