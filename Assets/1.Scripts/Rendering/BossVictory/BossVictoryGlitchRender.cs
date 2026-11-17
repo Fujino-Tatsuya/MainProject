@@ -139,6 +139,7 @@ public static class BossVictoryGlitchRender
         {
             renderPassEvent = RenderPassEvent.AfterRenderingTransparents + 1,   // 글리치 합성(+ RECTIFY 글로우) 뒤, 후처리 전
         };
+        _overlayPass.ConfigureInput(ScriptableRenderPassInput.Depth);   // 보스 관통 — 셰이더가 _CameraDepthTexture 로 깊이를 직접 비교
 
         RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         _hooked = true;
@@ -614,7 +615,7 @@ public static class BossVictoryGlitchRender
         }
     }
 
-    // 글리치 합성 뒤 — LightMode "BossVictoryOverlay" 반투명을 지금 색 대상(합성 결과)에 그린다. 깊이 없이(셰이더 ZTest Always) — 보스·벽 위에 늘.
+    // 글리치 합성 뒤 — LightMode "BossVictoryOverlay" 반투명을 지금 색 대상(합성 결과)에 그린다. 깊이 버퍼 없이 — 셰이더(FragOverlay)가 깊이 텍스처로 직접 비교해 보스 앞은 노이즈 위에, 몸 속은 가려진다(관통).
     // 마스크·합성이 건너뛴 프레임(백 버퍼 대상 등)에도 그린다 — 전역 1 이라 Forward 가 안 그리니 여기서 빠지면 레이저가 사라진다.
     sealed class OverlayPass : ScriptableRenderPass
     {
@@ -645,6 +646,9 @@ public static class BossVictoryGlitchRender
                 var filtering = new FilteringSettings(RenderQueueRange.transparent);
                 data.list = renderGraph.CreateRendererList(new RendererListParams(renderingData.cullResults, drawing, filtering));
                 builder.UseRendererList(data.list);
+                if (resourceData.cameraDepthTexture.IsValid())
+                    builder.UseTexture(resourceData.cameraDepthTexture, AccessFlags.Read);
+                builder.UseAllGlobalTextures(true);
                 builder.SetRenderAttachment(color, 0, AccessFlags.ReadWrite);
                 builder.AllowGlobalStateModification(false);
                 builder.SetRenderFunc(static (OverlayData d, RasterGraphContext ctx) => ctx.cmd.DrawRendererList(d.list));

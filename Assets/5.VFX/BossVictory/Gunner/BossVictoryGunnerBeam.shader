@@ -70,7 +70,8 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
         _BoltGlowWidth ("줄기 번짐 폭 (굵기 배수)", Range(1, 20)) = 5
         _BoltCoverage ("줄기 길이 (레이저 길이 비율)", Range(0.05, 1)) = 0.75
 
-        [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("깊이 비교 (Always = 보스·벽에 안 가리고 늘 위)", Float) = 8
+        [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("깊이 비교 (LessEqual = 보스 몸에 들어간 부분은 가려져 관통 · Always = 늘 위)", Float) = 4
+        _DepthSoft ("관통 경계 부드러움 m (글리치 중 — 보스 표면에서 이만큼 안쪽까지 서서히 사라짐)", Range(0.01, 2)) = 0.25
 
         [HideInInspector] _BeamLength ("레이저 길이 m (코드)", Float) = 10
         [HideInInspector] _BeamTime ("시계 초 (코드)", Float) = 0
@@ -91,6 +92,7 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
         HLSLINCLUDE
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
@@ -115,6 +117,8 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
                 half _StreakKeep;
                 half _StreakFlow;
                 half4 _LineColor;
+                half _ZTest;
+                half _DepthSoft;
                 half _LineAmount;
                 half _LineCover;
                 half _LineCount;
@@ -356,6 +360,20 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
                 if (_BossVictoryBeamOverlay > 0.5) output.positionCS = float4(2.0, 2.0, 2.0, 1.0);
                 return output;
             }
+            // 오버레이 패스 조각 — 깊이 버퍼 없이 글리치 합성 결과 위에 그리므로 깊이 비교를 직접 한다(_CameraDepthTexture = 불투명 = 보스·벽).
+            // 레이저가 보스 표면보다 앞이면 그대로, 몸 안으로 들어가면 _DepthSoft(m) 동안 서서히 사라짐 → 앞쪽은 노이즈 위에 보이고 몸 속은 가려져 관통처럼 보인다.
+            half4 FragOverlay(Varyings input) : SV_Target
+            {
+                half4 c = Frag(input);
+                if (_ZTest < 7.5)
+                {
+                    float2 uv = input.positionCS.xy / _ScaledScreenParams.xy;
+                    float sceneEye = LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams);
+                    float fragEye = LinearEyeDepth(input.positionCS.z, _ZBufferParams);
+                    c *= (half)saturate(1.0 - (fragEye - sceneEye) / max(_DepthSoft, 1e-3));
+                }
+                return c;
+            }
         ENDHLSL
 
         Pass
@@ -375,7 +393,7 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
             ENDHLSL
         }
 
-        // 처치 글리치 합성 뒤(BossVictoryGlitchRender 오버레이 패스만 그림) — 보스·벽 위에 늘 그린다.
+        // 처치 글리치 합성 뒤(BossVictoryGlitchRender 오버레이 패스만 그림) — 깊이는 FragOverlay 가 직접 비교(보스 관통).
         Pass
         {
             Name "BossVictoryOverlay"
@@ -388,7 +406,7 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
 
             HLSLPROGRAM
             #pragma vertex Vert
-            #pragma fragment Frag
+            #pragma fragment FragOverlay
             #pragma shader_feature_local _ _BILLBOARD _LIGHTNING
             ENDHLSL
         }
