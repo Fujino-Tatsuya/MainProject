@@ -27,13 +27,13 @@ public sealed class BossVictoryBossLookTests
     }
 
     [Test]
-    public void 어쌔신만_림라이트_팔라딘_거너는_노이즈()
+    public void 어쌔신_거너는_림라이트_팔라딘은_노이즈()
     {
         var s = AssetDatabase.LoadAssetAtPath<BossVictoryGlitchSettings>(SettingsPath);
         Assert.IsNotNull(s, SettingsPath);
         Assert.AreEqual(BossVictoryBossLookMode.RimLight, s.ProfileFor(TutorialCharacter.Assassin).bossLook, "어쌔신 = 림라이트");
         Assert.AreEqual(BossVictoryBossLookMode.Noise, s.ProfileFor(TutorialCharacter.Paladin).bossLook, "팔라딘 = 노이즈");
-        Assert.AreEqual(BossVictoryBossLookMode.Noise, s.ProfileFor(TutorialCharacter.Gunner).bossLook, "거너 = 노이즈");
+        Assert.AreEqual(BossVictoryBossLookMode.RimLight, s.ProfileFor(TutorialCharacter.Gunner).bossLook, "거너 = 림라이트(11-17)");
     }
 
     [Test]

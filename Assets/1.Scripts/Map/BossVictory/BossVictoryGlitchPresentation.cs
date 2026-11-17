@@ -134,7 +134,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     public static bool TimelineClockLog;
     double _realStartAt;     // 처치 순간의 실제 시각(realtimeSinceStartup) — 시작 경과만큼 앞으로 당김
     float _clockLogPrevT = -1f;
-    string _finisherTimingKey, _bossTimingKey;
+    string _finisherTimingKey, _bossTimingKey, _bossDashTimingKey;
 
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
     void ClockLog(string what)
@@ -192,6 +192,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (_bossTimingKey == null) { _bossTimingKey = BossVictoryClipTiming.Key(true, bc.name); BossVictoryClipTiming.BeginRun(_bossTimingKey); }
             BossVictoryClipTiming.Record(_bossTimingKey, _glitchTime - tl.bossHitAnimTime, bt);
         }
+        if (_bossDashPlayed && _bossDashAnimators.Count > 0 && SampleState(_bossDashAnimators[0], Animator.StringToHash(_settings.bossDashPrepStateName), out AnimationClip dc, out float dt))
+        {
+            if (_bossDashTimingKey == null) { _bossDashTimingKey = BossVictoryClipTiming.Key(true, dc.name); BossVictoryClipTiming.BeginRun(_bossDashTimingKey); }
+            BossVictoryClipTiming.Record(_bossDashTimingKey, _glitchTime - tl.bossDashPrepTime, dt);
+        }
 #endif
     }
 
@@ -223,6 +228,10 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     readonly List<Animator> _bossHitAnimators = new List<Animator>();   // 피격 애니를 튼 보스 Animator 중 사망 트리거 파라미터가 있는 것
     readonly List<Animator> _bossPlayedAnimators = new List<Animator>();   // 피격 애니를 튼 보스 Animator 전부(끝 자르기 판정, 255 후속 10)
     float _bossTrimAt = -1f;   // 피격 애니가 자른 끝에 닿은 글리치 시각(아직이면 -1) — 보스 배율 규칙의 한 노드
+    // 돌진 준비 애니(11-17) — 피격 애니와 같은 방식의 독립 노드.
+    bool _bossDashPlayed;
+    readonly List<Animator> _bossDashAnimators = new List<Animator>();   // 돌진 준비 애니를 튼 보스 Animator 전부(끝 자르기 판정)
+    float _bossDashTrimAt = -1f;
 
     /// <summary>[이 피어] 지금 보스(연출 중이 아니면 null) — 타임라인 창이 실제 보스의 피격 애니 클립 길이를 보여 준다.</summary>
     public GameObject BossObject => _running ? _boss : null;
@@ -323,10 +332,11 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     /// <summary>[이 피어] 보스 시간 배율 — 서버(호스트)의 사망 표현 대기도 이 값으로 흐른다(<see cref="BossEncounterDirector.VictoryDeathTimeScaleFor"/>).</summary>
     public float BossTimeScale => _running && _profile != null
-        ? BossVictoryBossTimeScale.Scale(_profile.timeline.BossNodes(HasBossHitAnim, _bossTrimAt), _killerSlowAt, _profile.bossAfterFinisherScale, _glitchTime)
+        ? BossVictoryBossTimeScale.Scale(_profile.timeline.BossNodes(HasBossHitAnim, _bossTrimAt, HasBossDashPrep, _bossDashTrimAt), _killerSlowAt, _profile.bossAfterFinisherScale, _glitchTime)
         : 1f;
 
     bool HasBossHitAnim => !string.IsNullOrEmpty(_settings.bossHitStateName);
+    bool HasBossDashPrep => !string.IsNullOrEmpty(_settings.bossDashPrepStateName);
 
     void Awake()
     {
@@ -379,6 +389,9 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _bossHitPlayed = false;
         _bossTrimAt = -1f;
         _bossPlayedAnimators.Clear();
+        _bossDashPlayed = false;
+        _bossDashTrimAt = -1f;
+        _bossDashAnimators.Clear();
         _bossEffectRate = -1f;
         _bossHitAnimators.Clear();
         _finisherWarned = false;
@@ -395,7 +408,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _dashAnimScale = -1f;
         _dashMoveMotor = null;
         _dashPierce = null;
-        _finisherTimingKey = _bossTimingKey = null;
+        _finisherTimingKey = _bossTimingKey = _bossDashTimingKey = null;
         _clockLogPrevT = -1f;
 
         PlayerLifeInputPolicy.SetVictoryInputHeld(true);
@@ -1054,9 +1067,14 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void TickBoss()
     {
         if (_boss == null) return;
-        if (!_bossHitPlayed && BossVictoryBossTimeScale.ShouldPlayHitAnim(_profile.timeline.BossNodes(HasBossHitAnim), _glitchTime))
+        BossVictoryBossTimeScale.Nodes playNodes = _profile.timeline.BossNodes(HasBossHitAnim, -1f, HasBossDashPrep);
+        // 돌진 준비(11-17)를 먼저 — 같은 프레임에 둘 다 지나면 피격 애니가 뒤에 틀어 이긴다(배율 규칙과 같음).
+        if (!_bossDashPlayed && BossVictoryBossTimeScale.ShouldPlayDashPrep(playNodes, _glitchTime))
+            PlayBossDashPrep();
+        if (!_bossHitPlayed && BossVictoryBossTimeScale.ShouldPlayHitAnim(playNodes, _glitchTime))
             PlayBossHitAnim();
         if (_bossHitPlayed && _bossTrimAt < 0f) TickBossHitTrim();
+        if (_bossDashPlayed && _bossDashTrimAt < 0f) TickBossDashTrim();
         // 처치 순간 서버 사망 상태가 건 사망 트리거(AnyState→Death)가 피격 애니를 빼앗지 않게 — 사망 상태 복제가 늦게 와도 매 프레임 비운다.
         for (int i = 0; i < _bossHitAnimators.Count; i++)
             if (_bossHitAnimators[i] != null) _bossHitAnimators[i].ResetTrigger(_bossDeathTrigger);
@@ -1071,8 +1089,20 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     void PlayBossHitAnim()
     {
         _bossHitPlayed = true;
-        string state = _settings.bossHitStateName;
-        ClockLog($"보스 피격 애니 시작 {_profile.timeline.bossHitAnimTime:0.000}s '{state}'");
+        ClockLog($"보스 피격 애니 시작 {_profile.timeline.bossHitAnimTime:0.000}s '{_settings.bossHitStateName}'");
+        PlayBossState(_settings.bossHitStateName, _settings.bossHitFadeSeconds, _bossPlayedAnimators, "피격 애니", "bossHitStateName");
+    }
+
+    // 돌진 준비 애니(11-17) — 설정 SO 상태(23호 DashPrep)를 처음부터. 피격 애니와 같은 방식(사망 트리거 비우기 목록도 공유).
+    void PlayBossDashPrep()
+    {
+        _bossDashPlayed = true;
+        ClockLog($"보스 돌진 준비 애니 시작 {_profile.timeline.bossDashPrepTime:0.000}s '{_settings.bossDashPrepStateName}'");
+        PlayBossState(_settings.bossDashPrepStateName, _settings.bossDashPrepFadeSeconds, _bossDashAnimators, "돌진 준비 애니", "bossDashPrepStateName");
+    }
+
+    void PlayBossState(string state, float fade, List<Animator> playedInto, string what, string settingName)
+    {
         int hash = Animator.StringToHash(state);
         _bossDeathTrigger = _boss.TryGetComponent(out MonsterBase monster) && monster.MonsterData != null ? monster.MonsterData.deathTrigger : null;
         int played = 0;
@@ -1080,16 +1110,16 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         {
             Animator a = _animators[i];
             if (_animatorRoles[i] != Role.Boss || a == null || !a.isActiveAndEnabled || a.runtimeAnimatorController == null || !a.HasState(0, hash)) continue;
-            if (_settings.bossHitFadeSeconds > 0f) a.CrossFadeInFixedTime(hash, _settings.bossHitFadeSeconds, 0, 0f);
+            if (fade > 0f) a.CrossFadeInFixedTime(hash, fade, 0, 0f);
             else a.Play(hash, 0, 0f);
             played++;
-            _bossPlayedAnimators.Add(a);
-            if (!string.IsNullOrEmpty(_bossDeathTrigger) && HasTrigger(a, _bossDeathTrigger)) _bossHitAnimators.Add(a);
+            playedInto.Add(a);
+            if (!string.IsNullOrEmpty(_bossDeathTrigger) && HasTrigger(a, _bossDeathTrigger) && !_bossHitAnimators.Contains(a)) _bossHitAnimators.Add(a);
         }
         if (played == 0)
-            Edit.LogWarning($"[BossVictory] 보스 피격 애니 상태 '{state}' 가 보스 Animator 에 없다 — 마지막 자세 그대로(설정 SO bossHitStateName).", this);
+            Edit.LogWarning($"[BossVictory] 보스 {what} 상태 '{state}' 가 보스 Animator 에 없다 — 안 튼다(설정 SO {settingName}).", this);
         else
-            Edit.Log($"[BossVictory] 보스 피격 애니 '{state}' (글리치 t {_glitchTime:0.00})", this);
+            Edit.Log($"[BossVictory] 보스 {what} '{state}' (글리치 t {_glitchTime:0.00})", this);
     }
 
     // 피격 애니 끝 자르기(255 후속 10) — 자른 프레임(클립 시간)에 닿은 순간을 보스 배율 노드로 남긴다(배율 0, 뒤 슬로우 노드가 오면 다시 움직임). 한 번만.
@@ -1104,6 +1134,22 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             _bossTrimAt = _glitchTime;
             ClockLog($"보스 피격 애니 끝 자르기 도달(클립 {trim:0.000}s)");
             Edit.Log($"[BossVictory] 보스 피격 애니 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, clip.frameRate)}({clip.name}) 에서 정지 (글리치 t {_glitchTime:0.00})", this);
+            return;
+        }
+    }
+
+    // 돌진 준비 애니 끝 자르기(11-17) — 피격 애니 끝 자르기와 같은 규칙.
+    void TickBossDashTrim()
+    {
+        float trim = _profile.timeline.bossDashPrepTrimSeconds;
+        if (trim <= 0f) return;
+        int hash = Animator.StringToHash(_settings.bossDashPrepStateName);
+        for (int i = 0; i < _bossDashAnimators.Count; i++)
+        {
+            if (!BossVictoryAnimTrim.TryReachTrim(_bossDashAnimators[i], hash, trim, out AnimationClip clip)) continue;
+            _bossDashTrimAt = _glitchTime;
+            ClockLog($"보스 돌진 준비 애니 끝 자르기 도달(클립 {trim:0.000}s)");
+            Edit.Log($"[BossVictory] 보스 돌진 준비 애니 끝 자르기 — {BossVictoryAnimTrim.FrameLabel(trim, clip.length, clip.frameRate)}({clip.name}) 에서 정지 (글리치 t {_glitchTime:0.00})", this);
             return;
         }
     }
@@ -1787,6 +1833,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerFrozen = false;
         _bossHitAnimators.Clear();
         _bossPlayedAnimators.Clear();
+        _bossDashAnimators.Clear();
         EndDash();
         ReleaseDashMotor();
         _dashOn = false;

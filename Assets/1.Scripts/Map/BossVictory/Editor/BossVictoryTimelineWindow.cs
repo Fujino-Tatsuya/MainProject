@@ -137,7 +137,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             _profile = _settings != null ? _settings.ProfileFor(_character) : null;
         }
         if (_profile == before) return;
-        _finisherClipKey = _bossHitClipKey = null;
+        _finisherClipKey = _bossHitClipKey = _bossDashClipKey = null;
         _finisherEstimate = null;
         _profileSo = null;
         if (before != null) Select(-1, -1, -1);   // 번호가 다른 타임라인 — 선택 풀기
@@ -1000,7 +1000,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // SO 에 바로 저장(Play 끝나도 유지 — Q5).
     void Save()
     {
-        _finisherClipKey = _bossHitClipKey = null;   // 처치 연출 스킬 칸·피격 상태 이름이 바뀌었을 수 있다 — 클립 다시 찾기
+        _finisherClipKey = _bossHitClipKey = _bossDashClipKey = null;   // 처치 연출 스킬 칸·피격 상태 이름이 바뀌었을 수 있다 — 클립 다시 찾기
         Timeline.SyncCameraCutShots();
         Timeline.FitCameraCutLengths();   // 컷 길이 = 다음 컷 시작까지(표시용 — 판정은 시작만)
         EditorUtility.SetDirty(_profile);
@@ -1561,6 +1561,9 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         BossVictoryMarker.BossHitAnim =>
             "이 시각에 보스가 아래 상태(23호 getowned = Boss_23_ParryHit_InPlace, 제자리)를 처음부터 재생한다(보스 ×1). 0 = 처치 순간. 상태 이름이 비면 마지막 피격 자세 그대로. " +
             "보스 배율은 피격 애니·정지·슬로우 중 시각이 가장 늦은 노드가 이긴다. 한 번만 — 되감기는 ⏮.",
+        BossVictoryMarker.BossDashPrepAnim =>
+            "이 시각에 보스가 아래 상태(23호 DashPrep = 돌진 준비)를 처음부터 재생한다(보스 ×1). 0 = 끔 — 켜려면 줄 우클릭 '여기로 옮기기'. " +
+            "오른쪽 끝을 앞으로 끌면 끝 자르기 — 그 프레임에서 보스가 멈춘다(배율 0). 피격 애니와 겹치면 나중에 시작한 쪽 애니가 이긴다(배율도 시각이 가장 늦은 노드). 한 번만 — 되감기는 ⏮.",
         BossVictoryMarker.BossFreeze =>
             "이 시각에 보스를 그 자세로 멈춘다(배율 0). 0 = 끔. 뒤에 슬로우가 오면 슬로우 배율로 다시 움직인다(시각이 가장 늦은 노드가 이김).",
         BossVictoryMarker.BossSlow =>
@@ -2139,6 +2142,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawClipNodeOptions(BossVictoryMarker.BossHitAnim);
                 DrawSettingsFields("보스 피격 애니(비우면 마지막 자세)", nameof(BossVictoryGlitchSettings.bossHitStateName), nameof(BossVictoryGlitchSettings.bossHitFadeSeconds));
                 break;
+            case BossVictoryMarker.BossDashPrepAnim:
+                DrawClipNodeOptions(BossVictoryMarker.BossDashPrepAnim);
+                DrawSettingsFields("보스 돌진 준비 애니(비우면 안 틂)", nameof(BossVictoryGlitchSettings.bossDashPrepStateName), nameof(BossVictoryGlitchSettings.bossDashPrepFadeSeconds));
+                break;
             case BossVictoryMarker.BossSlow:
                 DrawProfileFields("보스 End 후 배율", nameof(BossVictoryProfile.bossAfterFinisherScale));
                 break;
@@ -2690,10 +2697,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // ── 애니 클립 노드(255 후속 7·10) — 마커 줄을 클립으로: 시작 = 마커 값, 길이 = 상태 클립 전체 또는 끝 자르기(BossVictoryAnimTrim) ──
     // 처치 연출 스킬('스킬 연출 시작' 줄) = 미리보기 캐릭터(또는 랩 재생 중 실제 처치자)의 처치 연출 스킬 클립(공속 100%) ·
     // 보스 피격 애니('보스 피격 애니 시작' 줄) = 23호 컨트롤러(또는 실제 보스)의 bossHitStateName 상태 클립(23호 getowned = ParryHit_InPlace 1.42초).
+    // 보스 돌진 준비 애니('보스 돌진 준비 애니 시작' 줄, 11-17) = 같은 방식, bossDashPrepStateName(23호 DashPrep). 0 = 끔(클립 안 그림).
     // 자르기 값은 클립 시간(초) 하나 — 캐릭터마다 클립 길이가 다르면 프레임 표시도 다르다.
 
     static readonly Color FinisherColor = new Color(0.80f, 0.45f, 0.55f);
     static readonly Color BossHitColor = new Color(0.85f, 0.35f, 0.30f);
+    static readonly Color BossDashColor = new Color(0.90f, 0.55f, 0.25f);
     const string BossHitControllerPath = "Assets/4.Animations/Wells&No.23/No.23/Controller/No23Controller.controller";
     Object _finisherClipKey;
     AnimationClip _finisherClipCache;
@@ -2703,16 +2712,33 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     string _bossHitStateCache;
     AnimationClip _bossHitClipCache;
     string _bossHitWhoCache;
+    Object _bossDashClipKey;
+    string _bossDashStateCache;
+    AnimationClip _bossDashClipCache;
+    string _bossDashWhoCache;
 
-    static bool IsClipNode(BossVictoryMarker m) => m == BossVictoryMarker.FinisherStart || m == BossVictoryMarker.BossHitAnim;
+    static readonly BossVictoryMarker[] ClipNodes = { BossVictoryMarker.FinisherStart, BossVictoryMarker.BossHitAnim, BossVictoryMarker.BossDashPrepAnim };
 
-    static string ClipNodeLabel(BossVictoryMarker m) => m == BossVictoryMarker.FinisherStart ? "처치 연출 스킬" : "보스 피격 애니";
+    static bool IsClipNode(BossVictoryMarker m) => m == BossVictoryMarker.FinisherStart || m == BossVictoryMarker.BossHitAnim || m == BossVictoryMarker.BossDashPrepAnim;
 
-    float NodeTrim(BossVictoryMarker m) => m == BossVictoryMarker.FinisherStart ? Timeline.finisherTrimSeconds : Timeline.bossHitTrimSeconds;
+    static string ClipNodeLabel(BossVictoryMarker m) => m switch
+    {
+        BossVictoryMarker.FinisherStart => "처치 연출 스킬",
+        BossVictoryMarker.BossDashPrepAnim => "보스 돌진 준비 애니",
+        _ => "보스 피격 애니",
+    };
+
+    float NodeTrim(BossVictoryMarker m) => m switch
+    {
+        BossVictoryMarker.FinisherStart => Timeline.finisherTrimSeconds,
+        BossVictoryMarker.BossDashPrepAnim => Timeline.bossDashPrepTrimSeconds,
+        _ => Timeline.bossHitTrimSeconds,
+    };
 
     void SetNodeTrimRaw(BossVictoryMarker m, float trim)
     {
         if (m == BossVictoryMarker.FinisherStart) Timeline.finisherTrimSeconds = trim;
+        else if (m == BossVictoryMarker.BossDashPrepAnim) Timeline.bossDashPrepTrimSeconds = trim;
         else Timeline.bossHitTrimSeconds = trim;
     }
 
@@ -2720,11 +2746,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     static float NodeEndEvent(BossVictoryMarker m, AnimationClip clip) => m == BossVictoryMarker.FinisherStart && clip != null ? EndEventTime(clip) : -1f;
 
     float NodeFull(BossVictoryMarker m, out AnimationClip clip, out string who) =>
-        m == BossVictoryMarker.FinisherStart ? FinisherFull(out clip, out who) : BossHitFull(out clip, out who);
+        m == BossVictoryMarker.FinisherStart ? FinisherFull(out clip, out who)
+        : m == BossVictoryMarker.BossDashPrepAnim ? BossStateFull(_settings.bossDashPrepStateName, "상태 이름 없음(안 틂)", ref _bossDashClipKey, ref _bossDashStateCache, ref _bossDashClipCache, ref _bossDashWhoCache, out clip, out who)
+        : BossStateFull(_settings.bossHitStateName, "상태 이름 없음(마지막 자세)", ref _bossHitClipKey, ref _bossHitStateCache, ref _bossHitClipCache, ref _bossHitWhoCache, out clip, out who);
 
     // 클립 시간 → 타임라인 초(노드 시작 뒤) — 디버그 씬 마지막 재생 실측 표본(속도 파라미터·공속·연출 배율 포함). 없으면 배율 1 가정(BossVictoryClipTiming).
     static IReadOnlyList<Vector2> NodeTiming(BossVictoryMarker m, AnimationClip clip) =>
-        clip != null && BossVictoryClipTiming.TryGet(BossVictoryClipTiming.Key(m == BossVictoryMarker.BossHitAnim, clip.name), out IReadOnlyList<Vector2> s) ? s : null;
+        clip != null && BossVictoryClipTiming.TryGet(BossVictoryClipTiming.Key(m != BossVictoryMarker.FinisherStart, clip.name), out IReadOnlyList<Vector2> s) ? s : null;
 
     static float NodeSeconds(BossVictoryMarker m, AnimationClip clip, float clipTime) => BossVictoryClipTiming.ClipToTimeline(NodeTiming(m, clip), clipTime);
 
@@ -2746,29 +2774,29 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         return clip != null ? clip.length : 0f;
     }
 
-    // 보스 피격 애니 상태 클립 — 랩 재생 중이면 실제 보스 Animator, 아니면 23호 컨트롤러. 상태 이름이 비면 없음.
-    float BossHitFull(out AnimationClip clip, out string who)
+    // 보스 상태 클립(피격 애니·돌진 준비 애니) — 랩 재생 중이면 실제 보스 Animator, 아니면 23호 컨트롤러. 상태 이름이 비면 없음.
+    static float BossStateFull(string state, string emptyWho, ref Object keyCache, ref string stateCache, ref AnimationClip clipCache, ref string whoCache, out AnimationClip clip, out string who)
     {
-        string state = _settings.bossHitStateName;
         GameObject boss = EditorApplication.isPlaying && BossVictoryGlitchPresentation.Instance != null ? BossVictoryGlitchPresentation.Instance.BossObject : null;
         Object key = boss != null ? boss : AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(BossHitControllerPath);
-        if (key != _bossHitClipKey || state != _bossHitStateCache)
+        if (key != keyCache || state != stateCache)
         {
-            _bossHitClipKey = key;
-            _bossHitStateCache = state;
+            keyCache = key;
+            stateCache = state;
             Animator animator = boss != null ? boss.GetComponentInChildren<Animator>(true) : null;
             RuntimeAnimatorController controller = animator != null ? animator.runtimeAnimatorController : key as RuntimeAnimatorController;
-            _bossHitClipCache = string.IsNullOrEmpty(state) || controller == null ? null : AnimationEventRequirements.FindStateClip(controller, state);
-            _bossHitWhoCache = string.IsNullOrEmpty(state) ? "상태 이름 없음(마지막 자세)" : boss != null ? $"실제 보스 {boss.name} '{state}'" : $"23호 '{state}'";
+            clipCache = string.IsNullOrEmpty(state) || controller == null ? null : AnimationEventRequirements.FindStateClip(controller, state);
+            whoCache = string.IsNullOrEmpty(state) ? emptyWho : boss != null ? $"실제 보스 {boss.name} '{state}'" : $"23호 '{state}'";
         }
-        clip = _bossHitClipCache;
-        who = _bossHitWhoCache;
+        clip = clipCache;
+        who = whoCache;
         return clip != null ? clip.length : 0f;
     }
 
     // 클립 칸 — 원래 길이를 모르면(클립 없음) 시작 표시만 짧게.
     bool ClipNodeRect(Rect lanes, BossVictoryMarker m, out Rect r)
     {
+        if (BossVictoryTimeline.ZeroMeansOff(m) && Timeline.MarkerTime(m) <= 0f) { r = default; return false; }   // 돌진 준비 애니 0 = 끔(11-17)
         float full = NodeFull(m, out AnimationClip clip, out _);
         float trim = NodeTrim(m);
         float length = full > 0f ? NodeSeconds(m, clip, BossVictoryAnimTrim.PlayedLength(trim, full)) : Mathf.Max(0.1f, trim);
@@ -2783,6 +2811,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     {
         DrawClipNode(lanes, BossVictoryMarker.FinisherStart);
         DrawClipNode(lanes, BossVictoryMarker.BossHitAnim);
+        DrawClipNode(lanes, BossVictoryMarker.BossDashPrepAnim);
+        if (Timeline.bossDashPrepTime <= 0f)   // 꺼짐 — 줄 왼쪽에 흐린 안내(우클릭 '여기로 옮기기'로 켬)
+        {
+            Rect row = RowRect(lanes, MarkerRow(BossVictoryMarker.BossDashPrepAnim));
+            GUI.Label(new Rect(lanes.x + 6f, row.y + 2f, 320f, row.height - 2f), "보스 돌진 준비 애니 (끔 — 우클릭 '여기로 옮기기')", EditorStyles.miniLabel);
+        }
     }
 
     void DrawClipNode(Rect lanes, BossVictoryMarker m)
@@ -2792,7 +2826,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         bool selected = IsSelectedMarker(m);
         float trim = NodeTrim(m);
         float start = Timeline.MarkerTime(m);
-        Color color = m == BossVictoryMarker.FinisherStart ? FinisherColor : BossHitColor;
+        Color color = m == BossVictoryMarker.FinisherStart ? FinisherColor : m == BossVictoryMarker.BossDashPrepAnim ? BossDashColor : BossHitColor;
         bool trimmed = full > 0f && BossVictoryAnimTrim.IsTrimmed(trim, full);
         if (trimmed)   // 잘려 나간 뒤쪽 = 흐린 칸(원래 끝까지)
         {
@@ -2831,7 +2865,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     // 몸통 = 시작 이동(마커 끌기와 같음) · 오른쪽 끝 = 끝 자르기(원래 길이를 알 때만).
     bool PickClipNode(Rect lanes, Vector2 mouse, out BossVictoryMarker m, out bool trimEdge)
     {
-        foreach (BossVictoryMarker node in new[] { BossVictoryMarker.FinisherStart, BossVictoryMarker.BossHitAnim })
+        foreach (BossVictoryMarker node in ClipNodes)
         {
             m = node;
             trimEdge = false;
@@ -2851,7 +2885,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     void AddClipNodeCursors(Rect lanes)
     {
-        foreach (BossVictoryMarker node in new[] { BossVictoryMarker.FinisherStart, BossVictoryMarker.BossHitAnim })
+        foreach (BossVictoryMarker node in ClipNodes)
         {
             if (!ClipNodeRect(lanes, node, out Rect r)) continue;
             float inner = EdgeInner(r);

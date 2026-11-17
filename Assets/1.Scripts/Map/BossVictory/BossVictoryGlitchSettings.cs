@@ -33,6 +33,12 @@ public sealed class BossVictoryGlitchSettings : ScriptableObject
     [Tooltip("보스 피격 애니로 넘어가는 CrossFade(초). 0 = 바로.")]
     [Min(0f)] public float bossHitFadeSeconds = 0.05f;
 
+    [Header("보스 돌진 준비 애니(처치 연출 — 타임라인 '보스 돌진 준비 애니 시작' 마커, 11-17)")]
+    [Tooltip("보스 Animator 상태 이름 — 처치 연출에서 처음부터 튼다. 23호 기본 DashPrep. 비우면 노드가 있어도 안 튼다.")]
+    public string bossDashPrepStateName = "DashPrep";
+    [Tooltip("보스 돌진 준비 애니로 넘어가는 CrossFade(초). 0 = 바로.")]
+    [Min(0f)] public float bossDashPrepFadeSeconds = 0.05f;
+
     public enum HideOthersTarget { Teammates, TeammatesAndAttachedEffects }
 
     [Header("마커 옵션(시각 = 타임라인 마커, 255 후속 3)")]
