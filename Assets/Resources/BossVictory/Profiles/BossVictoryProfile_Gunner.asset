@@ -55,35 +55,195 @@ MonoBehaviour:
     m_RotationOrder: 4
   retreatDistance: 5
   retreatSkillSlot: 1
-  chargeScaleFrom: 0.25
+  gunnerQ:
+    startScale: 0.05
+    stage1:
+      sphereScale: 0.1
+      ease: 0
+      burst: 1
+      burstScale: 0.5
+      shakeIntensity: 0
+      shakeDuration: 0
+    stage2:
+      sphereScale: 0.3
+      ease: 0
+      burst: 1
+      burstScale: 1
+      shakeIntensity: 0
+      shakeDuration: 0
+    stage3:
+      sphereScale: 1
+      ease: 0
+      burst: 1
+      burstScale: 1.5
+      shakeIntensity: 0
+      shakeDuration: 0
+    overchargeScale: 1
+    ventScale: 1
+    beamWidthScale: 1
+    beamMesh3D: 1
+    beamLength: 10
+    chargeOffset: {x: 0, y: 0, z: 0.1}
+    fireOffset: {x: 0, y: 0, z: 0}
+    sphereDelay: 0
+    beamHoldSeconds: 5
+    beamFreezeAt: 0.12
+    fxStart:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    fxStage1:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    fxStage2:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    fxStage3:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    burstAmount: 1
+    burstBrightness: 1
+    overchargeAmount: 1
+    overchargeBrightness: 1
+    fireShakeIntensity: 0
+    fireShakeDuration: 0.25
+    fireFlashIntensity: 0
+    fireFlashDuration: 0.15
+    fireFlashRange: 6
+    fireFlashColor: {r: 1, g: 1, b: 1, a: 1}
+    beamBrightness: 1
+    beamColorOverride: 0
+    beamColor: {r: 1, g: 1, b: 1, a: 1}
+    beamFadeSeconds: 0
+    beamFlowSpeed: 1.5
+    beamNoiseFlowSpeed: 2
+    vibrationCameraIntensity: 0.4
+    vibrationFrequency: 18
+    vibrationBodyIntensity: 0.03
+    vibrationSeconds: 5
+    vibrationRampIn: 0.05
+    vibrationRampOut: 0.4
+    useBeamPassPoint: 0
+    beamPassPoint: {x: 0, y: 1.2, z: 0}
+    lightSceneDim: 0.5
+    lightContrast: 25
+    beamLightCount: 3
+    beamLightIntensity: 8
+    beamLightRange: 8
+    lightInSeconds: 0.05
+    lightRecoverSeconds: 0.5
+    recoilDistance: 1
+    recoilSeconds: 0.6
+  chargeScaleFrom: -1
   chargeScaleTo: 1
   chargeScaleCurve:
     serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 1
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 1
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
+    m_Curve: []
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
   timeline:
     desaturate:
-    - start: 0.105
+    - start: 2.73
       length: 7.095
       fadeIn: 0.09
       fadeOut: 0
@@ -563,12 +723,16 @@ MonoBehaviour:
     backDashStartTime: 0.2
     finisherStartTime: 0.65
     finisherTrimSeconds: 4.9333334
-    slowStartTime: 1.85
+    slowStartTime: 2.4
     bossHitAnimTime: 0.2
     bossHitTrimSeconds: 0
     bossFreezeTime: 0
     bossSlowTime: 0.2
-    chargeStartTime: -1
+    chargeStartTime: 0.39
+    gunnerStage1Time: 0.70000005
+    gunnerStage2Time: 1.56
+    gunnerStage3Time: 2.41
+    gunnerFireTime: 3.13
     killerActionEndTime: 0
   paletteColors:
   - {r: 0.83396226, g: 0.35089353, b: 0.7660715, a: 1}

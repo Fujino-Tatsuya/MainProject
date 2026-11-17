@@ -515,6 +515,20 @@ public class GunnerBeamView : BaseNetworkBehaviour
     // 299 — 레이저 정지 화면: 멈춘 레이저 입자(유지 시간 끝·정리 때 다시 재생)
     private readonly List<ParticleSystem> victoryBeamPaused = new List<ParticleSystem>();
     private readonly GunnerBeamMeshSwap victoryBeamMesh = new GunnerBeamMeshSwap();   // 300 — 몸통 원통 렌더
+    // 301 — 통과 지점(보스 기준 → 월드, 처치 연출이 매 프레임)·발사 때 정한 레이저 방향(3D, 반동·떨림 중에도 평행 유지)
+    private bool victoryHasPass;
+    private Vector3 victoryPassPoint;
+    private Vector3 victoryBeamDir3 = Vector3.forward;
+    private Color victoryBeamColor = Color.white;
+    // 301 — 레이저 = 광원(씬 어둡게·대비·레이저 위 라이트)·땅울림(반복 흔들림 다음 시각)·몸 떨림(Armature 원래 자리)·흐름(속도 칸을 덮은 렌더러)
+    private readonly BossVictoryBeamLight victoryBeamLight = new BossVictoryBeamLight();
+    private float victoryNextRumble;
+    private Transform victoryJitterTarget;
+    private Vector3 victoryJitterHome;
+    private readonly List<Renderer> victoryFlowRenderers = new List<Renderer>();
+    private static MaterialPropertyBlock victoryFlowBlock;
+    private static readonly int FlowMainSpeedId = Shader.PropertyToID("_SpeedMainTexUVNoiseZW");
+    private static readonly int FlowNoiseSpeedId = Shader.PropertyToID("_DistortionSpeedXYPowerZ");
 
     /// <summary>[이 피어] 처치 연출 거너 Q 를 그리는 중인가(평소 충전 BeginCharge 를 막는다).</summary>
     public bool IsVictoryCharging => victoryOn;
@@ -536,13 +550,18 @@ public class GunnerBeamView : BaseNetworkBehaviour
         victoryLaser = false;
     }
 
-    /// <summary>[이 피어] 이번 프레임 처치 연출 거너 Q 상태(타임라인 초 기준)·레이저 방향(보스 쪽, 수평). 그리기는 LateUpdate.</summary>
-    public void SetVictoryFrame(in BossVictoryGunnerCharge.Frame frame, Vector3 direction)
+    /// <summary>
+    /// [이 피어] 이번 프레임 처치 연출 거너 Q 상태(타임라인 초 기준)·레이저 방향(보스 쪽, 수평). 그리기는 LateUpdate.
+    /// <paramref name="passPoint"/>(301) = 레이저 통과 지점(월드) — 있으면 발사 순간 총구 → 그 점 방향(3D), 없으면 수평 방향.
+    /// </summary>
+    public void SetVictoryFrame(in BossVictoryGunnerCharge.Frame frame, Vector3 direction, Vector3? passPoint = null)
     {
         if (!victoryOn) return;
         victoryFrame = frame;
         direction.y = 0f;
         if (direction.sqrMagnitude > 1e-6f) victoryDir = direction.normalized;
+        victoryHasPass = passPoint.HasValue;
+        if (passPoint.HasValue) victoryPassPoint = passPoint.Value;
     }
 
     /// <summary>[이 피어] 처치 연출 거너 Q 정리 — 구체·과충전·레이저를 끄고 소켓 위치·배율·레이저 폭을 원래대로(끝·취소·파괴). 안 켰으면 무시.</summary>
@@ -567,12 +586,16 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (victoryLight != null) Destroy(victoryLight.gameObject);
         victoryLight = null;
         victorySphere = false;
+        victoryBeamLight.Release();   // 301
+        RestoreVictoryJitter();
+        victoryHasPass = false;
     }
 
     // LateUpdate — 오프셋 → 구체 → 단계(알림·색·과충전) → 구체 크기 → 발사 → 레이저 끝. 타임라인은 앞으로만 간다.
     private void TickVictory()
     {
         BossVictoryGunnerCharge.Frame f = victoryFrame;
+        TickVictoryJitter(f);   // 301 — 몸 떨림을 먼저(총구 본·소켓이 따라온다)
         PlaceVictorySockets();
 
         if (f.SphereVisible && !victorySphere && !victoryFired && chargeLoopPlayer != null)
@@ -602,11 +625,123 @@ public class GunnerBeamView : BaseNetworkBehaviour
             if (f.BeamFrozen && victoryBeamPaused.Count == 0) FreezeVictoryBeam();
             else if (!f.BeamFrozen && victoryBeamPaused.Count > 0) ResumeVictoryBeam();
             if (!f.LaserOn) EndVictoryLaser();
-            else victoryFx.ApplyUniform(chargeBeamPlayer, 1f, victoryLook.beamBrightness, f.LaserFade);
+            else
+            {
+                victoryFx.ApplyUniform(chargeBeamPlayer, 1f, victoryLook.beamBrightness, f.LaserFade);
+                // 301 — 끝점 = 지금 총구 + 발사 때 방향 × 길이(반동·떨림으로 총구가 움직여도 레이저가 평행하게 따라간다)
+                if (chargeBeamPlayer != null)
+                    chargeBeamEnd = chargeBeamPlayer.Socket.position + victoryBeamDir3 * Mathf.Max(0f, victoryLook.beamLength);
+                ApplyVictoryFlow();
+            }
         }
 
         TickVictoryLight(f);
+        TickVictoryRumble(f);
+        Vector3 beamStart = chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
+        victoryBeamLight.Tick(victoryLook, f.Fired ? f.LightAmount : 0f, beamStart, chargeBeamEnd, victoryBeamColor);
     }
+
+    // 301 — 땅울림: 진동 동안 짧은 연출 흔들림을 주파수만큼 반복(세기 × 진동 비율). 시계 = 실제 시간(처치자 배율과 무관).
+    private void TickVictoryRumble(in BossVictoryGunnerCharge.Frame f)
+    {
+        float amp = victoryLook.vibrationCameraIntensity * f.Vibration;
+        if (amp <= 0f || CameraFeedback.Instance == null) return;
+        float now = Time.unscaledTime;
+        if (now < victoryNextRumble) return;
+        float period = 1f / Mathf.Max(0.5f, victoryLook.vibrationFrequency);
+        victoryNextRumble = now + period;
+        CameraFeedback.Instance.PlayImpactShake(amp, period * 2f);
+    }
+
+    // 301 — 몸·총 떨림: Armature 를 원래 자리 + 노이즈(세기 × 진동 비율)로. 0 이 되면 원래 자리.
+    private void TickVictoryJitter(in BossVictoryGunnerCharge.Frame f)
+    {
+        float amp = victoryLook.vibrationBodyIntensity * f.Vibration;
+        if (amp <= 0f)
+        {
+            RestoreVictoryJitter();
+            return;
+        }
+        if (victoryJitterTarget == null)
+        {
+            victoryJitterTarget = movement != null ? movement.ArmatureTransform : null;
+            if (victoryJitterTarget == null || victoryJitterTarget == transform) { victoryJitterTarget = null; return; }
+            victoryJitterHome = victoryJitterTarget.localPosition;
+        }
+        float t = Time.unscaledTime * Mathf.Max(0.5f, victoryLook.vibrationFrequency);
+        var n = new Vector3(Mathf.PerlinNoise(t, 0.1f) - 0.5f, (Mathf.PerlinNoise(t, 7.3f) - 0.5f) * 0.5f, Mathf.PerlinNoise(t, 13.7f) - 0.5f);
+        victoryJitterTarget.localPosition = victoryJitterHome + n * (2f * amp);
+    }
+
+    private void RestoreVictoryJitter()
+    {
+        if (victoryJitterTarget != null) victoryJitterTarget.localPosition = victoryJitterHome;
+        victoryJitterTarget = null;
+    }
+
+    // 301 — 레이저 흐름: 속도 칸(_SpeedMainTexUVNoiseZW.x·_DistortionSpeedXYPowerZ.x)을 렌더러 블록으로 덮는다(재질 = SVN 원본 그대로).
+    // 매 프레임 다시 쓴다 — 색 지정(EffectRecolor)이 블록을 비우고 다시 칠해도 다음 프레임에 돌아온다. 원통 U(0 = 총구)를 따라 + = 끝 쪽으로.
+    private void ApplyVictoryFlow()
+    {
+        if (victoryFlowRenderers.Count == 0) return;
+        victoryFlowBlock ??= new MaterialPropertyBlock();
+        for (int i = 0; i < victoryFlowRenderers.Count; i++)
+        {
+            Renderer r = victoryFlowRenderers[i];
+            if (r == null || r.sharedMaterial == null) continue;
+            r.GetPropertyBlock(victoryFlowBlock, 0);
+            if (victoryLook.beamFlowSpeed != 0f)
+            {
+                Vector4 v = r.sharedMaterial.GetVector(FlowMainSpeedId);
+                v.x = -victoryLook.beamFlowSpeed;
+                victoryFlowBlock.SetVector(FlowMainSpeedId, v);
+            }
+            if (victoryLook.beamNoiseFlowSpeed != 0f && r.sharedMaterial.HasProperty(FlowNoiseSpeedId))
+            {
+                Vector4 v = r.sharedMaterial.GetVector(FlowNoiseSpeedId);
+                v.x = -victoryLook.beamNoiseFlowSpeed;
+                victoryFlowBlock.SetVector(FlowNoiseSpeedId, v);
+            }
+            r.SetPropertyBlock(victoryFlowBlock, 0);
+        }
+    }
+
+    // 흐름 끝 — 덮은 칸을 재질 값으로(풀 반납 때 색 지정 복원이 블록을 통째로 비운다).
+    private void RestoreVictoryFlow()
+    {
+        if (victoryFlowRenderers.Count == 0) return;
+        victoryFlowBlock ??= new MaterialPropertyBlock();
+        for (int i = 0; i < victoryFlowRenderers.Count; i++)
+        {
+            Renderer r = victoryFlowRenderers[i];
+            if (r == null || r.sharedMaterial == null) continue;
+            r.GetPropertyBlock(victoryFlowBlock, 0);
+            victoryFlowBlock.SetVector(FlowMainSpeedId, r.sharedMaterial.GetVector(FlowMainSpeedId));
+            if (r.sharedMaterial.HasProperty(FlowNoiseSpeedId))
+                victoryFlowBlock.SetVector(FlowNoiseSpeedId, r.sharedMaterial.GetVector(FlowNoiseSpeedId));
+            r.SetPropertyBlock(victoryFlowBlock, 0);
+        }
+        victoryFlowRenderers.Clear();
+    }
+
+    // 흐름을 덮을 렌더러 — 레이저 인스턴스 중 재질에 속도 칸(HS_Blend_CG)이 있는 것. 흐름 둘 다 0 이면 안 모은다(블록 안 건다).
+    private void CollectVictoryFlowRenderers()
+    {
+        victoryFlowRenderers.Clear();
+        if (victoryLook.beamFlowSpeed == 0f && victoryLook.beamNoiseFlowSpeed == 0f) return;
+        int count = chargeBeamPlayer.GetInstances(BeamInstances);
+        for (int i = 0; i < count; i++)
+        {
+            BeamInstances[i].GetComponentsInChildren(true, BeamRenderers);
+            for (int k = 0; k < BeamRenderers.Count; k++)
+            {
+                ParticleSystemRenderer r = BeamRenderers[k];
+                if (r.sharedMaterial != null && r.sharedMaterial.HasProperty(FlowMainSpeedId)) victoryFlowRenderers.Add(r);
+            }
+        }
+    }
+
+    private static readonly List<ParticleSystemRenderer> BeamRenderers = new List<ParticleSystemRenderer>();
 
     // 총구 포인트 라이트(295) — 차징 중 = 차징 소켓에 마커 보간 세기·범위·색, 발사 뒤 = 발사 소켓에 번쩍(세기 → 0). 세기 0 이면 꺼 둔다(안 만든다).
     private void TickVictoryLight(in BossVictoryGunnerCharge.Frame f)
@@ -706,7 +841,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (victoryLook.fireShakeIntensity > 0f && CameraFeedback.Instance != null)
             CameraFeedback.Instance.PlayImpactShake(victoryLook.fireShakeIntensity, BossVictoryGunnerQ.ShakeSeconds(victoryLook.fireShakeDuration));
         Vector3 start = chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
-        Vector3 end = BossVictoryGunnerCharge.BeamEnd(start, victoryDir, victoryLook.beamLength);
+        // 301 — 통과 지점을 켜면 총구 → 그 점(위아래로 기울 수 있음), 아니면 보스 쪽 수평(지금). 방향은 레이저 끝까지 고정.
+        victoryBeamDir3 = BossVictoryGunnerCharge.BeamDirection(start, victoryDir, victoryHasPass && victoryLook.useBeamPassPoint, victoryPassPoint);
+        Vector3 end = start + victoryBeamDir3 * Mathf.Max(0f, victoryLook.beamLength);
+        victoryBeamColor = victoryLook.beamColorOverride ? victoryLook.beamColor
+                         : tint.IsSet ? Color.HSVToRGB(tint.Hue, 0.8f, 1f) : victoryLook.fireFlashColor;
+        victoryNextRumble = 0f;
         // 298 — 레이저 유지 = 프로필 beamHoldSeconds(타임라인). 저작 안전 회수 1초가 그보다 짧으면 1초에 강제 회수돼 안 보였다 → 처치 연출 동안 끔, 정리 때 원래대로.
         victorySafety.Suspend(chargeBeamPlayer);
         PlayChargeBeam(start, end, VictoryBeamWidth(), false, null);
@@ -715,6 +855,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
             ApplyVictoryBeamWidth(victoryLook.beamWidthScale);
             // 300 — 몸통 빌보드를 원통 메시로(낮은 앵글에서 종이처럼 안 보이게). 같은 프레임 첫 방출 전이라 첫 버스트부터.
             if (victoryLook.beamMesh3D) ApplyVictoryBeamMesh();
+            CollectVictoryFlowRenderers();   // 301 — 흐름(첫 프레임부터)
+            ApplyVictoryFlow();
             chargeBeamStopAt = float.MaxValue;   // 유지 시간 = 타임라인(EndVictoryLaser)
             victoryLaser = true;
         }
@@ -758,6 +900,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     {
         victoryLaser = false;
         ResumeVictoryBeam();   // 299 — 멈춘 채 회수·반납되지 않게 먼저 재개
+        RestoreVictoryFlow();  // 301
         chargeBeamStopAt = -1f;
         // 페이드아웃(295)이 있으면 0 까지 내려간 뒤라 남은 입자 없이 바로 걷는다(덮은 밝기를 되돌릴 때 잔상이 다시 밝아지지 않게). 없으면 예전 그대로 자연 해제.
         if (chargeBeamPlayer != null)

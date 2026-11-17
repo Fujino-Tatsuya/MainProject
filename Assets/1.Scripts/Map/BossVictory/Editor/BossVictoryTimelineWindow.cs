@@ -1773,7 +1773,8 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (_profile == null) return;
         bool dash = _profile.killerMove == BossVictoryKillerMove.TeleportDash;
         bool sword = ShowsFallingSword(_profile);
-        if (!dash && !sword) return;
+        bool pass = _profile.killerMove == BossVictoryKillerMove.RetreatCharge && _profile.gunnerQ != null && _profile.gunnerQ.useBeamPassPoint;
+        if (!dash && !sword && !pass) return;
         if (!TryGetBossPose(out Vector3 bossPos, out Quaternion bossRot, out string source)) return;
         List<BossVictoryClip> clips = Timeline.assassinDash;
 
@@ -1782,6 +1783,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         Handles.DrawAAPolyLine(2f, bossPos, bossPos + BossVictoryKillerMoves.Yaw(bossRot) * Vector3.forward * 1.5f);   // 보스 정면(+Z)
         Handles.Label(bossPos + Vector3.up * 0.8f, $"기준: {source}");
         if (sword) DrawFallingSwordHandle(bossPos, bossRot);
+        if (pass) DrawBeamPassHandle(bossPos, bossRot);
         if (!dash || clips == null || clips.Count == 0) return;
 
         int selected = _selTrack == (int)BossVictoryTrack.AssassinDash && HasClipSelection ? _selIndex : -1;
@@ -1821,6 +1823,29 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
     }
 
     static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, c.a * a);
+
+    static readonly Color BeamPassColor = new Color(0.45f, 0.9f, 1f);
+
+    // 거너 레이저 통과 지점(301 — 프로필 gunnerQ.beamPassPoint, 보스 기준 x 옆·y 위·z 앞): 점 + 바닥까지 세로선 + 끌기 핸들(높이 포함 3D 저장).
+    void DrawBeamPassHandle(Vector3 bossPos, Quaternion bossRot)
+    {
+        Vector3 point = BossVictoryKillerMoves.BossPoint(bossPos, bossRot, _profile.gunnerQ.beamPassPoint);
+        Vector3 floor = new Vector3(point.x, bossPos.y, point.z);
+        Handles.color = BeamPassColor;
+        Handles.SphereHandleCap(0, point, Quaternion.identity, 0.35f, EventType.Repaint);
+        Handles.DrawDottedLine(floor, point, 3f);
+        Handles.DrawWireDisc(floor, Vector3.up, 0.4f);
+        Handles.Label(point + Vector3.up * 0.4f, $"레이저 통과 지점 · 높이 {_profile.gunnerQ.beamPassPoint.y:0.##}m");
+        EditorGUI.BeginChangeCheck();
+        Vector3 moved = Handles.PositionHandle(point, Quaternion.identity);
+        if (!EditorGUI.EndChangeCheck()) return;
+        Undo.RecordObject(_profile, "처치 연출 거너 레이저 통과 지점");
+        _profile.gunnerQ.beamPassPoint = BossVictoryKillerMoves.BossLocalOffset(bossPos, bossRot, moved);
+        EditorUtility.SetDirty(_profile);
+        if (ProfileIsAsset) AssetDatabase.SaveAssetIfDirty(_profile);
+        _profileSo?.Update();
+        Repaint();
+    }
 
     // 처치 연출 낙하 검 자리(팔라딘 — 프로필 fallingSwordOffset): 보스 기준 점 + 바닥까지 세로선 + 끌기 핸들(높이 0 으로 저장).
     static bool ShowsFallingSword(BossVictoryProfile p) =>
@@ -2158,6 +2183,20 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     GunnerQField(nameof(BossVictoryGunnerQ.fireFlashRange)), GunnerQField(nameof(BossVictoryGunnerQ.fireFlashColor)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamBrightness)), GunnerQField(nameof(BossVictoryGunnerQ.beamColorOverride)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamColor)), GunnerQField(nameof(BossVictoryGunnerQ.beamFadeSeconds)));
+                DrawProfileFields("레이저 흐름·진동(301) — 흐름 = 몸통 텍스처·노이즈가 총구 → 끝으로 흐르는 속도(UV/초, 0 = 재질 값, 음수 = 반대로) · 땅울림 카메라 세기·주파수 · 몸·총 떨림(m) · 진동 길이(발사 뒤 초, 레이저 유지와 별개)·올림·내림(초) — 세기 0 = 없음",
+                    GunnerQField(nameof(BossVictoryGunnerQ.beamFlowSpeed)), GunnerQField(nameof(BossVictoryGunnerQ.beamNoiseFlowSpeed)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.vibrationCameraIntensity)), GunnerQField(nameof(BossVictoryGunnerQ.vibrationFrequency)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.vibrationBodyIntensity)), GunnerQField(nameof(BossVictoryGunnerQ.vibrationSeconds)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.vibrationRampIn)), GunnerQField(nameof(BossVictoryGunnerQ.vibrationRampOut)));
+                DrawProfileFields("레이저 통과 지점(301) — 켜면 총구 → 이 점(보스 기준 x 옆·y 위·z 앞, m)을 지나 길이만큼(위아래로 기울 수 있음). 이 마커를 고르면 Scene 뷰 핸들로 끈다. 끄면 보스 쪽 수평",
+                    GunnerQField(nameof(BossVictoryGunnerQ.useBeamPassPoint)), GunnerQField(nameof(BossVictoryGunnerQ.beamPassPoint)));
+                DrawProfileFields("레이저 = 광원(301) — 씬 조명 어둡게(0~1, 간파 암순응과 같은 공유 배율) · 화면 대비(0~100) · 레이저 위 포인트 라이트 수·세기·범위(레이저 색) · 차오름(발사부터)·돌아옴(유지 끝부터) 초 — 0 = 없음, 글리치 흑백·호박색 위에 겹친다",
+                    GunnerQField(nameof(BossVictoryGunnerQ.lightSceneDim)), GunnerQField(nameof(BossVictoryGunnerQ.lightContrast)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.beamLightCount)), GunnerQField(nameof(BossVictoryGunnerQ.beamLightIntensity)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.beamLightRange)), GunnerQField(nameof(BossVictoryGunnerQ.lightInSeconds)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.lightRecoverSeconds)));
+                DrawProfileFields("반동 밀림(301) — 발사부터 레이저 반대쪽(수평)으로 등속(LINEAR) 거리(m)·시간(초). 오너가 실제로 움직이고 벽에서 멈춘다(다른 피어는 위치 복제). 0 = 없음",
+                    GunnerQField(nameof(BossVictoryGunnerQ.recoilDistance)), GunnerQField(nameof(BossVictoryGunnerQ.recoilSeconds)));
                 DrawGunnerQNote();
                 break;
             case BossVictoryMarker.FocusKiller:

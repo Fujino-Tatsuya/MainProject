@@ -243,6 +243,13 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
     - UV: U = 길이(0 총구 → 1 끝, 텍스처가 가로로 긴 Trail), V = 둘레 0→1→0 삼각파(이음매 없음). U 방향이 Stretched 와 반대면 Play 에서 그라데이션이 뒤집혀 보인다 — 그때 `BuildCylinder` 의 U 를 1−y 로.
     - 되돌리기: 레이저 끝·정리 때 예약하고, 남은 소멸 꼬리 입자가 다 사라지면(LateUpdate) 빌보드로(도중에 바뀌지 않게). 파괴 때는 바로. 프리팹(SVN)은 그대로.
     - 창 발사 마커 칸 '레이저 멈춤 시점'. 테스트 `BossVictoryGunnerLaserTests`.
+  - **레이저 흐름·진동·통과 지점·광원·반동(301)** — 프로필 `gunnerQ` 칸, 필드 기본 0/꺼짐(거너 프로필에만 시작값). 창 발사 마커 아래 네 묶음. 전부 각 피어 표시(반동 이동만 오너), 새 RPC 없음.
+    - 흐름: `beamFlowSpeed`·`beamNoiseFlowSpeed`(UV/초) → 레이저 렌더러 블록으로 셰이더 `HS_Blend_CG` 의 `_SpeedMainTexUVNoiseZW.x`·`_DistortionSpeedXYPowerZ.x` 를 덮는다(+ = 원통 U 끝 쪽, 음수 = 반대, 0 = 재질 값). 색 지정이 블록을 비워도 매 프레임 다시 쓰고, 레이저 끝에 재질 값으로. 재질(SVN)은 그대로.
+    - 진동: 발사부터 `vibrationSeconds`(레이저 유지와 별개) 동안 올림·유지·내림 비율(`BossVictoryGunnerCharge.Envelope`). ① 땅울림 = 기존 연출 흔들림(`PlayImpactShake`)을 `vibrationFrequency` 번/초 반복 ② 몸·총 떨림 = Armature 로컬 위치 + 펄린 노이즈(m) — 총구 소켓이 따라온다. 발사 한 번 흔들림(295)은 따로.
+    - 통과 지점: `useBeamPassPoint` 켜면 발사 순간 총구 → `beamPassPoint`(보스 발밑 + 보스 수평 회전 기준 x 옆·y 위·z 앞) 방향으로 길이만큼(위아래로 기울 수 있음, `BeamDirection`). 방향은 레이저 끝까지 고정, 끝점은 매 프레임 지금 총구 + 방향 × 길이(반동·떨림 중에도 평행). 창이 열려 있으면 Scene 뷰 하늘색 구 + 핸들로 끈다(후퇴 차징 프로필·켰을 때만).
+    - 광원(`BossVictoryBeamLight`): 비율 = 발사부터 `lightInSeconds` 차오름 → 레이저 유지 끝까지 → `lightRecoverSeconds` 돌아옴. ① 씬 조명 `SceneLightDim.Shared` 태양·환경광 × (1 − `lightSceneDim`×비율)(간파 암순응과 곱) ② 런타임 전역 Volume(우선순위 125) ColorAdjustments.contrast = `lightContrast`, 가중치 = 비율 ③ 레이저를 `beamLightCount` 등분한 칸 가운데 포인트 라이트(레이저 색 = 덮어쓰기 색 또는 한계 돌파 색). 정리 때 배율 반납·Volume·라이트 파괴.
+    - 반동: 발사부터 `recoilSeconds` 동안 등속으로 `recoilDistance` m, 방향 = 발사 순간 레이저 반대쪽(수평). 오너만 `PlayerMotor.AddGroundedDisplacement`(FixedUpdate, 벽에서 멈춤 — 백대쉬와 같은 길, 겹치면 더해짐), 다른 피어는 위치 복제.
+    - 테스트 `BossVictoryGunnerBeamFxTests`.
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
 

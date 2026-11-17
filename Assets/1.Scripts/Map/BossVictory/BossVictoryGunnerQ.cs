@@ -109,6 +109,50 @@ public sealed class BossVictoryGunnerQ
     [Tooltip("레이저 페이드아웃(타임라인 초) — 유지 시간 뒤 이 길이 동안 알파 1 → 0 후 끔. 0 = 바로 끔(지금).")]
     [Min(0f)] public float beamFadeSeconds;
 
+    // ── 301 — 레이저 흐름·진동·통과 지점·광원·반동(기본 0 = 꺼짐, 거너 프로필에만 시작값) ──
+    [Tooltip("레이저 흐름(301) — 몸통 텍스처가 총구 → 끝으로 흐르는 속도(UV/초, 셰이더 _SpeedMainTexUVNoiseZW.x). 0 = 재질 값 그대로.")]
+    public float beamFlowSpeed;
+    [Tooltip("레이저 노이즈 흐름(301) — 왜곡 노이즈(_Flow)가 흐르는 속도(UV/초, 셰이더 _DistortionSpeedXYPowerZ.x). 0 = 재질 값 그대로.")]
+    public float beamNoiseFlowSpeed;
+
+    [Tooltip("레이저 진동 — 땅울림 카메라 흔들림 세기(301). 발사부터 진동 길이 동안 계속(짧은 흔들림을 주파수만큼 반복). 0 = 없음. 발사 한 번 흔들림(295)은 따로.")]
+    [Min(0f)] public float vibrationCameraIntensity;
+    [Tooltip("땅울림 주파수(초당 흔들림 횟수, 301).")]
+    [Min(0.5f)] public float vibrationFrequency = 18f;
+    [Tooltip("레이저 진동 — 처치자 몸·총 떨림 세기(m, 301). 0 = 없음.")]
+    [Min(0f)] public float vibrationBodyIntensity;
+    [Tooltip("진동 길이(발사 뒤 타임라인 초, 301) — 레이저 유지 시간과 별개. 0 = 없음.")]
+    [Min(0f)] public float vibrationSeconds;
+    [Tooltip("진동 올라오는 시간(초, 301) — 발사부터 0 → 1.")]
+    [Min(0f)] public float vibrationRampIn = 0.05f;
+    [Tooltip("진동 가라앉는 시간(초, 301) — 진동 길이 끝에서 1 → 0.")]
+    [Min(0f)] public float vibrationRampOut = 0.3f;
+
+    [Tooltip("켬 = 레이저가 총구에서 아래 통과 지점을 지나 길이만큼(위아래로도 기울 수 있음, 301). 끔 = 보스 쪽 수평(지금).")]
+    public bool useBeamPassPoint;
+    [Tooltip("레이저 통과 지점(301) — 보스 기준 x 옆·y 위·z 앞(m, 보스 발밑·보스 정면 축). 타임라인 창을 열면 Scene 뷰 핸들로 끈다.")]
+    public Vector3 beamPassPoint = new Vector3(0f, 1.2f, 0f);
+
+    [Tooltip("레이저 = 광원(301) — 씬 조명(태양·환경광)을 이 비율만큼 어둡게(0~1, 간파 암순응과 같은 공유 배율). 0 = 없음.")]
+    [Range(0f, 1f)] public float lightSceneDim;
+    [Tooltip("화면 대비 올림(301, URP 색 보정 contrast −100~100 중 더하는 값). 0 = 없음.")]
+    [Range(0f, 100f)] public float lightContrast;
+    [Tooltip("레이저를 따라 놓는 포인트 라이트 수(301, 레이저 색). 0 = 없음.")]
+    [Range(0, 8)] public int beamLightCount = 3;
+    [Tooltip("레이저 포인트 라이트 세기(301). 0 = 없음.")]
+    [Min(0f)] public float beamLightIntensity;
+    [Tooltip("레이저 포인트 라이트 범위(m, 301).")]
+    [Min(0f)] public float beamLightRange = 6f;
+    [Tooltip("광원 효과(어둡게·대비·라이트)가 발사부터 차오르는 시간(초, 301).")]
+    [Min(0f)] public float lightInSeconds = 0.05f;
+    [Tooltip("광원 효과가 레이저 유지 끝부터 원래로 돌아오는 시간(초, 301).")]
+    [Min(0f)] public float lightRecoverSeconds = 0.4f;
+
+    [Tooltip("반동 밀림 거리(m, 301) — 발사부터 레이저 반대쪽(수평)으로 등속. 오너가 실제로 움직이고(벽에서 멈춤) 다른 피어는 위치 복제. 0 = 없음.")]
+    [Min(0f)] public float recoilDistance;
+    [Tooltip("반동 밀림 시간(타임라인 초, 301).")]
+    [Min(0.01f)] public float recoilSeconds = 0.5f;
+
     public Stage StageAt(int stage) => stage switch
     {
         1 => stage1,
@@ -220,6 +264,10 @@ public static class BossVictoryGunnerCharge
         public float FlashIntensity; // 발사 번쩍 라이트 세기(295) — 발사부터 길이 동안 세기 → 0
         public bool BeamFrozen;     // 레이저 정지 화면(299) — 발사 + 멈춤 시점 ≤ t < 발사 + 유지 시간(멈춤 시점 < 유지 시간일 때만)
         public ChargeFxSample Fx;   // 차징 이펙트 파트 배율·포인트 라이트(295 — 마커 사이 보간)
+        public float SinceFire;     // 발사 뒤 타임라인 초(301 — 발사 전 음수)
+        public float Vibration;     // 진동 세기 비율 0~1(301)
+        public float LightAmount;   // 레이저 광원 효과 비율 0~1(301)
+        public float Recoil;        // 반동 밀림 진행 0~1(301, 등속)
     }
 
     /// <summary>파트 하나의 이 순간 배율(295) — <see cref="BossVictoryChargePartFx"/> 를 마커 사이 보간한 값.</summary>
@@ -272,8 +320,50 @@ public static class BossVictoryGunnerCharge
         f.LaserFade = f.LaserOn ? LaserFade(sinceFire, hold, fade) : 0f;
         f.FlashIntensity = FireFlash(q.fireFlashIntensity, q.fireFlashDuration, sinceFire);
         f.BeamFrozen = f.Fired && BeamFrozen(sinceFire, q.beamFreezeAt, hold);
+        f.SinceFire = sinceFire;
+        f.Vibration = Envelope(sinceFire, q.vibrationRampIn, q.vibrationSeconds, q.vibrationRampOut);
+        f.LightAmount = Envelope(sinceFire, q.lightInSeconds, hold, q.lightRecoverSeconds, recoverAfterEnd: true);
+        f.Recoil = q.recoilDistance > 0f ? RecoilProgress(sinceFire, q.recoilSeconds) : 0f;
         return f;
     }
+
+    /// <summary>
+    /// 발사 뒤 세기 비율(301) — 0 → 1(올림 <paramref name="rampIn"/>초) → 유지 → 1 → 0(내림 <paramref name="rampOut"/>초).
+    /// <paramref name="recoverAfterEnd"/> = false(진동): 내림이 길이 <paramref name="length"/> 안에서 끝난다(길이 0 = 늘 0).
+    /// true(광원): 길이(레이저 유지)까지 유지하고 그 뒤 내림 동안 돌아온다. 발사 전 = 0.
+    /// </summary>
+    public static float Envelope(float sinceFire, float rampIn, float length, float rampOut, bool recoverAfterEnd = false)
+    {
+        if (sinceFire < 0f || length <= 0f) return 0f;
+        float end = recoverAfterEnd ? length + Mathf.Max(0f, rampOut) : length;
+        if (sinceFire >= end) return 0f;
+        float up = rampIn > 0f ? Mathf.Clamp01(sinceFire / rampIn) : 1f;
+        float downStart = recoverAfterEnd ? length : Mathf.Max(0f, length - Mathf.Max(0f, rampOut));
+        float down = sinceFire <= downStart || end <= downStart ? 1f : Mathf.Clamp01((end - sinceFire) / (end - downStart));
+        return Mathf.Min(up, down);
+    }
+
+    /// <summary>반동 밀림 진행(301) — 발사부터 <paramref name="seconds"/> 동안 0 → 1 등속(LINEAR). 발사 전 0, 뒤 1.</summary>
+    public static float RecoilProgress(float sinceFire, float seconds) =>
+        sinceFire <= 0f ? 0f : seconds <= 0f ? 1f : Mathf.Clamp01(sinceFire / seconds);
+
+    /// <summary>
+    /// 레이저 방향(301) — 통과 지점을 쓰면 총구 → 통과 지점(3D, 위아래로 기울 수 있음), 아니면(또는 너무 가까우면) 수평 <paramref name="flatDirection"/>.
+    /// </summary>
+    public static Vector3 BeamDirection(Vector3 muzzle, Vector3 flatDirection, bool usePassPoint, Vector3 passPoint)
+    {
+        if (usePassPoint)
+        {
+            Vector3 d = passPoint - muzzle;
+            if (d.sqrMagnitude > 0.01f) return d.normalized;
+        }
+        flatDirection.y = 0f;
+        return flatDirection.sqrMagnitude > 1e-6f ? flatDirection.normalized : Vector3.forward;
+    }
+
+    /// <summary>레이저 위 포인트 라이트 자리(301) — 시작~끝을 count 등분한 칸의 가운데(i = 0..count-1).</summary>
+    public static Vector3 BeamLightPoint(Vector3 start, Vector3 end, int i, int count) =>
+        count <= 0 ? start : Vector3.Lerp(start, end, (i + 0.5f) / count);
 
     /// <summary>레이저 알파(295) — 발사 뒤 <paramref name="hold"/> 동안 1, 그 뒤 <paramref name="fade"/> 동안 1 → 0(선형), 넘으면 0. 페이드 0 = 유지 끝에 바로 0.</summary>
     public static float LaserFade(float sinceFire, float hold, float fade)

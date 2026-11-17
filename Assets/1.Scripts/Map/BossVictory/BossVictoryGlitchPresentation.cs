@@ -637,7 +637,22 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         BossVictoryGunnerCharge.Times times = BossVictoryGunnerCharge.From(_profile.timeline);
         BossVictoryGunnerCharge.Frame f = BossVictoryGunnerCharge.Evaluate(times, _profile.gunnerQ, _glitchTime);
         Vector3 dir = _boss != null ? _boss.transform.position - _killer.transform.position : _killer.transform.forward;
-        _gunnerBeam.SetVictoryFrame(f, dir);
+        // 301 — 통과 지점(보스 기준 오프셋 → 월드, 보스 위치·회전 = 복제값 → 모든 피어 같음). 끄면 null = 수평(지금).
+        Vector3? pass = null;
+        if (_profile.gunnerQ.useBeamPassPoint && _boss != null)
+            pass = BossVictoryKillerMoves.BossPoint(_boss.transform.position, _boss.transform.rotation, _profile.gunnerQ.beamPassPoint);
+        _gunnerBeam.SetVictoryFrame(f, dir, pass);
+        // 301 — 반동 밀림(등속): 발사 순간 레이저 반대쪽(수평)을 정하고, 진행 비율만 넘겨 FixedUpdate 가 오너를 옮긴다(다른 피어 = 위치 복제).
+        if (f.Fired && !_gunnerRecoilDirSet)
+        {
+            Vector3 aim = (pass ?? (_boss != null ? _boss.transform.position : _killer.transform.position + _killer.transform.forward)) - _killer.transform.position;
+            aim.y = 0f;
+            _gunnerRecoilDir = aim.sqrMagnitude > 1e-6f ? -aim.normalized : -_killer.transform.forward;
+            _gunnerRecoilDirSet = true;
+            if (_profile.gunnerQ.recoilDistance > 0f)
+                ClockLog($"거너 Q 반동 {_profile.gunnerQ.recoilDistance:0.##}m / {_profile.gunnerQ.recoilSeconds:0.##}초{(_killer.IsOwner ? "(오너 이동)" : "(위치는 복제)")}");
+        }
+        _gunnerRecoilTarget = f.Recoil;
         if (f.Stage != _gunnerStageLogged || f.Fired != _gunnerFiredLogged)
         {
             if (f.Stage != _gunnerStageLogged) ClockLog($"거너 Q {f.Stage}단계");
@@ -649,6 +664,21 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
     int _gunnerStageLogged;
     bool _gunnerFiredLogged;
+    // 301 — 반동 밀림: 방향(발사 순간 고정)·목표 진행(TickGunnerQ)·이미 옮긴 진행(FixedUpdate)
+    bool _gunnerRecoilDirSet;
+    Vector3 _gunnerRecoilDir;
+    float _gunnerRecoilTarget, _gunnerRecoilMoved;
+
+    // 오너만 — 진행 차이만큼 바닥 이동(벽에서 멈춤, 백대쉬·순간이동 Q 와 같은 길). 백대쉬와 겹치면 더해진다.
+    void StepGunnerRecoil()
+    {
+        if (_gunnerBeam == null || !_gunnerRecoilDirSet || !_killer.IsOwner) return;
+        float distance = _profile.gunnerQ.recoilDistance;
+        if (distance <= 0f || Mathf.Approximately(_gunnerRecoilTarget, _gunnerRecoilMoved)) return;
+        if (!_killer.TryGetComponent(out PlayerMotor motor)) return;
+        motor.AddGroundedDisplacement(_gunnerRecoilDir * (distance * (_gunnerRecoilTarget - _gunnerRecoilMoved)));
+        _gunnerRecoilMoved = _gunnerRecoilTarget;
+    }
 
     // ── [순간이동 Q 트랙(272 후속)] 타임라인 '어쌔신 순간이동·Q 이동' 클립마다 — 시작에 그 클립 시작 지점으로 순간이동 → 길이 동안 도착 지점까지 Q 이동(곡선) → 끝에 일섬.
     // 순서 = 시작 순(#1 #2 …), 겹치면 앞 클립은 다음 클립 시작에서 끝. 마지막 뒤엔 애니가 정지 프레임까지 가서 멈춘다(TickFinisherTrim).
@@ -895,6 +925,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     {
         if (!_running || _killer == null) return;
         if (_dashMoveMotor != null) StepDashSegment();
+        StepGunnerRecoil();   // 301
         if (!_dashRunning) return;
         if (!BossEncounterDirector.StepSkid(_killer, _dashMotor, _dashDir, _profile.backDashDistance, _dashStartAt, _profile.backDashDuration,
                                             Time.timeAsDouble, ref _dashDone, ref _dashReaction, ref _dashIdle, _dashEase, _profile.backDashIdleDelay,
@@ -932,6 +963,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _gunnerBeam = null;
         _gunnerStageLogged = 0;
         _gunnerFiredLogged = false;
+        _gunnerRecoilDirSet = false;
+        _gunnerRecoilTarget = _gunnerRecoilMoved = 0f;
         if (_move == BossVictoryKillerMove.RetreatCharge && _killer.TryGetComponent(out GunnerBeamView beam))
         {
             _gunnerBeam = beam;
