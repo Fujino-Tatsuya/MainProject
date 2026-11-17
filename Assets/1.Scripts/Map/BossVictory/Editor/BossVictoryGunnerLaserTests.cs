@@ -82,4 +82,33 @@ public sealed class BossVictoryGunnerLaserTests
         Assert.AreEqual(1f, BossVictoryGunnerCharge.SphereScale(t, q, 3f), Tolerance);
         Assert.IsTrue(BossVictoryGunnerCharge.Evaluate(t, q, 0.5f).SphereVisible, "sphereDelay 0 = 차징 시작부터 보임");
     }
+
+    // ── 299 레이저 정지 화면 — 레이저 이펙트가 1초 남짓 원샷이라 유지 시간 동안 입자를 멈춰 둔다 ──
+
+    [Test]
+    public void 레이저_멈춤은_멈춤_시점부터_유지_끝까지()
+    {
+        Assert.IsFalse(BossVictoryGunnerCharge.BeamFrozen(0.1f, 0.12f, 31.6f), "다 뻗기 전");
+        Assert.IsTrue(BossVictoryGunnerCharge.BeamFrozen(0.12f, 0.12f, 31.6f), "멈춤 시점");
+        Assert.IsTrue(BossVictoryGunnerCharge.BeamFrozen(20f, 0.12f, 31.6f), "유지 중");
+        Assert.IsFalse(BossVictoryGunnerCharge.BeamFrozen(31.6f, 0.12f, 31.6f), "유지 끝 = 재개(소멸 꼬리)");
+        Assert.IsFalse(BossVictoryGunnerCharge.BeamFrozen(0.05f, 0.12f, 0.1f), "유지 ≤ 멈춤 시점 = 안 멈춤(예전 그대로)");
+        Assert.IsFalse(BossVictoryGunnerCharge.BeamFrozen(0.2f, 0.12f, 0.1f));
+    }
+
+    [Test]
+    public void 프레임_멈춤은_타임라인_초_기준이고_페이드는_유지_뒤()
+    {
+        var q = new BossVictoryGunnerQ { beamHoldSeconds = 2f, beamFadeSeconds = 0.5f };
+        Assert.AreEqual(0.12f, q.beamFreezeAt, Tolerance, "기본 멈춤 시점");
+        var t = new BossVictoryGunnerCharge.Times { ChargeStart = 0f, Stage1 = 0.3f, Stage2 = 0.6f, Stage3 = 0.9f, Fire = 1f };
+        Assert.IsFalse(BossVictoryGunnerCharge.Evaluate(t, q, 0.95f).BeamFrozen, "발사 전");
+        BossVictoryGunnerCharge.Frame held = BossVictoryGunnerCharge.Evaluate(t, q, 2f);
+        Assert.IsTrue(held.BeamFrozen);
+        Assert.AreEqual(1f, held.LaserFade, Tolerance, "멈춘 동안 알파 1");
+        BossVictoryGunnerCharge.Frame fading = BossVictoryGunnerCharge.Evaluate(t, q, 3.25f);
+        Assert.IsFalse(fading.BeamFrozen, "유지 끝 뒤 = 재개");
+        Assert.IsTrue(fading.LaserOn);
+        Assert.AreEqual(0.5f, fading.LaserFade, Tolerance, "페이드는 유지 끝부터 기존대로");
+    }
 }

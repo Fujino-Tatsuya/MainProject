@@ -2146,9 +2146,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 break;
             }
             case BossVictoryMarker.GunnerFire:
-                DrawProfileFields("거너 Q 발사(294 · 이 캐릭터 프로필) — 방출 섬광 크기 · 레이저 굵기 배율(보이는 것만) · 길이(m, 벽 무시·보스 관통) · 유지 시간(타임라인 초) · 발사 오프셋(총구 기준 x 옆·y 위·z 앞, 섬광·레이저 시작점)",
+                DrawProfileFields("거너 Q 발사(294 · 이 캐릭터 프로필) — 방출 섬광 크기 · 레이저 굵기 배율(보이는 것만) · 길이(m, 벽 무시·보스 관통) · 유지 시간(타임라인 초) · 레이저 멈춤 시점(발사 뒤 초, 299 — 이때 정지 화면 → 유지 끝에 재개, 유지 ≤ 이 값이면 안 멈춤) · 발사 오프셋(총구 기준 x 옆·y 위·z 앞, 섬광·레이저 시작점)",
                     GunnerQField(nameof(BossVictoryGunnerQ.ventScale)), GunnerQField(nameof(BossVictoryGunnerQ.beamWidthScale)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamLength)), GunnerQField(nameof(BossVictoryGunnerQ.beamHoldSeconds)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.beamFreezeAt)),
                     GunnerQField(nameof(BossVictoryGunnerQ.fireOffset)));
                 DrawProfileFields("발사 연출(295) — 카메라 흔들림(세기 0 = 없음) · 총구 번쩍 라이트(세기 0 = 없음, 발사 소켓) · 레이저 밝기·색 덮어쓰기(끄면 한계 돌파 색)·페이드아웃(초, 유지 시간 뒤 · 0 = 바로 끔)",
                     GunnerQField(nameof(BossVictoryGunnerQ.fireShakeIntensity)), GunnerQField(nameof(BossVictoryGunnerQ.fireShakeDuration)),
