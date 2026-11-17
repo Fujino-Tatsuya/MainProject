@@ -506,6 +506,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private readonly Dictionary<ParticleSystem, Vector2> victoryWidthHome = new Dictionary<ParticleSystem, Vector2>();
     // 295 — 차징 이펙트 세부 조절(풀 인스턴스 값 배율 → 정리 때 되돌림)·총구 포인트 라이트(런타임 1개, 정리 때 파괴)·알림/과충전 루프로 튼 것
     private readonly BossVictoryChargeFxApplier victoryFx = new BossVictoryChargeFxApplier();
+    // 298 — 처치 연출 동안 끈 소켓 안전 회수(차징·과충전·알림 루프·레이저). 정리(EndVictoryCharge) 때 원래 값.
+    private readonly EffectSocketSafetyOverride victorySafety = new EffectSocketSafetyOverride();
     private Light victoryLight;
     private bool victoryBurstLooping;
     private bool victoryOverchargeTuned;
@@ -556,6 +558,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         victoryBurstLooping = false;
         victoryOverchargeTuned = false;
         victoryFx.RestoreAll();
+        victorySafety.RestoreAll();
         if (victoryLight != null) Destroy(victoryLight.gameObject);
         victoryLight = null;
         victorySphere = false;
@@ -572,6 +575,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             victorySphere = true;
             FaceForward(chargeLoopPlayer);
             chargeLoopPlayer.SetTint(OverdriveTint(victoryStage));
+            victorySafety.Suspend(chargeLoopPlayer);   // 298 — 차징 길이 = 타임라인(저작 안전 회수 3초를 넘으면 도중에 꺼졌다)
             chargeLoopPlayer.Play();
         }
 
@@ -653,6 +657,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
                 chargeFullPlayer.PlayOnce();
             else
             {
+                victorySafety.Suspend(chargeFullPlayer);
                 chargeFullPlayer.Play();
                 victoryBurstLooping = true;
                 victoryFx.ApplyUniform(chargeFullPlayer, victoryLook.burstAmount, victoryLook.burstBrightness, 1f);
@@ -663,6 +668,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
             FaceForward(overchargePlayer);
             SetVictoryScale(overchargePlayer, victoryLook.overchargeScale);
             overchargePlayer.SetTint(tint);
+            victorySafety.Suspend(overchargePlayer);
             overchargePlayer.Play();
             victoryOverchargeTuned = true;
             victoryFx.ApplyUniform(overchargePlayer, victoryLook.overchargeAmount, victoryLook.overchargeBrightness, 1f);
@@ -693,6 +699,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
             CameraFeedback.Instance.PlayImpactShake(victoryLook.fireShakeIntensity, BossVictoryGunnerQ.ShakeSeconds(victoryLook.fireShakeDuration));
         Vector3 start = chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
         Vector3 end = BossVictoryGunnerCharge.BeamEnd(start, victoryDir, victoryLook.beamLength);
+        // 298 — 레이저 유지 = 프로필 beamHoldSeconds(타임라인). 저작 안전 회수 1초가 그보다 짧으면 1초에 강제 회수돼 안 보였다 → 처치 연출 동안 끔, 정리 때 원래대로.
+        victorySafety.Suspend(chargeBeamPlayer);
         PlayChargeBeam(start, end, VictoryBeamWidth(), false, null);
         if (chargeBeamPlayer != null && chargeBeamStopAt >= 0f)
         {
