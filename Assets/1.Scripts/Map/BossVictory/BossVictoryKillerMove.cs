@@ -88,6 +88,17 @@ public static class BossVictoryKillerMoves
         return clipSpan / moveSeconds / (stateSpeed > 0f ? stateSpeed : 1f);
     }
 
+    /// <summary>
+    /// 순간이동 Q 클립에 들어갈 때 애니 시작 클립 시각(297) — Custom0 + 늦게 들어간 만큼(<paramref name="t"/> − 클립 시작)의 진행.
+    /// 이동 중 애니는 Custom0 → End(<paramref name="clipSpan"/>)를 클립 길이에 맞춰 도니(상태 속도 × 배율 = 구간 ÷ 길이) 늦은 시간 × 구간 ÷ 길이, 구간 안으로 자른다.
+    /// 프레임 단위로 늦게 들어가도(끊김 포함) 자세가 타임라인 시각에 맞는다.
+    /// </summary>
+    public static float SegmentStartClipTime(float custom0, float clipSpan, float clipStart, float clipLength, float t)
+    {
+        if (clipLength <= 0f || clipSpan <= 0f) return custom0;
+        return custom0 + Mathf.Clamp01((t - clipStart) / clipLength) * clipSpan;
+    }
+
     static float Ease(AnimationCurve curve, float u) =>
         curve != null && curve.length > 0 ? curve.Evaluate(u) : u;
 }
@@ -158,4 +169,67 @@ public static class BossVictoryAssassinDash
         BossVictoryClip c = clips[order[k]];
         return BossVictoryKillerMoves.MoveProgress(Mathf.Min(t, SegmentEnd(clips, order, k)), c.start, c.End, ease);
     }
+
+    /// <summary>
+    /// 시각 <paramref name="t"/> 의 타임라인상 예상 처치자 위치(297) — 보스 로컬 오프셋(높이 0, +Z = 보스 정면). 첫 클립 전이면 false.
+    /// <paramref name="t"/> 와 <b>같은 시각에 시작하는 클립은 아직 안 들어간 것</b>으로 본다 — 런타임은 클립 순간이동을 시각이 지난 다음 프레임에 하고,
+    /// 같은 시각 카메라 컷은 그 앞 위치를 잡았다(지금까지 저작된 구도의 기준).
+    /// </summary>
+    public static bool ExpectedLocal(List<BossVictoryClip> clips, float t, AnimationCurve ease, out Vector3 local)
+    {
+        local = default;
+        var order = new List<int>(clips != null ? clips.Count : 0);
+        Order(clips, order);
+        int k = -1;
+        for (int i = 0; i < order.Count; i++)
+        {
+            if (clips[order[i]].start >= t) break;
+            k = i;
+        }
+        if (k < 0) return false;
+        BossVictoryClip c = clips[order[k]];
+        local = Vector3.LerpUnclamped(c.dashFrom, c.dashTo, Progress(clips, order, k, t, ease));
+        local.y = 0f;
+        return true;
+    }
+
+    /// <summary>
+    /// 카메라 컷을 보스 정면 기준(<see cref="BossVictoryCameraCuts.Anchor.BossFacing"/>)으로 일회성 이관(297).
+    /// 컷마다 위치를 잡는 시각(컷 시작, 블렌드가 있으면 블렌드 시작)의 예상 처치자 위치(<see cref="ExpectedLocal"/>)로 기준 좌표계를 만들고
+    /// 같은 화면이 되게 키를 다시 계산한다 — 보스 = 원점·정면 +Z(보스 로컬). 이미 보스 정면·처치자 무기(매 프레임 추종) 기준·첫 클립 전 컷은 건너뛴다.
+    /// 바꾼 컷 수. <paramref name="skipped"/> 에 건너뛴 이유.
+    /// </summary>
+    public static int RebaseCutsToBossFacing(BossVictoryTimeline tl, AnimationCurve ease, List<string> skipped = null)
+    {
+        if (tl == null || tl.cameraCut == null) return 0;
+        tl.SyncCameraCutShots();
+        int changed = 0;
+        for (int i = 0; i < tl.cameraCut.Count; i++)
+        {
+            BossVictoryCameraCuts.Cut shot = tl.cameraCutShots[i];
+            if (shot.anchor == BossVictoryCameraCuts.Anchor.BossFacing) continue;
+            if (shot.anchor == BossVictoryCameraCuts.Anchor.KillerWeapon)
+            {
+                skipped?.Add($"컷 #{i + 1} — 처치자 무기 기준(매 프레임 추종)이라 그대로");
+                continue;
+            }
+            float captureAt = tl.cameraCut[i].start - tl.CameraCutBlendSeconds(i);
+            if (!ExpectedLocal(tl.assassinDash, captureAt, ease, out Vector3 killer))
+            {
+                skipped?.Add($"컷 #{i + 1} — {captureAt:0.###}s 가 첫 순간이동 클립 전이라 예상 위치가 없어 그대로");
+                continue;
+            }
+            tl.cameraCutShots[i] = BossVictoryCameraCuts.Rebase(shot, BossVictoryCameraCuts.Anchor.BossFacing, LocalSubjects(killer));
+            changed++;
+        }
+        return changed;
+    }
+
+    /// <summary>보스 로컬 기준 위치 한 벌 — 보스 = 원점·정면 +Z, 처치자 = <paramref name="killerLocal"/>.</summary>
+    public static BossVictoryCameraCuts.Subjects LocalSubjects(Vector3 killerLocal) => new BossVictoryCameraCuts.Subjects
+    {
+        Killer = killerLocal,
+        BossBase = Vector3.zero,
+        BossForward = Vector3.forward,
+    };
 }

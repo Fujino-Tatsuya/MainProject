@@ -486,7 +486,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         _ => BossVictoryTimeline.MarkerLabel(marker),
     };
 
-    static readonly string[] AnchorLabels = { "가운데", "처치자", "보스", "처치자 무기(매 프레임)" };
+    static readonly string[] AnchorLabels = { "가운데", "처치자", "보스", "처치자 무기(매 프레임)", "보스 정면" };
 
     static string AnchorLabel(BossVictoryCameraCuts.Anchor anchor) =>
         (int)anchor >= 0 && (int)anchor < AnchorLabels.Length ? AnchorLabels[(int)anchor] : anchor.ToString();
@@ -1638,7 +1638,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         c.start = Mathf.Max(0f, EditorGUILayout.FloatField("시작(초)", c.start));
         EditorGUILayout.LabelField("구간 끝(초)", $"{Timeline.CameraCutEnd(_selIndex):0.00} — 다음 컷 시작(마지막 컷 = 로비 전환)까지 자동");
         shot.anchor = (BossVictoryCameraCuts.Anchor)EditorGUILayout.Popup(new GUIContent("기준",
-                "화면을 이 점 + 처치자→보스 수평 축 좌표계로 저장 — 어디서 죽든 같은 구도. 바꾸면 저장된 화면은 새 기준으로 다시 읽힌다(Scene 뷰로 다시 찍기 권장)."),
+                "화면을 이 점 + 처치자→보스 수평 축 좌표계로 저장 — 어디서 죽든 같은 구도. '보스 정면' = 보스 발밑 + 보스 수평 정면 축(처치자 위치와 무관 — 보스 기준으로 순간이동하는 어쌔신용, 297). 바꾸면 저장된 화면은 새 기준으로 다시 읽힌다(Scene 뷰로 다시 찍기 권장)."),
             (int)shot.anchor, AnchorLabels);
         if (BossVictoryCameraCuts.FollowsEveryFrame(shot.anchor))
         {
@@ -1794,6 +1794,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         if (!SessionState.GetBool(SubjectsKey, false)) return false;
         s.Killer = SessionState.GetVector3(SubjectsKey + ".Killer", Vector3.zero);
         s.BossBase = SessionState.GetVector3(SubjectsKey + ".Boss", Vector3.forward);
+        s.BossForward = SessionState.GetVector3(SubjectsKey + ".BossForward", Vector3.forward);   // 기준 '보스 정면'(297)
         s.HasWeapon = SessionState.GetBool(SubjectsKey + ".HasWeapon", false);
         s.Weapon = SessionState.GetVector3(SubjectsKey + ".Weapon", Vector3.zero);
         source = "마지막 회차";
@@ -1808,6 +1809,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
         SessionState.SetBool(SubjectsKey, true);
         SessionState.SetVector3(SubjectsKey + ".Killer", s.Killer);
         SessionState.SetVector3(SubjectsKey + ".Boss", s.BossBase);
+        SessionState.SetVector3(SubjectsKey + ".BossForward", s.BossForward);
         SessionState.SetBool(SubjectsKey + ".HasWeapon", s.HasWeapon);
         SessionState.SetVector3(SubjectsKey + ".Weapon", s.Weapon);
     }

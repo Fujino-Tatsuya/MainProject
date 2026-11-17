@@ -66,7 +66,7 @@ public sealed class BossVictoryCameraCutTests
     [Test]
     public void 상대_변환_왕복_그리고_다른_자리에서_같은_구도()
     {
-        var a = new BossVictoryCameraCuts.Subjects { Killer = new Vector3(3f, 0f, -2f), BossBase = new Vector3(-4f, 0.5f, 7f) };
+        var a = new BossVictoryCameraCuts.Subjects { Killer = new Vector3(3f, 0f, -2f), BossBase = new Vector3(-4f, 0.5f, 7f), BossForward = new Vector3(1f, 0.2f, 1f) };
         Vector3 wp = new Vector3(1f, 6f, -9f);
         Quaternion wr = Quaternion.Euler(25f, 130f, 3f);
         foreach (BossVictoryCameraCuts.Anchor anchor in System.Enum.GetValues(typeof(BossVictoryCameraCuts.Anchor)))
@@ -77,12 +77,12 @@ public sealed class BossVictoryCameraCutTests
             Assert.Greater(Mathf.Abs(Quaternion.Dot(wr, r)), 0.99999f, anchor + " 회전 왕복");
 
             // 다른 자리·방향에서 죽어도 기준점에서 본 구도(거리·축에 대한 각)가 같다.
-            var b = new BossVictoryCameraCuts.Subjects { Killer = new Vector3(50f, 2f, 50f), BossBase = new Vector3(50f, 2f, 40f) };
+            var b = new BossVictoryCameraCuts.Subjects { Killer = new Vector3(50f, 2f, 50f), BossBase = new Vector3(50f, 2f, 40f), BossForward = Vector3.left };
             BossVictoryCameraCuts.ToWorld(anchor, b, lp, lr, out Vector3 pb, out Quaternion rb);
             Vector3 originA = BossVictoryCameraCuts.AnchorPoint(anchor, a), originB = BossVictoryCameraCuts.AnchorPoint(anchor, b);
             Assert.AreEqual(Vector3.Distance(wp, originA), Vector3.Distance(pb, originB), 1e-3f, anchor + " 기준점 거리 같음");
-            float camToAxisA = Vector3.SignedAngle(BossVictoryCameraCuts.Axis(a), wr * Vector3.forward, Vector3.up);
-            float camToAxisB = Vector3.SignedAngle(BossVictoryCameraCuts.Axis(b), rb * Vector3.forward, Vector3.up);
+            float camToAxisA = Vector3.SignedAngle(BossVictoryCameraCuts.FrameForward(anchor, a), wr * Vector3.forward, Vector3.up);
+            float camToAxisB = Vector3.SignedAngle(BossVictoryCameraCuts.FrameForward(anchor, b), rb * Vector3.forward, Vector3.up);
             Assert.AreEqual(camToAxisA, camToAxisB, 1e-2f, anchor + " 축 기준 시선 방위 같음");
         }
     }

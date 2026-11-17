@@ -539,11 +539,11 @@ MonoBehaviour:
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
     cameraCutShots:
-    - anchor: 0
+    - anchor: 4
       keys:
       - u: 0
-        position: {x: 3.72, y: 16.657612, z: 6.64}
-        rotation: {x: -0.3195841, y: 0.6749104, z: -0.5197531, w: -0.41499236}
+        position: {x: -0.06390672, y: 16.657612, z: 4.7431135}
+        rotation: {x: -0.05716482, y: 0.7888041, z: -0.6074615, w: -0.07423479}
         fov: 42.04
         curve: 1
       smoothPath: 0
@@ -559,11 +559,11 @@ MonoBehaviour:
       endRotation: {x: 0, y: 0, z: 0, w: 0}
       endFov: 0
       ease: 0
-    - anchor: 0
+    - anchor: 4
       keys:
       - u: 0
-        position: {x: -9.924023, y: 0.026340425, z: -4.0049987}
-        rotation: {x: 0.08954522, y: -0.5462063, z: -0.058906857, w: -0.8307649}
+        position: {x: 11.740769, y: 0.026340425, z: -3.0200782}
+        rotation: {x: 0.09097459, y: 0.5259314, z: 0.0566744, w: -0.8437463}
         fov: 49.16
         curve: 1
       smoothPath: 0

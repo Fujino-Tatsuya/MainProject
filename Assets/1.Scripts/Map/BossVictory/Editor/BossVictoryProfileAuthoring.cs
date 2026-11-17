@@ -99,6 +99,31 @@ public static class BossVictoryProfileAuthoring
         }
     }
 
+    /// <summary>
+    /// 할 일 297 — 어쌔신 카메라 컷을 보스 정면 기준으로 일회성 이관(<see cref="BossVictoryAssassinDash.RebaseCutsToBossFacing"/>).
+    /// 컷마다 그 컷이 위치를 잡는 시각의 타임라인상 예상 처치자 위치로 지금 구도를 그대로 옮긴다. 이미 보스 정면인 컷은 건너뛴다(다시 눌러도 안전).
+    /// 팔라딘·거너는 건드리지 않는다. 정본 에셋은 297 커밋에 이관 결과가 들어 있다 — 이 메뉴는 다른 브랜치·복구용.
+    /// </summary>
+    [MenuItem("Tools/Boss Victory/어쌔신 카메라 컷 보스 정면 기준 이관 (297)")]
+    public static void RebaseAssassinCuts()
+    {
+        var assassin = AssetDatabase.LoadAssetAtPath<BossVictoryProfile>(ProfilePath(TutorialCharacter.Assassin));
+        if (assassin == null || assassin.timeline == null)
+        {
+            Debug.LogError($"[BossVictory] 어쌔신 프로필이 없다 — {ProfilePath(TutorialCharacter.Assassin)}");
+            return;
+        }
+        Undo.RecordObject(assassin, "어쌔신 카메라 컷 보스 정면 기준 이관 (297)");
+        var skipped = new List<string>();
+        int changed = BossVictoryAssassinDash.RebaseCutsToBossFacing(assassin.timeline, assassin.teleportMoveEase, skipped);
+        if (changed > 0)
+        {
+            EditorUtility.SetDirty(assassin);
+            AssetDatabase.SaveAssetIfDirty(assassin);
+        }
+        Debug.Log($"[BossVictory] 어쌔신 카메라 컷 보스 정면 이관 — 바꾼 컷 {changed}개" + (skipped.Count > 0 ? " · " + string.Join(" / ", skipped) : ""), assassin);
+    }
+
     /// <summary>어쌔신 Variant Animator 의 순간이동 Q 상태 클립(없으면 null).</summary>
     public static AnimationClip TeleportMoveClip(string state)
     {

@@ -10,13 +10,17 @@ using UnityEngine;
 /// </summary>
 public static class BossVictoryCameraCuts
 {
-    /// <summary>컷 기준점 — 카메라 위치·회전을 이 점 + 처치자→보스 수평 축 좌표계로 저장한다(어디서 죽든 같은 구도).</summary>
+    /// <summary>
+    /// 컷 기준점 — 카메라 위치·회전을 이 점 + 축 좌표계로 저장한다(어디서 죽든 같은 구도). 축 = 처치자→보스 수평, 단 <see cref="BossFacing"/> 만 보스 수평 정면.
+    /// 🔴 직렬화 값 = 순서 — 새 기준은 끝에만 붙인다.
+    /// </summary>
     public enum Anchor
     {
         Middle,  // 처치자·보스 발밑 가운데
         Killer,  // 처치자 발밑
         Boss,    // 보스 발밑(트랜스폼 위치)
         KillerWeapon,   // 처치자 무기(BossVictoryWeaponMarker → WeaponTransformRelay 첫 무기, 없으면 처치자 발밑) — 이 기준만 매 프레임 따라간다
+        BossFacing,     // 보스 발밑 + 보스 수평 정면 축(297) — 처치자 위치와 무관(보스 위치·회전 = 복제값 → 모든 피어 같음). 보스 기준으로 움직이는 어쌔신 순간이동용
     }
 
     /// <summary>이 기준점은 컷 동안 매 프레임 따라가는가(나머지는 컷 시작 1회 고정).</summary>
@@ -50,7 +54,7 @@ public static class BossVictoryCameraCuts
 
     /// <summary>
     /// 컷 하나 = 화면 키 목록(255 후속 6 — 옛 시작 → 끝 2점 일반화). 화면 = 기준점 좌표계의 카메라 위치·회전 + FOV.
-    /// 기준 좌표계: 원점 = <see cref="anchor"/> 점 · +Z = 처치자 → 보스 수평 방향 · +Y = 위(옛 yaw 0 = 처치자 쪽에서 보스를 봄과 같은 방향 정의).
+    /// 기준 좌표계: 원점 = <see cref="anchor"/> 점 · +Z = 처치자 → 보스 수평 방향(기준 '보스 정면'만 보스 수평 정면, 297) · +Y = 위(옛 yaw 0 = 처치자 쪽에서 보스를 봄과 같은 방향 정의).
     /// 키 1개 = 고정 컷 · 2개 이상 = 첫 키(u 0) → … → 끝 키(u 1). 컷 구간 = 클립 시작 ~ 다음 컷 시작(마지막 = 로비 전환), 키 u = 그 구간 비율.
     /// 🔴 구조체 복사는 키 목록을 같이 쓴다 — 붙여넣기는 <see cref="WithCopiedKeys"/>.
     /// </summary>
@@ -130,6 +134,8 @@ public static class BossVictoryCameraCuts
         public Vector3 Killer;
         /// <summary>보스 발밑(트랜스폼 위치).</summary>
         public Vector3 BossBase;
+        /// <summary>보스 정면(트랜스폼 forward — 기준 <see cref="Anchor.BossFacing"/> 축, 수평만 씀). 0 이면 월드 +Z.</summary>
+        public Vector3 BossForward;
         /// <summary>처치자 무기 위치(기준 '처치자 무기' — 매 프레임 갱신, 부드러움 적용 뒤). <see cref="HasWeapon"/> 이 false 면 처치자 발밑으로.</summary>
         public Vector3 Weapon;
         public bool HasWeapon;
@@ -179,19 +185,29 @@ public static class BossVictoryCameraCuts
         return a.sqrMagnitude > 0.0001f ? a.normalized : Vector3.forward;
     }
 
+    /// <summary>보스 수평 정면(퇴화하면 월드 +Z) — 기준 <see cref="Anchor.BossFacing"/> 의 +Z.</summary>
+    public static Vector3 BossFacingAxis(in Subjects s)
+    {
+        Vector3 f = Flat(s.BossForward);
+        return f.sqrMagnitude > 0.0001f ? f.normalized : Vector3.forward;
+    }
+
+    /// <summary>기준 좌표계 +Z — <see cref="Anchor.BossFacing"/> = 보스 수평 정면, 나머지 = 처치자→보스 수평 축.</summary>
+    public static Vector3 FrameForward(Anchor anchor, in Subjects s) => anchor == Anchor.BossFacing ? BossFacingAxis(s) : Axis(s);
+
     public static Vector3 AnchorPoint(Anchor anchor, in Subjects s) => anchor switch
     {
         Anchor.Killer => s.Killer,
-        Anchor.Boss => s.BossBase,
+        Anchor.Boss or Anchor.BossFacing => s.BossBase,
         Anchor.KillerWeapon => s.HasWeapon ? s.Weapon : s.Killer,
         _ => Vector3.Lerp(s.Killer, s.BossBase, 0.5f),
     };
 
-    /// <summary>기준 좌표계 — 원점 = 기준점 · 회전 = 처치자→보스 수평 축을 +Z 로.</summary>
+    /// <summary>기준 좌표계 — 원점 = 기준점 · 회전 = <see cref="FrameForward"/>(처치자→보스 수평 축, 보스 정면 기준은 보스 수평 정면)을 +Z 로.</summary>
     public static void Frame(Anchor anchor, in Subjects s, out Vector3 origin, out Quaternion rotation)
     {
         origin = AnchorPoint(anchor, s);
-        rotation = Quaternion.LookRotation(Axis(s), Vector3.up);
+        rotation = Quaternion.LookRotation(FrameForward(anchor, s), Vector3.up);
     }
 
     /// <summary>월드 카메라 자세 → 기준 좌표계(저장용).</summary>
@@ -209,6 +225,25 @@ public static class BossVictoryCameraCuts
         Frame(anchor, s, out Vector3 origin, out Quaternion frame);
         worldPosition = origin + frame * localPosition;
         worldRotation = Normalize(frame * localRotation);
+    }
+
+    /// <summary>
+    /// 컷을 다른 기준으로 옮긴다(297) — 같은 <paramref name="s"/> 에서 화면(세계 자세)이 그대로 되게 키마다 기준 좌표계 자세를 다시 계산한다. FOV·곡선·나머지 칸 그대로.
+    /// 키가 없으면(옛 2점) 키로 옮긴 뒤 바꾼다. 원본 키 목록은 건드리지 않는다(새 목록).
+    /// </summary>
+    public static Cut Rebase(in Cut cut, Anchor to, in Subjects s)
+    {
+        Cut c = cut.WithCopiedKeys();
+        if (!c.HasKeys) c.keys = c.LegacyKeys();
+        for (int i = 0; i < c.keys.Count; i++)
+        {
+            CutKey k = c.keys[i];
+            ToWorld(cut.anchor, s, k.position, k.rotation, out Vector3 wp, out Quaternion wr);
+            ToLocal(to, s, wp, wr, out k.position, out k.rotation);
+            c.keys[i] = k;
+        }
+        c.anchor = to;
+        return c;
     }
 
     /// <summary>곡선 값(0~1 → 0~1).</summary>
