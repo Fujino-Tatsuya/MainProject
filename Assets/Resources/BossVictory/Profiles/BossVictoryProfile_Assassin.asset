@@ -766,7 +766,7 @@ MonoBehaviour:
     chargeStartTime: -1
     killerActionEndTime: 0
   paletteColors:
-  - {r: 0.8867924, g: 0.225881, b: 0.2298093, a: 1}
+  - {r: 0.4415095, g: 0.069142014, b: 0.0720973, a: 1}
   - {r: 1, g: 0.8794998, b: 0.88432217, a: 1}
   - {r: 0.24034558, g: 0, b: 0.116915695, a: 1}
   - {r: 1, g: 1, b: 1, a: 1}
