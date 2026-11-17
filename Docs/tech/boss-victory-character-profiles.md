@@ -193,6 +193,37 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
     - 레이저 = 보스 방향 수평, 벽 무시·보스 관통·길이 칸 그대로, 피격 이펙트 없음. 오프셋 0 이면 원래 소켓 자리. 소켓·크기·폭은 실제 Q 와 공유하는 풀 인스턴스라 레이저 끝·정리 때 원래 값으로 되돌린다.
     - 이관: 옛 `chargeScaleFrom/To/Curve` 는 숨긴 칸으로 남아 프로필 `OnEnable` 에서 한 번 옮긴다(단계 크기 = Lerp(from, to, curve(k/3)), 1~3단계·발사 마커 = 차징 시작 + 0.3/0.6/0.9/1.2) — 끝나면 `chargeScaleFrom = -1`. 저장은 에셋을 다시 저장할 때.
     - 새 RPC·복제 값 없음 — 각 피어 로컬 표시. 테스트 `BossVictoryGunnerQTests`(마커 시각·단계 크기 보간·이관).
+  - **차징 이펙트 세부 조절(295)** — 같은 프로필 `gunnerQ` 를 넓혔다. 이 피어 표시 전용이고 새 RPC 는 없다. 프리팹 `50.Art/VFX/Common/Players/Player2/Q_ChargeLaser/FX_GunnerCharge.prefab`(SVN)은 고치지 않는다. 대신 재생 중인 풀 인스턴스의 ParticleSystem 값을 배율로 덮고, 정리(`EndVictoryCharge`)·파괴 때 처음 값으로 되돌린다(`BossVictoryChargeFxApplier`, `Map/BossVictory/`).
+    - **294 구체 크기가 안 보이던 원인** — 파트 셋(Charge 와 그 아래 ChargeParticle·ChargeLine)의 `scalingMode` 가 모두 Local 이다. 그래서 루트 `localScale` 을 받지 않았다. 지금은 구체 크기를 파트 크기·모양 반경·시작 속도에 곱한다(균일 스케일과 같은 모양). 그래서 294 단계 크기가 **이제 실제로 보인다** — 기존 프로필 값이 보이는 크기를 바꾼다.
+    - **파트 = 렌더 모드로 가른다**(`BossVictoryChargeFxApplier.PartOf`):
+      - Stretch = 빛줄기 `line` — 지금 프리팹에서는 오브젝트 이름 ChargeParticle.
+      - Mesh = 입자 `particle` — 이름 ChargeLine.
+      - 그 밖 = 코어 `core` — 지금 프리팹의 Charge(Billboard).
+      - 오브젝트 이름이 화면에 보이는 모양과 반대라 이름으로 가르지 않는다.
+    - **마커 값** `fxStart`(차징 시작)·`fxStage1~3`(`BossVictoryChargeFx`). 앞 마커 → 이 마커 사이를 구체 크기와 같은 구간·곡선으로 보간한다(`BossVictoryGunnerCharge.Segment`·`EvaluateFx`).
+      - 파트마다(`BossVictoryChargePartFx`) 배율 칸: 크기 · 양(rate·버스트 수) · 반복 간격(초, 0 = 프리팹 값) · 수명 · 재생 속도(simulationSpeed) · HDR 밝기(재질 색 칸 MaterialPropertyBlock) · 길이(lengthScale, 빛줄기만).
+      - 반복 간격은 한쪽이 0 이면 섞지 않는다. 도착 마커에서 계단식으로 바뀐다.
+      - 총구 포인트 라이트 칸: 세기·범위·색. 차징 소켓 위치에 놓인다. 세기 0 = 없음.
+    - **단계 도착 카메라 흔들림** — 칸 `stageN.shakeIntensity`·`shakeDuration`. 세기 0 = 없음, 길이 0 = 0.2초.
+    - **발사**
+      - 카메라 흔들림 `fireShakeIntensity`·`fireShakeDuration`. 흔들림은 단계 도착과 같은 기존 `CameraFeedback.PlayImpactShake`(설정창 배율 포함)를 쓴다.
+      - 번쩍 라이트 `fireFlashIntensity`·`fireFlashDuration`·`fireFlashRange`·`fireFlashColor`. 발사 소켓에서 세기 → 0 으로 줄어든다.
+      - 레이저 `beamBrightness` · `beamColorOverride`·`beamColor`(끄면 한계 돌파 색) · `beamFadeSeconds`. 페이드아웃은 유지 시간 뒤 알파 1 → 0 이다. 페이드가 있으면 끝에 `StopImmediate` 로 걷는다.
+    - **최대 충전 알림** `burstAmount`·`burstBrightness`, **과충전** `overchargeAmount`·`overchargeBrightness`.
+      - 원샷(`PlayOnce`)은 인스턴스에 닿을 수 없다. 그래서 알림 배율이 1 이 아니면 루프 핸들(`Play`)로 틀고 바로 덮는다(첫 시뮬레이션 전). 배율 1 이면 예전처럼 원샷으로 튼다.
+    - **라이트** — 런타임 `Light` 1개("BossVictoryChargeLight", Point, 그림자 없음). 세기가 0 이면 꺼 두고, 정리 때 파괴한다.
+    - **기본값 = 지금 모습**: 배율 1, 라이트·흔들림·번쩍·페이드 0, 색 덮어쓰기 끔. 밝기 배율이 1 이면 MaterialPropertyBlock 을 걸지 않는다 — 같은 값이라도 블록을 걸면 이 파티클 셰이더가 다르게 그려진다(EffectRecolor 11-03).
+    - **같은 칸을 쓰는 다른 코드**
+      - 재생 속도 = `ShurikenEffectSystem.SetPlayRate`, 색 = `EffectRecolor`.
+      - 그 칸은 "마지막에 내가 쓴 값"과 지금 값이 다르면 밖에서 바뀐 것으로 본다. 그 값을 새 기준으로 삼고 그 위에 배율을 곱한다.
+    - **창**
+      - 차징 시작 마커 = `fxStart`.
+      - 1~3단계 마커 = 흔들림 · `fxStageN` · 알림 배율. 3단계는 과충전 배율도 함께 보인다.
+      - 발사 마커 = 발사 연출 칸.
+      - 차징 시작·1~3단계 마커만 여러 개 고르면 '차징 이펙트(295) 공통 칸'이 보인다.
+    - **안 하는 것**: 히트스톱, Scene 뷰 미리보기. 평소 Q 충전의 `ScaleChargeLoop`(루트 스케일)도 같은 이유로 안 먹지만 이번 범위가 아니다.
+    - **한계** — 덮은 풀 인스턴스는 정리 때까지 덮인 채다. 그 사이 같은 풀을 다른 거너 Q 가 다시 쓰면 배율이 따라간다(처치 연출 중이라 드묾).
+    - 테스트 `BossVictoryChargeFxTests`: 기본값 = 지금 모습 · 구간·파트 보간 · 반복 간격 계단 · 페이드 · 번쩍 · 기준 추적 · 곡선 배율 · 렌더 모드 → 파트.
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
 

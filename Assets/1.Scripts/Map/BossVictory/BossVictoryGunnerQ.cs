@@ -21,10 +21,20 @@ public sealed class BossVictoryGunnerQ
         public bool burst;
         [Tooltip("최대 충전 알림 크기(배율 — 소켓 저작 배율에 곱).")]
         [Min(0.01f)] public float burstScale;
+        [Tooltip("이 단계 도달 순간 카메라 흔들림 세기(295 — CameraFeedback.PlayImpactShake, 설정창 화면 흔들림 배율 곱). 0 = 끔.")]
+        [Min(0f)] public float shakeIntensity;
+        [Tooltip("카메라 흔들림 길이(초). 0 = 기본 0.2초.")]
+        [Min(0f)] public float shakeDuration;
 
         public static Stage Make(float sphereScale, bool burst = true, float burstScale = 1f) =>
             new Stage { sphereScale = sphereScale, ease = BossVictoryKeyCurve.Linear, burst = burst, burstScale = burstScale };
     }
+
+    /// <summary>흔들림 길이 0 = 이 값(초).</summary>
+    public const float DefaultShakeDuration = 0.2f;
+
+    /// <summary>흔들림 길이 칸 → 실제 초(0 이하 = 기본).</summary>
+    public static float ShakeSeconds(float duration) => duration > 0f ? duration : DefaultShakeDuration;
 
     [Tooltip("차징 시작 마커의 차징 구체 크기(배율 — 거너 평소 0.25).")]
     [Min(0f)] public float startScale = 0.25f;
@@ -51,12 +61,107 @@ public sealed class BossVictoryGunnerQ
     [Tooltip("레이저 유지 시간(타임라인 초) — 발사 마커부터.")]
     [Min(0.01f)] public float beamHoldSeconds = 0.5f;
 
+    // ── 차징 이펙트 세부(할 일 295) — 마커마다(차징 시작·1·2·3단계) 파트별 배율·포인트 라이트, 마커 사이 = 그 단계 곡선(ease)으로 보간.
+    //    기본값 = 지금 모습(배율 1·라이트 0·흔들림 0). 차징 루프 FX_GunnerCharge(SVN 아트) 프리팹은 그대로 — 런타임에 인스턴스 값을 배율로 덮고 끝나면 되돌린다. ──
+    [Tooltip("차징 시작 마커 값(295) — 파트별 배율·포인트 라이트. 1단계까지 1단계 곡선으로 1단계 값에 다가간다.")]
+    public BossVictoryChargeFx fxStart = new BossVictoryChargeFx();
+    [Tooltip("1단계 마커 값(295).")]
+    public BossVictoryChargeFx fxStage1 = new BossVictoryChargeFx();
+    [Tooltip("2단계 마커 값(295).")]
+    public BossVictoryChargeFx fxStage2 = new BossVictoryChargeFx();
+    [Tooltip("3단계 마커 값(295) — 3단계 ~ 발사 유지.")]
+    public BossVictoryChargeFx fxStage3 = new BossVictoryChargeFx();
+
+    [Tooltip("최대 충전 알림(FX_GunnerChargeFull) 입자량 배율(295 — 버스트 개수·rate). 크기는 단계 칸 '알림 크기'.")]
+    [Min(0f)] public float burstAmount = 1f;
+    [Tooltip("최대 충전 알림 색 밝기(HDR 배율, 295).")]
+    [Min(0f)] public float burstBrightness = 1f;
+    [Tooltip("과충전 루프(FX_GunnerOvercharge) 입자량 배율(295). 크기는 '과충전 크기'.")]
+    [Min(0f)] public float overchargeAmount = 1f;
+    [Tooltip("과충전 루프 색 밝기(HDR 배율, 295).")]
+    [Min(0f)] public float overchargeBrightness = 1f;
+
+    [Tooltip("발사 순간 카메라 흔들림 세기(295). 0 = 끔.")]
+    [Min(0f)] public float fireShakeIntensity;
+    [Tooltip("발사 흔들림 길이(초). 0 = 기본 0.2초.")]
+    [Min(0f)] public float fireShakeDuration = 0.25f;
+    [Tooltip("발사 순간 포인트 라이트 번쩍 세기(295 — 발사 소켓, 길이 동안 0 으로 줄어듦). 0 = 끔.")]
+    [Min(0f)] public float fireFlashIntensity;
+    [Tooltip("발사 번쩍 길이(타임라인 초).")]
+    [Min(0.01f)] public float fireFlashDuration = 0.15f;
+    [Tooltip("발사 번쩍 반경(m).")]
+    [Min(0f)] public float fireFlashRange = 6f;
+    [Tooltip("발사 번쩍 색.")]
+    public Color fireFlashColor = Color.white;
+
+    [Tooltip("레이저 색 밝기(HDR 배율, 295).")]
+    [Min(0f)] public float beamBrightness = 1f;
+    [Tooltip("켬 = 레이저 색상을 아래 색으로(색상만 — 밝기·채도는 이펙트 것). 끔 = 한계 돌파 단계 색(지금).")]
+    public bool beamColorOverride;
+    [Tooltip("레이저 색(켰을 때 — 색상만 쓴다).")]
+    public Color beamColor = Color.white;
+    [Tooltip("레이저 페이드아웃(타임라인 초) — 유지 시간 뒤 이 길이 동안 알파 1 → 0 후 끔. 0 = 바로 끔(지금).")]
+    [Min(0f)] public float beamFadeSeconds;
+
     public Stage StageAt(int stage) => stage switch
     {
         1 => stage1,
         2 => stage2,
         _ => stage3,
     };
+
+    /// <summary>마커 k 의 차징 이펙트 값(0 = 차징 시작, 1~3 = 단계). 비었으면 기본(배율 1).</summary>
+    public BossVictoryChargeFx FxAt(int k) => (k switch
+    {
+        0 => fxStart,
+        1 => fxStage1,
+        2 => fxStage2,
+        _ => fxStage3,
+    }) ?? BossVictoryChargeFx.Identity;
+}
+
+/// <summary>
+/// 차징 루프 파트 하나 배율(할 일 295). 파트 = 렌더 모드로 가른다(<see cref="BossVictoryChargeFxApplier.PartOf"/>):
+/// 빛줄기 = Stretch 입자(FX_GunnerCharge 의 ChargeParticle — lengthScale 15) · 입자 = Mesh 입자(ChargeLine) · 코어 = 그 밖(Charge 빌보드).
+/// </summary>
+[Serializable]
+public sealed class BossVictoryChargePartFx
+{
+    [Tooltip("크기 배율 — 구체 크기(294)와 곱해 입자 크기·속도·방출 반지름에(이 파트가 Local 스케일이라 루트 크기가 안 먹어서 295 부터 이렇게).")]
+    [Min(0f)] public float size = 1f;
+    [Tooltip("입자량 배율 — 버스트 개수·rate.")]
+    [Min(0f)] public float amount = 1f;
+    [Tooltip("버스트 반복 간격(초). 0 = 프리팹 그대로(0.5초).")]
+    [Min(0f)] public float repeatInterval;
+    [Tooltip("수명 배율(새로 나오는 입자부터).")]
+    [Min(0.01f)] public float lifetime = 1f;
+    [Tooltip("재생 속도 배율(simulationSpeed — 처치 연출 이펙트 배율에 곱).")]
+    [Min(0.01f)] public float speed = 1f;
+    [Tooltip("색 밝기(HDR 배율 — 재질 색 칸, 1 = 그대로 손대지 않음).")]
+    [Min(0f)] public float brightness = 1f;
+    [Tooltip("길이 배율(lengthScale) — Stretch 파트(빛줄기)만.")]
+    [Min(0.01f)] public float length = 1f;
+}
+
+/// <summary>차징 이펙트 마커 하나 값(할 일 295) — 파트 셋 + 포인트 라이트(차징 오프셋 자리).</summary>
+[Serializable]
+public sealed class BossVictoryChargeFx
+{
+    [Tooltip("빛줄기(Stretch 입자 — ChargeParticle).")]
+    public BossVictoryChargePartFx line = new BossVictoryChargePartFx();
+    [Tooltip("입자(Mesh 입자 — ChargeLine).")]
+    public BossVictoryChargePartFx particle = new BossVictoryChargePartFx();
+    [Tooltip("코어(빌보드 — Charge).")]
+    public BossVictoryChargePartFx core = new BossVictoryChargePartFx();
+    [Tooltip("포인트 라이트 세기(차징 중 총구 = 차징 오프셋 자리). 0 = 끔.")]
+    [Min(0f)] public float lightIntensity;
+    [Tooltip("포인트 라이트 반경(m).")]
+    [Min(0f)] public float lightRange = 3f;
+    [Tooltip("포인트 라이트 색.")]
+    public Color lightColor = Color.white;
+
+    /// <summary>값 없는 칸 대신(배율 1·라이트 꺼짐) — 고치지 말 것.</summary>
+    public static readonly BossVictoryChargeFx Identity = new BossVictoryChargeFx();
 }
 
 /// <summary>
@@ -104,7 +209,42 @@ public static class BossVictoryGunnerCharge
         public float SphereScale;
         public int Stage;           // 지난 단계 마커 수(0~3) — 단계 색 = 한계 돌파 색 이 단계
         public bool Fired;          // t ≥ 발사
-        public bool LaserOn;        // 발사 ≤ t < 발사 + 유지 시간
+        public bool LaserOn;        // 발사 ≤ t < 발사 + 유지 시간 + 페이드아웃(295)
+        public float LaserFade;     // 레이저 알파(295) — 유지 중 1, 페이드아웃 동안 1 → 0
+        public float FlashIntensity; // 발사 번쩍 라이트 세기(295) — 발사부터 길이 동안 세기 → 0
+        public ChargeFxSample Fx;   // 차징 이펙트 파트 배율·포인트 라이트(295 — 마커 사이 보간)
+    }
+
+    /// <summary>파트 하나의 이 순간 배율(295) — <see cref="BossVictoryChargePartFx"/> 를 마커 사이 보간한 값.</summary>
+    public struct PartSample
+    {
+        public float Size, Amount, RepeatInterval, Lifetime, Speed, Brightness, Length;
+
+        public static PartSample One => new PartSample { Size = 1f, Amount = 1f, RepeatInterval = 0f, Lifetime = 1f, Speed = 1f, Brightness = 1f, Length = 1f };
+
+        public static PartSample From(BossVictoryChargePartFx p) => p == null ? One : new PartSample
+        {
+            Size = p.size, Amount = p.amount, RepeatInterval = p.repeatInterval, Lifetime = p.lifetime,
+            Speed = p.speed, Brightness = p.brightness, Length = p.length,
+        };
+    }
+
+    /// <summary>차징 이펙트 이 순간 값(295) — 파트 셋·포인트 라이트.</summary>
+    public struct ChargeFxSample
+    {
+        public PartSample Line, Particle, Core;
+        public float LightIntensity, LightRange;
+        public Color LightColor;
+
+        public static ChargeFxSample From(BossVictoryChargeFx fx)
+        {
+            fx ??= BossVictoryChargeFx.Identity;
+            return new ChargeFxSample
+            {
+                Line = PartSample.From(fx.line), Particle = PartSample.From(fx.particle), Core = PartSample.From(fx.core),
+                LightIntensity = fx.lightIntensity, LightRange = fx.lightRange, LightColor = fx.lightColor,
+            };
+        }
     }
 
     public static Frame Evaluate(Times times, BossVictoryGunnerQ q, float t)
@@ -115,12 +255,94 @@ public static class BossVictoryGunnerCharge
             Stage = StageAt(o, t),
             Fired = t >= o.Fire,
             SphereScale = SphereScale(o, q, t),
+            Fx = EvaluateFx(o, q, t),
         };
         f.Charging = t >= o.ChargeStart && !f.Fired;
         f.SphereVisible = f.Charging && t >= o.ChargeStart + Mathf.Max(0f, q.sphereDelay);
-        f.LaserOn = f.Fired && t < o.Fire + Mathf.Max(0.01f, q.beamHoldSeconds);
+        float sinceFire = t - o.Fire;
+        float hold = Mathf.Max(0.01f, q.beamHoldSeconds), fade = Mathf.Max(0f, q.beamFadeSeconds);
+        f.LaserOn = f.Fired && sinceFire < hold + fade;
+        f.LaserFade = f.LaserOn ? LaserFade(sinceFire, hold, fade) : 0f;
+        f.FlashIntensity = FireFlash(q.fireFlashIntensity, q.fireFlashDuration, sinceFire);
         return f;
     }
+
+    /// <summary>레이저 알파(295) — 발사 뒤 <paramref name="hold"/> 동안 1, 그 뒤 <paramref name="fade"/> 동안 1 → 0(선형), 넘으면 0. 페이드 0 = 유지 끝에 바로 0.</summary>
+    public static float LaserFade(float sinceFire, float hold, float fade)
+    {
+        if (sinceFire < hold) return 1f;
+        if (fade <= 0f) return 0f;
+        return Mathf.Clamp01(1f - (sinceFire - hold) / fade);
+    }
+
+    /// <summary>발사 번쩍 세기(295) — 발사 순간 <paramref name="peak"/> → 길이 동안 선형으로 0. 발사 전·길이 뒤·세기 0 = 0.</summary>
+    public static float FireFlash(float peak, float duration, float sinceFire)
+    {
+        if (peak <= 0f || sinceFire < 0f || duration <= 0f || sinceFire >= duration) return 0f;
+        return peak * (1f - sinceFire / duration);
+    }
+
+    /// <summary>
+    /// 시각 t 가 어느 마커 사이인가 — from·to = 마커 번호(0 = 차징 시작, 1~3 = 단계), w = 도착 마커(to) 곡선을 지난 비율(0~1, 곡선에 따라 넘칠 수 있음).
+    /// 차징 시작 전 = (0,0,0), 3단계 뒤 = (3,3,0), 두 마커가 같은 시각이면 뒤 마커로 바로(w = 1). 구체 크기(294)·차징 이펙트(295) 공용.
+    /// </summary>
+    public static void Segment(Times ordered, BossVictoryGunnerQ q, float t, out int from, out int to, out float w)
+    {
+        from = to = 0;
+        w = 0f;
+        float prevTime = ordered.ChargeStart;
+        if (t < prevTime) return;
+        for (int k = 1; k <= 3; k++)
+        {
+            float at = ordered.Stage(k);
+            if (t < at)
+            {
+                float u = at > prevTime ? (t - prevTime) / (at - prevTime) : 1f;
+                from = k - 1;
+                to = k;
+                w = BossVictoryKeys.Ease(q.StageAt(k).ease, u);
+                return;
+            }
+            prevTime = at;
+        }
+        from = to = 3;
+    }
+
+    /// <summary>차징 이펙트(295) — 마커 값(차징 시작·1·2·3단계)을 구체 크기와 같은 구간·곡선으로 보간.</summary>
+    public static ChargeFxSample EvaluateFx(Times ordered, BossVictoryGunnerQ q, float t)
+    {
+        Segment(ordered, q, t, out int from, out int to, out float w);
+        ChargeFxSample a = ChargeFxSample.From(q.FxAt(from));
+        if (from == to) return a;
+        return Lerp(a, ChargeFxSample.From(q.FxAt(to)), w);
+    }
+
+    public static ChargeFxSample Lerp(in ChargeFxSample a, in ChargeFxSample b, float w) => new ChargeFxSample
+    {
+        Line = Lerp(a.Line, b.Line, w),
+        Particle = Lerp(a.Particle, b.Particle, w),
+        Core = Lerp(a.Core, b.Core, w),
+        LightIntensity = Mathf.Max(0f, Mathf.LerpUnclamped(a.LightIntensity, b.LightIntensity, w)),
+        LightRange = Mathf.Max(0f, Mathf.LerpUnclamped(a.LightRange, b.LightRange, w)),
+        LightColor = Color.LerpUnclamped(a.LightColor, b.LightColor, w),
+    };
+
+    /// <summary>
+    /// 파트 배율 보간 — 반복 간격은 한쪽이 0(= 프리팹 그대로)이면 섞지 않고 도착(w ≥ 1)부터 뒤 값, 그 전엔 앞 값(계단). 둘 다 값이 있으면 보간.
+    /// 배율은 0 아래로 내려가지 않는다(곡선이 넘쳐도).
+    /// </summary>
+    public static PartSample Lerp(in PartSample a, in PartSample b, float w) => new PartSample
+    {
+        Size = Mathf.Max(0f, Mathf.LerpUnclamped(a.Size, b.Size, w)),
+        Amount = Mathf.Max(0f, Mathf.LerpUnclamped(a.Amount, b.Amount, w)),
+        RepeatInterval = a.RepeatInterval > 0f && b.RepeatInterval > 0f
+            ? Mathf.Max(0.01f, Mathf.LerpUnclamped(a.RepeatInterval, b.RepeatInterval, w))
+            : (w >= 1f ? b.RepeatInterval : a.RepeatInterval),
+        Lifetime = Mathf.Max(0.01f, Mathf.LerpUnclamped(a.Lifetime, b.Lifetime, w)),
+        Speed = Mathf.Max(0.01f, Mathf.LerpUnclamped(a.Speed, b.Speed, w)),
+        Brightness = Mathf.Max(0f, Mathf.LerpUnclamped(a.Brightness, b.Brightness, w)),
+        Length = Mathf.Max(0.01f, Mathf.LerpUnclamped(a.Length, b.Length, w)),
+    };
 
     /// <summary>시각 t 까지 지난 단계 마커 수(0~3, 정렬된 시각 기준).</summary>
     public static int StageAt(Times ordered, float t)
@@ -137,22 +359,12 @@ public static class BossVictoryGunnerCharge
     /// </summary>
     public static float SphereScale(Times ordered, BossVictoryGunnerQ q, float t)
     {
-        float prevTime = ordered.ChargeStart, prevScale = q.startScale;
-        if (t < prevTime) return prevScale;
-        for (int k = 1; k <= 3; k++)
-        {
-            BossVictoryGunnerQ.Stage s = q.StageAt(k);
-            float at = ordered.Stage(k);
-            if (t < at)
-            {
-                float u = at > prevTime ? (t - prevTime) / (at - prevTime) : 1f;
-                return Mathf.LerpUnclamped(prevScale, s.sphereScale, BossVictoryKeys.Ease(s.ease, u));
-            }
-            prevTime = at;
-            prevScale = s.sphereScale;
-        }
-        return prevScale;
+        Segment(ordered, q, t, out int from, out int to, out float w);
+        float a = ScaleAt(q, from);
+        return from == to ? a : Mathf.LerpUnclamped(a, ScaleAt(q, to), w);
     }
+
+    static float ScaleAt(BossVictoryGunnerQ q, int k) => k <= 0 ? q.startScale : q.StageAt(k).sphereScale;
 
     /// <summary>총구 기준 로컬 오프셋(x = 옆, y = 위, z = 앞) → 월드 점. 앞 = <paramref name="facing"/>(수평), 위 = 월드 위.</summary>
     public static Vector3 OffsetPoint(Vector3 muzzle, Vector3 facing, Vector3 localOffset)

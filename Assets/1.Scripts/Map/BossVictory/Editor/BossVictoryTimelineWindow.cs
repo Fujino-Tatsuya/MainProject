@@ -2115,6 +2115,7 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawProfileFields("거너 Q 차징(294 · 이 캐릭터 프로필) — 시작 크기 · 구체 지연(타임라인 초) · 차징 오프셋(총구 기준 x 옆·y 위·z 앞, 구체·알림·과충전)",
                     GunnerQField(nameof(BossVictoryGunnerQ.startScale)), GunnerQField(nameof(BossVictoryGunnerQ.sphereDelay)),
                     GunnerQField(nameof(BossVictoryGunnerQ.chargeOffset)));
+                DrawProfileFields(FxTitle("차징 시작"), GunnerQField(nameof(BossVictoryGunnerQ.fxStart)));
                 if (Timeline.chargeStartTime >= 0f && GUILayout.Button($"자동으로(백대쉬 시작 + {BossVictoryTimeline.DefaultChargeDelay:0.0}초)", GUILayout.Width(220f)))
                 {
                     Record("처치 연출 타임라인 Q 차징 시작 자동");
@@ -2132,7 +2133,13 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                 DrawProfileFields($"거너 Q {k}단계(294 · 이 캐릭터 프로필) — 도달 크기·곡선(앞 마커 → 이 마커)·최대 충전 알림 켜기·크기 · 한계 돌파 색 {k}",
                     $"{stage}.{nameof(BossVictoryGunnerQ.Stage.sphereScale)}", $"{stage}.{nameof(BossVictoryGunnerQ.Stage.ease)}",
                     $"{stage}.{nameof(BossVictoryGunnerQ.Stage.burst)}", $"{stage}.{nameof(BossVictoryGunnerQ.Stage.burstScale)}");
-                if (k == 3) DrawProfileFields("과충전 루프(3단계 ~ 발사)", GunnerQField(nameof(BossVictoryGunnerQ.overchargeScale)));
+                DrawProfileFields($"{k}단계 도착 카메라 흔들림(295) — 세기 0 = 없음 · 길이 0 = 0.2초",
+                    $"{stage}.{nameof(BossVictoryGunnerQ.Stage.shakeIntensity)}", $"{stage}.{nameof(BossVictoryGunnerQ.Stage.shakeDuration)}");
+                DrawProfileFields(FxTitle($"{k}단계"), GunnerQField($"fxStage{k}"));
+                DrawProfileFields("최대 충전 알림 양·밝기 배율(295 · 모든 단계 공용, 1 = 그대로)",
+                    GunnerQField(nameof(BossVictoryGunnerQ.burstAmount)), GunnerQField(nameof(BossVictoryGunnerQ.burstBrightness)));
+                if (k == 3) DrawProfileFields("과충전 루프(3단계 ~ 발사) — 크기 · 양·밝기 배율(295, 1 = 그대로)", GunnerQField(nameof(BossVictoryGunnerQ.overchargeScale)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.overchargeAmount)), GunnerQField(nameof(BossVictoryGunnerQ.overchargeBrightness)));
                 DrawGunnerQNote();
                 break;
             }
@@ -2141,6 +2148,12 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
                     GunnerQField(nameof(BossVictoryGunnerQ.ventScale)), GunnerQField(nameof(BossVictoryGunnerQ.beamWidthScale)),
                     GunnerQField(nameof(BossVictoryGunnerQ.beamLength)), GunnerQField(nameof(BossVictoryGunnerQ.beamHoldSeconds)),
                     GunnerQField(nameof(BossVictoryGunnerQ.fireOffset)));
+                DrawProfileFields("발사 연출(295) — 카메라 흔들림(세기 0 = 없음) · 총구 번쩍 라이트(세기 0 = 없음, 발사 소켓) · 레이저 밝기·색 덮어쓰기(끄면 한계 돌파 색)·페이드아웃(초, 유지 시간 뒤 · 0 = 바로 끔)",
+                    GunnerQField(nameof(BossVictoryGunnerQ.fireShakeIntensity)), GunnerQField(nameof(BossVictoryGunnerQ.fireShakeDuration)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.fireFlashIntensity)), GunnerQField(nameof(BossVictoryGunnerQ.fireFlashDuration)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.fireFlashRange)), GunnerQField(nameof(BossVictoryGunnerQ.fireFlashColor)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.beamBrightness)), GunnerQField(nameof(BossVictoryGunnerQ.beamColorOverride)),
+                    GunnerQField(nameof(BossVictoryGunnerQ.beamColor)), GunnerQField(nameof(BossVictoryGunnerQ.beamFadeSeconds)));
                 DrawGunnerQNote();
                 break;
             case BossVictoryMarker.FocusKiller:
@@ -2164,6 +2177,10 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
 
     // 거너 Q 칸(294) — 프로필 gunnerQ 안 칸 경로.
     static string GunnerQField(string name) => $"{nameof(BossVictoryProfile.gunnerQ)}.{name}";
+
+    // 차징 이펙트 마커 값(295) 제목 — 앞 마커 → 이 마커 사이를 구체 크기와 같은 곡선으로 보간.
+    static string FxTitle(string at) =>
+        $"차징 이펙트 · {at}(295) — 파트 빛줄기(Stretch)·입자(Mesh)·코어별 크기·양·반복 간격(0 = 프리팹)·수명·속도·밝기·길이(빛줄기만) 배율 · 총구 포인트 라이트(세기 0 = 없음)";
 
     void DrawGunnerQNote()
     {
@@ -3520,6 +3537,16 @@ public sealed class BossVictoryTimelineWindow : EditorWindow
             stagePaths.Add(GunnerQField($"stage{m - BossVictoryMarker.GunnerStage1 + 1}"));
         }
         if (stagePaths != null) DrawCommonProfileProperties("거너 Q 단계(294) 공통 칸", stagePaths);
+        // 차징 이펙트(295) — 차징 시작·1~3단계 마커만 골랐으면 fx 칸 공통
+        var fxPaths = new List<string>();
+        foreach (NodeRef n in _multi)
+        {
+            var m = (BossVictoryMarker)n.MarkerId;
+            if (m == BossVictoryMarker.ChargeStart) fxPaths.Add(GunnerQField(nameof(BossVictoryGunnerQ.fxStart)));
+            else if (m >= BossVictoryMarker.GunnerStage1 && m <= BossVictoryMarker.GunnerStage3) fxPaths.Add(GunnerQField($"fxStage{m - BossVictoryMarker.GunnerStage1 + 1}"));
+            else { fxPaths = null; break; }
+        }
+        if (fxPaths != null) DrawCommonProfileProperties("차징 이펙트(295) 공통 칸", fxPaths);
     }
 
     // 프로필 SO 의 같은 모양 칸 여러 개(경로 목록)를 한 번에 — 첫 경로의 하위 칸마다 값이 다르면 '—', 고치면 그 칸만 전부에(boxedValue).

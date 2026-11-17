@@ -351,6 +351,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     public override void OnDestroy()
     {
         echoBombVisuals?.Clear();
+        EndVictoryCharge();   // 처치 연출 거너 Q(295) — 풀 인스턴스 덮은 값 되돌림·런타임 라이트 파괴
         base.OnDestroy();
     }
 
@@ -503,6 +504,11 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private readonly Dictionary<Transform, Vector3> victorySocketHome = new Dictionary<Transform, Vector3>();
     private readonly Dictionary<EffectSocketPlayer, float> victoryScaleHome = new Dictionary<EffectSocketPlayer, float>();
     private readonly Dictionary<ParticleSystem, Vector2> victoryWidthHome = new Dictionary<ParticleSystem, Vector2>();
+    // 295 — 차징 이펙트 세부 조절(풀 인스턴스 값 배율 → 정리 때 되돌림)·총구 포인트 라이트(런타임 1개, 정리 때 파괴)·알림/과충전 루프로 튼 것
+    private readonly BossVictoryChargeFxApplier victoryFx = new BossVictoryChargeFxApplier();
+    private Light victoryLight;
+    private bool victoryBurstLooping;
+    private bool victoryOverchargeTuned;
 
     /// <summary>[이 피어] 처치 연출 거너 Q 를 그리는 중인가(평소 충전 BeginCharge 를 막는다).</summary>
     public bool IsVictoryCharging => victoryOn;
@@ -546,6 +552,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
         foreach (KeyValuePair<EffectSocketPlayer, float> home in victoryScaleHome)
             if (home.Key != null) home.Key.SetScale(home.Value);
         victoryScaleHome.Clear();
+        if (victoryBurstLooping && chargeFullPlayer != null) chargeFullPlayer.Stop();
+        victoryBurstLooping = false;
+        victoryOverchargeTuned = false;
+        victoryFx.RestoreAll();
+        if (victoryLight != null) Destroy(victoryLight.gameObject);
+        victoryLight = null;
         victorySphere = false;
     }
 
@@ -566,14 +578,62 @@ public class GunnerBeamView : BaseNetworkBehaviour
         while (!victoryFired && victoryStage < f.Stage)
             ReachVictoryStage(++victoryStage);
 
+        // 구체 크기·파트 배율(295) — 파트 셋이 scalingMode Local 이라 루트 스케일(294)은 안 먹는다 → 파트 값에 곱한다.
         if (victorySphere && !victoryFired)
-            ScaleChargeLoop(f.SphereScale);
+            victoryFx.ApplyParts(chargeLoopPlayer, f.Fx, f.SphereScale);
+        if (victoryOverchargeTuned && !victoryFired)
+            victoryFx.ApplyUniform(overchargePlayer, victoryLook.overchargeAmount, victoryLook.overchargeBrightness, 1f);
 
         if (f.Fired && !victoryFired)
             FireVictoryLaser(Mathf.Max(victoryStage, f.Stage));
 
-        if (victoryLaser && !f.LaserOn)
-            EndVictoryLaser();
+        if (victoryLaser)
+        {
+            if (!f.LaserOn) EndVictoryLaser();
+            else victoryFx.ApplyUniform(chargeBeamPlayer, 1f, victoryLook.beamBrightness, f.LaserFade);
+        }
+
+        TickVictoryLight(f);
+    }
+
+    // 총구 포인트 라이트(295) — 차징 중 = 차징 소켓에 마커 보간 세기·범위·색, 발사 뒤 = 발사 소켓에 번쩍(세기 → 0). 세기 0 이면 꺼 둔다(안 만든다).
+    private void TickVictoryLight(in BossVictoryGunnerCharge.Frame f)
+    {
+        float intensity = 0f, range = 0f;
+        Color color = Color.white;
+        EffectSocketPlayer at = null;
+        if (f.Charging)
+        {
+            intensity = f.Fx.LightIntensity;
+            range = f.Fx.LightRange;
+            color = f.Fx.LightColor;
+            at = chargeLoopPlayer;
+        }
+        else if (f.Fired)
+        {
+            intensity = f.FlashIntensity;
+            range = victoryLook.fireFlashRange;
+            color = victoryLook.fireFlashColor;
+            at = chargeBeamPlayer;
+        }
+
+        if (intensity <= 0f || range <= 0f)
+        {
+            if (victoryLight != null && victoryLight.enabled) victoryLight.enabled = false;
+            return;
+        }
+        if (victoryLight == null)
+        {
+            var go = new GameObject("BossVictoryChargeLight");
+            victoryLight = go.AddComponent<Light>();
+            victoryLight.type = LightType.Point;
+            victoryLight.shadows = LightShadows.None;
+        }
+        victoryLight.enabled = true;
+        victoryLight.intensity = intensity;
+        victoryLight.range = range;
+        victoryLight.color = color;
+        victoryLight.transform.position = at != null ? at.Socket.position : transform.position + Vector3.up;
     }
 
     // 단계 k 도달 — 한계 돌파 색 k(구체·이후 연출), 켜졌으면 최대 충전 알림(크기), 3단계부터 과충전 루프(크기).
@@ -587,7 +647,16 @@ public class GunnerBeamView : BaseNetworkBehaviour
             FaceForward(chargeFullPlayer);
             SetVictoryScale(chargeFullPlayer, s.burstScale);
             chargeFullPlayer.SetTint(tint);
-            chargeFullPlayer.PlayOnce();
+            // 양·밝기 배율(295) — 원샷(PlayOnce)은 인스턴스에 못 닿아 배율이 1 이 아니면 루프 핸들(Play)로 틀고 바로 덮는다(첫 시뮬레이션 전).
+            // 배율 1 = 예전 그대로 원샷. 루프로 튼 것은 다음 알림·정리 때 끈다(Play 가 앞 것을 회수).
+            if (Mathf.Approximately(victoryLook.burstAmount, 1f) && Mathf.Approximately(victoryLook.burstBrightness, 1f))
+                chargeFullPlayer.PlayOnce();
+            else
+            {
+                chargeFullPlayer.Play();
+                victoryBurstLooping = true;
+                victoryFx.ApplyUniform(chargeFullPlayer, victoryLook.burstAmount, victoryLook.burstBrightness, 1f);
+            }
         }
         if (k >= 3 && overchargePlayer != null)
         {
@@ -595,7 +664,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
             SetVictoryScale(overchargePlayer, victoryLook.overchargeScale);
             overchargePlayer.SetTint(tint);
             overchargePlayer.Play();
+            victoryOverchargeTuned = true;
+            victoryFx.ApplyUniform(overchargePlayer, victoryLook.overchargeAmount, victoryLook.overchargeBrightness, 1f);
         }
+        // 단계 도착 카메라 흔들림(295) — 기존 연출 흔들림(설정창 배율 포함). 세기 0 = 없음.
+        if (s.shakeIntensity > 0f && CameraFeedback.Instance != null)
+            CameraFeedback.Instance.PlayImpactShake(s.shakeIntensity, BossVictoryGunnerQ.ShakeSeconds(s.shakeDuration));
     }
 
     // 발사 — 실제 발사와 같은 순서(충전 지우기 → 방출 섬광 → 레이저 → Gunner_Q_Fire, 그 End 이벤트 = 처치 연출 스킬 End).
@@ -613,7 +687,10 @@ public class GunnerBeamView : BaseNetworkBehaviour
             chargeVentPlayer.SetTint(tint);
             chargeVentPlayer.PlayOnce();
         }
-        Tint(chargeBeamPlayer, tint);
+        // 레이저 색(295) — 덮어쓰기 켜면 프로필 색, 아니면 한계 돌파 색 그대로. 밝기·페이드아웃 = TickVictory(ApplyUniform).
+        Tint(chargeBeamPlayer, victoryLook.beamColorOverride ? EffectTint.FromColor(victoryLook.beamColor) : tint);
+        if (victoryLook.fireShakeIntensity > 0f && CameraFeedback.Instance != null)
+            CameraFeedback.Instance.PlayImpactShake(victoryLook.fireShakeIntensity, BossVictoryGunnerQ.ShakeSeconds(victoryLook.fireShakeDuration));
         Vector3 start = chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
         Vector3 end = BossVictoryGunnerCharge.BeamEnd(start, victoryDir, victoryLook.beamLength);
         PlayChargeBeam(start, end, VictoryBeamWidth(), false, null);
@@ -635,7 +712,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
     {
         victoryLaser = false;
         chargeBeamStopAt = -1f;
-        if (chargeBeamPlayer != null) chargeBeamPlayer.Stop();
+        // 페이드아웃(295)이 있으면 0 까지 내려간 뒤라 남은 입자 없이 바로 걷는다(덮은 밝기를 되돌릴 때 잔상이 다시 밝아지지 않게). 없으면 예전 그대로 자연 해제.
+        if (chargeBeamPlayer != null)
+        {
+            if (victoryLook != null && victoryLook.beamFadeSeconds > 0f) chargeBeamPlayer.StopImmediate();
+            else chargeBeamPlayer.Stop();
+        }
         foreach (KeyValuePair<ParticleSystem, Vector2> home in victoryWidthHome)
         {
             if (home.Key == null) continue;
