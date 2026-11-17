@@ -28,10 +28,21 @@ Material:
     - _BeamLength: 10
     - _BeamTime: 0
     - _Billboard: 0
+    - _BoltChance: 0.75
+    - _BoltCount: 3
+    - _BoltCoverage: 0.75
+    - _BoltDetail: 0.12
+    - _BoltGlowWidth: 5
+    - _BoltJag: 0.35
+    - _BoltRate: 12
+    - _BoltSegment: 1.4
+    - _BoltSpread: 0.55
+    - _BoltWidth: 0.035
     - _CorePower: 8
     - _EndFade: 0
     - _FlowSpeed: 12
     - _GlowPower: 1
+    - _Lightning: 0
     - _NoiseAmount: 0.6
     - _NoiseAround: 3
     - _NoiseScale: 1.2
@@ -39,6 +50,13 @@ Material:
     - _PulseAmount: 0.12
     - _PulseFreq: 14
     - _StartFade: 0
+    - _StreakAmount: 0
+    - _StreakAround: 2.5
+    - _StreakCut: 0.5
+    - _StreakFlow: 0.6
+    - _StreakKeep: 0.55
+    - _StreakScale: 0.35
+    - _StreakSoft: 0.15
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _CoreColor: {r: 0, g: 0, b: 0, a: 1}

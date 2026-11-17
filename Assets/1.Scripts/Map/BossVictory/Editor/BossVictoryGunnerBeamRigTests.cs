@@ -73,4 +73,33 @@ public class BossVictoryGunnerBeamRigTests
         }
         finally { Object.DestroyImmediate(m); }
     }
+
+    [Test]
+    public void 번개_메시는_줄기마다_축_위_점_좌우_UV2는_줄기_번호_앞면은_우가_옆()
+    {
+        Mesh m = BossVictoryGunnerBeamAuthoring.BuildBolts(4, 65);
+        try
+        {
+            Vector3[] v = m.vertices;
+            Vector2[] uv = m.uv, uv2 = m.uv2;
+            Assert.AreEqual(4 * 65 * 2, v.Length);
+            for (int i = 0; i < v.Length; i++)
+            {
+                Assert.AreEqual(0f, v[i].x, Tolerance, "정점은 축 위(셰이더가 옮긴다)");
+                Assert.AreEqual(v[i].z, uv[i].x, Tolerance, "UV.x = 길이");
+                Assert.IsTrue(uv[i].y == 0f || uv[i].y == 1f, "UV.y = 좌 0 · 우 1");
+                Assert.AreEqual(i / (65 * 2), (int)uv2[i].x, "UV2.x = 줄기 번호");
+            }
+            // 셰이더가 우(UV.y 1)를 옆 = cross(진행, 카메라 방향)으로 펴면 면 법선 cross(옆, 진행)이 카메라 쪽 — 옆 = +X, 진행 = +Z 로 놓으면 −Y.
+            Vector3 P(int k) => new Vector3(uv[k].y - 0.5f, 0f, v[k].z);
+            int[] t = m.triangles;
+            for (int i = 0; i < t.Length; i += 3)
+            {
+                Assert.AreEqual((int)uv2[t[i]].x, (int)uv2[t[i + 2]].x, "삼각형이 줄기를 건너지 않음");
+                Vector3 face = Vector3.Cross(P(t[i + 1]) - P(t[i]), P(t[i + 2]) - P(t[i]));
+                Assert.Less(face.y, 0f, $"삼각형 {i / 3} 감는 방향");
+            }
+        }
+        finally { Object.DestroyImmediate(m); }
+    }
 }
