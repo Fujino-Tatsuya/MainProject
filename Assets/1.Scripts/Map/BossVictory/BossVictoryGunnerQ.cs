@@ -48,6 +48,9 @@ public sealed class BossVictoryGunnerQ
     [Min(0.01f)] public float ventScale = 1f;
     [Tooltip("레이저 굵기 배율(보이는 것만 — 몸통 입자 폭).")]
     [Min(0.01f)] public float beamWidthScale = 1f;
+    [Tooltip("레이저 몸통을 3D 원통으로(300) — 몸통 빌보드 입자를 처치 연출 동안만 원통 메시 렌더로 바꿔, 낮은 앵글·레이저 축 방향 컷에서도 두께가 보인다. " +
+             "끄면 예전 빌보드(위에서 볼 때만 두께가 보임). 번개·불꽃·섬광은 그대로.")]
+    public bool beamMesh3D = true;
     [Tooltip("레이저 길이(m) — 처치 연출에서는 벽을 무시하고 보스를 관통한다(착탄 이펙트 없음).")]
     [Min(0.1f)] public float beamLength = 30f;
 

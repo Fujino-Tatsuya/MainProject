@@ -237,6 +237,11 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
     - 유지 시간 ≤ 멈춤 시점이면 멈추지 않는다(예전 그대로).
     - 판정은 타임라인 초 기준 순수 함수 `BossVictoryGunnerCharge.BeamFrozen` → `Frame.BeamFrozen` 이라 시간 배율·글리치와 무관하다.
     - 멈춘 동안에도 밝기·페이드(색 블록)·폭은 그대로 먹는다. 레이저 끝·정리(`EndVictoryLaser`)에서 먼저 재개하므로 멈춘 채 풀에 돌아가지 않는다. 평소 Q 는 불변.
+  - **레이저 3D 원통(300)** — 몸통 `LaserCore`·`LaserCoreDark` 는 Stretched Billboard(카메라를 향해 도는 평면)라 낮은 앵글·레이저 축 방향 컷에서 종이처럼 얇게 보였다.
+    - 프로필 `beamMesh3D`(기본 켬)면 발사 순간 몸통(size3D·Stretch 인 시스템만 — 번개·불꽃·섬광·이동 빔은 그대로)을 Mesh 렌더 + 런타임 원통(`GunnerBeamMeshSwap` — 축 +Y·y∈[0,1]·반지름 0.5)으로 바꾼다.
+    - 맞춤: 몸통 속도가 로컬 −Z 라 Stretched 꼬리는 +Z(= 레이저 끝)로 뻗는다 → 정렬 Local + 입자 회전 X +90°(메시 +Y → 로컬 +Z), 길이 = startSizeY(규약 "값 1 = 1m"), 지름 = startSizeX, 단면 원이 되게 Z = X.
+    - UV: U = 길이(0 총구 → 1 끝, 텍스처가 가로로 긴 Trail), V = 둘레 0→1→0 삼각파(이음매 없음). U 방향이 Stretched 와 반대면 Play 에서 그라데이션이 뒤집혀 보인다 — 그때 `BuildCylinder` 의 U 를 1−y 로.
+    - 되돌리기: 레이저 끝·정리 때 예약하고, 남은 소멸 꼬리 입자가 다 사라지면(LateUpdate) 빌보드로(도중에 바뀌지 않게). 파괴 때는 바로. 프리팹(SVN)은 그대로.
     - 창 발사 마커 칸 '레이저 멈춤 시점'. 테스트 `BossVictoryGunnerLaserTests`.
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).

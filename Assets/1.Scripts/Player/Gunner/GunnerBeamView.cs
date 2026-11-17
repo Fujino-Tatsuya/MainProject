@@ -352,6 +352,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     {
         echoBombVisuals?.Clear();
         EndVictoryCharge();   // 처치 연출 거너 Q(295) — 풀 인스턴스 덮은 값 되돌림·런타임 라이트 파괴
+        victoryBeamMesh.RestoreNow();   // 300 — 풀 인스턴스는 남는다 → 원통 렌더를 바로 빌보드로
         base.OnDestroy();
     }
 
@@ -513,6 +514,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private bool victoryOverchargeTuned;
     // 299 — 레이저 정지 화면: 멈춘 레이저 입자(유지 시간 끝·정리 때 다시 재생)
     private readonly List<ParticleSystem> victoryBeamPaused = new List<ParticleSystem>();
+    private readonly GunnerBeamMeshSwap victoryBeamMesh = new GunnerBeamMeshSwap();   // 300 — 몸통 원통 렌더
 
     /// <summary>[이 피어] 처치 연출 거너 Q 를 그리는 중인가(평소 충전 BeginCharge 를 막는다).</summary>
     public bool IsVictoryCharging => victoryOn;
@@ -561,6 +563,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
         victoryOverchargeTuned = false;
         victoryFx.RestoreAll();
         victorySafety.RestoreAll();
+        victoryBeamMesh.RequestRestore();   // 300 — 남은 입자가 사라지면 LateUpdate 가 빌보드로(파괴면 OnDestroy 가 바로)
         if (victoryLight != null) Destroy(victoryLight.gameObject);
         victoryLight = null;
         victorySphere = false;
@@ -710,6 +713,8 @@ public class GunnerBeamView : BaseNetworkBehaviour
         if (chargeBeamPlayer != null && chargeBeamStopAt >= 0f)
         {
             ApplyVictoryBeamWidth(victoryLook.beamWidthScale);
+            // 300 — 몸통 빌보드를 원통 메시로(낮은 앵글에서 종이처럼 안 보이게). 같은 프레임 첫 방출 전이라 첫 버스트부터.
+            if (victoryLook.beamMesh3D) ApplyVictoryBeamMesh();
             chargeBeamStopAt = float.MaxValue;   // 유지 시간 = 타임라인(EndVictoryLaser)
             victoryLaser = true;
         }
@@ -768,6 +773,18 @@ public class GunnerBeamView : BaseNetworkBehaviour
             main.startSizeZMultiplier = home.Value.y;
         }
         victoryWidthHome.Clear();
+        victoryBeamMesh.RequestRestore();   // 300 — 소멸 꼬리 입자가 다 사라진 뒤 빌보드로(LateUpdate Tick)
+    }
+
+    // 300 — 레이저 인스턴스 몸통(size3D·Stretch)을 원통 메시 렌더로. 되돌리기 = 입자 소멸 뒤(Tick) 또는 정리(RestoreNow).
+    private void ApplyVictoryBeamMesh()
+    {
+        int count = chargeBeamPlayer.GetInstances(BeamInstances);
+        for (int i = 0; i < count; i++)
+        {
+            BeamInstances[i].GetComponentsInChildren(true, BeamSystems);
+            victoryBeamMesh.Apply(BeamSystems);
+        }
     }
 
     // 레이저 굵기(보이는 것만) — 몸통(size3D) 입자의 X·Z 크기 배율. 길이(Y)는 StretchBeam 이 쓴다.
@@ -1880,6 +1897,9 @@ public class GunnerBeamView : BaseNetworkBehaviour
         //    다시 잡은 뒤에 자식의 월드 회전을 덮어야 한 프레임도 끌려가지 않는다.
         if (charging)
             UpdateCharge();
+
+        // 300 — 처치 연출 레이저 원통 렌더 되돌리기 대기(소멸 꼬리 입자가 다 사라지면). 처치 연출이 끝난 뒤에도 돈다.
+        if (victoryBeamMesh.Active) victoryBeamMesh.Tick();
 
         // 보스 처치 연출 거너 Q(294) — 소켓 오프셋을 놓은 뒤 아래 Q 빔이 그 소켓에서 겨눈다.
         if (victoryOn)
