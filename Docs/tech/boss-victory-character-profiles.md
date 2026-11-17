@@ -28,13 +28,22 @@
 - **도구 막대 캐릭터 드롭다운**(팔라딘·거너·어쌔신) = 그 프로필을 편집. 옛 '미리보기 캐릭터'(스킬 클립 길이 표시)와 통합. ('기본' 줄은 기본 프로필 에셋 삭제와 함께 뺐다, 11-12.)
 - Play 중 연출이 돌면 **실제 처치자 캐릭터를 따라간다**(드롭다운 잠김, '실제 처치자'). 처치자를 못 찾은 회차면 '코드 기본값'으로 보이고 고쳐도 저장되지 않는다.
 - 표에 프로필이 없는 캐릭터를 고르면 코드 기본값이 보이고(고쳐도 저장 안 됨 안내) '이 캐릭터 프로필 만들기(코드 기본값)' 버튼. 메뉴 `Tools/Boss Victory/캐릭터별 프로필 만들기 (267)` 도 같은 길 — **기본 프로필 에셋은 다시 만들지 않는다**. 새 프로필 원본을 다른 캐릭터 복제가 아니라 코드 기본값으로 둔 이유: 팔라딘 등을 복제하면 그 캐릭터 전용 칸(손 검 번개·낙하 검 배율·백대쉬 동시)까지 딸려 온다. 비슷하게 시작하려면 노드 복사로 옮긴다.
-- **노드 복사**: 클립·마커 우클릭 → '다른 캐릭터에 복사…' → 캐릭터 체크 → 복사. Ctrl/⌘+클릭으로 여러 노드를 골라 한 번에. 같은 시각으로:
+- **노드 복사**: 클립·마커 우클릭 → '다른 캐릭터에 복사…' → 캐릭터 체크 → 복사. Shift(또는 Ctrl/⌘)+클릭·사각형으로 여러 노드를 골라 한 번에(키는 복사 대상 아님). 같은 시각으로:
   - 마커(백대쉬 시작·스킬 연출 시작·느려짐·보스 노드·로비 전환 등 하나뿐인 것) = **덮어쓰기**. 애니 클립 노드(스킬 연출 시작·보스 피격 애니)는 끝 자르기도 같이.
   - 클립(카메라 컷·화면 효과 구간·HUD 숨김) = **새로 추가**(카메라 컷 값·키 포함). 1개뿐인 트랙(TV 꺼짐·처치자 평타)은 덮어쓰기.
   - Undo 한 번(Ctrl+Z)에 전부 되돌림. 순수 함수 `BossVictoryTimeline.CopyMarkerFrom`·`CopyClipFrom`.
-- 노드 인스펙터의 백대쉬·배율·스킬 칸은 지금 프로필 칸, 트랙 모양 값(색·노이즈 등)은 공용 설정 칸.
+- 노드 속성 칸(296부터 창 **왼쪽 세로 패널**)의 백대쉬·배율·스킬 칸은 지금 프로필 칸, 트랙 모양 값(색·노이즈 등)은 공용 설정 칸.
+- **왼쪽 속성 패널(296)**: 옛 아래 칸(255 후속 9)을 창 왼쪽으로 — 타임라인은 오른쪽 나머지. 패널·타임라인 사이 막대를 좌우로 끌어 폭(최소 220px · 타임라인 최소 260px, EditorPrefs `BossVictoryTimelineWindow.PanelWidth` 기억). 내용이 길면 세로 스크롤. 맨 위 '조작' 접기 = 단축키 안내.
+- **여러 개 선택(296)** — 순수 함수 `BossVictoryMultiEdit`(`Editor/BossVictoryMultiEdit.cs`), EditMode `BossVictoryMultiEditTests`:
+  - **Shift(또는 Ctrl/⌘)+클릭** = 넣기, 다시 누르면 빼기. 클립·마커(클립 노드 포함)·키를 섞어 고를 수 있다. **빈 곳 클릭** = 선택 풀기. **빈 곳 끌기** = 사각형 선택(클립·마커·클립 노드 — 키는 Shift+클릭), Shift 누르고 끌면 지금 선택에 더하기.
+  - 선택한 것 하나를 끌면 **전부 같은 Δ초** 이동. 스냅(0.01초)은 잡은 노드 기준, 그 Δ 를 나머지에 그대로. 가장 앞 노드가 0초 아래로 못 가게 Δ 를 한 번에 막는다(간격 유지). 처치자 평타(시작 0 고정)는 끝이 움직인다.
+  - 선택 클립의 **끝(또는 시작)을 끌면** 선택 클립 전부 같은 Δ 로 길이(클립마다 최소 0.01초·0초). 카메라 컷(길이 자동)·마커·키는 이때 그대로.
+  - 못 움직이는 노드는 건너뜀: 꺼진 마커(0 = 끔인 마커가 0일 때)·시작·끝 키·클립과 같이 선택된 키(클립 비율이라 따라감). 처치 연출 스킬·보스 피격 애니 **끝 자르기**는 그 노드 하나만.
+  - Undo 한 번(끌기 묶음 — 손을 뗄 때 합침).
+  - 왼쪽 패널 = "N개 선택" + 목록. **같은 종류**(같은 트랙 클립 / 마커 / 같은 트랙 키)면 공통 칸 — 값이 다르면 '—', 고친 칸만 전부에: 클립 = 시작·길이(처치자 평타 = 끝)·노이즈 UV·두둥실·순간이동 두 점, 마커 = 시각(전부 같은 시각으로), 거너 Q 1~3단계 마커만이면 단계 칸 전부, 키 = 세기(컷 키 = FOV)·다음 키까지 곡선. 종류가 섞이면 개수만.
+  - 기존 단축키를 여러 개에도: **Del** = 선택 클립 전부 + 중간 키(마커는 못 지움) · **Ctrl+C/V/D** = 선택 클립(트랙·간격 유지 — 붙여넣기는 각자 트랙, 가장 앞 클립이 재생 헤드·우클릭 시각, 복제 = 가장 늦은 끝 뒤). 새 단축키는 없다.
 - 메뉴 `Tools/Boss Victory/캐릭터별 프로필 만들기 (267)` — 없는 캐릭터 프로필(팔라딘·거너·어쌔신)만 코드 기본값으로 만들어 표에 넣는다(덮어쓰지 않음, 기본 프로필 에셋은 안 만듦).
-- **스크롤**(11-12): 위 시간 눈금 = 세로 고정·가로(시간 스크롤) 따라감, 왼쪽 트랙 이름 열 = 세로 따라감·가로 고정. 트랙이 넘치면 세로 막대(맨 밑에 트랙 1칸 여유), 확대해서 시간이 넘치면 맨 아래 가로 막대. 휠(트랙·눈금 위) = 줌, 휠(이름 열 위) = 세로 스크롤, 가운데 끌기 = 시간 이동. 아래 노드 인스펙터는 따로 세로 스크롤.
+- **스크롤**(11-12): 위 시간 눈금 = 세로 고정·가로(시간 스크롤) 따라감, 왼쪽 트랙 이름 열 = 세로 따라감·가로 고정. 트랙이 넘치면 세로 막대(맨 밑에 트랙 1칸 여유), 확대해서 시간이 넘치면 맨 아래 가로 막대. 휠(트랙·눈금 위) = 줌, 휠(이름 열 위) = 세로 스크롤, 가운데 끌기 = 시간 이동. 왼쪽 속성 패널은 따로 세로 스크롤(296).
 - **카메라 컷 → Scene 뷰**(11-12): 컷 인스펙터 '이 카메라 뷰로 Scene 카메라 세팅하기'(컷 시작) · '재생 헤드 N초 화면으로'(이동 컷 그 순간, 재생 헤드가 컷 구간 안일 때만). 자세 = 런타임과 같은 `BossVictoryCameraCuts.Pose`, 기준 = 'Scene 뷰로' 와 같은 처치자·보스 위치(Play 중 지금 회차 / 아니면 이 에디터 세션 마지막 회차). 기준이 없거나 Scene 뷰가 없으면 비활성 + 이유. 앞 컷과 섞는 블렌드 구간은 반영하지 않는다(이 컷 자신의 화면). 기준 '처치자 무기'(매 프레임 추종·부드러움)는 §4.15.
 
 ## 4. 디버그 랩 (DebugBossVictory)
@@ -163,7 +172,7 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
 - **어쌔신 순간이동 Q — 타임라인 트랙 '어쌔신 순간이동·Q 이동'(272 후속, `BossVictoryTrack.AssassinDash` · 목록 `timeline.assassinDash`)**:
   - **클립 하나 = 한 번**: 클립 시작에 그 클립의 **시작 지점**으로 순간이동 → 클립 길이 동안 **도착 지점**까지 Q 이동(곡선 `teleportMoveEase`) → 끝에 일섬 1번.
   - **여러 개 = 시작 순서대로 #1 → #2 …**(시작이 같으면 목록 순). 겹치면 앞 클립은 다음 클립 시작에서 끝난다(그 자리까지만 가고 일섬 끝점도 거기). 순수 함수 `BossVictoryAssassinDash`(`Order`·`Number`·`SegmentEnd`·`Current`·`AllDone`·`Progress`).
-  - 두 점 = 클립마다 보스 기준 오프셋 `dashFrom`·`dashTo`(보스 위치 + 보스 **수평** 회전 × 오프셋, +Z = 보스 정면, 높이 = 처치자 발). 보스가 없으면 처치자 기준. 창에서 클립을 고르면 아래 칸에 숫자로 고친다.
+  - 두 점 = 클립마다 보스 기준 오프셋 `dashFrom`·`dashTo`(보스 위치 + 보스 **수평** 회전 × 오프셋, +Z = 보스 정면, 높이 = 처치자 발). 보스가 없으면 처치자 기준. 창에서 클립을 고르면 왼쪽 칸(296)에 숫자로 고친다.
   - 순간이동 = `LobbyPodLaunch.TeleportOwner` 순서(백대쉬·대시 끊기 → 넉백 지움 → `TeleportAuthoritative` → 방향 = 도착 지점 쪽 → `NetworkTransform.Teleport`). 이동 = 오너가 FixedUpdate 에 진행 차이만큼 `AddGroundedDisplacement`(유닛 통과, 벽이면 멈춤). 진행 = 글리치 시각 기준(클립 길이 = 실제 초).
   - 애니 = Q 대신 `teleportMoveState`(기본 `Assassin_Q_DashStrike_Transformed` = Combo_Attack_03_04, 60fps 1.917초, 상태 속도 1.5, Custom0 0.15·End 0.425). 첫 클립에 `PlayerSkillController.PlayPresentationStateOnly` 로 스킬 없이 0층을 쥐고(클립 이벤트는 어느 스킬에도 안 감 — **End 는 '스킬 끝'이 아니다**), **클립마다 Custom0 프레임부터 다시** 튼다. 이동 중 처치자 애니 배율 = `MoveAnimScale` = (End − Custom0) ÷ 클립 길이 ÷ 상태 속도 — 도착하는 순간 End 자세(기본 0.275초 클립 = 배율 0.667). 클립 사이 빈 시간은 제자리에서 애니가 그대로 이어진다.
   - 일섬 = 일반 Q 그대로 — 클립 시작에 `AssassinSkillView.BeginPierce(시작 지점, 방향)`, 이동 끝에 `EndPresentationPierce(진행 점)`(PierceLine + PierceBurst, 특성 색 없음). 끝점은 계산값이라 모든 피어 같다.
@@ -183,13 +192,44 @@ ZZZ 글리치 교체(188597bd)로 옛 연출과 함께 빠졌던 원을 새 글�
   - 멀면 E·백대쉬 없이 **같은 '거너 Q 차징 시작' 마커**에 Q(294 — 옛 '백대쉬 시작 시각에 바로 Q' 폐기).
   - **3단계 차징·큰 레이저(294)** — 타임라인 트랙 '◆ 거너 Q' 한 줄에 마커 5개: 차징 시작 → 1단계 → 2단계 → 3단계 → 발사(`BossVictoryMarker.ChargeStart`·`GunnerStage1~3`·`GunnerFire`, 칸 `chargeStartTime`·`gunnerStage1/2/3Time`·`gunnerFireTime`). 기본 = 차징 시작 + 0.3 / 0.6 / 0.9 / 1.2초(옛 1.2초 충전과 같은 길이). 순서가 뒤집히면 앞 마커 시각으로 붙인다(`BossVictoryGunnerCharge.Times.Ordered`).
     - 진행은 프리젠테이션이 글리치 시각(타임라인 초)으로 계산(`BossVictoryGunnerCharge.Evaluate`)해 매 프레임 `GunnerBeamView.SetVictoryFrame` 에 넘긴다 — 뷰는 그리기만. 연출 시간 배율과 무관하게 마커에 맞는다. 옛 1.2초 코루틴(`GunnerChargeLaserSkill.OnPresentationOnlyStart`)은 지웠다. Gunner_Q_Fire 의 End = 처치 연출 스킬 End 는 그대로.
-    - 수치 = 프로필 `gunnerQ`(`BossVictoryGunnerQ`, `Map/BossVictory/BossVictoryGunnerQ.cs`). 창에서 거너 Q 마커를 고르면 아래 칸에 그 마커 값:
+    - 수치 = 프로필 `gunnerQ`(`BossVictoryGunnerQ`, `Map/BossVictory/BossVictoryGunnerQ.cs`). 창에서 거너 Q 마커를 고르면 왼쪽 칸(296)에 그 마커 값:
       - 차징 시작: 시작 크기 `startScale`·구체 등장 지연 `sphereDelay`(타임라인 초)·차징 오프셋 `chargeOffset`(총구 기준 옆 x·위 y·앞 z — 구체·경고·과충전).
       - 1~3단계: 도달 크기 `stageN.sphereScale`·이전 마커 → 이 마커 보간 곡선 `ease`·도달 순간 경고 폭발(`chargeFullPlayer`) 켜기·크기. 3단계 = 과충전(`overchargePlayer`) 시작·크기 `overchargeScale`. 단계 색 = `OverdriveTint` 1 → 2 → 3(1단계 전 = 0).
       - 발사: 배출(`chargeVent`) 크기·레이저 폭 배율(표시만)·길이 `beamLength`(m)·유지 `beamHoldSeconds`(타임라인 초)·발사 오프셋 `fireOffset`(배출·레이저 시작).
     - 레이저 = 보스 방향 수평, 벽 무시·보스 관통·길이 칸 그대로, 피격 이펙트 없음. 오프셋 0 이면 원래 소켓 자리. 소켓·크기·폭은 실제 Q 와 공유하는 풀 인스턴스라 레이저 끝·정리 때 원래 값으로 되돌린다.
     - 이관: 옛 `chargeScaleFrom/To/Curve` 는 숨긴 칸으로 남아 프로필 `OnEnable` 에서 한 번 옮긴다(단계 크기 = Lerp(from, to, curve(k/3)), 1~3단계·발사 마커 = 차징 시작 + 0.3/0.6/0.9/1.2) — 끝나면 `chargeScaleFrom = -1`. 저장은 에셋을 다시 저장할 때.
     - 새 RPC·복제 값 없음 — 각 피어 로컬 표시. 테스트 `BossVictoryGunnerQTests`(마커 시각·단계 크기 보간·이관).
+  - **차징 이펙트 세부 조절(295)** — 같은 프로필 `gunnerQ` 를 넓혔다. 이 피어 표시 전용이고 새 RPC 는 없다. 프리팹 `50.Art/VFX/Common/Players/Player2/Q_ChargeLaser/FX_GunnerCharge.prefab`(SVN)은 고치지 않는다. 대신 재생 중인 풀 인스턴스의 ParticleSystem 값을 배율로 덮고, 정리(`EndVictoryCharge`)·파괴 때 처음 값으로 되돌린다(`BossVictoryChargeFxApplier`, `Map/BossVictory/`).
+    - **294 구체 크기가 안 보이던 원인** — 파트 셋(Charge 와 그 아래 ChargeParticle·ChargeLine)의 `scalingMode` 가 모두 Local 이다. 그래서 루트 `localScale` 을 받지 않았다. 지금은 구체 크기를 파트 크기·모양 반경·시작 속도에 곱한다(균일 스케일과 같은 모양). 그래서 294 단계 크기가 **이제 실제로 보인다** — 기존 프로필 값이 보이는 크기를 바꾼다.
+    - **파트 = 렌더 모드로 가른다**(`BossVictoryChargeFxApplier.PartOf`):
+      - Stretch = 빛줄기 `line` — 지금 프리팹에서는 오브젝트 이름 ChargeParticle.
+      - Mesh = 입자 `particle` — 이름 ChargeLine.
+      - 그 밖 = 코어 `core` — 지금 프리팹의 Charge(Billboard).
+      - 오브젝트 이름이 화면에 보이는 모양과 반대라 이름으로 가르지 않는다.
+    - **마커 값** `fxStart`(차징 시작)·`fxStage1~3`(`BossVictoryChargeFx`). 앞 마커 → 이 마커 사이를 구체 크기와 같은 구간·곡선으로 보간한다(`BossVictoryGunnerCharge.Segment`·`EvaluateFx`).
+      - 파트마다(`BossVictoryChargePartFx`) 배율 칸: 크기 · 양(rate·버스트 수) · 반복 간격(초, 0 = 프리팹 값) · 수명 · 재생 속도(simulationSpeed) · HDR 밝기(재질 색 칸 MaterialPropertyBlock) · 길이(lengthScale, 빛줄기만).
+      - 반복 간격은 한쪽이 0 이면 섞지 않는다. 도착 마커에서 계단식으로 바뀐다.
+      - 총구 포인트 라이트 칸: 세기·범위·색. 차징 소켓 위치에 놓인다. 세기 0 = 없음.
+    - **단계 도착 카메라 흔들림** — 칸 `stageN.shakeIntensity`·`shakeDuration`. 세기 0 = 없음, 길이 0 = 0.2초.
+    - **발사**
+      - 카메라 흔들림 `fireShakeIntensity`·`fireShakeDuration`. 흔들림은 단계 도착과 같은 기존 `CameraFeedback.PlayImpactShake`(설정창 배율 포함)를 쓴다.
+      - 번쩍 라이트 `fireFlashIntensity`·`fireFlashDuration`·`fireFlashRange`·`fireFlashColor`. 발사 소켓에서 세기 → 0 으로 줄어든다.
+      - 레이저 `beamBrightness` · `beamColorOverride`·`beamColor`(끄면 한계 돌파 색) · `beamFadeSeconds`. 페이드아웃은 유지 시간 뒤 알파 1 → 0 이다. 페이드가 있으면 끝에 `StopImmediate` 로 걷는다.
+    - **최대 충전 알림** `burstAmount`·`burstBrightness`, **과충전** `overchargeAmount`·`overchargeBrightness`.
+      - 원샷(`PlayOnce`)은 인스턴스에 닿을 수 없다. 그래서 알림 배율이 1 이 아니면 루프 핸들(`Play`)로 틀고 바로 덮는다(첫 시뮬레이션 전). 배율 1 이면 예전처럼 원샷으로 튼다.
+    - **라이트** — 런타임 `Light` 1개("BossVictoryChargeLight", Point, 그림자 없음). 세기가 0 이면 꺼 두고, 정리 때 파괴한다.
+    - **기본값 = 지금 모습**: 배율 1, 라이트·흔들림·번쩍·페이드 0, 색 덮어쓰기 끔. 밝기 배율이 1 이면 MaterialPropertyBlock 을 걸지 않는다 — 같은 값이라도 블록을 걸면 이 파티클 셰이더가 다르게 그려진다(EffectRecolor 11-03).
+    - **같은 칸을 쓰는 다른 코드**
+      - 재생 속도 = `ShurikenEffectSystem.SetPlayRate`, 색 = `EffectRecolor`.
+      - 그 칸은 "마지막에 내가 쓴 값"과 지금 값이 다르면 밖에서 바뀐 것으로 본다. 그 값을 새 기준으로 삼고 그 위에 배율을 곱한다.
+    - **창**
+      - 차징 시작 마커 = `fxStart`.
+      - 1~3단계 마커 = 흔들림 · `fxStageN` · 알림 배율. 3단계는 과충전 배율도 함께 보인다.
+      - 발사 마커 = 발사 연출 칸.
+      - 차징 시작·1~3단계 마커만 여러 개 고르면 '차징 이펙트(295) 공통 칸'이 보인다.
+    - **안 하는 것**: 히트스톱, Scene 뷰 미리보기. 평소 Q 충전의 `ScaleChargeLoop`(루트 스케일)도 같은 이유로 안 먹지만 이번 범위가 아니다.
+    - **한계** — 덮은 풀 인스턴스는 정리 때까지 덮인 채다. 그 사이 같은 풀을 다른 거너 Q 가 다시 쓰면 배율이 따라간다(처치 연출 중이라 드묾).
+    - 테스트 `BossVictoryChargeFxTests`: 기본값 = 지금 모습 · 구간·파트 보간 · 반복 간격 계단 · 페이드 · 번쩍 · 기준 추적 · 곡선 배율 · 렌더 모드 → 파트.
   - E 의 End 는 처치 연출 스킬 End 로 세지 않는다(`OnFinisherEnded` 가 스킬로 거름).
   - 카메라 = 기존 카메라 컷 트랙 `Anchor.Killer`(새 기능 없음).
 
