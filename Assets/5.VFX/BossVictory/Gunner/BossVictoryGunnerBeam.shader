@@ -70,6 +70,8 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
         _BoltGlowWidth ("줄기 번짐 폭 (굵기 배수)", Range(1, 20)) = 5
         _BoltCoverage ("줄기 길이 (레이저 길이 비율)", Range(0.05, 1)) = 0.75
 
+        [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("깊이 비교 (Always = 보스·벽에 안 가리고 늘 위)", Float) = 8
+
         [HideInInspector] _BeamLength ("레이저 길이 m (코드)", Float) = 10
         [HideInInspector] _BeamTime ("시계 초 (코드)", Float) = 0
     }
@@ -84,19 +86,9 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
             "IgnoreProjector" = "True"
         }
 
-        Pass
-        {
-            Name "Forward"
-            Tags { "LightMode" = "UniversalForward" }
-
-            Blend One OneMinusSrcAlpha   // premultiplied — 알파 0 = 가산, 알파 1 = 배경을 가림(_Opacity)
-            ZWrite Off
-            Cull Back
-
-            HLSLPROGRAM
-            #pragma vertex Vert
-            #pragma fragment Frag
-            #pragma shader_feature_local _ _BILLBOARD _LIGHTNING
+        // 코드는 두 패스 공용. Forward = 평소(URP 반투명 단계), BossVictoryOverlay = 처치 글리치가 켜진 동안 글리치 합성 뒤에 따로 그린다
+        // (BossVictoryGlitchRender — 합성이 보스 픽셀을 노이즈·림으로 덮어 레이저가 보스에 가려지던 문제). 그 동안 Forward 는 전역 _BossVictoryBeamOverlay = 1 로 안 그린다.
+        HLSLINCLUDE
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -208,6 +200,8 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
                 o += float2(Polyline(meters / fine, lineKey + 41.0), Polyline(meters / fine, lineKey + 59.0)) * _BoltDetail;
                 return o;
             }
+
+            float _BossVictoryBeamOverlay;   // 전역(BossVictoryGlitchRender) — 1 = 글리치 합성 뒤 오버레이 패스가 그림, Forward 는 건너뜀
 
             Varyings Vert(Attributes input)
             {
@@ -354,6 +348,48 @@ Shader "BeaverLobby/VFX/BossVictoryGunnerBeam"
                 col *= _Color.rgb * fade * input.color.rgb;
                 return half4(col, cover);
             }
+
+            // Forward 패스 정점 — 오버레이가 맡은 프레임엔 클립 공간 밖으로 보내 통째로 버린다.
+            Varyings VertForward(Attributes input)
+            {
+                Varyings output = Vert(input);
+                if (_BossVictoryBeamOverlay > 0.5) output.positionCS = float4(2.0, 2.0, 2.0, 1.0);
+                return output;
+            }
+        ENDHLSL
+
+        Pass
+        {
+            Name "Forward"
+            Tags { "LightMode" = "UniversalForward" }
+
+            Blend One OneMinusSrcAlpha
+            ZWrite Off
+            ZTest [_ZTest]
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma vertex VertForward
+            #pragma fragment Frag
+            #pragma shader_feature_local _ _BILLBOARD _LIGHTNING
+            ENDHLSL
+        }
+
+        // 처치 글리치 합성 뒤(BossVictoryGlitchRender 오버레이 패스만 그림) — 보스·벽 위에 늘 그린다.
+        Pass
+        {
+            Name "BossVictoryOverlay"
+            Tags { "LightMode" = "BossVictoryOverlay" }
+
+            Blend One OneMinusSrcAlpha
+            ZWrite Off
+            ZTest Always
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma shader_feature_local _ _BILLBOARD _LIGHTNING
             ENDHLSL
         }
     }

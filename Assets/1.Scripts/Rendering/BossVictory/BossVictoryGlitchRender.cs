@@ -95,6 +95,12 @@ public static class BossVictoryGlitchRender
     static Material _maskPlayer, _maskBoss, _composite;
     static MaskPass _maskPass;
     static CompositePass _compositePass;
+    static OverlayPass _overlayPass;
+
+    // 처치 연출 전용 레이저(302) 등 — 셰이더 LightMode "BossVictoryOverlay" 패스를 글리치 합성 뒤에 그린다(합성이 보스 픽셀을 덮어 레이저가 가려지던 문제).
+    // 그리는 동안 전역 1 → 그 셰이더의 Forward 패스는 건너뛴다(두 번 안 그림). 오버레이를 안 넣는 카메라·프레임은 0(평소 Forward).
+    public const string OverlayLightMode = "BossVictoryOverlay";
+    public static readonly int OverlayGlobalId = Shader.PropertyToID("_BossVictoryBeamOverlay");
     static bool _anyEffect;   // 이번 프레임 효과가 하나라도 켜졌나 — 다 0 이면 패스를 아예 건너뛴다
     static bool _hooked;
 
@@ -129,6 +135,10 @@ public static class BossVictoryGlitchRender
             renderPassEvent = RenderPassEvent.AfterRenderingTransparents,       // 이펙트까지 그린 뒤, 후처리 전
         };
         _compositePass.ConfigureInput(ScriptableRenderPassInput.Depth);   // 발밑 회색 원 — 픽셀 월드 위치
+        _overlayPass = new OverlayPass
+        {
+            renderPassEvent = RenderPassEvent.AfterRenderingTransparents + 1,   // 글리치 합성(+ RECTIFY 글로우) 뒤, 후처리 전
+        };
 
         RenderPipelineManager.beginCameraRendering += OnBeginCamera;
         _hooked = true;
@@ -143,6 +153,8 @@ public static class BossVictoryGlitchRender
         _hooked = false;
         _maskPass = null;
         _compositePass = null;
+        _overlayPass = null;
+        Shader.SetGlobalFloat(OverlayGlobalId, 0f);
         CoreUtils.Destroy(_maskPlayer);
         CoreUtils.Destroy(_maskBoss);
         CoreUtils.Destroy(_composite);
@@ -411,11 +423,14 @@ public static class BossVictoryGlitchRender
 
     static void OnBeginCamera(ScriptableRenderContext ctx, Camera cam)
     {
+        Shader.SetGlobalFloat(OverlayGlobalId, 0f);   // 카메라마다 — 오버레이를 넣는 카메라만 아래에서 1 (씬 뷰·UI 카메라는 평소 Forward)
         if (_maskPass == null || !_anyEffect || cam == null || cam.cameraType != CameraType.Game) return;
         UniversalAdditionalCameraData data = cam.GetUniversalAdditionalCameraData();
         if (data == null || data.renderType != CameraRenderType.Base || data.scriptableRenderer == null) return;
         data.scriptableRenderer.EnqueuePass(_maskPass);
         data.scriptableRenderer.EnqueuePass(_compositePass);
+        data.scriptableRenderer.EnqueuePass(_overlayPass);
+        Shader.SetGlobalFloat(OverlayGlobalId, 1f);
     }
 
     static readonly Vector4 FullScreenScaleBias = new Vector4(1f, 1f, 0f, 0f);
@@ -595,6 +610,44 @@ public static class BossVictoryGlitchRender
                     if (d.idTex.IsValid()) d.material.SetTexture(IdIdTex, d.idTex);
                     Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, d.material, d.pass);
                 });
+            }
+        }
+    }
+
+    // 글리치 합성 뒤 — LightMode "BossVictoryOverlay" 반투명을 지금 색 대상(합성 결과)에 그린다. 깊이 없이(셰이더 ZTest Always) — 보스·벽 위에 늘.
+    // 마스크·합성이 건너뛴 프레임(백 버퍼 대상 등)에도 그린다 — 전역 1 이라 Forward 가 안 그리니 여기서 빠지면 레이저가 사라진다.
+    sealed class OverlayPass : ScriptableRenderPass
+    {
+        static readonly ShaderTagId Tag = new ShaderTagId(OverlayLightMode);
+
+        class OverlayData
+        {
+            public RendererListHandle list;
+        }
+
+        public OverlayPass()
+        {
+            profilingSampler = new ProfilingSampler("BossVictoryOverlay");
+        }
+
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+        {
+            UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
+            UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
+            UniversalRenderingData renderingData = frameData.Get<UniversalRenderingData>();
+            UniversalLightData lightData = frameData.Get<UniversalLightData>();
+            TextureHandle color = resourceData.activeColorTexture;
+            if (!color.IsValid()) return;
+
+            using (var builder = renderGraph.AddRasterRenderPass<OverlayData>("BossVictoryOverlay", out OverlayData data))
+            {
+                DrawingSettings drawing = RenderingUtils.CreateDrawingSettings(Tag, renderingData, cameraData, lightData, SortingCriteria.CommonTransparent);
+                var filtering = new FilteringSettings(RenderQueueRange.transparent);
+                data.list = renderGraph.CreateRendererList(new RendererListParams(renderingData.cullResults, drawing, filtering));
+                builder.UseRendererList(data.list);
+                builder.SetRenderAttachment(color, 0, AccessFlags.ReadWrite);
+                builder.AllowGlobalStateModification(false);
+                builder.SetRenderFunc(static (OverlayData d, RasterGraphContext ctx) => ctx.cmd.DrawRendererList(d.list));
             }
         }
     }

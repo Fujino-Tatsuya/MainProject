@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
 using VeyTrace.Rendering.Occlusion;
@@ -293,8 +292,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     Quaternion _gameCamRot;
     float _gameCamFov;
     bool _cutSuppressed;
-    CinemachineExternalImpulseListener _impulseListener;
-    bool _impulseWasEnabled;
     readonly List<Canvas> _hiddenWorldCanvases = new List<Canvas>();
     struct WallEntry
     {
@@ -1560,7 +1557,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         subjects = BossVictoryCameraCuts.FollowWeapon(subjects, live, cut.weaponFollowSmoothing, Time.unscaledDeltaTime);
     }
 
-    // 컷 카메라에 들어갈 때 한 번 — 머리 위 UI·윤곽선·잔여 흔들림이 컷을 깬다(옛 연출과 같은 목록). 벽 가림은 컷과 무관하게 Begin~Teardown.
+    // 컷 카메라에 들어갈 때 한 번 — 머리 위 UI·윤곽선이 컷을 깬다(옛 연출과 같은 목록).
+    // 흔들림 리스너는 끄지 않는다(11-17) — 끄면 첫 컷부터 게임 카메라로 돌아올 때까지 발사·땅울림 흔들림이 전부 사라졌다. 리스너는 브레인 뒤에 오프셋만 얹어 컷 카메라와 같이 산다. 벽 가림은 컷과 무관하게 Begin~Teardown.
     void SuppressForCuts(BossVictoryCameraCuts.Subjects subjects)
     {
         if (_cutSuppressed) return;
@@ -1573,14 +1571,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
             if (c == null || !c.enabled || !c.isRootCanvas || c.renderMode != RenderMode.WorldSpace) continue;
             c.enabled = false;
             _hiddenWorldCanvases.Add(c);
-        }
-
-        Camera main = Camera.main;
-        _impulseListener = main != null ? main.GetComponent<CinemachineExternalImpulseListener>() : null;
-        if (_impulseListener != null)
-        {
-            _impulseWasEnabled = _impulseListener.enabled;
-            _impulseListener.enabled = false;
         }
 
         CollectWalls(Vector3.Lerp(subjects.Killer, subjects.BossBase, 0.5f));
@@ -1655,8 +1645,6 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         for (int i = 0; i < _hiddenWorldCanvases.Count; i++)
             if (_hiddenWorldCanvases[i] != null) _hiddenWorldCanvases[i].enabled = true;
         _hiddenWorldCanvases.Clear();
-        if (_impulseListener != null) _impulseListener.enabled = _impulseWasEnabled;
-        _impulseListener = null;
         if (!_cutSuppressed) return;
         _cutSuppressed = false;
         PlayerSilhouetteFeature.SuppressedByCinematic = false;
