@@ -487,49 +487,142 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <summary>Q 발사 애니 상태 이름(처치 연출 End 검사 — 267 후속).</summary>
     public string ChargeFireStateName => chargeFireStateName;
 
-    // 보스 처치 연출 차징 구체 크기(할 일 272) — 프로필 '시작 → 목표 크기 + 성장 곡선'. 켜져 있으면 chargeScaleRange 대신 이 값(레이저 폭은 그대로).
-    private bool presentationScaleSet;
-    private float presentationScaleFrom;
-    private float presentationScaleTo;
-    private AnimationCurve presentationScaleCurve;
+    // ── 보스 처치 연출 거너 Q 3단계 차징·큰 레이저(할 일 294) — [이 피어] 표시 전용, RPC 아님 ──
+    // 시각은 처치 연출 타임라인이 정한다 — BossVictoryGlitchPresentation 이 매 프레임 타임라인 초로 계산한 상태(BossVictoryGunnerCharge.Frame)를
+    // SetVictoryFrame 으로 넘기고, 여기는 그 상태를 LateUpdate 에서 그린다(전 피어가 같은 복제 처치 상태·시각으로 각자 — 새 RPC·복제 값 없음).
+    // 평소 Q 충전(BeginCharge/UpdateCharge — 자기 시계·1.2초 최대 충전 알림)은 이 동안 쓰지 않는다. 판정·특성(잔류 포격·광폭)·착탄 이펙트 없음.
+    // 소켓 위치(오프셋)·소켓 배율·레이저 몸통 폭은 정리(EndVictoryCharge)·레이저 끝 때 원래 값으로 되돌린다.
+    private bool victoryOn;
+    private BossVictoryGunnerQ victoryLook;
+    private BossVictoryGunnerCharge.Frame victoryFrame;
+    private Vector3 victoryDir = Vector3.forward;
+    private bool victorySphere;   // 구체 루프를 켰다
+    private int victoryStage;     // 처리한 단계(알림·색·과충전) 0~3
+    private bool victoryFired;
+    private bool victoryLaser;    // 레이저를 붙잡고 있다(유지 시간 끝 = 타임라인이 끔)
+    private readonly Dictionary<Transform, Vector3> victorySocketHome = new Dictionary<Transform, Vector3>();
+    private readonly Dictionary<EffectSocketPlayer, float> victoryScaleHome = new Dictionary<EffectSocketPlayer, float>();
+    private readonly Dictionary<ParticleSystem, Vector2> victoryWidthHome = new Dictionary<ParticleSystem, Vector2>();
 
-    /// <summary>[이 피어] 보스 처치 연출 Q 차징 구체 크기를 시작 → 목표(성장 곡선)로 — 다음 충전부터 발사까지. 끄기 = <see cref="ClearPresentationChargeScale"/>(연출 정리).</summary>
-    public void SetPresentationChargeScale(float from, float to, AnimationCurve growth)
-    {
-        presentationScaleSet = true;
-        presentationScaleFrom = from;
-        presentationScaleTo = to;
-        presentationScaleCurve = growth;
-    }
-
-    /// <summary>[이 피어] 처치 연출 차징 크기를 끄고 평소 chargeScaleRange 로.</summary>
-    public void ClearPresentationChargeScale() => presentationScaleSet = false;
-
-    /// <summary>[이 피어] 보스 처치 연출 — 특성 없는 기본 충전(색 단계 0). RPC 아님.</summary>
-    public void BeginPresentationCharge(float maxChargeTime)
-    {
-        BeginCharge(maxChargeTime);
-        chargeTint = OverdriveTint(0);
-        if (chargeLoopPlayer != null) chargeLoopPlayer.SetTint(chargeTint);
-    }
+    /// <summary>[이 피어] 처치 연출 거너 Q 를 그리는 중인가(평소 충전 BeginCharge 를 막는다).</summary>
+    public bool IsVictoryCharging => victoryOn;
 
     /// <summary>
-    /// [이 피어] 보스 처치 연출 — Q 발사 연출만(267 후속). 판정·상태 전환(Focus → Skill)·특성(잔류 포격·광폭·과열 색) 없음, RPC 아님.
-    /// 순서는 실제 발사와 같다: 충전 지우기 → 방출 섬광 → 레이저 → Gunner_Q_Fire(그 End 이벤트 = 처치 연출 스킬 End).
+    /// [이 피어] 보스 처치 연출 거너 Q 시작(294) — 처치 연출 스킬(Q) 표시 재생 <b>전에</b> 부른다(그 재생의 OnClientPlay 평소 충전을 막는다).
+    /// 이후 매 프레임 <see cref="SetVictoryFrame"/>, 끝 = <see cref="EndVictoryCharge"/>.
     /// </summary>
-    public void PlayPresentationChargeLaser(Vector3 origin, Vector3 end, float width, bool stopped)
+    public void BeginVictoryCharge(BossVictoryGunnerQ look)
     {
-        EffectTint tint = OverdriveTint(0);
+        EndVictoryCharge();
         EndCharge();
+        victoryOn = true;
+        victoryLook = look ?? new BossVictoryGunnerQ();
+        victoryFrame = default;
+        victoryStage = 0;
+        victorySphere = false;
+        victoryFired = false;
+        victoryLaser = false;
+    }
+
+    /// <summary>[이 피어] 이번 프레임 처치 연출 거너 Q 상태(타임라인 초 기준)·레이저 방향(보스 쪽, 수평). 그리기는 LateUpdate.</summary>
+    public void SetVictoryFrame(in BossVictoryGunnerCharge.Frame frame, Vector3 direction)
+    {
+        if (!victoryOn) return;
+        victoryFrame = frame;
+        direction.y = 0f;
+        if (direction.sqrMagnitude > 1e-6f) victoryDir = direction.normalized;
+    }
+
+    /// <summary>[이 피어] 처치 연출 거너 Q 정리 — 구체·과충전·레이저를 끄고 소켓 위치·배율·레이저 폭을 원래대로(끝·취소·파괴). 안 켰으면 무시.</summary>
+    public void EndVictoryCharge()
+    {
+        if (!victoryOn) return;
+        victoryOn = false;
+        EndCharge();
+        if (victoryLaser) EndVictoryLaser();
+        foreach (KeyValuePair<Transform, Vector3> home in victorySocketHome)
+            if (home.Key != null) home.Key.localPosition = home.Value;
+        victorySocketHome.Clear();
+        foreach (KeyValuePair<EffectSocketPlayer, float> home in victoryScaleHome)
+            if (home.Key != null) home.Key.SetScale(home.Value);
+        victoryScaleHome.Clear();
+        victorySphere = false;
+    }
+
+    // LateUpdate — 오프셋 → 구체 → 단계(알림·색·과충전) → 구체 크기 → 발사 → 레이저 끝. 타임라인은 앞으로만 간다.
+    private void TickVictory()
+    {
+        BossVictoryGunnerCharge.Frame f = victoryFrame;
+        PlaceVictorySockets();
+
+        if (f.SphereVisible && !victorySphere && !victoryFired && chargeLoopPlayer != null)
+        {
+            victorySphere = true;
+            FaceForward(chargeLoopPlayer);
+            chargeLoopPlayer.SetTint(OverdriveTint(victoryStage));
+            chargeLoopPlayer.Play();
+        }
+
+        while (!victoryFired && victoryStage < f.Stage)
+            ReachVictoryStage(++victoryStage);
+
+        if (victorySphere && !victoryFired)
+            ScaleChargeLoop(f.SphereScale);
+
+        if (f.Fired && !victoryFired)
+            FireVictoryLaser(Mathf.Max(victoryStage, f.Stage));
+
+        if (victoryLaser && !f.LaserOn)
+            EndVictoryLaser();
+    }
+
+    // 단계 k 도달 — 한계 돌파 색 k(구체·이후 연출), 켜졌으면 최대 충전 알림(크기), 3단계부터 과충전 루프(크기).
+    private void ReachVictoryStage(int k)
+    {
+        EffectTint tint = OverdriveTint(k);
+        if (chargeLoopPlayer != null) chargeLoopPlayer.SetTint(tint);   // 재생 중이면 바로, 아니면 켤 때
+        BossVictoryGunnerQ.Stage s = victoryLook.StageAt(k);
+        if (s.burst && chargeFullPlayer != null)
+        {
+            FaceForward(chargeFullPlayer);
+            SetVictoryScale(chargeFullPlayer, s.burstScale);
+            chargeFullPlayer.SetTint(tint);
+            chargeFullPlayer.PlayOnce();
+        }
+        if (k >= 3 && overchargePlayer != null)
+        {
+            FaceForward(overchargePlayer);
+            SetVictoryScale(overchargePlayer, victoryLook.overchargeScale);
+            overchargePlayer.SetTint(tint);
+            overchargePlayer.Play();
+        }
+    }
+
+    // 발사 — 실제 발사와 같은 순서(충전 지우기 → 방출 섬광 → 레이저 → Gunner_Q_Fire, 그 End 이벤트 = 처치 연출 스킬 End).
+    // 레이저 = 발사 소켓(오프셋 적용)에서 보스 쪽 수평으로 프로필 길이(벽 무시·보스 관통), 착탄·몬스터 적중 연출 없음, 유지 = 타임라인이 끈다.
+    private void FireVictoryLaser(int stage)
+    {
+        victoryFired = true;
+        EffectTint tint = OverdriveTint(stage);
+        EndCharge();
+        victorySphere = false;
         if (chargeVentPlayer != null)
         {
             FaceForward(chargeVentPlayer);
+            SetVictoryScale(chargeVentPlayer, victoryLook.ventScale);
             chargeVentPlayer.SetTint(tint);
             chargeVentPlayer.PlayOnce();
         }
         Tint(chargeBeamPlayer, tint);
-        Tint(chargeEndPlayer, tint);
-        PlayChargeBeam(origin, end, width, stopped, null);
+        Vector3 start = chargeBeamPlayer != null ? chargeBeamPlayer.Socket.position : transform.position + Vector3.up;
+        Vector3 end = BossVictoryGunnerCharge.BeamEnd(start, victoryDir, victoryLook.beamLength);
+        PlayChargeBeam(start, end, VictoryBeamWidth(), false, null);
+        if (chargeBeamPlayer != null && chargeBeamStopAt >= 0f)
+        {
+            ApplyVictoryBeamWidth(victoryLook.beamWidthScale);
+            chargeBeamStopAt = float.MaxValue;   // 유지 시간 = 타임라인(EndVictoryLaser)
+            victoryLaser = true;
+        }
         if (animator != null && animator.runtimeAnimatorController != null && !string.IsNullOrEmpty(chargeFireStateName))
         {
             int hash = Animator.StringToHash(chargeFireStateName);
@@ -538,8 +631,96 @@ public class GunnerBeamView : BaseNetworkBehaviour
         }
     }
 
+    private void EndVictoryLaser()
+    {
+        victoryLaser = false;
+        chargeBeamStopAt = -1f;
+        if (chargeBeamPlayer != null) chargeBeamPlayer.Stop();
+        foreach (KeyValuePair<ParticleSystem, Vector2> home in victoryWidthHome)
+        {
+            if (home.Key == null) continue;
+            ParticleSystem.MainModule main = home.Key.main;
+            main.startSizeXMultiplier = home.Value.x;
+            main.startSizeZMultiplier = home.Value.y;
+        }
+        victoryWidthHome.Clear();
+    }
+
+    // 레이저 굵기(보이는 것만) — 몸통(size3D) 입자의 X·Z 크기 배율. 길이(Y)는 StretchBeam 이 쓴다.
+    // 원래 값은 처음 한 번 적어 두고 레이저 끝에 되돌린다(풀 인스턴스를 평소 Q 가 다시 쓴다).
+    private void ApplyVictoryBeamWidth(float scale)
+    {
+        int count = chargeBeamPlayer.GetInstances(BeamInstances);
+        for (int i = 0; i < count; i++)
+        {
+            BeamInstances[i].GetComponentsInChildren(true, BeamSystems);
+            for (int k = 0; k < BeamSystems.Count; k++)
+            {
+                ParticleSystem ps = BeamSystems[k];
+                ParticleSystem.MainModule main = ps.main;
+                if (!main.startSize3D) continue;
+                if (!victoryWidthHome.TryGetValue(ps, out Vector2 home))
+                {
+                    home = new Vector2(main.startSizeXMultiplier, main.startSizeZMultiplier);
+                    victoryWidthHome[ps] = home;
+                }
+                main.startSizeXMultiplier = home.x * scale;
+                main.startSizeZMultiplier = home.y * scale;
+            }
+        }
+    }
+
+    // 미배선(LineRenderer 대체) 폭 — 데이터 폭 × 굵기 배율.
+    private float VictoryBeamWidth()
+    {
+        traitFxSkill ??= GetComponentInChildren<GunnerChargeLaserSkill>(true);
+        float width = traitFxSkill != null && traitFxSkill.Data is GunnerChargeLaserData data ? data.BeamWidth : 1.2f;
+        return width * (victoryLook != null ? victoryLook.beamWidthScale : 1f);
+    }
+
+    // 소켓 배율 = 저작 배율(처음 한 번 적어 둠) × 배율 — 다음 재생부터(EffectSocketPlayer.SetScale).
+    private void SetVictoryScale(EffectSocketPlayer player, float multiplier)
+    {
+        if (!victoryScaleHome.TryGetValue(player, out float home))
+        {
+            home = player.Scale;
+            victoryScaleHome[player] = home;
+        }
+        player.SetScale(home * multiplier);
+    }
+
+    // 오프셋 — 총구 기준 로컬(옆·위·앞). 차징 = 구체·알림·과충전 소켓, 발사 = 섬광·레이저 소켓. 매 프레임 본 애니 뒤(LateUpdate)에 다시 놓는다.
+    private void PlaceVictorySockets()
+    {
+        Vector3 facing = movement != null ? movement.CurrentFacing : transform.forward;
+        PlaceVictorySocket(chargeLoopPlayer, victoryLook.chargeOffset, facing);
+        PlaceVictorySocket(chargeFullPlayer, victoryLook.chargeOffset, facing);
+        PlaceVictorySocket(overchargePlayer, victoryLook.chargeOffset, facing);
+        PlaceVictorySocket(chargeVentPlayer, victoryLook.fireOffset, facing);
+        PlaceVictorySocket(chargeBeamPlayer, victoryLook.fireOffset, facing);
+    }
+
+    // 소켓 원래 자리(부모 기준 — 총구 본을 따라감) + 오프셋. 오프셋 0·루트·부모 없는 소켓은 건드리지 않는다(루트면 플레이어가 움직인다).
+    private void PlaceVictorySocket(EffectSocketPlayer player, Vector3 offset, Vector3 facing)
+    {
+        if (player == null) return;
+        Transform socket = player.Socket;
+        if (socket == null || socket == transform || socket.parent == null) return;
+        if (!victorySocketHome.TryGetValue(socket, out Vector3 home))
+        {
+            if (offset == Vector3.zero) return;
+            home = socket.localPosition;
+            victorySocketHome[socket] = home;
+        }
+        socket.position = BossVictoryGunnerCharge.OffsetPoint(socket.parent.TransformPoint(home), facing, offset);
+    }
+
     public void BeginCharge(float maxChargeTime)
     {
+        // 보스 처치 연출 거너 Q(294) 중 = 표시 재생의 OnClientPlay 가 부른 평소 충전 — 타임라인이 그리므로 무시.
+        if (victoryOn)
+            return;
+
         chargeMaxTime = Mathf.Max(0.01f, maxChargeTime);
         chargeStartTime = Time.time;
         chargeFullPlayed = false;
@@ -714,12 +895,15 @@ public class GunnerBeamView : BaseNetworkBehaviour
             }
         }
 
+        ScaleChargeLoop(Mathf.Lerp(chargeScaleRange.x, chargeScaleRange.y, t));
+    }
+
+    // 충전 루프(구체) 인스턴스 루트 균일 스케일 — 평소 충전·처치 연출 거너 Q(294) 공용.
+    private void ScaleChargeLoop(float s)
+    {
         if (chargeLoopPlayer == null)
             return;
 
-        float s = presentationScaleSet
-            ? BossVictoryKillerMoves.ChargeScale(presentationScaleFrom, presentationScaleTo, presentationScaleCurve, t)
-            : Mathf.Lerp(chargeScaleRange.x, chargeScaleRange.y, t);
         int count = chargeLoopPlayer.GetInstances(BeamInstances);
         for (int i = 0; i < count; i++)
         {
@@ -1572,6 +1756,10 @@ public class GunnerBeamView : BaseNetworkBehaviour
         //    다시 잡은 뒤에 자식의 월드 회전을 덮어야 한 프레임도 끌려가지 않는다.
         if (charging)
             UpdateCharge();
+
+        // 보스 처치 연출 거너 Q(294) — 소켓 오프셋을 놓은 뒤 아래 Q 빔이 그 소켓에서 겨눈다.
+        if (victoryOn)
+            TickVictory();
 
         if (chargeBeamStopAt >= 0f)
         {

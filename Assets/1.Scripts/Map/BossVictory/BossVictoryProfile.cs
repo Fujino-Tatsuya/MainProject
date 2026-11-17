@@ -51,7 +51,7 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
 
     [Header("처치자 이동(272 — 백대쉬 / 순간이동 Q(어쌔신) / 후퇴 차징(거너)). 이동은 처치자 오너가 실제로, 다른 피어는 복제 위치. 특성 연출 없음")]
     [Tooltip("백대쉬 = 지금 흐름(백대쉬 → 처치 연출 스킬). 순간이동 = 타임라인 '어쌔신 순간이동·Q 이동' 클립마다 그 시작 지점으로 순간이동 → 클립 길이 동안 아래 Q 상태로 도착 지점까지(처치 연출 스킬 대신, 마지막 뒤 정지 프레임). " +
-             "후퇴 차징 = 제자리 — 보스와 '후퇴 거리'보다 가까우면 백대쉬 시작에 후퇴 스킬(E) 표시 + 백대쉬, 'Q 차징 시작' 마커에 처치 연출 스킬(Q) / 멀면 백대쉬 시작 시각에 바로 Q.")]
+             "후퇴 차징 = 제자리 — 보스와 '후퇴 거리'보다 가까우면 백대쉬 시작에 후퇴 스킬(E) 표시 + 백대쉬. Q 차징은 가깝든 멀든 '거너 Q' 줄 차징 시작 마커에(294) → 1·2·3단계 → 발사.")]
     public BossVictoryKillerMove killerMove = BossVictoryKillerMove.BackDash;
 
     [Tooltip("[순간이동] 클립마다 트는 애니 상태(기본 = Combo_Attack_03_04 를 든 상태) — Custom0 프레임부터, Custom0 → End 가 클립 길이에 맞게. 이 클립의 End 는 '스킬 끝'이 아니다. " +
@@ -64,12 +64,13 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Min(0f)] public float retreatDistance = 5f;
     [Tooltip("[후퇴 차징] 가까울 때 백대쉬와 같이 표시로만 트는 스킬 칸(거너 E 냉각 백스텝 — 애니·이펙트만, 이동은 백대쉬).")]
     public PlayerSkillSlot retreatSkillSlot = PlayerSkillSlot.Sub;
-    [Tooltip("[후퇴 차징] Q 차징 구체 시작 크기(배율 — 거너 평소 0.25).")]
-    [Min(0f)] public float chargeScaleFrom = 0.25f;
-    [Tooltip("[후퇴 차징] Q 차징 구체 목표 크기 — 최대 충전(발사 순간)에 이 크기. 레이저 폭은 그대로.")]
-    [Min(0f)] public float chargeScaleTo = 1f;
-    [Tooltip("[후퇴 차징] 차징 구체 성장 곡선(가로 = 충전 0~1, 세로 = 시작 → 목표 0~1).")]
-    public AnimationCurve chargeScaleCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+    [Tooltip("[후퇴 차징] 거너 Q 3단계 차징·큰 레이저(294) — 단계별 구체 크기·알림·과충전·섬광·레이저 굵기·길이·오프셋·지연·유지. 시각 = 타임라인 '거너 Q' 줄 마커 5개.")]
+    public BossVictoryGunnerQ gunnerQ = new BossVictoryGunnerQ();
+
+    // 옛 칸(272 — 시작 → 목표 크기·성장 곡선) — 읽기만 해서 gunnerQ·단계 마커로 옮긴다(294, OnEnable). 옮긴 뒤·새 프로필 = 시작 크기 -1.
+    [SerializeField, HideInInspector] float chargeScaleFrom = -1f;
+    [SerializeField, HideInInspector] float chargeScaleTo = 1f;
+    [SerializeField, HideInInspector] AnimationCurve chargeScaleCurve;
 
     [Header("타임라인(트랙별 클립·마커 — 창 Tools/Boss Victory/처치 연출 타임라인 에서 캐릭터를 골라 편집)")]
     [Tooltip("t = 처치 판정 순간(복제 처치 시각) 뒤 초. 화면 효과 세기·HUD 숨김·TV 꺼짐·카메라 컷 = 클립, 카메라 처치자 포커스·처치자 외 숨김·로비 전환 = 마커. 처치 연출 스킬은 이 속에서 재생.")]
@@ -119,6 +120,23 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
         timeline.SeedRectify();        // 배경 글자 트랙 전 에셋 = 기본 클립 한 번(267 후속)
         timeline.SeedRectifyFill();    // RECTIFY 안쪽 색 트랙 전 에셋 = 기본 클립 한 번(267 후속)
         timeline.MigrateKeys();
+    }
+
+    // 거너 Q 옛 시작 → 목표 크기 → 단계 마커(294) — 곡선 Evaluate 를 쓰므로 직렬화 콜백(메인 스레드 아닐 수 있음) 대신 OnEnable(메인 스레드, 불러온 뒤).
+    void OnEnable() => MigrateLegacyGunnerCharge();
+
+    /// <summary>
+    /// 옛 거너 Q 차징 칸(시작 → 목표 크기·성장 곡선, 272)이 남아 있으면 단계 마커 시각·크기로 옮기고(<see cref="BossVictoryGunnerCharge.Migrate"/>) 옛 칸을 비운다(멱등).
+    /// 옮겼으면 true. 새 프로필·옮긴 뒤 = 아무것도 안 함.
+    /// </summary>
+    public bool MigrateLegacyGunnerCharge()
+    {
+        if (chargeScaleFrom < 0f || timeline == null) return false;
+        gunnerQ ??= new BossVictoryGunnerQ();
+        BossVictoryGunnerCharge.Migrate(gunnerQ, timeline, chargeScaleFrom, chargeScaleTo, chargeScaleCurve);
+        chargeScaleFrom = -1f;
+        chargeScaleCurve = null;
+        return true;
     }
 
     /// <summary>다른 프로필 값을 통째로 덮어쓴다(키 목록·컷 값까지 새 목록 — 원본과 공유하지 않음).</summary>

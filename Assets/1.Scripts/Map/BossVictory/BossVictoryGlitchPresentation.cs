@@ -81,6 +81,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     BossVictoryKillerMove _move;
     bool _tooClose;                   // 후퇴 차징 — 처치 순간 보스와 수평 거리 < 후퇴 거리(각 피어가 자기 화면 위치로)
     PlayerSkillBase _finisherSkill;   // 지금 처치 연출 스킬(End 구독 대상 — 후퇴 스킬 E 의 End 는 무시, 순간이동 Q 는 null)
+    GunnerBeamView _gunnerBeam;       // 후퇴 차징 거너 Q 처치 연출(294) — 처치 연출 스킬 시작 ~ 정리, 매 프레임 타임라인 상태를 넘긴다
     // 순간이동 Q(어쌔신, 272 후속) — 타임라인 '어쌔신 순간이동·Q 이동' 클립마다(시작 순). 두 점은 보스 기준(모든 피어 같은 값). 이동은 오너만(모터), 일섬·애니는 각 피어.
     bool _dashOn;                     // 처치 연출 단계에 들어와 트랙을 돌리는 중
     readonly List<int> _dashOrder = new List<int>();
@@ -537,6 +538,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
                 BeginBackDash(motionOnly: true);
             }
             if (_dashOn) TickAssassinDash();
+            if (_gunnerBeam != null) TickGunnerQ();
             // 순간이동 Q(272 후속) — 정지 프레임은 마지막 이동이 끝난 뒤에만(클립 사이 빈 시간엔 애니가 이어 재생된다).
             if (_killerStep == BossVictoryKillerSequence.Step.Finisher && !_killerFrozen && (!_dashOn || DashAllDone)) TickFinisherTrim();
         }
@@ -626,6 +628,26 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _killerSkills.PlayPresentationOnly(skill, dir);   // 냉기는 정면(보스 쪽), 몸은 백대쉬로 반대쪽
         Edit.Log($"[BossVictory] 후퇴 스킬 — {_killer.name} {_profile.retreatSkillSlot} {skill.Data.AnimatorStateName} + 백대쉬 (글리치 t {_glitchTime:0.00})", this);
     }
+
+    // [후퇴 차징 거너 Q(294)] 매 프레임 — 타임라인 '거너 Q' 마커(차징 시작·1·2·3단계·발사)로 지금 상태를 계산해 뷰에 넘긴다(글리치 시계 = 타임라인 초,
+    // 처치자·이펙트 시간 배율과 무관하게 마커 시각에 맞는다). 레이저 방향 = 보스 쪽(수평). 각 피어가 같은 타임라인으로 각자 — 새 RPC 없음.
+    void TickGunnerQ()
+    {
+        BossVictoryGunnerCharge.Times times = BossVictoryGunnerCharge.From(_profile.timeline);
+        BossVictoryGunnerCharge.Frame f = BossVictoryGunnerCharge.Evaluate(times, _profile.gunnerQ, _glitchTime);
+        Vector3 dir = _boss != null ? _boss.transform.position - _killer.transform.position : _killer.transform.forward;
+        _gunnerBeam.SetVictoryFrame(f, dir);
+        if (f.Stage != _gunnerStageLogged || f.Fired != _gunnerFiredLogged)
+        {
+            if (f.Stage != _gunnerStageLogged) ClockLog($"거너 Q {f.Stage}단계");
+            if (f.Fired && !_gunnerFiredLogged) ClockLog("거너 Q 발사");
+            _gunnerStageLogged = f.Stage;
+            _gunnerFiredLogged = f.Fired;
+        }
+    }
+
+    int _gunnerStageLogged;
+    bool _gunnerFiredLogged;
 
     // ── [순간이동 Q 트랙(272 후속)] 타임라인 '어쌔신 순간이동·Q 이동' 클립마다 — 시작에 그 클립 시작 지점으로 순간이동 → 길이 동안 도착 지점까지 Q 이동(곡선) → 끝에 일섬.
     // 순서 = 시작 순(#1 #2 …), 겹치면 앞 클립은 다음 클립 시작에서 끝. 마지막 뒤엔 애니가 정지 프레임까지 가서 멈춘다(TickFinisherTrim).
@@ -869,9 +891,15 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
 
         Vector3 dir = _boss != null ? _boss.transform.position - _killer.transform.position : _killer.transform.forward;
         dir.y = 0f;
-        // 후퇴 차징(272) — Q 차징 구체 크기 = 프로필 시작 → 목표(발사 순간 목표 크기). 정리 때 끈다.
+        // 후퇴 차징(272·294) — 거너 Q 3단계 차징·큰 레이저를 타임라인 '거너 Q' 마커로(TickGunnerQ 가 매 프레임). 표시 재생(OnClientPlay 평소 충전)보다 먼저. 정리 때 끈다.
+        _gunnerBeam = null;
+        _gunnerStageLogged = 0;
+        _gunnerFiredLogged = false;
         if (_move == BossVictoryKillerMove.RetreatCharge && _killer.TryGetComponent(out GunnerBeamView beam))
-            beam.SetPresentationChargeScale(_profile.chargeScaleFrom, _profile.chargeScaleTo, _profile.chargeScaleCurve);
+        {
+            _gunnerBeam = beam;
+            beam.BeginVictoryCharge(_profile.gunnerQ);
+        }
         _finisherSkill = skill;
         _killerSkills.PresentationSkillEnded += OnFinisherEnded;
         // 대상 = 보스(대상 지정 스킬의 대상 자리 연출 — 팔라딘 R 하늘에서 떨어지는 칼. 판정 없음).
@@ -1700,7 +1728,8 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         _dashOn = false;
         _dashAnimScale = -1f;
         _finisherSkill = null;
-        if (_killer != null && _killer.TryGetComponent(out GunnerBeamView beam)) beam.ClearPresentationChargeScale();
+        if (_gunnerBeam != null) _gunnerBeam.EndVictoryCharge();   // 거너 Q 처치 연출(294) — 소켓 위치·배율·레이저 폭 원래대로
+        _gunnerBeam = null;
         EndKillerSword();
         s_realtimeFx.Clear();
 
