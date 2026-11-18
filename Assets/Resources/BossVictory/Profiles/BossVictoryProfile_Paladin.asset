@@ -55,29 +55,193 @@ MonoBehaviour:
     m_RotationOrder: 4
   retreatDistance: 5
   retreatSkillSlot: 1
-  chargeScaleFrom: 0.25
+  gunnerQ:
+    startScale: 0.25
+    stage1:
+      sphereScale: 0.5
+      ease: 0
+      burst: 1
+      burstScale: 1
+      shakeIntensity: 0
+      shakeDuration: 0
+    stage2:
+      sphereScale: 0.75
+      ease: 0
+      burst: 1
+      burstScale: 1
+      shakeIntensity: 0
+      shakeDuration: 0
+    stage3:
+      sphereScale: 1
+      ease: 0
+      burst: 1
+      burstScale: 1
+      shakeIntensity: 0
+      shakeDuration: 0
+    overchargeScale: 1
+    ventScale: 1
+    beamWidthScale: 1
+    beamMesh3D: 1
+    victoryBeamPrefab: {fileID: 0}
+    victoryBeamFreeze: 0
+    victoryBeamInnerScale: 1
+    victoryBeamAirScale: 1
+    beamLength: 30
+    chargeOffset: {x: 0, y: 0, z: 0}
+    fireOffset: {x: 0, y: 0, z: 0}
+    sphereDelay: 0
+    beamHoldSeconds: 0.5
+    beamFreezeAt: 0.12
+    fxStart:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    fxStage1:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    fxStage2:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    fxStage3:
+      line:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      particle:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      core:
+        size: 1
+        amount: 1
+        repeatInterval: 0
+        lifetime: 1
+        speed: 1
+        brightness: 1
+        length: 1
+      lightIntensity: 0
+      lightRange: 3
+      lightColor: {r: 1, g: 1, b: 1, a: 1}
+    burstAmount: 1
+    burstBrightness: 1
+    overchargeAmount: 1
+    overchargeBrightness: 1
+    fireShakeIntensity: 0
+    fireShakeDuration: 0.25
+    fireFlashIntensity: 0
+    fireFlashDuration: 0.15
+    fireFlashRange: 6
+    fireFlashColor: {r: 1, g: 1, b: 1, a: 1}
+    beamBrightness: 1
+    beamColorOverride: 0
+    beamColor: {r: 1, g: 1, b: 1, a: 1}
+    beamFadeSeconds: 0
+    beamFlowSpeed: 0
+    beamNoiseFlowSpeed: 0
+    vibrationCameraIntensity: 0
+    vibrationFrequency: 18
+    vibrationBodyIntensity: 0
+    vibrationSeconds: 0
+    vibrationRampIn: 0.05
+    vibrationRampOut: 0.3
+    useBeamPassPoint: 0
+    beamPassPoint: {x: 0, y: 1.2, z: 0}
+    lightSceneDim: 0
+    lightContrast: 0
+    beamLightCount: 3
+    beamLightIntensity: 0
+    beamLightRange: 6
+    lightInSeconds: 0.05
+    lightRecoverSeconds: 0.4
+    recoilDistance: 0
+    recoilSeconds: 0.5
+  chargeScaleFrom: -1
   chargeScaleTo: 1
   chargeScaleCurve:
     serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 1
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 1
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
+    m_Curve: []
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
@@ -107,6 +271,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     amber:
     - start: 5.35
       length: 0.8699999
@@ -135,6 +300,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 2.56
       length: 2.8
       fadeIn: 0
@@ -162,6 +328,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     scanline:
     - start: 1.41
       length: 4.8900003
@@ -187,6 +354,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     bossNoise:
     - start: 1.05
       length: 4.8900003
@@ -212,6 +380,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     tear:
     - start: 0.32
       length: 0.09
@@ -240,6 +409,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 0.68
       length: 0.2
       fadeIn: 0
@@ -267,6 +437,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 2.45
       length: 0.20000005
       fadeIn: 0
@@ -291,6 +462,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 5.03
       length: 1.9500003
       fadeIn: 0
@@ -318,6 +490,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 1.34
       length: 0.2
       fadeIn: 0
@@ -345,6 +518,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 4.08
       length: 0.2
       fadeIn: 0
@@ -372,6 +546,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     smear:
     - start: 0.09
       length: 0.16
@@ -400,6 +575,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 0.32
       length: 0.09
       fadeIn: 0
@@ -427,6 +603,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     hudHide:
     - start: 0.08
       length: 6.2200003
@@ -452,6 +629,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     crtOff: []
     cameraCut:
     - start: 0.77
@@ -469,6 +647,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 2.13
       length: 0.19999981
       fadeIn: 0
@@ -484,6 +663,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 2.33
       length: 1.4200001
       fadeIn: 0
@@ -499,6 +679,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     - start: 3.75
       length: 2.04
       fadeIn: 0
@@ -514,6 +695,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     cameraCutShots:
     - anchor: 0
       keys:
@@ -612,6 +794,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     cameraBob:
     - start: 2.55
       length: 4.04
@@ -640,6 +823,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     rectify:
     - start: 3.2
       length: 2.7800002
@@ -665,6 +849,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     rectifySeeded: 1
     rectifyFill:
     - start: 3.39
@@ -688,6 +873,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     rectifyFillSeeded: 1
     cameraBobSeeded: 1
     groundCircle:
@@ -715,6 +901,7 @@ MonoBehaviour:
       bobDamping: 0
       dashFrom: {x: 0, y: 0, z: 0}
       dashTo: {x: 0, y: 0, z: 0}
+      pulseStrength: 0
     assassinDash: []
     groundCircleSeeded: 1
     focusKillerTime: 0.2
@@ -726,9 +913,17 @@ MonoBehaviour:
     slowStartTime: 1.06
     bossHitAnimTime: 0.2
     bossHitTrimSeconds: 0
+    bossReachTime: 0
+    bossReachTrimSeconds: 0
+    bossReachUpperAnimSpeed: 1
+    bossReachWalkAnimSpeed: 1
     bossFreezeTime: 0
     bossSlowTime: 0.2
     chargeStartTime: -1
+    gunnerStage1Time: 0.5
+    gunnerStage2Time: 0.8
+    gunnerStage3Time: 1.1
+    gunnerFireTime: 1.4000001
     killerActionEndTime: 0
   paletteColors:
   - {r: 0.9169811, g: 0.67380774, b: 0.29585615, a: 1}
@@ -756,7 +951,7 @@ MonoBehaviour:
   rectifyOrangeGradient: 1
   rectifyScanlineSpacing: 0.0005
   rectifyScanlineDark: 0
-  bossLook: 0
-  bossRimWidth: 0.35
-  bossRimSoftness: 0.1
+  bossLook: 1
+  bossRimWidth: 0.55
+  bossRimSoftness: 0
   bossRimInsideIntensity: 2
