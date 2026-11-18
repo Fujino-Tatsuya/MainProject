@@ -10,7 +10,7 @@ using System.Collections.Generic;
 /// <item>완료 보고: 상대 모델의 단계 완료를 진행기에 1회(<see cref="TryAcceptReport"/>). 진행기의 지금 단계와 같을 때만 — 어긋남·중복·역순은 무시.</item>
 /// <item>T33 위치 복귀의 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>, Q10 A): 회차당 1회(<see cref="TryConsumePracticeReset"/>).</item>
 /// <item>단계 안 사건 무전(TRAIN_03_COUNTER/WALL/COMBAT)은 없앴다(157 Q6 A — 명세 §3.3 중복 대사 금지, 문구 키는 보존).</item>
-/// <item>T31 봇 여러 마리(할 일 303): 회차에 등록한 봇이 모두 간파되는 순간 1회만 완료(<see cref="TryRecordCounterSuccess"/> — 팀 합산, 누가 몇 마리든 무관).
+/// <item>T31 봇 = 훈련 명단 인원수만큼(할 일 303, 최소 1 — <see cref="SpawnCountFor"/>·배치 <see cref="CounterBotSlot"/>): 회차에 등록한 봇이 모두 간파되는 순간 1회만 완료(<see cref="TryRecordCounterSuccess"/> — 팀 합산, 누가 몇 마리든 무관).
 /// T32 부터는 마지막에 간파된 봇 1마리만 남는다(<see cref="TryPickSurvivor"/>).</item>
 /// </list>
 /// </summary>
@@ -85,9 +85,28 @@ public sealed class LobbySparringLink
 
     // ─── T31 봇 여러 마리(할 일 303) ─────────────────────────────────────
 
-    /// <summary>회차 시작 때 스폰할 봇 수 — T31 로 시작하면 배치 칸 수(최소 1), 그 밖(이미 지난 단계에서 시작)은 1.</summary>
-    public static int SpawnCountFor(LobbyTutorialActivity activity, int counterSlots) =>
-        activity == LobbyTutorialActivity.Counter ? Math.Max(1, counterSlots) : 1;
+    /// <summary>회차 시작 때 스폰할 봇 수 — T31 로 시작하면 그 순간 훈련 명단 인원수(최소 1), 그 밖(이미 지난 단계에서 시작)은 1. 이후 인원이 줄어도 봇 수는 그대로다.</summary>
+    public static int SpawnCountFor(LobbyTutorialActivity activity, int rosterCount) =>
+        activity == LobbyTutorialActivity.Counter ? Math.Max(1, rosterCount) : 1;
+
+    /// <summary>
+    /// T31 봇 자리(A/B 위치 기준 오프셋, 그 방향 기준) — 줄마다 x 가운데 정렬. 한 줄에 <paramref name="maxRowWidth"/> 안에 드는 만큼만 놓고 나머지는 앞(+z) 줄로 넘긴다.
+    /// 줄 간격은 전체가 <paramref name="maxDepth"/> 안에 들도록 줄인다. 앞으로만 쌓는 까닭: A/B 위치가 집결 구역 뒤쪽에 치우쳐 있다.
+    /// </summary>
+    public static void CounterBotSlot(int index, int count, float spacing, float maxRowWidth, float rowSpacing, float maxDepth, out float x, out float z)
+    {
+        count = Math.Max(1, count);
+        index = Math.Min(Math.Max(0, index), count - 1);
+        spacing = Math.Max(0f, spacing);
+
+        int perRow = spacing > 0f ? Math.Max(1, (int)Math.Floor(Math.Max(0f, maxRowWidth) / spacing + 0.0001f) + 1) : count;
+        int rows = (count + perRow - 1) / perRow;
+        int row = index / perRow;
+        int inRow = row < rows - 1 ? perRow : count - perRow * (rows - 1);
+
+        x = (index % perRow - (inRow - 1) * 0.5f) * spacing;
+        z = rows > 1 ? row * Math.Min(Math.Max(0f, rowSpacing), Math.Max(0f, maxDepth) / (rows - 1)) : 0f;
+    }
 
     /// <summary>봇별 첫 공격 지연(초) — 간파 창이 완전히 겹치지 않게 순번만큼 늦춘다.</summary>
     public static float FirstAttackDelay(int index, float staggerSeconds) => Math.Max(0, index) * Math.Max(0f, staggerSeconds);

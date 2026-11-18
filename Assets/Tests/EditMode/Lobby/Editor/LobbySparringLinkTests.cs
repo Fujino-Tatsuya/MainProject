@@ -1,3 +1,4 @@
+using UnityEngine;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
@@ -145,11 +146,54 @@ public sealed class LobbySparringLinkTests
     }
 
     [Test]
-    public void SpawnCount_T31UsesSlots_OtherStartsOne()
+    public void SpawnCount_T31FollowsRoster_OtherStartsOne()
     {
+        Assert.That(LobbySparringLink.SpawnCountFor(LobbyTutorialActivity.Counter, 1), Is.EqualTo(1), "솔로");
+        Assert.That(LobbySparringLink.SpawnCountFor(LobbyTutorialActivity.Counter, 2), Is.EqualTo(2));
         Assert.That(LobbySparringLink.SpawnCountFor(LobbyTutorialActivity.Counter, 3), Is.EqualTo(3));
-        Assert.That(LobbySparringLink.SpawnCountFor(LobbyTutorialActivity.Counter, 0), Is.EqualTo(1), "배치 칸이 비어도 1마리");
+        Assert.That(LobbySparringLink.SpawnCountFor(LobbyTutorialActivity.Counter, 5), Is.EqualTo(5), "그 이상도 인원수대로");
+        Assert.That(LobbySparringLink.SpawnCountFor(LobbyTutorialActivity.Counter, 0), Is.EqualTo(1), "명단이 비어도 1마리");
         Assert.That(LobbySparringLink.SpawnCountFor(LobbyTutorialActivity.Wall, 3), Is.EqualTo(1), "T31 뒤에서 시작한 회차");
+    }
+
+    static (float x, float z) Slot(int index, int count)
+    {
+        LobbySparringLink.CounterBotSlot(index, count, 2.5f, 6f, 2f, 3f, out var x, out var z);
+        return (x, z);
+    }
+
+    [TestCase(1, new[] { 0f })]
+    [TestCase(2, new[] { -1.25f, 1.25f })]
+    [TestCase(3, new[] { -2.5f, 0f, 2.5f })]
+    public void CounterBotSlot_OneRowIsCentered(int count, float[] expectedX)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            Assert.That(Slot(i, count).x, Is.EqualTo(expectedX[i]).Within(1e-5f), $"{i}/{count}");
+            Assert.That(Slot(i, count).z, Is.EqualTo(0f));
+        }
+    }
+
+    [Test]
+    public void CounterBotSlot_OverflowGoesToCenteredNextRow()
+    {
+        Assert.That(Slot(2, 4).x, Is.EqualTo(2.5f).Within(1e-5f), "첫 줄 3마리");
+        Assert.That(Slot(3, 4).x, Is.EqualTo(0f).Within(1e-5f), "남은 1마리는 가운데");
+        Assert.That(Slot(3, 4).z, Is.EqualTo(2f).Within(1e-5f));
+    }
+
+    [Test]
+    public void CounterBotSlot_ManyBotsStayInsideWidthAndDepth_NoOverlap()
+    {
+        const int count = 12;
+        var seen = new HashSet<(int, int)>();
+        for (var i = 0; i < count; i++)
+        {
+            var (x, z) = Slot(i, count);
+            Assert.That(Mathf.Abs(x), Is.LessThanOrEqualTo(3f), "폭 6m 안");
+            Assert.That(z, Is.InRange(0f, 3f), "깊이 3m 안");
+            Assert.That(seen.Add((Mathf.RoundToInt(x * 100f), Mathf.RoundToInt(z * 100f))), Is.True, $"{i} 겹침");
+        }
     }
 
     [Test]
@@ -215,7 +259,7 @@ public sealed class LobbySparringLinkTests
     [Test]
     public void ThreeBotModels_OnlyLastCounterReachesFlow_SurvivorContinuesToT32()
     {
-        // 컴포넌트와 같은 순서 — 봇마다 모델 1개, T31 완료는 봇 전원 뒤 진행기에 1회, T32 알림은 남은 봇 모델만 받는다.
+        // 3인 기준. 컴포넌트와 같은 순서 — 봇마다 모델 1개, T31 완료는 봇 전원 뒤 진행기에 1회, T32 알림은 남은 봇 모델만 받는다.
         var models = new Dictionary<ulong, TrainingSparringModel>();
         var link = Started();
         foreach (ulong id in new ulong[] { 1, 2, 3 })

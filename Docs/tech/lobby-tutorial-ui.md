@@ -148,7 +148,7 @@
 
 ## 간파 가능 표시 — `LobbyCounterPrompt` (할 일 303)
 
-훈련 봇마다 머리 우상단 스크린 UI(`OverheadHealthBarCanvas` 아래). 조건·흐름은 [lobby-training.md](lobby-training.md) §간파 훈련. 위치·크기·펄스 = `Resources/Lobby/LobbyCounterPromptSettings.asset`. CombatHUD·튜토리얼 UI 프리팹은 건드리지 않는다.
+훈련 봇마다 머리 우상단 스크린 UI(`OverheadHealthBarCanvas` 아래). 간파 창이 열린 동안 + T32·T34 넉백 차례(밀림·기절·위치 복구 대기 중 숨김). 조건·흐름은 [lobby-training.md](lobby-training.md) §간파 훈련. 위치·크기·펄스 = `Resources/Lobby/LobbyCounterPromptSettings.asset`. CombatHUD·튜토리얼 UI 프리팹은 건드리지 않는다.
 
 ## 문구 키 — `LobbyTutorialUiStrings`
 

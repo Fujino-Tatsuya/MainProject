@@ -24,6 +24,40 @@ public sealed class LobbyTutorialUiCounterPromptTests
         Assert.That(LobbyCounterPromptRules.WindowActive(activity, true), Is.False);
     }
 
+    [TestCase(LobbyTutorialActivity.VulnerableCc, TrainingSparringStage.VulnerableCc)]
+    [TestCase(LobbyTutorialActivity.Wall, TrainingSparringStage.Wall)]
+    public void T32_T34_는_넉백_차례에_창이_없어도_표시하고_반응_중엔_숨긴다(LobbyTutorialActivity activity, TrainingSparringStage stage)
+    {
+        Assert.That(LobbyCounterPromptRules.PromptActive(activity, stage, false, false), Is.True);
+        Assert.That(LobbyCounterPromptRules.PromptActive(activity, stage, false, true), Is.False, "밀림·기절·복구 대기");
+    }
+
+    [TestCase(LobbyTutorialActivity.ResetPosition, TrainingSparringStage.Resetting)]
+    [TestCase(LobbyTutorialActivity.ResetPosition, TrainingSparringStage.VulnerableCc)]
+    [TestCase(LobbyTutorialActivity.Wall, TrainingSparringStage.Resetting)]
+    [TestCase(LobbyTutorialActivity.SuppressKill, TrainingSparringStage.Wall)]
+    [TestCase(LobbyTutorialActivity.Counter, TrainingSparringStage.Counter)]
+    [TestCase(LobbyTutorialActivity.SuppressKill, TrainingSparringStage.SuppressKill)]
+    public void 넉백_차례가_아니면_창이_닫힌_동안_표시_없음(LobbyTutorialActivity activity, TrainingSparringStage stage)
+    {
+        Assert.That(LobbyCounterPromptRules.PromptActive(activity, stage, false, false), Is.False);
+    }
+
+    [TestCase(LobbyTutorialActivity.Counter, TrainingSparringStage.Counter)]
+    [TestCase(LobbyTutorialActivity.SuppressKill, TrainingSparringStage.SuppressKill)]
+    public void T31_T40_은_창이_열리면_표시(LobbyTutorialActivity activity, TrainingSparringStage stage)
+    {
+        Assert.That(LobbyCounterPromptRules.PromptActive(activity, stage, true, false), Is.True);
+    }
+
+    [Test]
+    public void T34_빗나감_뒤_다시_켜지면_펄스도_다시()
+    {
+        var pushed = LobbyCounterPromptRules.PromptActive(LobbyTutorialActivity.Wall, TrainingSparringStage.Wall, false, true);
+        var restored = LobbyCounterPromptRules.PromptActive(LobbyTutorialActivity.Wall, TrainingSparringStage.Wall, false, false);
+        Assert.That(LobbyCounterPromptRules.PulseStarts(pushed, restored), Is.True);
+    }
+
     [Test]
     public void 간파_암전_중엔_숨기고_풀려도_펄스는_다시_시작하지_않는다()
     {

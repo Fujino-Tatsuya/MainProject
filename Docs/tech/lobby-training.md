@@ -32,7 +32,7 @@
 | 6 | T20_CombatGather | Gather | 전원 집결 1초(카운트다운, 이탈 = 취소) | `Train02Start` |
 | 7 | T22_Combat | Activity Combat | 생성 상대 6마리 전원 사망 | 남은 수 표시 없음 |
 | 8 | T30_CounterGather | Gather | 전원 집결 1초 | `Train03Area` |
-| 9 | T31_Counter | Activity Counter | 봇 3마리 모두 간파(팀 합산, 303) | |
+| 9 | T31_Counter | Activity Counter | 스폰된 봇(훈련 명단 인원수) 모두 간파(팀 합산, 303) | |
 | 10 | T32_VulnerableCC | Activity VulnerableCc | 새 시전 넉백/기절 실제 적용 1회 | 보조 2줄 |
 | 11 | T33_ResetPosition | Activity ResetPosition | 상대 위치 복귀 실행(자동) | |
 | 12 | T34_Wall | Activity Wall | 지정 벽 유효 넉백 충돌 | 벽 `WALL_TRAIN_WEST` |
@@ -157,13 +157,13 @@
   - 데이터 테이블 `Lobby` 시트에 새 프리팹 열이 없다 → 경고만, 인스펙터 값(= 옛 상대에서 복사한 값)으로 돈다. 병합 Export 때 열이 생긴다.
   23호 코드(`TwentyThreeBoss`)를 읽어 같은 규칙을 이 상대 안에 다시 썼다 — 23호·공용 코드는 고치지 않는다(23호 규칙이 바뀌면 같이 맞춘다). 이동 없음, 사거리(`SpinnerBotData.attackRange`) 안이면 간파 창 → 공격.
 - **상태** = `TrainingSparringModel`(순수, 진행기 Activity 를 따라감) · 연결 = `LobbyTrainingSparring` + `LobbySparringLink` · "새 시전" 판정 = `LobbyCastWindow`.
-- **스폰(303)** = T30 집결 확정(T31 시작) 순간 **3마리** — `Train03Arena` A/B 위치 기준 오프셋(`LobbyTrainingSparring.counterBotOffsets`, 코드 기본 x ±2.5m·칸 수 = 마리 수, NavMesh 1m 보정). 첫 공격은 봇마다 `counterBotStaggerSeconds`(기본 0.7초)씩 늦춰 간파 창이 완전히 겹치지 않게 한다. 집결 대기 중엔 없다. 간파 훈련이 아닌 단계로 넘어가거나 진행기 디스폰 때 전부 구독 해제·정리.
+- **스폰(303)** = T30 집결 확정(T31 시작) 순간 **훈련 명단 인원수만큼**(최소 1 — 솔로 1·2인 2·3인 3, 이후 인원이 줄어도 봇 수는 그대로이고 남은 사람이 끝낼 수 있다). `Train03Arena` A/B 위치 기준 가운데 정렬(`LobbySparringLink.CounterBotSlot`, `LobbyTrainingSparring` 칸 `counterBotSpacing` 2.5·`counterBotMaxRowWidth` 6 — 넘치면 앞쪽 다음 줄·`counterBotRowSpacing` 2·`counterBotMaxDepth` 3, NavMesh 1m 보정). 첫 공격은 봇마다 `counterBotStaggerSeconds`(기본 0.7초)씩 늦춰 간파 창이 완전히 겹치지 않게 한다. 집결 대기 중엔 없다. 간파 훈련이 아닌 단계로 넘어가거나 진행기 디스폰 때 전부 구독 해제·정리.
 - **T31 → T32(303)** = 봇마다 완료가 오지만 `LobbySparringLink.TryRecordCounterSuccess`(봇 id 집합)가 전원 간파 순간에만 true → 진행기 보고 1회. T32 알림 때 마지막에 간파된 봇만 남기고 나머지 디스폰(`TryPickSurvivor`, 기록 없으면 첫 봇) — 남은 봇이 T32~T40 을 잇는다.
-- **간파 표시(303)** = 훈련 봇마다 `LobbyCounterPrompt`(모든 피어, 봇 스폰 때 런타임 부착). T31~T40 에 그 봇의 복제 간파 창(`IInterruptWindowReplica.ReplicatedWindowOpen`)이 열린 동안 머리 우상단에 마우스 아이콘 + 오른쪽 버튼 빨간 빛(열리는 순간 펄스) + 문구 `UI.Lobby.Tutorial.CounterPrompt`(ko "우클릭!", en "RMB!"). 새 RPC·복제 값 없음. 화면 밖·카메라 뒤·간파 암전(A5 `CombatUiHidden`)이면 숨김. 수치·이미지 = `Resources/Lobby/LobbyCounterPromptSettings.asset`, 빛 스프라이트 = `2.Prefabs/UI/Textures/Input_RMB_RedGlow.png`(아이콘은 50.Art `Input_RMB` 참조만). 규칙 = 순수 `LobbyCounterPromptRules`.
+- **간파 표시(303)** = 훈련 봇마다 `LobbyCounterPrompt`(모든 피어, 봇 스폰 때 런타임 부착). T31~T40 에 그 봇의 복제 간파 창(`IInterruptWindowReplica.ReplicatedWindowOpen`)이 열린 동안, 그리고 T32·T34 에서 넉백을 넣을 차례(진행기 단계 = 봇 단계, 밀림·기절 반응·T34 빗나감 위치 복구 대기 중 제외 — 복구되면 다시 표시)에 머리 우상단에 마우스 아이콘 + 오른쪽 버튼 빨간 빛(열리는 순간 펄스) + 문구 `UI.Lobby.Tutorial.CounterPrompt`(ko "우클릭!", en "RMB!"). 새 RPC 없음, 복제 값은 봇의 `_crowdControlReacting`(bool) 하나 — 밀림·복구 대기는 서버만 아는 값이라 전 피어가 같게 숨으려면 필요하다. 세 캐릭터 우클릭 모두 같은 간파 베이스라 취약 봇에 고정 거리 넉백을 낸다(T32·T34 시전은 선착순 장부에 걸리지 않음). 화면 밖·카메라 뒤·간파 암전(A5 `CombatUiHidden`)이면 숨김. 수치·이미지 = `Resources/Lobby/LobbyCounterPromptSettings.asset`, 빛 스프라이트 = `2.Prefabs/UI/Textures/Input_RMB_RedGlow.png`(아이콘은 50.Art `Input_RMB` 참조만). 규칙 = 순수 `LobbyCounterPromptRules`.
 
 | 단계 | 상대 동작 | 완료 |
 |---|---|---|
-| T31 간파 | 3마리 각각: 처치 불가, 간파 창(보라빛 예고, 훈련 최소 2초로 연장)을 단 같은 공격 반복. 실패 = 반복 | 3마리 모두 실제 간파 성공(봇마다 그 순간 판정, 그로기 끝을 기다리지 않음). 성공 뒤 **취약 무기한 유지**(T34 끝까지)·자발 행동 멈춤 |
+| T31 간파 | 봇 각각: 처치 불가, 간파 창(보라빛 예고, 훈련 최소 2초로 연장)을 단 같은 공격 반복. 실패 = 반복 | 스폰된 봇 모두 실제 간파 성공(봇마다 그 순간 판정, 그로기 끝을 기다리지 않음). 성공 뒤 **취약 무기한 유지**(T34 끝까지)·자발 행동 멈춤 |
 | T32 취약 중 CC | 취약 유지, 자발 행동 없음. 넉백(간파 스킬·넉백 세기 > 0) = 밀림, 밀림 뒤 경직 = 기절, 뇌진탕 = 밀림이 끝나면 기절. **넉백 없는 경직만 = 반응·인정 없음** | 단계 진입 뒤 **새 시전**의 넉백/기절 **실제 적용** 1회(누구 것이든) |
 | T33 위치 복귀 | 앞 CC 반응이 끝나면 상대만 `PointC` 로, 체력 복구(취약·칸 보존). 플레이어는 `PracticeReset`(쿨·대시) 회차당 1회 | 복귀 실행 = 자동 완료 |
 | T34 벽 | 그대로 취약. 지정 벽 `DesignatedWall_West` = `WALL_TRAIN_WEST` | 지정 벽 유효 넉백 충돌 자체(새 시전). 칸 감소는 실제 규칙대로(조건 아님). 빗나간 넉백 = 위치 복구 후 재시도 |
@@ -289,9 +289,10 @@ QA·부스 운영용 예외 키(키 표·게이트 = [debug-hotkeys.md](debug-ho
 - [ ] L20→L21: 입구 집결 1초 → 훈련장 안으로 텔레포트(재집결 없음) → 훈련 대사 동안 표적 없음
 - [ ] T10: 6항목(기본 공격·Q·E·R·우클릭·대시) 각자 체크, 둘 다 끝나야 다음
 - [ ] T20→T22: 카운트다운 1초('시작까지 1'), 한 명이 나가면 취소·재시작 → 상대 6마리 전멸
-- [ ] T30→T31: 집결 1초 → 봇 3마리 스폰, 공격·간파 창이 엇갈림, 창이 열린 봇마다 머리 우상단에 우클릭 표시(오른쪽 버튼 빨간 펄스 + 문구)
-- [ ] T31: 간파된 봇은 취약 상태로 멈춤, 3마리 모두 간파해야 완료(2인이면 나눠서 해도 됨)
-- [ ] T32 진입: 마지막에 간파한 봇만 남고 2마리 사라짐
+- [ ] T30→T31: 집결 1초 → 봇이 훈련 인원수만큼(솔로 1·2인 2) 가운데 정렬로 스폰, 공격·간파 창이 엇갈림, 창이 열린 봇마다 머리 우상단에 우클릭 표시(오른쪽 버튼 빨간 펄스 + 문구)
+- [ ] T31: 간파된 봇은 취약 상태로 멈춤, 스폰된 봇 모두 간파해야 완료(나눠서 해도 됨, 도중에 한 명이 나가도 남은 사람이 끝낼 수 있음)
+- [ ] T32 진입: 마지막에 간파한 봇만 남고 나머지 사라짐(솔로는 그 봇 그대로)
+- [ ] T32·T34: 넉백 차례에 남은 봇 위 우클릭 표시, 밀리는 중·기절 중·T33 복귀 중 숨김, T34 빗나가 위치가 복구되면 다시 표시
 - [ ] T32: 새 넉백/기절 스킬 적중으로 완료(간파 자동 넉백·진입 전 투사체는 불인정)
 - [ ] T33→T34: 상대만 C 위치 복귀(취약 유지) → 서쪽 지정 벽으로 넉백하면 완료, 빗나가면 위치 복구 후 재시도
 - [ ] T40: 칸 소진 → 제압이 끝나지 않고 유지, 제압 중 처치로 완료(제압 전엔 안 죽음)

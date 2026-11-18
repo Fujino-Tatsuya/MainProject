@@ -10,9 +10,9 @@ using UnityEngine.SceneManagement;
 /// 연결 규칙은 <see cref="LobbySparringLink"/>, 단계 판정은 훈련 상대(<see cref="TrainingSparringBot"/>·<see cref="TrainingSparringModel"/>),
 /// T32·T34 "새 시전" 판정은 <see cref="LobbyCastWindow"/>. 여기는 스폰·구독·짝짓기 입력·보고만 한다.
 /// <list type="bullet">
-/// <item>시작 = 진행기 T31(Counter) 이 시작되는 순간(T30 집결 확정 — 집결 대기 중엔 스폰하지 않는다): 상대 3마리(할 일 303, 칸 counterBotOffsets)를 <see cref="LobbyTrainingSparringArena.SpawnPoint"/> 기준으로 스폰하고
+/// <item>시작 = 진행기 T31(Counter) 이 시작되는 순간(T30 집결 확정 — 집결 대기 중엔 스폰하지 않는다): 상대를 훈련 명단 인원수만큼(할 일 303, 최소 1) <see cref="LobbyTrainingSparringArena.SpawnPoint"/> 기준 가운데 정렬로 스폰하고
 /// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣은 뒤 같은 평가에서 T31 시작 알림까지 준다.</item>
-/// <item>T31 통과 = 3마리 모두 간파(팀 합산) — 마지막 1마리 순간에 Counter 완료를 1회만 보고(<see cref="LobbySparringLink.TryRecordCounterSuccess"/>). T32 알림 때 마지막에 간파된 봇만 남기고 나머지를 디스폰 → 그 봇이 T32~T40 을 잇는다.</item>
+/// <item>T31 통과 = 스폰된 봇 모두 간파(팀 합산 — 도중에 사람이 나가도 봇 수는 그대로, 남은 사람이 끝낼 수 있다) — 마지막 1마리 순간에 Counter 완료를 1회만 보고(<see cref="LobbySparringLink.TryRecordCounterSuccess"/>). T32 알림 때 마지막에 간파된 봇만 남기고 나머지를 디스폰 → 그 봇이 T32~T40 을 잇는다.</item>
 /// <item>시작 알림: T31~T40 이 시작될 때마다 <see cref="TrainingSparringBot.ServerNotifyFlowStageStarted"/> 1회(앞으로만) — 그 단계 revision 을 기억한다.
 /// T32·T34 알림이면 판정 창을 열고 그 순간 접속자별 시전 기준선(Player 인스턴스, <see cref="Player.ServerCastSeq"/>)을 잡는다.</item>
 /// <item>짝짓기 입력: 접속자 Player 의 <see cref="Player.ServerAttackLanded"/>(대상에 이 상대가 있을 때)·상대의 CC·벽·넉백 끝을 프레임 번호와 함께 창에 넣고,
@@ -40,9 +40,18 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     [Tooltip("A/B·C 위치와 지정 벽(LobbyTraining/Train03Arena) — 임시 좌표, 최종 위치는 사용자.")]
     [SerializeField] private LobbyTrainingSparringArena arena;
 
-    [Header("T31 간파 봇 여러 마리(할 일 303)")]
-    [Tooltip("T31 봇 배치 — 칸 수 = 마리 수. A/B 위치 기준 오프셋(m, 그 방향 기준). 기본 ±2.5m: 집결 구역(7×5) 안이고, 사거리 2m 라 플레이어가 봇마다 다가가야 한다.")]
-    [SerializeField] private Vector3[] counterBotOffsets = { new Vector3(-2.5f, 0f, 0f), Vector3.zero, new Vector3(2.5f, 0f, 0f) };
+    [Header("T31 간파 봇 — 훈련 명단 인원수만큼(할 일 303)")]
+    [Tooltip("봇 사이 간격(m). 기본 2.5: 봇 사거리가 2m 라 플레이어가 봇마다 다가가야 한다.")]
+    [SerializeField, Min(0f)] private float counterBotSpacing = 2.5f;
+
+    [Tooltip("한 줄 최대 폭(m) — 넘치면 다음 줄로. 기본 6: 집결 구역 폭 7m 안.")]
+    [SerializeField, Min(0f)] private float counterBotMaxRowWidth = 6f;
+
+    [Tooltip("줄 사이 간격(m, A/B 위치 앞쪽으로 쌓는다).")]
+    [SerializeField, Min(0f)] private float counterBotRowSpacing = 2f;
+
+    [Tooltip("앞쪽으로 쌓는 최대 깊이(m) — 줄이 많으면 줄 간격을 줄여 이 안에 넣는다. 기본 3: 집결 구역 안.")]
+    [SerializeField, Min(0f)] private float counterBotMaxDepth = 3f;
 
     [Tooltip("봇마다 첫 공격을 이만큼씩 늦춘다(초) — 간파 창(훈련 2초)이 완전히 겹치지 않게.")]
     [SerializeField, Min(0f)] private float counterBotStaggerSeconds = 0.7f;
@@ -237,10 +246,10 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         _castWindow.Reset();
         _pendingReports.Clear();
 
-        var count = LobbySparringLink.SpawnCountFor(activity, counterBotOffsets != null ? counterBotOffsets.Length : 0);
+        var count = LobbySparringLink.SpawnCountFor(activity, _director.ServerTrainingRoster.Count);
         for (var i = 0; i < count; i++)
         {
-            var bot = SpawnBotServer(i);
+            var bot = SpawnBotServer(i, count);
             if (bot == null)
                 continue;
 
@@ -264,7 +273,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
                   $"지정 벽 {(arena != null && arena.DesignatedWalls != null ? arena.DesignatedWalls.Length : 0)}개");
     }
 
-    private TrainingSparringBot SpawnBotServer(int index)
+    private TrainingSparringBot SpawnBotServer(int index, int count)
     {
         if (sparringPrefab == null)
             return null;
@@ -272,8 +281,8 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         var point = arena != null ? arena.SpawnPoint : null;
         var origin = point != null ? point.position : transform.position;
         var rotation = point != null ? Quaternion.Euler(0f, point.eulerAngles.y, 0f) : Quaternion.identity;
-        var offset = counterBotOffsets != null && index < counterBotOffsets.Length ? counterBotOffsets[index] : Vector3.zero;
-        var position = origin + rotation * offset;
+        LobbySparringLink.CounterBotSlot(index, count, counterBotSpacing, counterBotMaxRowWidth, counterBotRowSpacing, counterBotMaxDepth, out var x, out var z);
+        var position = origin + rotation * new Vector3(x, 0f, z);
         if (NavMesh.SamplePosition(position, out var hit, 1f, NavMesh.AllAreas))
             position = hit.position;
 

@@ -3,8 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// [전 피어·표시 전용] 간파 훈련 봇 머리 우상단 "우클릭!" 표시(할 일 303) — 그 봇의 간파 창이 열린 동안 마우스 아이콘의 오른쪽 버튼이 빨갛게 빛나고 문구가 뜬다.
-/// 판정 입력은 이미 복제되는 값만 읽는다(<see cref="IInterruptWindowReplica.ReplicatedWindowOpen"/>·진행기 현재 행) — 새 RPC·NetworkVariable 없음.
+/// [전 피어·표시 전용] 간파 훈련 봇 머리 우상단 "우클릭!" 표시(할 일 303) — 그 봇의 간파 창이 열린 동안, 그리고 T32·T34 에서 넉백을 넣을 차례에 마우스 아이콘의 오른쪽 버튼이 빨갛게 빛나고 문구가 뜬다.
+/// 판정 입력은 복제값만 읽는다(<see cref="IInterruptWindowReplica.ReplicatedWindowOpen"/>·봇 단계·봇 반응 중·진행기 현재 행) — 규칙은 <see cref="LobbyCounterPromptRules"/>.
 /// 봇이 스폰될 때 붙고(<see cref="Attach"/>) 디스폰 때 UI 와 함께 사라진다. UI 는 머리 위 체력바 공용 캔버스(<see cref="OverheadHealthBarCanvas"/>)에 그리고,
 /// 위치 계산·카메라 뒤/화면 밖 처리도 체력바와 같다. 수치·이미지 = <see cref="LobbyCounterPromptSettings"/>.
 /// </summary>
@@ -12,13 +12,14 @@ using UnityEngine.UI;
 public sealed class LobbyCounterPrompt : MonoBehaviour
 {
     private LobbyCounterPromptSettings _settings;
+    private TrainingSparringBot _bot;
     private IInterruptWindowReplica _window;
     private Canvas _canvas;
     private RectTransform _root;
     private CanvasGroup _group;
     private Image _glow;
     private TMP_Text _label;
-    private bool _windowWasActive;
+    private bool _wasActive;
     private float _pulseStartedAt;
 
     /// <summary>봇에 표시를 붙인다. 설정·이미지가 비면 경고만 — 훈련 진행에는 영향 없다.</summary>
@@ -39,6 +40,7 @@ public sealed class LobbyCounterPrompt : MonoBehaviour
     private void Build(LobbyCounterPromptSettings settings, TrainingSparringBot bot)
     {
         _settings = settings;
+        _bot = bot;
         _window = bot;
         _canvas = OverheadHealthBarCanvas.Instance;
 
@@ -119,17 +121,17 @@ public sealed class LobbyCounterPrompt : MonoBehaviour
 
         var director = LobbyTrainingDirector.Active;
         var activity = director != null ? director.CurrentActivity : LobbyTutorialActivity.None;
-        var windowActive = LobbyCounterPromptRules.WindowActive(activity, _window.ReplicatedWindowOpen);
+        var active = LobbyCounterPromptRules.PromptActive(activity, _bot.SparringStage, _window.ReplicatedWindowOpen, _bot.IsCrowdControlReacting);
 
         // 시간은 unscaled — 간파 슬로우에 펄스가 늘어지지 않게.
-        if (LobbyCounterPromptRules.PulseStarts(_windowWasActive, windowActive))
+        if (LobbyCounterPromptRules.PulseStarts(_wasActive, active))
         {
             _pulseStartedAt = Time.unscaledTime;
             _label.text = LobbyTutorialUiStrings.CounterPromptText;
         }
-        _windowWasActive = windowActive;
+        _wasActive = active;
 
-        var visible = LobbyCounterPromptRules.Visible(windowActive, InterruptProductionDirector.CombatUiHidden);
+        var visible = LobbyCounterPromptRules.Visible(active, InterruptProductionDirector.CombatUiHidden);
         if (_root.gameObject.activeSelf != visible)
             _root.gameObject.SetActive(visible);
         if (!visible)
