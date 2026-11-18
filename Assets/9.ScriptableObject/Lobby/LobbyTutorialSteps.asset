@@ -78,7 +78,7 @@ MonoBehaviour:
     dialogueId: LOBBY_DLG_INTRO
     speakerKey: LOBBY_SPEAKER_SUPERVISOR
     backgroundId: 
-    dialogueSeconds: 0
+    dialogueSeconds: 2.5
     locksInput: 0
     requiredSkillTags: 
     trainingProfile: 0
