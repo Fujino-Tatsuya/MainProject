@@ -413,8 +413,16 @@ public sealed class LobbyBriefingVideoScreen : MonoBehaviour
         if (_keycap == null || _skipLabel == null)
             return;
         float width = _skipLabel.GetPreferredValues(_skipLabel.text).x;
-        _keycap.anchoredPosition = new Vector2(-(width + 16f), 1f);
+        _keycap.anchoredPosition = new Vector2(-(width + 16f * TitleSkipScale), 1f * TitleSkipScale);
     }
+
+    // 타이틀 Esc 건너뛰기(TitleSkipHint, 1.TitleScene 의 SkipHint_Root)와 같은 크기 — 그 루트 높이 58.835 ÷ 기준 높이 72 = 배율.
+    // 같은 1920×1080·0.5 캔버스라 캔버스 단위 값이 그대로 같은 화면 크기다. 타이틀 씬 값(키캡 48×40·글자 22)을 바꾸면 여기도 맞춘다.
+    private const float TitleSkipScale = 58.835f / CinematicOverlay.SkipPillHeight;
+    private const float TitleKeycapWidth = 48f;
+    private const float TitleKeycapHeight = 40f;
+    private const float TitleKeyFontSize = 22f;
+    private const float TitleLabelFontSize = 22f;
 
     // 오른쪽 아래 [Esc] 건너뛰기 n/m — 타이틀 Esc 건너뛰기(TitleSkipHint)와 같은 키캡·글자(알약 배경 없음). 영상 위라 글자에 검은 외곽선.
     private void BuildSkip(Transform parent)
@@ -424,9 +432,9 @@ public sealed class LobbyBriefingVideoScreen : MonoBehaviour
         var root = (RectTransform)_skipRoot.transform;
         root.anchorMin = root.anchorMax = root.pivot = new Vector2(1f, 0f);
         root.anchoredPosition = new Vector2(-56f, 56f);
-        root.sizeDelta = new Vector2(420f, CinematicOverlay.SkipPillHeight);
+        root.sizeDelta = new Vector2(420f, CinematicOverlay.SkipPillHeight * TitleSkipScale);
 
-        _skipLabel = CinematicOverlay.Label(root, "Label", 28f, TextAlignmentOptions.Right);
+        _skipLabel = CinematicOverlay.Label(root, "Label", TitleLabelFontSize * TitleSkipScale, TextAlignmentOptions.Right);
         CinematicOverlay.Stretch((RectTransform)_skipLabel.transform);
         _skipLabel.color = CinematicOverlay.SkipTextColor;
         _skipLabel.outlineWidth = 0.25f;
@@ -434,16 +442,18 @@ public sealed class LobbyBriefingVideoScreen : MonoBehaviour
         _skipLabel.text = UiStrings.BossIntroSkip.Text;
 
         // 키캡은 글자 바로 왼쪽 — 글자 폭이 n/m 에 따라 바뀌어 글자가 바뀔 때마다 PlaceKeycap 이 옮긴다.
+        float kw = TitleKeycapWidth * TitleSkipScale;
+        float kh = TitleKeycapHeight * TitleSkipScale;
         Image keycap = CinematicOverlay.NewImage(root, "Keycap",
-            CinematicOverlay.KeycapSprite((int)CinematicOverlay.SkipKeycapWidth, (int)CinematicOverlay.SkipKeycapHeight), Color.white);
+            CinematicOverlay.KeycapSprite(Mathf.RoundToInt(kw), Mathf.RoundToInt(kh)), Color.white);
         RectTransform k = keycap.rectTransform;
         k.anchorMin = k.anchorMax = k.pivot = new Vector2(1f, 0.5f);
-        k.sizeDelta = new Vector2(CinematicOverlay.SkipKeycapWidth, CinematicOverlay.SkipKeycapHeight);
+        k.sizeDelta = new Vector2(kw, kh);
         _keycap = k;
         PlaceKeycap();
-        TMP_Text key = CinematicOverlay.Label(keycap.transform, "Key", 21f, TextAlignmentOptions.Center);
+        TMP_Text key = CinematicOverlay.Label(keycap.transform, "Key", TitleKeyFontSize * TitleSkipScale, TextAlignmentOptions.Center);
         CinematicOverlay.Stretch((RectTransform)key.transform);
-        ((RectTransform)key.transform).offsetMin = new Vector2(0f, 3f);   // 키캡 아랫단(그림자) 위 가운데
+        ((RectTransform)key.transform).offsetMin = new Vector2(0f, 3f * TitleSkipScale);   // 키캡 아랫단(그림자) 위 가운데
         key.text = "Esc";
         key.color = CinematicOverlay.KeycapTextColor;
         key.fontStyle = FontStyles.Bold;
