@@ -29,6 +29,7 @@ MonoBehaviour:
   fallingSwordLife: 0
   killerMove: 1
   teleportMoveState: Assassin_Q_DashStrike_Transformed
+  teleportMoveClip: {fileID: 7400000, guid: 92fed079ebb423342a820558746d04f8, type: 2}
   teleportMoveEase:
     serializedVersion: 2
     m_Curve:

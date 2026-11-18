@@ -57,6 +57,9 @@ public sealed class BossVictoryProfile : ScriptableObject, ISerializationCallbac
     [Tooltip("[순간이동] 클립마다 트는 애니 상태(기본 = Combo_Attack_03_04 를 든 상태) — Custom0 프레임부터, Custom0 → End 가 클립 길이에 맞게. 이 클립의 End 는 '스킬 끝'이 아니다. " +
              "정지 프레임 = 타임라인 '처치 연출 스킬' 클립 끝 자르기(기본 71프레임) — 마지막 클립 뒤에만.")]
     public string teleportMoveState = BossVictoryKillerMoves.DefaultTeleportMoveState;
+    [Tooltip("[순간이동] 위 상태가 든 클립(기본 = Combo_Attack_03_04). 빌드에는 상태 이름으로 클립을 찾는 길(에디터 전용)이 없어 이 칸으로 Custom0·End 시각과 길이를 읽는다. " +
+             "에디터에서는 상태에서 찾은 클립이 먼저고, 못 찾을 때만 이 칸을 쓴다.")]
+    public AnimationClip teleportMoveClip;
     [Tooltip("[순간이동] 이동 곡선(가로 = 클립 0~1, 세로 = 시작 지점 → 도착 지점 0~1) — 모든 클립 공용.")]
     public AnimationCurve teleportMoveEase = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
