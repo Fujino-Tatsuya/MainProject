@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 18cf45fddec0144b5e1b0c34ebfebad3, type: 3}
+  m_Name: LobbyCounterPromptSettings
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyCounterPromptSettings
+  mouseIcon: {fileID: 21300000, guid: cd0f1e40d2ef5abb868ce365552f1a41, type: 3}
+  rightButtonGlow: {fileID: 21300000, guid: 92cdcb8f3ca4c6b609521fb42ddb49af, type: 3}
+  font: {fileID: 11400000, guid: dcd1a3c7a759ca047b35a1a6ee54e88d, type: 2}
+  fontMaterial: {fileID: 2100000, guid: b2982e9092bc4734b7afe47b5676f550, type: 2}
+  worldHeight: 1.7
+  screenOffset: {x: 56, y: 28}
+  iconHeight: 60
+  labelGap: 8
+  labelFontSize: 32
+  labelColor: {r: 1, g: 1, b: 1, a: 1}
+  glowColor: {r: 1, g: 0.14, b: 0.1, a: 1}
+  glowRestAlpha: 0.7
+  pulseSeconds: 0.35
+  pulseScale: 1.3

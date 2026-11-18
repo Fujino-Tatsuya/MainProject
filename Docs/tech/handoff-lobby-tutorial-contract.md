@@ -26,7 +26,7 @@
 | 3 | L20_TrainingGather | Gather | **`Entrance`**(문 앞 입구 영역) | **확정: A**(157 PLAN §10.3) — 입구 집결 확정 → 명단 전원 `Gather_Train01Start` 안으로 텔레포트 → 바로 L21(내부 재집결 없음). 활성 집결 테두리 = `Gather_Entrance`. **명세 §5 L20 의 '문 통과' 문구는 이 텔레포트로 대체**(`Door_Training` 막힘 유지 — Q4 B). `Train01Start` 는 도착지일 뿐 활성 구역이 되지 않는다 |
 | 4 | L21_TrainingIntro | Dialogue | — | `LOBBY_DLG_TRAINING` |
 | 5 | T10_Basic | Activity(BasicCheck) | — | 개인 6항목, 진행 = PartyComplete |
-| 6 | T20_CombatGather | Gather | `Train02Start` | 유지 3초 = 카운트다운 → 표시 상태 T21 |
+| 6 | T20_CombatGather | Gather | `Train02Start` | 유지 1초(303) = 카운트다운 → 표시 상태 T21 |
 | 7 | T22_Combat | Activity(Combat) | — | 남은 상대 표시 없음 |
 | 8 | T30_CounterGather | Gather | `Train03Area` | |
 | 9 | T31_Counter | Activity(Counter) | — | |
@@ -63,7 +63,7 @@
 | `ActiveGatherZone` | `PartyGatherZone` | 테두리 footprint = 이 구역 BoxCollider(트리거 = 테두리 공유). `GatheredCount`·`ParticipantCount`·`IsCountdownActive`·`IsConfirmed` |
 | `ActivePathId` | string | 비면 경로 끔. 같은 revision 동안 바뀌지 않는다 |
 | `ActiveTargetWallId` | string | T34 만 값. 완료(다음 revision) 즉시 빈 값 |
-| `CountdownRemainingSeconds` | double | T20 카운트다운 중만, 그 밖 0(유지 0.3초는 표시하지 않음) |
+| `CountdownRemainingSeconds` | double | T20 카운트다운 중만, 그 밖 0(다른 집결은 표시하지 않음) |
 | `Dialogue` / `IsDialogueActive` | `LobbyTutorialDialogueView` / bool | DialogueId·SpeakerKey·BackgroundId·StartServerTime·EndServerTime·Revision. 대사 중엔 목표 패널 숨김 |
 | `Video` / `IsVideoActive` | `LobbyTutorialVideoView` / bool | 292 — Clip·StartServerTime·EndServerTime·Revision. Kind=Video 이고 출격 확정 전일 때만. 시작 시각 0 = 서버가 아직 안 실음(다음 Publish 에서 같은 revision 으로 값만 바뀜, 이벤트 없음). 영상 단계는 `Dialogue*` 이벤트를 내지 않는다 |
 | `IsInputLockedForBriefing` | bool | L31 영상·L34(표시 참고용 — 실제 잠금은 서버) |

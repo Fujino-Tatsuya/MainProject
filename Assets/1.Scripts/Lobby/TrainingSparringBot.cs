@@ -68,6 +68,9 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     // 제압이 끝나는 서버 시각(NetworkManager.ServerTime) — 남은 시간 표시. 제압 아님·무기한 제압(T34·T40)이면 0.
     readonly NetworkVariable<double> _suppressEndsAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    // 밀림·기절 반응 중(T34 빗나감 뒤 위치 복구 대기 포함) — 우클릭 표시(할 일 303)가 전 피어에서 같게 숨으려면 필요하다. 밀림은 서버만 아는 값이다.
+    readonly NetworkVariable<bool> _crowdControlReacting = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // ── 서버 런타임 ──
     TrainingSparringModel _model;
@@ -91,6 +94,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     float _pendingConcussion;          // 밀림이 끝나면 걸 기절(특성 뇌진탕)
     bool _ccStun;                      // 기절(경직) 반응 중
     bool _resetting;
+    bool _missRestorePending;          // T34 넉백이 끝나고 빗나감 위치 복구를 기다린다(판정은 다음 프레임)
     int _interruptSuccessCount;
 
     /// <summary>[서버] 취약 중 CC 를 받았다 — (넉백 에피소드(밀림 없으면 0), 종류, 실제 적용). 시전 짝짓기는 <see cref="LobbyCastWindow"/>.</summary>
@@ -110,13 +114,15 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public event Action ServerSuppressHasteDue;
     /// <summary>[서버] 상대 사망. 인자 = 모델이 완료로 인정했는가(false = 처치 방지 누락).</summary>
     public event Action<bool> ServerSparringDied;
-    /// <summary>[서버] 모델 단계 완료(T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring.</summary>
-    public event Action<LobbyTutorialActivity> ServerStageCompleted;
+    /// <summary>[서버] 모델 단계 완료(이 봇, T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring(T31 은 봇 전원이 끝났을 때 1회, 할 일 303).</summary>
+    public event Action<TrainingSparringBot, LobbyTutorialActivity> ServerStageCompleted;
     /// <summary>[서버] T33 위치 복귀 실행 완료 — 진행기가 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>)을 이어 건다(Q10 A).</summary>
     public event Action ServerResetExecuted;
 
     /// <summary>[모든 피어] 상대 단계(복제).</summary>
     public TrainingSparringStage SparringStage => _stage.Value;
+    /// <summary>[모든 피어] 밀림·기절 반응 중, 또는 T34 빗나감 위치 복구 대기 중(복제).</summary>
+    public bool IsCrowdControlReacting => _crowdControlReacting.Value;
     /// <summary>[모든 피어] 간파 게이지(0~100, 복제).</summary>
     public float CounterGauge => _gauge.Value;
     /// <summary>[모든 피어] 칸 UI 표시(복제 — 모델 ShowsSegmentUi).</summary>
@@ -165,13 +171,24 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     protected override bool FaceTargetWhileAttacking => false;
 
     #region 수명
-    /// <summary>[모든 피어] 스폰된 훈련 상대(없으면 null) — 로비 튜토리얼 파사드(<see cref="LobbyTutorialState.TrainingTarget"/>)가 읽는다.</summary>
-    public static TrainingSparringBot Current { get; private set; }
+    static readonly List<TrainingSparringBot> s_spawned = new List<TrainingSparringBot>();
+    LobbyCounterPrompt _counterPrompt;
+
+    /// <summary>
+    /// [모든 피어] 스폰된 훈련 상대(없으면 null) — 로비 튜토리얼 파사드(<see cref="LobbyTutorialState.TrainingTarget"/>)가 읽는다.
+    /// T31 은 여러 마리(가장 나중에 스폰된 봇), T32 부터는 남은 1마리(할 일 303).
+    /// </summary>
+    public static TrainingSparringBot Current => s_spawned.Count > 0 ? s_spawned[s_spawned.Count - 1] : null;
+
+    // 도메인 리로드 없는 Play 진입에서 지난 세션 봇이 남지 않게.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSpawned() => s_spawned.Clear();
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        Current = this;
+        s_spawned.Add(this);
+        _counterPrompt = LobbyCounterPrompt.Attach(this);
         _vulnerableVisual.OnValueChanged += OnVulnerableVisualChanged;
         ApplyVulnerableTint(_vulnerableVisual.Value);
 
@@ -192,9 +209,16 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public override void OnNetworkDespawn()
     {
         _vulnerableVisual.OnValueChanged -= OnVulnerableVisualChanged;
-        if (Current == this)
-            Current = null;
+        s_spawned.Remove(this);
+        if (_counterPrompt != null)
+            Destroy(_counterPrompt);
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>[서버] 첫 공격을 늦춘다 — T31 봇끼리 간파 창이 완전히 겹치지 않게(할 일 303). 스폰 뒤 1회.</summary>
+    public void ServerDelayFirstAttack(float seconds)
+    {
+        if (IsServer) DelayFirstAttack(seconds);
     }
 
     /// <summary>[서버] 씬 배치 주입(스폰한 프리팹은 씬 콜라이더를 직렬화로 못 가리킨다). null 이면 그 항목은 그대로.</summary>
@@ -249,6 +273,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     {
         if (!IsServer || _model == null || !_model.NeedsRetryAfterMiss || _kbActive || State == MonsterState.Dead) return false;
         RepositionToResetPoint();
+        _missRestorePending = false;
+        SyncModel();
         Debug.Log($"{Tag} T34 지정 벽 빗나감 — 위치 복구 후 재시도({(resetPoint != null ? resetPoint.name : "제자리")})", this);
         return true;
     }
@@ -768,6 +794,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
             TryStartStun(_pendingConcussion, "뇌진탕 기절");
         _pendingConcussion = 0f;
 
+        _missRestorePending = _model != null && _model.NeedsRetryAfterMiss;
         ServerKnockbackEnded?.Invoke(_kbEpisode);
     }
 
@@ -885,11 +912,14 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         while (_model.TryConsumeStageReport(out LobbyTutorialActivity completed))
         {
             Debug.Log($"{Tag} 단계 완료 — {completed}", this);
-            ServerStageCompleted?.Invoke(completed);
+            ServerStageCompleted?.Invoke(this, completed);
         }
 
         if (_stage.Value != _model.Stage) _stage.Value = _model.Stage;
         if (_segmentUi.Value != _model.ShowsSegmentUi) _segmentUi.Value = _model.ShowsSegmentUi;
+
+        bool reacting = CrowdControlActive || (_missRestorePending && _model.NeedsRetryAfterMiss);
+        if (_crowdControlReacting.Value != reacting) _crowdControlReacting.Value = reacting;
     }
     #endregion
 

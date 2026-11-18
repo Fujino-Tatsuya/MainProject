@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>
 /// 할 일 157 ⑥ — T20 전투 구역 집결 → T21 카운트다운(표시 상태) → T22 전투(명세 §5 T20–T22, §10 수용 기준 5).
-/// 집결·카운트다운 = <see cref="PartyGatherRules"/>(행 holdSeconds 3), 표시 = <see cref="LobbyTutorialCountdownDisplay"/>,
+/// 집결·카운트다운 = <see cref="PartyGatherRules"/>(행 holdSeconds 1 — 할 일 303), 표시 = <see cref="LobbyTutorialCountdownDisplay"/>,
 /// 상대 6마리 = <see cref="LobbyRules.CombatSpawnSet"/>, 완료 = <see cref="LobbyCombatLedger"/>.
 /// </summary>
 public sealed class LobbyCombatStageTests
@@ -44,7 +44,7 @@ public sealed class LobbyCombatStageTests
     // ─── T20 집결 · T21 카운트다운 ────────────────────────────────────────
 
     [Test]
-    public void T20_전원_집결하면_3초_카운트다운_뒤_확정_1회()
+    public void T20_전원_집결하면_1초_카운트다운_뒤_확정_1회()
     {
         var rules = T20Gather(0, 1);
         rules.SetMemberState(0, In);
@@ -52,10 +52,10 @@ public sealed class LobbyCombatStageTests
 
         Assert.That(rules.Tick(10d), Is.False);
         Assert.That(rules.IsCountdownActive, Is.True);
-        Assert.That(rules.CountdownEndTime, Is.EqualTo(13d).Within(1e-4));
-        Assert.That(rules.Tick(12.99d), Is.False);
-        Assert.That(rules.Tick(13d), Is.True);
-        Assert.That(rules.Tick(14d), Is.False, "확정은 한 번");
+        Assert.That(rules.CountdownEndTime, Is.EqualTo(11d).Within(1e-4));
+        Assert.That(rules.Tick(10.99d), Is.False);
+        Assert.That(rules.Tick(11d), Is.True);
+        Assert.That(rules.Tick(12d), Is.False, "확정은 한 번");
     }
 
     [Test]
@@ -69,18 +69,18 @@ public sealed class LobbyCombatStageTests
         Assert.That(LobbyTutorialCountdownDisplay.DisplayStateId(t20, rules.IsCountdownActive), Is.EqualTo("T21_CombatCountdown"));
 
         rules.SetMemberState(1, Out);
-        Assert.That(rules.Tick(2.5d), Is.False);
+        Assert.That(rules.Tick(0.5d), Is.False);
         Assert.That(rules.IsCountdownActive, Is.False);
         Assert.That(rules.CountdownEndTime, Is.EqualTo(PartyGatherRules.NoCountdown));
         Assert.That(LobbyTutorialCountdownDisplay.DisplayStateId(t20, rules.IsCountdownActive), Is.EqualTo("T20_CombatGather"));
 
-        // 원래 끝 시각(3초)이 지나도 확정되지 않는다 — 다시 모이면 처음부터 3초.
-        Assert.That(rules.Tick(3d), Is.False);
+        // 원래 끝 시각(1초)이 지나도 확정되지 않는다 — 다시 모이면 처음부터 1초.
+        Assert.That(rules.Tick(1d), Is.False);
         rules.SetMemberState(1, In);
-        Assert.That(rules.Tick(4d), Is.False);
-        Assert.That(rules.CountdownEndTime, Is.EqualTo(7d).Within(1e-4));
-        Assert.That(rules.Tick(6.99d), Is.False);
-        Assert.That(rules.Tick(7d), Is.True);
+        Assert.That(rules.Tick(2d), Is.False);
+        Assert.That(rules.CountdownEndTime, Is.EqualTo(3d).Within(1e-4));
+        Assert.That(rules.Tick(2.99d), Is.False);
+        Assert.That(rules.Tick(3d), Is.True);
     }
 
     [Test]
@@ -94,7 +94,7 @@ public sealed class LobbyCombatStageTests
         Assert.That(LobbyTutorialCountdownDisplay.IsActive(t20, true), Is.True);
         Assert.That(LobbyTutorialCountdownDisplay.DisplayStateId(t20, true), Is.EqualTo("T21_CombatCountdown"));
         Assert.That(LobbyTutorialCountdownDisplay.DisplayStateId(t20, false), Is.EqualTo("T20_CombatGather"));
-        // 유지 0.3초 집결 행(T30)은 구역이 잠깐 카운트다운을 돌려도 표시 상태가 바뀌지 않는다.
+        // 카운트다운 표시가 없는 집결 행(T30)은 구역이 잠깐 카운트다운을 돌려도 표시 상태가 바뀌지 않는다.
         Assert.That(LobbyTutorialCountdownDisplay.DisplayStateId(t30, true), Is.EqualTo("T30_CounterGather"));
         Assert.That(LobbyTutorialCountdownDisplay.IsActive(t22, true), Is.False);
         Assert.That(LobbyTutorialCountdownDisplay.IsActive(default, true), Is.False);
@@ -110,7 +110,7 @@ public sealed class LobbyCombatStageTests
     }
 
     [Test]
-    public void T21_남은_정수_초는_3_2_1_로_올림()
+    public void T21_남은_정수_초는_올림()
     {
         var rules = T20Gather(0);
         rules.SetMemberState(0, In);
@@ -119,12 +119,9 @@ public sealed class LobbyCombatStageTests
 
         int At(double now) => LobbyTutorialCountdownDisplay.WholeSecondsLeft(PartyGatherRules.RemainingSeconds(end, now));
 
-        Assert.That(At(0d), Is.EqualTo(3));
-        Assert.That(At(0.5d), Is.EqualTo(3));
-        Assert.That(At(1d), Is.EqualTo(2));
-        Assert.That(At(1.01d), Is.EqualTo(2));
-        Assert.That(At(2.4d), Is.EqualTo(1));
-        Assert.That(At(3d), Is.EqualTo(0));
+        Assert.That(At(0d), Is.EqualTo(1));
+        Assert.That(At(0.5d), Is.EqualTo(1));
+        Assert.That(At(1d), Is.EqualTo(0));
         Assert.That(At(5d), Is.EqualTo(0), "끝 지난 뒤 음수 없음");
         Assert.That(LobbyTutorialCountdownDisplay.WholeSecondsLeft(-1d), Is.EqualTo(0));
     }

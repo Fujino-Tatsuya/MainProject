@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -9,8 +10,9 @@ using UnityEngine.SceneManagement;
 /// 연결 규칙은 <see cref="LobbySparringLink"/>, 단계 판정은 훈련 상대(<see cref="TrainingSparringBot"/>·<see cref="TrainingSparringModel"/>),
 /// T32·T34 "새 시전" 판정은 <see cref="LobbyCastWindow"/>. 여기는 스폰·구독·짝짓기 입력·보고만 한다.
 /// <list type="bullet">
-/// <item>시작 = 진행기 T31(Counter) 이 시작되는 순간(T30 집결 확정 — 집결 대기 중엔 스폰하지 않는다): 상대를 <see cref="LobbyTrainingSparringArena.SpawnPoint"/> 에 스폰하고
-/// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣은 뒤 같은 평가에서 T31 시작 알림까지 준다. 이미 있으면 재사용.</item>
+/// <item>시작 = 진행기 T31(Counter) 이 시작되는 순간(T30 집결 확정 — 집결 대기 중엔 스폰하지 않는다): 상대를 훈련 명단 인원수만큼(할 일 303, 최소 1) <see cref="LobbyTrainingSparringArena.SpawnPoint"/> 기준 가운데 정렬로 스폰하고
+/// C 위치·지정 벽을 <see cref="TrainingSparringBot.ServerConfigureArena"/> 로 넣은 뒤 같은 평가에서 T31 시작 알림까지 준다.</item>
+/// <item>T31 통과 = 스폰된 봇 모두 간파(팀 합산 — 도중에 사람이 나가도 봇 수는 그대로, 남은 사람이 끝낼 수 있다) — 마지막 1마리 순간에 Counter 완료를 1회만 보고(<see cref="LobbySparringLink.TryRecordCounterSuccess"/>). T32 알림 때 마지막에 간파된 봇만 남기고 나머지를 디스폰 → 그 봇이 T32~T40 을 잇는다.</item>
 /// <item>시작 알림: T31~T40 이 시작될 때마다 <see cref="TrainingSparringBot.ServerNotifyFlowStageStarted"/> 1회(앞으로만) — 그 단계 revision 을 기억한다.
 /// T32·T34 알림이면 판정 창을 열고 그 순간 접속자별 시전 기준선(Player 인스턴스, <see cref="Player.ServerCastSeq"/>)을 잡는다.</item>
 /// <item>짝짓기 입력: 접속자 Player 의 <see cref="Player.ServerAttackLanded"/>(대상에 이 상대가 있을 때)·상대의 CC·벽·넉백 끝을 프레임 번호와 함께 창에 넣고,
@@ -38,6 +40,22 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     [Tooltip("A/B·C 위치와 지정 벽(LobbyTraining/Train03Arena) — 임시 좌표, 최종 위치는 사용자.")]
     [SerializeField] private LobbyTrainingSparringArena arena;
 
+    [Header("T31 간파 봇 — 훈련 명단 인원수만큼(할 일 303)")]
+    [Tooltip("봇 사이 간격(m). 기본 2.5: 봇 사거리가 2m 라 플레이어가 봇마다 다가가야 한다.")]
+    [SerializeField, Min(0f)] private float counterBotSpacing = 2.5f;
+
+    [Tooltip("한 줄 최대 폭(m) — 넘치면 다음 줄로. 기본 6: 집결 구역 폭 7m 안.")]
+    [SerializeField, Min(0f)] private float counterBotMaxRowWidth = 6f;
+
+    [Tooltip("줄 사이 간격(m, A/B 위치 앞쪽으로 쌓는다).")]
+    [SerializeField, Min(0f)] private float counterBotRowSpacing = 2f;
+
+    [Tooltip("앞쪽으로 쌓는 최대 깊이(m) — 줄이 많으면 줄 간격을 줄여 이 안에 넣는다. 기본 3: 집결 구역 안.")]
+    [SerializeField, Min(0f)] private float counterBotMaxDepth = 3f;
+
+    [Tooltip("봇마다 첫 공격을 이만큼씩 늦춘다(초) — 간파 창(훈련 2초)이 완전히 겹치지 않게.")]
+    [SerializeField, Min(0f)] private float counterBotStaggerSeconds = 0.7f;
+
     // 서버
     private LobbyTrainingDirector _director;
     private readonly LobbySparringLink _link = new LobbySparringLink();
@@ -47,7 +65,8 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     private readonly List<ulong> _staleHooks = new List<ulong>();
     private readonly List<SkillTooltipTag> _sourceTags = new List<SkillTooltipTag>();
     private int _noticeRevision;
-    private TrainingSparringBot _bot;
+    private readonly List<TrainingSparringBot> _bots = new List<TrainingSparringBot>();
+    private TrainingSparringBot _bot;   // T31 = 첫 봇, T32~ = 남은 봇 — 단계 판정·연결의 대상
     private NetworkObject _dummy;
     private bool _warnedNoDummyPrefab;
 
@@ -62,7 +81,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     /// <summary>스폰된 간파 훈련 연결(없으면 null) — 서버 이벤트를 구독할 곳.</summary>
     public static LobbyTrainingSparring Active { get; private set; }
 
-    /// <summary>[서버] 지금 회차의 훈련 상대(없으면 null).</summary>
+    /// <summary>[서버] 지금 회차의 훈련 상대(T31 은 첫 봇, T32 부터 남은 봇, 없으면 null).</summary>
     public TrainingSparringBot ServerBot => _bot;
 
     public override void OnNetworkSpawn()
@@ -144,15 +163,24 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         if (LobbySparringLink.BotPresent(activity))
         {
             if (!_link.IsRoundActive)
-                BeginServer();
+                BeginServer(activity);
             if (_bot == null)
                 return;
 
             if (_link.TryTakeFlowNotice(activity, out var notice))
             {
+                if (LobbySparringLink.KeepsSingleBot(notice))
+                    KeepSurvivorBotServer();
+
                 _noticeRevision = _director.Revision;
                 BeginCastWindow(notice);
-                var accepted = _bot.ServerNotifyFlowStageStarted(notice);
+                var accepted = false;
+                foreach (var bot in _bots)
+                {
+                    if (bot != null)
+                        accepted |= bot.ServerNotifyFlowStageStarted(notice);
+                }
+
                 Debug.Log($"[SceneFlow] {Tag} 시작 알림 {notice} rev {_noticeRevision} → 상대 {(accepted ? "수락" : "확인만")} (상대 단계 {_bot.SparringStage}, 판정 창 {_castWindow.Mode})");
             }
         }
@@ -212,43 +240,56 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         Debug.Log($"[SceneFlow] {Tag} T50 자유 연습 허수아비 정리({reason}) — 디스폰 {despawned}");
     }
 
-    private void BeginServer()
+    private void BeginServer(LobbyTutorialActivity activity)
     {
         _link.BeginRound();
         _castWindow.Reset();
         _pendingReports.Clear();
 
-        if (_bot == null || !_bot.IsSpawned)
-            _bot = SpawnBotServer();
-        else
-            Debug.Log($"[SceneFlow] {Tag} 훈련 상대 재사용 — {_bot.name}");
+        var count = LobbySparringLink.SpawnCountFor(activity, _director.ServerTrainingRoster.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var bot = SpawnBotServer(i, count);
+            if (bot == null)
+                continue;
 
-        if (_bot == null)
+            bot.ServerConfigureArena(arena != null ? arena.ResetPoint : null, arena != null ? arena.DesignatedWalls : null);
+            bot.ServerDelayFirstAttack(LobbySparringLink.FirstAttackDelay(_bots.Count, counterBotStaggerSeconds));
+            Subscribe(bot);
+            _link.RegisterCounterBot(bot.NetworkObjectId);
+            _bots.Add(bot);
+        }
+
+        if (_bots.Count == 0)
         {
             Debug.LogError($"{Tag} 훈련 상대를 스폰하지 못했다 — 간파 훈련을 끝낼 수 없다(프리팹·NetworkPrefabs 확인).", this);
             return;
         }
 
-        _bot.ServerConfigureArena(arena != null ? arena.ResetPoint : null, arena != null ? arena.DesignatedWalls : null);
-        Subscribe(_bot);
+        _bot = _bots[0];
         SyncPlayerHooks();
-        Debug.Log($"[SceneFlow] {Tag} 간파 훈련 회차 {_link.Round} 시작 — 상대 {_bot.name} @ {_bot.transform.position}, " +
+        Debug.Log($"[SceneFlow] {Tag} 간파 훈련 회차 {_link.Round} 시작 — 상대 {_bots.Count}마리(첫 봇 {_bot.name} @ {_bot.transform.position}), " +
                   $"C 위치 {(arena != null && arena.ResetPoint != null ? arena.ResetPoint.position.ToString() : "(없음 — 제자리)")}, " +
                   $"지정 벽 {(arena != null && arena.DesignatedWalls != null ? arena.DesignatedWalls.Length : 0)}개");
     }
 
-    private TrainingSparringBot SpawnBotServer()
+    private TrainingSparringBot SpawnBotServer(int index, int count)
     {
         if (sparringPrefab == null)
             return null;
 
         var point = arena != null ? arena.SpawnPoint : null;
-        var position = point != null ? point.position : transform.position;
+        var origin = point != null ? point.position : transform.position;
         var rotation = point != null ? Quaternion.Euler(0f, point.eulerAngles.y, 0f) : Quaternion.identity;
+        LobbySparringLink.CounterBotSlot(index, count, counterBotSpacing, counterBotMaxRowWidth, counterBotRowSpacing, counterBotMaxDepth, out var x, out var z);
+        var position = origin + rotation * new Vector3(x, 0f, z);
+        if (NavMesh.SamplePosition(position, out var hit, 1f, NavMesh.AllAreas))
+            position = hit.position;
+
         var go = Instantiate(sparringPrefab, position, rotation);
         // 활성 씬이 로비가 아닐 때도 로비 씬과 같이 정리되게 진행기의 씬으로 옮긴다.
         SceneManager.MoveGameObjectToScene(go, gameObject.scene);
-        go.name = $"{sparringPrefab.name}_Train03";
+        go.name = $"{sparringPrefab.name}_Train03_{index}";
         var no = go.GetComponent<NetworkObject>();
         var bot = go.GetComponent<TrainingSparringBot>();
         if (no == null || bot == null)
@@ -262,6 +303,46 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         return bot;
     }
 
+    // T32 진입 — 마지막에 간파된 봇만 남기고 나머지를 정리한다. 남은 봇이 이후 단계를 그대로 잇는다.
+    private void KeepSurvivorBotServer()
+    {
+        if (_bots.Count <= 1 || !_link.TryPickSurvivor(out var survivorId))
+            return;
+
+        var survivor = _bot;
+        foreach (var bot in _bots)
+        {
+            if (bot != null && bot.NetworkObjectId == survivorId)
+                survivor = bot;
+        }
+
+        var removed = 0;
+        foreach (var bot in _bots)
+        {
+            if (bot != survivor && ReleaseBotServer(bot))
+                removed++;
+        }
+
+        _bots.Clear();
+        _bots.Add(survivor);
+        _bot = survivor;
+        Debug.Log($"[SceneFlow] {Tag} T32 진입 — {survivor.name} 만 남김(디스폰 {removed}마리)");
+    }
+
+    // 구독 해제 + 살아 있으면 디스폰 — T40 에서 처치된 상대는 사망 연출 뒤 스스로 디스폰한다.
+    private bool ReleaseBotServer(TrainingSparringBot bot)
+    {
+        if (bot == null)
+            return false;
+
+        Unsubscribe(bot);
+        if (!bot.IsSpawned || bot.CurrentHealth <= 0)
+            return false;
+
+        bot.NetworkObject.Despawn(true);
+        return true;
+    }
+
     private void EndServer(string reason)
     {
         var round = _link.Round;
@@ -271,21 +352,17 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         _pendingReports.Clear();
         UnhookAllPlayers();
 
-        var despawned = false;
-        if (_bot != null)
+        var despawned = 0;
+        foreach (var bot in _bots)
         {
-            Unsubscribe(_bot);
-            // 살아 있는 상대만 — T40 에서 처치된 상대는 사망 연출 뒤 스스로 디스폰한다.
-            if (_bot.IsSpawned && _bot.CurrentHealth > 0)
-            {
-                _bot.NetworkObject.Despawn(true);
-                despawned = true;
-            }
-
-            _bot = null;
+            if (ReleaseBotServer(bot))
+                despawned++;
         }
 
-        Debug.Log($"[SceneFlow] {Tag} 간파 훈련 정리({reason}) — 회차 {round}, 마지막 보고 {reported}, 상대 디스폰 {despawned}");
+        _bots.Clear();
+        _bot = null;
+
+        Debug.Log($"[SceneFlow] {Tag} 간파 훈련 정리({reason}) — 회차 {round}, 마지막 보고 {reported}, 상대 디스폰 {despawned}마리");
     }
 
     // ─── 서버: "새 시전" 판정 창 ─────────────────────────────────────────
@@ -435,7 +512,20 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
         bot.ServerSuppressHasteDue -= HandleBotSuppressHasteDue;
     }
 
-    private void HandleBotStageCompleted(LobbyTutorialActivity completed) => _pendingReports.Enqueue(completed);
+    // T31 = 봇마다 오지만 진행기엔 전원 간파 순간 1회만. 그 밖 단계는 남은 봇 1마리뿐이다.
+    private void HandleBotStageCompleted(TrainingSparringBot bot, LobbyTutorialActivity completed)
+    {
+        if (completed != LobbyTutorialActivity.Counter)
+        {
+            _pendingReports.Enqueue(completed);
+            return;
+        }
+
+        var allDone = _link.TryRecordCounterSuccess(bot.NetworkObjectId);
+        Debug.Log($"[SceneFlow] {Tag} T31 간파 {_link.CounteredBotCount}/{_link.CounterBotCount} — {bot.name}");
+        if (allDone)
+            _pendingReports.Enqueue(completed);
+    }
 
     private void HandleBotCrowdControlApplied(int episode, TrainingSparringCrowdControl kinds, bool applied) =>
         _castWindow.RecordCrowdControl(Time.frameCount, episode, kinds, applied);
