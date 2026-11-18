@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 /// <summary>
 /// [서버] 간파 훈련(T31~T40) 진행기 ↔ 훈련 상대 연결 규칙(할 일 86 T5c → 157 ⑦). NGO·MonoBehaviour 의존 없는 순수 클래스(EditMode 테스트 대상).
 /// 실행은 <see cref="LobbyTrainingSparring"/> — 여기는 "언제 한 번만 하나"만 정한다.
@@ -7,10 +10,16 @@
 /// <item>완료 보고: 상대 모델의 단계 완료를 진행기에 1회(<see cref="TryAcceptReport"/>). 진행기의 지금 단계와 같을 때만 — 어긋남·중복·역순은 무시.</item>
 /// <item>T33 위치 복귀의 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>, Q10 A): 회차당 1회(<see cref="TryConsumePracticeReset"/>).</item>
 /// <item>단계 안 사건 무전(TRAIN_03_COUNTER/WALL/COMBAT)은 없앴다(157 Q6 A — 명세 §3.3 중복 대사 금지, 문구 키는 보존).</item>
+/// <item>T31 봇 여러 마리(할 일 303): 회차에 등록한 봇이 모두 간파되는 순간 1회만 완료(<see cref="TryRecordCounterSuccess"/> — 팀 합산, 누가 몇 마리든 무관).
+/// T32 부터는 마지막에 간파된 봇 1마리만 남는다(<see cref="TryPickSurvivor"/>).</item>
 /// </list>
 /// </summary>
 public sealed class LobbySparringLink
 {
+    readonly List<ulong> _counterBots = new List<ulong>();
+    readonly HashSet<ulong> _counteredBots = new HashSet<ulong>();
+    bool _hasLastCountered;
+    ulong _lastCountered;
     LobbyTutorialActivity _notified = LobbyTutorialActivity.None;
     LobbyTutorialActivity _reported = LobbyTutorialActivity.None;
     bool _practiceResetDone;
@@ -68,7 +77,57 @@ public sealed class LobbySparringLink
         _notified = LobbyTutorialActivity.None;
         _reported = LobbyTutorialActivity.None;
         _practiceResetDone = false;
+        _counterBots.Clear();
+        _counteredBots.Clear();
+        _hasLastCountered = false;
         return true;
+    }
+
+    // ─── T31 봇 여러 마리(할 일 303) ─────────────────────────────────────
+
+    /// <summary>회차 시작 때 스폰할 봇 수 — T31 로 시작하면 배치 칸 수(최소 1), 그 밖(이미 지난 단계에서 시작)은 1.</summary>
+    public static int SpawnCountFor(LobbyTutorialActivity activity, int counterSlots) =>
+        activity == LobbyTutorialActivity.Counter ? Math.Max(1, counterSlots) : 1;
+
+    /// <summary>봇별 첫 공격 지연(초) — 간파 창이 완전히 겹치지 않게 순번만큼 늦춘다.</summary>
+    public static float FirstAttackDelay(int index, float staggerSeconds) => Math.Max(0, index) * Math.Max(0f, staggerSeconds);
+
+    /// <summary>이 단계 알림부터 봇 1마리만 남는가 — T32 이후.</summary>
+    public static bool KeepsSingleBot(LobbyTutorialActivity notice) =>
+        IsSparringStage(notice) && notice != LobbyTutorialActivity.Counter;
+
+    /// <summary>이번 회차 봇 수.</summary>
+    public int CounterBotCount => _counterBots.Count;
+
+    /// <summary>지금까지 간파된 봇 수.</summary>
+    public int CounteredBotCount => _counteredBots.Count;
+
+    /// <summary>이번 회차 봇 등록(스폰 직후).</summary>
+    public void RegisterCounterBot(ulong botId)
+    {
+        if (IsRoundActive && !_counterBots.Contains(botId))
+            _counterBots.Add(botId);
+    }
+
+    /// <summary>
+    /// 봇 하나의 T31 간파 성공 기록. 이번 기록으로 등록한 봇이 모두 간파됐으면 true — 진행기 보고는 이때 1회만.
+    /// 회차 밖·등록 안 된 봇·같은 봇 중복은 false.
+    /// </summary>
+    public bool TryRecordCounterSuccess(ulong botId)
+    {
+        if (!IsRoundActive || !_counterBots.Contains(botId) || !_counteredBots.Add(botId))
+            return false;
+
+        _hasLastCountered = true;
+        _lastCountered = botId;
+        return _counteredBots.Count == _counterBots.Count;
+    }
+
+    /// <summary>T32 이후 남길 봇 — 마지막에 간파된 봇, 간파 기록이 없으면(단계 건너뛰기) 처음 등록한 봇. 봇이 없으면 false.</summary>
+    public bool TryPickSurvivor(out ulong botId)
+    {
+        botId = _hasLastCountered ? _lastCountered : _counterBots.Count > 0 ? _counterBots[0] : 0UL;
+        return _hasLastCountered || _counterBots.Count > 0;
     }
 
     /// <summary>회차 끝(간파 훈련 이탈·진행기 디스폰). 진행 중이 아니었으면 false.</summary>

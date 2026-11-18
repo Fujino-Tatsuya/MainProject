@@ -53,26 +53,38 @@ public sealed class LobbyTutorialStepTableTests
     }
 
     [Test]
-    public void T20_은_3초_카운트다운과_T21_표시_상태를_가진다()
+    public void T20_은_1초_카운트다운과_T21_표시_상태를_가진다()
     {
         var table = LoadAsset();
         var t20 = table[table.IndexOf("T20_CombatGather")];
 
         Assert.That(t20.kind, Is.EqualTo(LobbyTutorialStepKind.Gather));
-        Assert.That(t20.holdSeconds, Is.EqualTo(3f));
+        Assert.That(t20.holdSeconds, Is.EqualTo(1f), "할 일 303");
         Assert.That(t20.countdownStateId, Is.EqualTo("T21_CombatCountdown"));
         Assert.That(t20.countdownObjectiveKey, Is.EqualTo("LOBBY_OBJ_COMBAT"));
     }
 
     [Test]
-    public void 나머지_집결은_유지_0_3초()
+    public void 훈련장_입구_전투_간파_집결은_1초_나머지는_0_3초()
     {
+        var oneSecond = new HashSet<string> { "L20_TrainingGather", "T20_CombatGather", "T30_CounterGather" };   // 할 일 303
         var table = LoadAsset();
         foreach (var step in table.Steps)
         {
-            if (step.kind == LobbyTutorialStepKind.Gather && step.stateId != "T20_CombatGather")
-                Assert.That(step.holdSeconds, Is.EqualTo(0.3f).Within(1e-4f), step.stateId);
+            if (step.kind == LobbyTutorialStepKind.Gather)
+                Assert.That(step.holdSeconds, Is.EqualTo(oneSecond.Contains(step.stateId) ? 1f : 0.3f).Within(1e-4f), step.stateId);
         }
+    }
+
+    [Test]
+    public void L34_대사_행은_입력_잠금이_끝_여유_포함_3초()
+    {
+        var table = LoadAsset();
+        var l34 = table[table.IndexOf("L34_SortieIntro")];
+        var seconds = LobbyTutorialRules.DialogueSeconds(l34.dialogueSeconds, 0f, "무시되는 문구", 2f, 0.08f, 3f, 0.5f);
+
+        Assert.That(l34.dialogueSeconds, Is.EqualTo(2.5f), "할 일 303");
+        Assert.That(seconds, Is.EqualTo(3d).Within(1e-4d));
     }
 
     [Test]

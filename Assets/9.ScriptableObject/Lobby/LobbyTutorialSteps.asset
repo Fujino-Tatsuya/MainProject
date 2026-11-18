@@ -95,7 +95,7 @@ MonoBehaviour:
     countdownObjectiveKey: 
     countdownProgressKey: 
     gatherPoint: 1
-    holdSeconds: 0.3
+    holdSeconds: 1
     pathId: PATH_TRAINING_HALL
     targetWallId: 
     dialogueId: 
@@ -170,7 +170,7 @@ MonoBehaviour:
     countdownObjectiveKey: LOBBY_OBJ_COMBAT
     countdownProgressKey: LOBBY_PROGRESS_COUNTDOWN
     gatherPoint: 4
-    holdSeconds: 3
+    holdSeconds: 1
     pathId: PATH_COMBAT_AREA
     targetWallId: 
     dialogueId: 
@@ -216,7 +216,7 @@ MonoBehaviour:
     countdownObjectiveKey: 
     countdownProgressKey: 
     gatherPoint: 5
-    holdSeconds: 0.3
+    holdSeconds: 1
     pathId: PATH_COUNTER_AREA
     targetWallId: 
     dialogueId: 
@@ -434,7 +434,7 @@ MonoBehaviour:
     dialogueId: LOBBY_BRIEF_SORTIE
     speakerKey: LOBBY_SPEAKER_SUPERVISOR
     backgroundId: 
-    dialogueSeconds: 0
+    dialogueSeconds: 2.5
     locksInput: 1
     requiredSkillTags: 
     trainingProfile: 0

@@ -55,6 +55,18 @@ public static class LobbyTutorialUiStrings
     public static readonly UiString TagStun = new UiString(P + "TagStun", "[기절]", Where + "문구 안 {tag:Stun} 표기(색 = SkillTooltipTagStyles)");
     public static readonly UiString TagSuppress = new UiString(P + "TagSuppress", "[제압]", Where + "문구 안 {tag:Suppress} 표기(색 = 인스펙터)");
 
+    public static readonly UiString CounterPrompt = new UiString(P + "CounterPrompt", "우클릭!", "3.LobbyScene › 간파 훈련 봇 머리 우상단 — 간파 창이 열린 동안(T31~T40, LobbyCounterPrompt)");
+
+    /// <summary>Strings 시트에 <see cref="CounterPrompt"/> 행이 생기기 전의 영어 문구 — 행이 있으면 시트가 이긴다(할 일 303).</summary>
+    public const string CounterPromptEnFallback = "RMB!";
+
+    /// <summary>시트에 행이 없을 때 쓸 문구(언어별).</summary>
+    public static string CounterPromptFallback(GameLanguage language) =>
+        language == GameLanguage.En ? CounterPromptEnFallback : CounterPrompt.Ko;
+
+    /// <summary>"우클릭!" 표시 문구 — 현재 언어.</summary>
+    public static string CounterPromptText => CounterPrompt.TextOr(CounterPromptFallback(Loc.Current));
+
     public static readonly UiString SpeakerSupervisor = new UiString(G + "LOBBY_SPEAKER_SUPERVISOR", "감독관", DialogueWhere + "이름표(임시 — 고유 이름이 정해지면 문구만 교체)");
 
     public static readonly UiString DlgCentralIntro = new UiString(G + "LOBBY_DLG_INTRO", "이번에 새로 온 신입들인가? 좋아. 실력 좀 볼까. 훈련장으로 와.", DialogueWhere + "L11 중앙 첫 대면");
@@ -78,6 +90,7 @@ public static class LobbyTutorialUiStrings
         ChapterBriefing, ChapterSortie, ObjGatherSortie,
         ProgressGather, ProgressPartyDone, ProgressCountdown,
         TagKnockback, TagStun, TagSuppress,
+        CounterPrompt,
         SpeakerSupervisor,
         DlgCentralIntro, DlgTrainingIntro, DlgBrief01, DlgBrief02, DlgBrief03, DlgBrief04,
     };

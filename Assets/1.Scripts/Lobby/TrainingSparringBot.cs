@@ -110,8 +110,8 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public event Action ServerSuppressHasteDue;
     /// <summary>[서버] 상대 사망. 인자 = 모델이 완료로 인정했는가(false = 처치 방지 누락).</summary>
     public event Action<bool> ServerSparringDied;
-    /// <summary>[서버] 모델 단계 완료(T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring.</summary>
-    public event Action<LobbyTutorialActivity> ServerStageCompleted;
+    /// <summary>[서버] 모델 단계 완료(이 봇, T31 Counter·T32 VulnerableCc·T34 Wall·T40 SuppressKill, 완료마다 1회) — 진행기 보고는 LobbyTrainingSparring(T31 은 봇 전원이 끝났을 때 1회, 할 일 303).</summary>
+    public event Action<TrainingSparringBot, LobbyTutorialActivity> ServerStageCompleted;
     /// <summary>[서버] T33 위치 복귀 실행 완료 — 진행기가 플레이어 쪽 리셋(<see cref="TrainingResetOptions.PracticeReset"/>)을 이어 건다(Q10 A).</summary>
     public event Action ServerResetExecuted;
 
@@ -165,13 +165,24 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     protected override bool FaceTargetWhileAttacking => false;
 
     #region 수명
-    /// <summary>[모든 피어] 스폰된 훈련 상대(없으면 null) — 로비 튜토리얼 파사드(<see cref="LobbyTutorialState.TrainingTarget"/>)가 읽는다.</summary>
-    public static TrainingSparringBot Current { get; private set; }
+    static readonly List<TrainingSparringBot> s_spawned = new List<TrainingSparringBot>();
+    LobbyCounterPrompt _counterPrompt;
+
+    /// <summary>
+    /// [모든 피어] 스폰된 훈련 상대(없으면 null) — 로비 튜토리얼 파사드(<see cref="LobbyTutorialState.TrainingTarget"/>)가 읽는다.
+    /// T31 은 여러 마리(가장 나중에 스폰된 봇), T32 부터는 남은 1마리(할 일 303).
+    /// </summary>
+    public static TrainingSparringBot Current => s_spawned.Count > 0 ? s_spawned[s_spawned.Count - 1] : null;
+
+    // 도메인 리로드 없는 Play 진입에서 지난 세션 봇이 남지 않게.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSpawned() => s_spawned.Clear();
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        Current = this;
+        s_spawned.Add(this);
+        _counterPrompt = LobbyCounterPrompt.Attach(this);
         _vulnerableVisual.OnValueChanged += OnVulnerableVisualChanged;
         ApplyVulnerableTint(_vulnerableVisual.Value);
 
@@ -192,9 +203,16 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     public override void OnNetworkDespawn()
     {
         _vulnerableVisual.OnValueChanged -= OnVulnerableVisualChanged;
-        if (Current == this)
-            Current = null;
+        s_spawned.Remove(this);
+        if (_counterPrompt != null)
+            Destroy(_counterPrompt);
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>[서버] 첫 공격을 늦춘다 — T31 봇끼리 간파 창이 완전히 겹치지 않게(할 일 303). 스폰 뒤 1회.</summary>
+    public void ServerDelayFirstAttack(float seconds)
+    {
+        if (IsServer) DelayFirstAttack(seconds);
     }
 
     /// <summary>[서버] 씬 배치 주입(스폰한 프리팹은 씬 콜라이더를 직렬화로 못 가리킨다). null 이면 그 항목은 그대로.</summary>
@@ -885,7 +903,7 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
         while (_model.TryConsumeStageReport(out LobbyTutorialActivity completed))
         {
             Debug.Log($"{Tag} 단계 완료 — {completed}", this);
-            ServerStageCompleted?.Invoke(completed);
+            ServerStageCompleted?.Invoke(this, completed);
         }
 
         if (_stage.Value != _model.Stage) _stage.Value = _model.Stage;

@@ -110,7 +110,7 @@ public static class LobbyTutorialCountdownDisplay
 
     /// <summary>
     /// 옛 집결 상태 표시(<see cref="PartyGatherStatusView"/>)가 보일 남은 초(할 일 157 ⑩) — 튜토리얼 진행 중이면 카운트다운 표시 행(T20)의 활성 구역만,
-    /// 그 밖 구역(유지 0.3초 집결·L40 출격·시연 즉시 출격)은 0 = 카운트다운 표시 없음(Q8 A). 진행기가 없으면 옛 동작(구역 카운트다운 그대로).
+    /// 그 밖 구역(카운트다운 표시가 없는 집결·L40 출격·시연 즉시 출격)은 0 = 카운트다운 표시 없음(Q8 A). 진행기가 없으면 옛 동작(구역 카운트다운 그대로).
     /// </summary>
     public static double ZoneStatusCountdownSeconds(bool tutorialAvailable, bool isTutorialActiveZone, double tutorialCountdownSeconds,
         bool zoneCountdownActive, double zoneRemainingSeconds)
@@ -120,7 +120,7 @@ public static class LobbyTutorialCountdownDisplay
         return zoneCountdownActive ? Math.Max(0d, zoneRemainingSeconds) : 0d;
     }
 
-    /// <summary>'시작까지 {n}' 의 n — 남은 초 올림(3초 유지 = 3→2→1), 0 미만은 0.</summary>
+    /// <summary>'시작까지 {n}' 의 n — 남은 초 올림(유지 3초면 3→2→1), 0 미만은 0.</summary>
     public static int WholeSecondsLeft(double remainingSeconds) =>
         remainingSeconds > 0d ? (int)Math.Ceiling(remainingSeconds) : 0;
 }
@@ -195,7 +195,7 @@ public static class LobbyTutorialState
     public static string ActivePathId => IsAvailable && !_snapshot.LaunchCommitted ? _current.PathId : string.Empty;
     public static string ActiveTargetWallId => IsAvailable && !_snapshot.LaunchCommitted ? _current.TargetWallId : string.Empty;
 
-    /// <summary>카운트다운 표시 상태일 때만 남은 초, 아니면 0(유지 0.3초는 표시하지 않는다).</summary>
+    /// <summary>카운트다운 표시 상태일 때만 남은 초, 아니면 0(다른 집결은 표시하지 않는다).</summary>
     public static double CountdownRemainingSeconds => IsCountdownDisplay ? ActiveGatherZone.CountdownRemainingSeconds : 0d;
 
     public static LobbyTutorialDialogueView Dialogue => _dialogue;

@@ -17,14 +17,14 @@ exe 실행 → 타이틀(1.TitleScene) — 아무 키 → 모니터 메뉴 → S
 ```
 - 단계·판정 상세 = [lobby-training.md](lobby-training.md)(단계표 L00~L41·서버 상태·Play 확인), 표시 계약 = [handoff-lobby-tutorial-contract.md](handoff-lobby-tutorial-contract.md).
 - **튜토리얼은 기본 흐름이다**(할 일 157 Q2) — 기본 설정에선 브리핑이 끝나야 출격 집결이 켜진다. 훈련 없이 바로 출격하려면 `LobbyRules.asset` 의 시연 플래그 `allowInstantSortie`(기본 **꺼짐**)를 켠다 — 켜면 중앙 집결 확정 전(L00·L10)에도 출격 구역이 켜진다. QA 는 Alt+1(클리어 플래그, [debug-hotkeys.md](debug-hotkeys.md)).
-- **준비 F·준비 n/m·로비 카운트다운 표시는 없다** — 집결 구역에 서 있으면 준비다. 집결 유지는 0.3초(전투 훈련 시작만 3초 카운트다운)이고, 출격 카운트다운 표시는 없다. 메인 진입은 `LobbyTrainingDirector` 가 출격 확정 때 1회.
+- **준비 F·준비 n/m·로비 카운트다운 표시는 없다** — 집결 구역에 서 있으면 준비다. 집결 유지는 0.3초(훈련장 입구·전투 훈련 시작·간파 훈련 집결은 1초, 그중 전투 훈련 시작만 카운트다운 표시)이고, 출격 카운트다운 표시는 없다. 메인 진입은 `LobbyTrainingDirector` 가 출격 확정 때 1회.
 - 집결 중에도 공격·스킬·대시·상호작용은 막지 않는다(사용자 결정 2026-10-22). 집결 인원은 쓰러진 사람을 세지 않는다(판정은 서버).
 - 튜토리얼 도중(중앙 집결 확정 뒤) 접속한 사람은 로비에서 기다리고(목표 패널 없음) 출격 인원에 들어간다. 단 **브리핑 진행 중에는 접속자 전원(늦게 들어온 사람 포함)의 이동·공격·스킬·대시·F 가 잠기고**, 끝나면 풀리며 출격 집결이 켜진다([lobby-training.md](lobby-training.md) §5 브리핑). **출격 집결 카운트다운 중·출격 확정(메인 로딩) 뒤에는 접속을 거절**한다(아래 "게임 진행 중").
 - **호스트·클라 모두 부팅 직후 타이틀을 한 번 거친다**(할 일 70, 2026-10-21). 타이틀 UI·입력은 평소 그대로(SETTING·EXIT 도 그대로)이고, **START 의 시작 연출이 끝나면** 수동 로비 대신 대기 화면 → 호스팅/자동 접속으로 간다. START 를 누르기 전엔 접속을 시도하지 않는다 — 클라 PC 도 **각자 START 를 눌러야** 붙는다.
 - 판 끝 로비 복귀·끊김 뒤 재접속 대기(6.DemoConnectScene)는 **타이틀을 다시 거치지 않는다**(세션 유지·판 도중 재합류를 지키려고). 타이틀은 exe 실행당 한 번뿐이다.
 - 5.ResultScene 은 없다(Build Settings 에서도 뺐다 — 결과는 로비 패널).
 - 판이 끝나도 연결과 고른 캐릭터는 그대로, 로비 튜토리얼은 **매 회차 라커 방문(L00)부터**(훈련을 끝낸 사람도 — 완료 자동 통과 없음, 할 일 157 Q3).
-- 수치: 집결 유지 = 단계표 `LobbyTutorialSteps.asset` 행 `holdSeconds`(기본 0.3초), 상호작용 반경 2m·시연 플래그 = `Assets/9.ScriptableObject/Lobby/LobbyRules.asset`(옛 `gatherHoldSeconds` 칸은 미사용).
+- 수치: 집결 유지 = 단계표 `LobbyTutorialSteps.asset` 행 `holdSeconds`(기본 0.3초, L20·T20·T30 = 1초), 상호작용 반경 2m·시연 플래그 = `Assets/9.ScriptableObject/Lobby/LobbyRules.asset`(옛 `gatherHoldSeconds` 칸은 미사용).
 
 ## 2. 설정 파일 — 모든 PC 에 같은 파일 하나 (호스트 1대 + 클라 최대 2대)
 1. **모든 PC 에 같은 빌드**를 깐다(§3).

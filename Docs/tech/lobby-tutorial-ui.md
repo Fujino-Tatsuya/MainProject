@@ -146,10 +146,15 @@
 명세 화면 01–27(21장면)의 목표·대사·삽화·경로 ID·벽 표식(화면 17)·라커룸 테두리(라커 경로 장면)를 순서대로 재현한다. 단축키 없음, `UNITY_EDITOR || DEVELOPMENT_BUILD` 에서만 동작.
 `partySize`(기본 3) = 진행 분모, `wallId` = 화면 17 에서 켤 벽 ID(기본 `WALL_TRAIN_WEST`).
 
+## 간파 가능 표시 — `LobbyCounterPrompt` (할 일 303)
+
+훈련 봇마다 머리 우상단 스크린 UI(`OverheadHealthBarCanvas` 아래). 조건·흐름은 [lobby-training.md](lobby-training.md) §간파 훈련. 위치·크기·펄스 = `Resources/Lobby/LobbyCounterPromptSettings.asset`. CombatHUD·튜토리얼 UI 프리팹은 건드리지 않는다.
+
 ## 문구 키 — `LobbyTutorialUiStrings`
 
 `Tutorial.Guide.LOBBY_*`(157 계약과 같은 id — 제목·지시문·설명·체크·진행·화자·대사) + 158 전용 `UI.Lobby.Tutorial.Tag*`(`{tag:ID}` 표기 3개).
 `UiStrings.All` 에 들어가 Export Template 이 키를 모은다. Strings 시트 행은 `GameData.xlsx` SVN r570 에 들어갔다(`LOBBY_*` 41행 + `UI.Lobby.Tutorial.Tag*` 3행). 시트에 없는 키는 ko 가 화면 폴백.
+`UI.Lobby.Tutorial.CounterPrompt`(303, ko `우클릭!` · en `RMB!`)는 시트 행 추가 전이다 — 그동안 코드 폴백으로 두 언어 모두 나온다. 행을 넣을 땐 en 칸을 꼭 채운다(빈 en 은 ko 로 표시).
 157 은 같은 id 를 `TutorialGuideTexts` SO 에도 둔다(지속시간·어댑터용). Export 는 같은 키를 처음 것만 남기므로 행이 둘 생기지 않는다.
 단 ko 폴백 문구가 다르다 — 158 은 `LOBBY_OBJ_VULN_CC`·`LOBBY_OBJ_WALL`·`LOBBY_BODY_SUPPRESS` 에 `{tag:Knockback}`·`{tag:Stun}`·`{tag:Suppress}` 자리표시자(색 태그),
 157 SO 는 `[넉백]` 같은 평문. 시트 행을 만들 때 `{tag:…}` 쪽으로 맞춰야 색이 나온다.
@@ -167,7 +172,7 @@
 
 ## 검증
 
-- EditMode(맵씬 러너 `Tools/Tests/맵씬 EditMode 테스트 실행`, 픽스처 `^LobbyTutorialUi\w*Tests$`): `LobbyTutorialUiRulesTests`·`LobbyTutorialUiPathSetTests`·`LobbyTutorialUiGatherBorderTests`·`LobbyTutorialUiBinderTests`.
-- **사람이 Play 확인(바인더·씬)**: L00 부터 목표 패널 문구·T10 체크/훈련 완료 n/N·집결 n/N·T21 '시작까지 3·2·1'·대사 패널(L11·L21·L34)·L31 브리핑 영상(전체 화면·Esc 건너뛰기 n/m, 292)·대사·영상 중 목표 숨김·단계별 바닥 경로 하나만·옛 3스텝 화살표가 튜토리얼 중 안 보임·상단 파티 슬롯/집결/왼쪽 칸 안 보임·상단 `TutorialGuideUI` 에 튜토리얼 문구가 안 뜸·캐릭터 선택(라커) 정상·늦은 참가자 목표 숨김. 경로 점 위치는 임시.
+- EditMode(맵씬 러너 `Tools/Tests/맵씬 EditMode 테스트 실행`, 픽스처 `^LobbyTutorialUi\w*Tests$`): `LobbyTutorialUiRulesTests`·`LobbyTutorialUiPathSetTests`·`LobbyTutorialUiGatherBorderTests`·`LobbyTutorialUiBinderTests`·`LobbyTutorialUiCounterPromptTests`.
+- **사람이 Play 확인(바인더·씬)**: L00 부터 목표 패널 문구·T10 체크/훈련 완료 n/N·집결 n/N·T21 '시작까지 1'·대사 패널(L11·L21·L34)·L31 브리핑 영상(전체 화면·Esc 건너뛰기 n/m, 292)·대사·영상 중 목표 숨김·단계별 바닥 경로 하나만·옛 3스텝 화살표가 튜토리얼 중 안 보임·상단 파티 슬롯/집결/왼쪽 칸 안 보임·상단 `TutorialGuideUI` 에 튜토리얼 문구가 안 뜸·캐릭터 선택(라커) 정상·늦은 참가자 목표 숨김. 경로 점 위치는 임시.
 - **사람이 Play 확인**: 1920×1080·1280×720·21:9·4:3 Game 뷰에서 목표 패널이 미니맵·특성·체력·스킬·키 가이드와 안 겹치는지, 대사 인물화가 키 가이드·스킬을 안 가리는지,
   디버그 구동으로 화면 01–27 대조(Scene_01/02 매핑 포함), 민트 테두리 = 트리거 박스(Scene 뷰 기즈모와 겹쳐 보기), 벽 표식 밝기·떠 보임, `□`/`■` 글리프 표시.
