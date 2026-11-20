@@ -170,6 +170,17 @@ public sealed class TrainingSparringBot : MonsterBase, IInterruptSlowMotionTarge
     protected override bool AutoHitReactions => false;
     protected override bool FaceTargetWhileAttacking => false;
 
+    // 스폰 뒤 회전 잠금 — 켜면 스폰 방향 그대로 서서 친다(대기 중 돌아보기·공격 직전 조준 모두 없음).
+    // 위치 복귀(C 위치)의 방향 맞춤은 순간이동이라 그대로 적용된다. 서버만 회전을 정하고 NetworkTransform 이 복제한다.
+    bool _facingLocked;
+    protected override bool BodyRotationLocked => _facingLocked || base.BodyRotationLocked;
+
+    /// <summary>[서버] 몸 회전 잠금을 켜고 끈다. 스폰 직후 진행기가 1회 부른다.</summary>
+    public void ServerLockFacing(bool locked)
+    {
+        if (IsServer) _facingLocked = locked;
+    }
+
     #region 수명
     static readonly List<TrainingSparringBot> s_spawned = new List<TrainingSparringBot>();
     LobbyCounterPrompt _counterPrompt;

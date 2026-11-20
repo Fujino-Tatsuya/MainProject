@@ -56,6 +56,9 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
     [Tooltip("봇마다 첫 공격을 이만큼씩 늦춘다(초) — 간파 창(훈련 2초)이 완전히 겹치지 않게.")]
     [SerializeField, Min(0f)] private float counterBotStaggerSeconds = 0.7f;
 
+    [Tooltip("켜면 봇이 스폰 방향 그대로 서서 돌지 않는다 — 플레이어 쪽으로 돌아보지 않고, 공격도 정면으로만 한다. T32 부터 남는 봇도 같다.")]
+    [SerializeField] private bool counterBotLockFacing = true;
+
     // 서버
     private LobbyTrainingDirector _director;
     private readonly LobbySparringLink _link = new LobbySparringLink();
@@ -254,6 +257,7 @@ public sealed class LobbyTrainingSparring : NetworkBehaviour
                 continue;
 
             bot.ServerConfigureArena(arena != null ? arena.ResetPoint : null, arena != null ? arena.DesignatedWalls : null);
+            bot.ServerLockFacing(counterBotLockFacing);
             bot.ServerDelayFirstAttack(LobbySparringLink.FirstAttackDelay(_bots.Count, counterBotStaggerSeconds));
             Subscribe(bot);
             _link.RegisterCounterBot(bot.NetworkObjectId);

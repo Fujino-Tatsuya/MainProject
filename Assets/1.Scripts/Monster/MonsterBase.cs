@@ -1119,8 +1119,9 @@ public class MonsterBase : Unit, IInterruptJudgeTarget
     /// <b>머리 본만</b> 돌려서 한다. 발사 방향은 몸통과 무관하다 —
     /// <c>MonsterRangedAttack</c> 은 <c>targetPoint - origin</c> 으로 쏘므로 영향이 없다
     /// (<c>transform.forward</c> 는 타깃이 원점과 겹칠 때의 폴백일 뿐이다).
+    /// 로비 간파 훈련봇(<c>TrainingSparringBot</c>)도 스폰 뒤 회전을 잠그려고 재정의한다.
     /// </summary>
-    protected bool BodyRotationLocked =>
+    protected virtual bool BodyRotationLocked =>
         data != null && data.archetype == MonsterArchetype.RangedTurret;
 
     /// <summary>
