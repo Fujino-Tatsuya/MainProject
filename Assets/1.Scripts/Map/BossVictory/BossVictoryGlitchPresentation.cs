@@ -704,6 +704,14 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
     List<BossVictoryClip> DashClips => _profile.timeline.assassinDash;
     bool DashAllDone => BossVictoryAssassinDash.AllDone(DashClips, _dashOrder, _glitchTime);
 
+    // 순간이동 Q 상태의 클립. FindStateClip 은 에디터 전용(빌드에선 늘 null — 이게 빌드에서 어쌔신 이동 트랙이 통째로 안 돌던 원인)이라
+    // 에디터에선 상태에서 찾고(컨트롤러를 바꿔도 따라감), 못 찾으면 프로필에 직접 건 클립을 쓴다.
+    AnimationClip FindTeleportClip(RuntimeAnimatorController controller)
+    {
+        AnimationClip clip = controller != null ? AnimationEventRequirements.FindStateClip(controller, _profile.teleportMoveState) : null;
+        return clip != null ? clip : _profile.teleportMoveClip;
+    }
+
     void StartAssassinDash()
     {
         _finisherSkill = null;
@@ -716,7 +724,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         }
         string state = _profile.teleportMoveState;
         RuntimeAnimatorController controller = _killerAnimator != null ? _killerAnimator.runtimeAnimatorController : null;
-        AnimationClip clip = controller != null ? AnimationEventRequirements.FindStateClip(controller, state) : null;
+        AnimationClip clip = FindTeleportClip(controller);
         if (clip == null)
         {
             Edit.LogError($"[BossVictory] 순간이동 Q 상태 '{state}' 가 {_killer.name} Animator 에 없다(프로필 teleportMoveState).", this);
@@ -817,7 +825,7 @@ public sealed class BossVictoryGlitchPresentation : MonoBehaviour
         else if (k > 0 && dir.sqrMagnitude > 0.0001f && _killer.TryGetComponent(out PlayerMovement facing)) facing.RotateImmediately(dir);
         if (_killerAnimator != null && _killerAnimator.runtimeAnimatorController != null)
         {
-            AnimationClip clip = AnimationEventRequirements.FindStateClip(_killerAnimator.runtimeAnimatorController, _profile.teleportMoveState);
+            AnimationClip clip = FindTeleportClip(_killerAnimator.runtimeAnimatorController);
             float len = clip != null && clip.length > 0f ? clip.length : 1f;
             // 시작 프레임 = Custom0 + 늦게 들어간 만큼(이 단계는 시각이 지난 다음 프레임에 들어온다 — 끊긴 프레임이면 더 늦다, 297).
             float startClip = BossVictoryKillerMoves.SegmentStartClipTime(_dashCustom0, _dashClipSpan, c.start, c.length, _glitchTime);
